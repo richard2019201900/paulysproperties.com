@@ -738,6 +738,7 @@ async function renderProperties(list) {
 window.openUpgradeModal = function(reason, currentTier) {
     $('upgradeReason').textContent = reason;
     $('upgradeCurrentTier').value = currentTier;
+    $('upgradeMessage').value = '';
     
     // Highlight current tier
     ['Starter', 'Pro', 'Elite'].forEach(t => {
@@ -755,10 +756,10 @@ window.openUpgradeModal = function(reason, currentTier) {
     if (dropdown) {
         dropdown.innerHTML = '<option value="">Choose a plan...</option>';
         if (currentTier === 'starter') {
-            dropdown.innerHTML += '<option value="pro">⭐ Pro (3 Listings)</option>';
-            dropdown.innerHTML += '<option value="elite">👑 Elite (Unlimited)</option>';
+            dropdown.innerHTML += '<option value="pro">⭐ Pro - 3 Listings ($25k/month)</option>';
+            dropdown.innerHTML += '<option value="elite">👑 Elite - Unlimited ($50k/month)</option>';
         } else if (currentTier === 'pro') {
-            dropdown.innerHTML += '<option value="elite">👑 Elite (Unlimited)</option>';
+            dropdown.innerHTML += '<option value="elite">👑 Elite - Unlimited ($50k/month)</option>';
         }
     }
     
@@ -766,94 +767,144 @@ window.openUpgradeModal = function(reason, currentTier) {
     openModal('upgradeModal');
 };
 
-window.submitUpgradeRequest = async function(e) {
-    e.preventDefault();
-    
+window.generateUpgradeMessage = function() {
     const user = auth.currentUser;
     if (!user) return;
     
-    const currentTier = $('upgradeCurrentTier').value;
     const requestedTier = $('upgradeRequestedTier').value;
-    const message = $('upgradeMessage').value.trim();
+    const currentTier = $('upgradeCurrentTier').value;
+    const messageBox = $('upgradeMessage');
+    
+    if (!requestedTier) {
+        messageBox.value = '';
+        return;
+    }
+    
+    const tierInfo = {
+        pro: { name: 'Pro', price: '$25,000', listings: '3' },
+        elite: { name: 'Elite', price: '$50,000', listings: 'unlimited' }
+    };
+    
+    const info = tierInfo[requestedTier];
+    const currentTierName = TIERS[currentTier]?.name || 'Starter';
+    const displayName = $('ownerUsername')?.value || user.email.split('@')[0];
+    
+    const message = `Hey Pauly! I'd like to upgrade my PaulysProperties.com account from ${currentTierName} to ${info.name}.
+
+Account: ${user.email}
+Display Name: ${displayName}
+Requested Plan: ${info.name} (${info.listings} listings)
+Monthly Cost: ${info.price}
+
+I'm ready to pay and start listing more properties!`;
+    
+    messageBox.value = message;
+};
+
+window.copyUpgradeMessage = function() {
+    const messageBox = $('upgradeMessage');
     const status = $('upgradeStatus');
     const btn = $('upgradeSubmitBtn');
     
-    if (!requestedTier) {
-        status.textContent = 'Please select a plan.';
+    if (!messageBox.value) {
+        status.textContent = 'Please select a plan first.';
         status.className = 'text-yellow-400 text-sm';
         showElement(status);
         return;
     }
     
-    btn.disabled = true;
-    btn.textContent = 'Submitting...';
-    
-    try {
-        await TierService.submitUpgradeRequest(user.email, currentTier, requestedTier, message);
-        
-        status.textContent = '✓ Request submitted! We\'ll review it shortly and get back to you.';
+    navigator.clipboard.writeText(messageBox.value).then(() => {
+        status.textContent = '✓ Message copied! Now send it to Pauly in-city.';
         status.className = 'text-green-400 text-sm';
         showElement(status);
         
-        btn.textContent = '✓ Submitted';
-        
+        btn.innerHTML = '✓ Copied!';
         setTimeout(() => {
-            closeModal('upgradeModal');
-            btn.disabled = false;
-            btn.textContent = '📩 Request Upgrade';
-            $('upgradeMessage').value = '';
+            btn.innerHTML = '📋 Copy Message';
         }, 2000);
-        
-    } catch (error) {
-        console.error('Error submitting upgrade request:', error);
-        status.textContent = 'Error submitting request. Please try again.';
+    }).catch(err => {
+        console.error('Copy failed:', err);
+        status.textContent = 'Failed to copy. Please select and copy manually.';
         status.className = 'text-red-400 text-sm';
         showElement(status);
-        btn.disabled = false;
-        btn.textContent = '📩 Request Upgrade';
-    }
+    });
 };
 
 // ==================== ADMIN FUNCTIONS ====================
-window.loadPendingUpgradeRequests = async function() {
-    const container = $('upgradeRequestsList');
+window.switchAdminTab = function(tab) {
+    const usersTab = $('adminUsersTab');
+    const historyTab = $('adminHistoryTab');
+    const usersBtn = $('adminTabUsers');
+    const historyBtn = $('adminTabHistory');
+    
+    if (tab === 'users') {
+        showElement(usersTab);
+        hideElement(historyTab);
+        usersBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white';
+        historyBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600';
+        loadAllUsers();
+    } else {
+        hideElement(usersTab);
+        showElement(historyTab);
+        historyBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white';
+        usersBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600';
+        loadUpgradeHistory();
+    }
+};
+
+window.loadAllUsers = async function() {
+    const container = $('allUsersList');
     if (!container) return;
     
+    container.innerHTML = '<p class="text-gray-500 italic">Loading users...</p>';
+    
     try {
-        const requests = await TierService.getPendingRequests();
+        const users = await TierService.getAllUsers();
         
-        if (requests.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 italic">No pending upgrade requests.</p>';
+        if (users.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 italic">No users found.</p>';
             return;
         }
         
-        container.innerHTML = requests.map(req => {
-            const currentTierData = TIERS[req.currentTier] || TIERS.starter;
-            const requestedTierData = TIERS[req.requestedTier] || TIERS.pro;
-            const date = req.createdAt?.toDate ? req.createdAt.toDate().toLocaleDateString() : 'Unknown';
+        container.innerHTML = users.map(user => {
+            const tierData = TIERS[user.tier] || TIERS.starter;
+            const listingCount = (ownerPropertyMap[user.email?.toLowerCase()] || []).length;
+            const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
+            const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
             
             return `
                 <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="text-white font-bold">${req.userEmail}</span>
-                                <span class="text-gray-500 text-sm">${date}</span>
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-2xl">${tierData.icon}</span>
+                                <div>
+                                    <div class="text-white font-bold">${user.username || user.email}</div>
+                                    <div class="text-gray-500 text-xs">${user.email}</div>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 text-sm">
-                                <span class="px-2 py-1 rounded bg-gray-700 ${currentTierData.color}">${currentTierData.icon} ${currentTierData.name}</span>
-                                <span class="text-gray-500">→</span>
-                                <span class="px-2 py-1 rounded bg-gray-700 ${requestedTierData.color}">${requestedTierData.icon} ${requestedTierData.name}</span>
+                            <div class="flex flex-wrap items-center gap-3 text-sm">
+                                <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
+                                <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
+                                <span class="text-gray-500 text-xs">Last updated: ${lastUpdated}</span>
                             </div>
-                            ${req.message ? `<p class="text-gray-400 text-sm mt-2 italic">"${req.message}"</p>` : ''}
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="approveUpgradeRequest('${req.id}')" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition">
-                                ✓ Approve
-                            </button>
-                            <button onclick="denyUpgradeRequest('${req.id}')" class="bg-gradient-to-r from-red-500 to-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition">
-                                ✗ Deny
-                            </button>
+                            ${user.tier !== 'pro' ? `
+                                <button onclick="adminUpgradeUser('${user.email}', 'pro', '${user.tier}')" class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                                    ⭐ Set Pro
+                                </button>
+                            ` : ''}
+                            ${user.tier !== 'elite' ? `
+                                <button onclick="adminUpgradeUser('${user.email}', 'elite', '${user.tier}')" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                                    👑 Set Elite
+                                </button>
+                            ` : ''}
+                            ${user.tier !== 'starter' ? `
+                                <button onclick="adminDowngradeUser('${user.email}', '${user.tier}')" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                                    🌱 Reset
+                                </button>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
@@ -861,36 +912,97 @@ window.loadPendingUpgradeRequests = async function() {
         }).join('');
         
     } catch (error) {
-        console.error('Error loading upgrade requests:', error);
-        container.innerHTML = '<p class="text-red-400">Error loading requests.</p>';
+        console.error('Error loading users:', error);
+        container.innerHTML = '<p class="text-red-400">Error loading users.</p>';
     }
 };
 
-window.approveUpgradeRequest = async function(requestId) {
-    if (!confirm('Approve this upgrade request?')) return;
+window.loadUpgradeHistory = async function() {
+    const container = $('upgradeHistoryList');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-gray-500 italic">Loading history...</p>';
     
     try {
-        await TierService.approveRequest(requestId);
-        alert('✓ Upgrade approved!');
-        loadPendingUpgradeRequests();
+        const history = await TierService.getUpgradeHistory();
+        
+        if (history.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 italic">No upgrade history found.</p>';
+            return;
+        }
+        
+        container.innerHTML = history.map(entry => {
+            const prevTierData = TIERS[entry.previousTier] || TIERS.starter;
+            const newTierData = TIERS[entry.newTier] || TIERS.starter;
+            const date = entry.upgradedAt?.toDate ? entry.upgradedAt.toDate().toLocaleString() : 'Unknown';
+            const price = entry.price ? `$${entry.price.toLocaleString()}` : '-';
+            
+            return `
+                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-white font-bold">${entry.userEmail}</span>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 text-sm">
+                                <span class="px-2 py-1 rounded bg-gray-700 ${prevTierData.color}">${prevTierData.icon} ${prevTierData.name}</span>
+                                <span class="text-gray-500">→</span>
+                                <span class="px-2 py-1 rounded bg-gray-700 ${newTierData.color}">${newTierData.icon} ${newTierData.name}</span>
+                                <span class="text-green-400 font-bold">${price}</span>
+                            </div>
+                            ${entry.paymentNote ? `<p class="text-gray-400 text-sm mt-1 italic">${entry.paymentNote}</p>` : ''}
+                        </div>
+                        <div class="text-right text-sm">
+                            <div class="text-gray-400">${date}</div>
+                            <div class="text-gray-500 text-xs">by ${entry.upgradedBy || 'system'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
     } catch (error) {
-        console.error('Error approving request:', error);
-        alert('Error approving request: ' + error.message);
+        console.error('Error loading upgrade history:', error);
+        container.innerHTML = '<p class="text-red-400">Error loading history.</p>';
     }
 };
 
-window.denyUpgradeRequest = async function(requestId) {
-    const reason = prompt('Reason for denial (optional):');
-    if (reason === null) return; // User cancelled
+window.adminUpgradeUser = async function(email, newTier, currentTier) {
+    const tierData = TIERS[newTier];
+    const price = newTier === 'pro' ? '$25,000' : '$50,000';
+    
+    const paymentNote = prompt(`Upgrading ${email} to ${tierData.name} (${price}/month)\n\nEnter payment confirmation or notes:`);
+    if (paymentNote === null) return; // User cancelled
     
     try {
-        await TierService.denyRequest(requestId, reason);
-        alert('Request denied.');
-        loadPendingUpgradeRequests();
+        await TierService.setUserTier(email, newTier, currentTier, paymentNote);
+        alert(`✓ ${email} upgraded to ${tierData.name}!`);
+        loadAllUsers();
     } catch (error) {
-        console.error('Error denying request:', error);
-        alert('Error denying request: ' + error.message);
+        console.error('Error upgrading user:', error);
+        alert('Error upgrading user: ' + error.message);
     }
+};
+
+window.adminDowngradeUser = async function(email, currentTier) {
+    if (!confirm(`Are you sure you want to reset ${email} to Starter tier?`)) return;
+    
+    const reason = prompt('Reason for downgrade (optional):');
+    if (reason === null) return;
+    
+    try {
+        await TierService.setUserTier(email, 'starter', currentTier, `Downgraded: ${reason || 'No reason given'}`);
+        alert(`${email} reset to Starter tier.`);
+        loadAllUsers();
+    } catch (error) {
+        console.error('Error downgrading user:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
+// Legacy function - now redirects to tab
+window.loadPendingUpgradeRequests = function() {
+    loadAllUsers();
 };
 
 // ==================== CREATE LISTING ====================

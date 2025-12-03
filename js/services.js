@@ -94,11 +94,13 @@ const TierService = {
     },
     
     /**
-     * Set user's tier (admin only)
+     * Set user's tier (admin only) - tracks history
      * @param {string} userEmail - Target user email
      * @param {string} newTier - New tier: 'starter', 'pro', 'elite'
+     * @param {string} previousTier - Previous tier for history
+     * @param {string} paymentNote - Optional payment/note info
      */
-    async setUserTier(userEmail, newTier) {
+    async setUserTier(userEmail, newTier, previousTier = null, paymentNote = '') {
         if (!TIERS[newTier]) {
             throw new Error('Invalid tier');
         }
@@ -111,13 +113,60 @@ const TierService = {
         }
         
         const userDoc = snapshot.docs[0];
+        const userData = userDoc.data();
+        const oldTier = previousTier || userData.tier || 'starter';
+        
+        // Update user tier
         await userDoc.ref.update({
             tier: newTier,
             tierUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             tierUpdatedBy: auth.currentUser?.email || 'system'
         });
         
-        console.log(`[TierService] Updated ${userEmail} to ${newTier} tier`);
+        // Add to upgrade history
+        await db.collection('upgradeHistory').add({
+            userEmail: normalizedEmail,
+            previousTier: oldTier,
+            newTier: newTier,
+            upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            upgradedBy: auth.currentUser?.email || 'system',
+            paymentNote: paymentNote,
+            price: newTier === 'pro' ? 25000 : (newTier === 'elite' ? 50000 : 0)
+        });
+        
+        console.log(`[TierService] Updated ${userEmail} from ${oldTier} to ${newTier} tier`);
+    },
+    
+    /**
+     * Get all users with their tier info
+     */
+    async getAllUsers() {
+        const snapshot = await db.collection('users').orderBy('email').get();
+        
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                email: data.email,
+                username: data.username || data.email?.split('@')[0],
+                tier: data.tier || 'starter',
+                tierUpdatedAt: data.tierUpdatedAt,
+                tierUpdatedBy: data.tierUpdatedBy,
+                createdAt: data.createdAt
+            };
+        });
+    },
+    
+    /**
+     * Get upgrade history
+     */
+    async getUpgradeHistory() {
+        const snapshot = await db.collection('upgradeHistory')
+            .orderBy('upgradedAt', 'desc')
+            .limit(50)
+            .get();
+        
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
     
     /**

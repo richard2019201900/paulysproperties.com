@@ -237,44 +237,50 @@
                     <div class="text-3xl mb-2">⭐</div>
                     <div class="text-white font-bold">Pro</div>
                     <div class="text-gray-400 text-sm">3 Listings</div>
-                    <div class="text-yellow-400 font-bold mt-2">Contact Us</div>
+                    <div class="text-yellow-400 font-bold mt-2">$25k/mo</div>
                 </div>
                 <div id="tierElite" class="p-4 rounded-xl border-2 border-purple-600 bg-purple-900/20 text-center">
                     <div class="text-3xl mb-2">👑</div>
                     <div class="text-white font-bold">Elite</div>
                     <div class="text-gray-400 text-sm">Unlimited</div>
-                    <div class="text-purple-400 font-bold mt-2">Contact Us</div>
+                    <div class="text-purple-400 font-bold mt-2">$50k/mo</div>
                 </div>
             </div>
             
-            <form id="upgradeForm" onsubmit="submitUpgradeRequest(event)" class="space-y-4">
+            <div class="space-y-4">
                 <input type="hidden" id="upgradeCurrentTier" value="">
                 
                 <div>
                     <label class="block text-gray-300 font-semibold mb-2">Select Desired Plan</label>
-                    <select id="upgradeRequestedTier" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500">
+                    <select id="upgradeRequestedTier" onchange="generateUpgradeMessage()" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500">
                         <option value="">Choose a plan...</option>
-                        <option value="pro">⭐ Pro (3 Listings)</option>
-                        <option value="elite">👑 Elite (Unlimited)</option>
+                        <option value="pro">⭐ Pro - 3 Listings ($25k/month)</option>
+                        <option value="elite">👑 Elite - Unlimited ($50k/month)</option>
                     </select>
                 </div>
                 
                 <div>
-                    <label class="block text-gray-300 font-semibold mb-2">Message (Optional)</label>
-                    <textarea id="upgradeMessage" rows="3" placeholder="Tell us about your property management needs..." class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 resize-none"></textarea>
+                    <label class="block text-gray-300 font-semibold mb-2">Message to Send In-City</label>
+                    <textarea id="upgradeMessage" rows="4" readonly class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-800 text-white focus:ring-2 focus:ring-purple-500 resize-none"></textarea>
+                    <p class="text-gray-500 text-xs mt-1">This message will be auto-generated based on your selection</p>
                 </div>
                 
                 <p id="upgradeStatus" class="text-sm hidden"></p>
+                
+                <!-- Instructions -->
+                <div class="bg-blue-900/30 border border-blue-600/50 rounded-xl p-4">
+                    <p class="text-blue-300 text-sm font-medium">📱 <strong>How to upgrade:</strong> Copy the message below and send it to Pauly in-city. Your upgrade will be processed within 24 hours after payment.</p>
+                </div>
                 
                 <div class="flex gap-4 pt-2">
                     <button type="button" onclick="closeModal('upgradeModal')" class="flex-1 bg-gray-700 text-gray-200 px-6 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">
                         Maybe Later
                     </button>
-                    <button type="submit" id="upgradeSubmitBtn" class="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
-                        📩 Request Upgrade
+                    <button type="button" id="upgradeSubmitBtn" onclick="copyUpgradeMessage()" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                        📋 Copy Message
                     </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -419,12 +425,40 @@
                     <span class="text-3xl">🔐</span>
                     <div>
                         <h3 class="text-xl md:text-2xl font-bold text-red-400">Admin Panel</h3>
-                        <p class="text-gray-400 text-sm">Manage user upgrade requests</p>
+                        <p class="text-gray-400 text-sm">Manage users and subscriptions</p>
                     </div>
                 </div>
                 
-                <div id="upgradeRequestsList" class="space-y-4">
-                    <p class="text-gray-500 italic">Loading upgrade requests...</p>
+                <!-- Admin Tabs -->
+                <div class="flex gap-2 mb-6 border-b border-gray-700 pb-4">
+                    <button id="adminTabUsers" onclick="switchAdminTab('users')" class="px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white">
+                        👥 All Users
+                    </button>
+                    <button id="adminTabHistory" onclick="switchAdminTab('history')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">
+                        📜 Upgrade History
+                    </button>
+                </div>
+                
+                <!-- All Users Tab -->
+                <div id="adminUsersTab" class="space-y-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-bold text-gray-200">Registered Users</h4>
+                        <button onclick="loadAllUsers()" class="text-purple-400 hover:text-purple-300 text-sm font-bold">🔄 Refresh</button>
+                    </div>
+                    <div id="allUsersList" class="space-y-3">
+                        <p class="text-gray-500 italic">Loading users...</p>
+                    </div>
+                </div>
+                
+                <!-- Upgrade History Tab -->
+                <div id="adminHistoryTab" class="hidden space-y-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-bold text-gray-200">Upgrade History</h4>
+                        <button onclick="loadUpgradeHistory()" class="text-purple-400 hover:text-purple-300 text-sm font-bold">🔄 Refresh</button>
+                    </div>
+                    <div id="upgradeHistoryList" class="space-y-3">
+                        <p class="text-gray-500 italic">Loading history...</p>
+                    </div>
                 </div>
             </div>
 
