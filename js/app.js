@@ -228,7 +228,8 @@ function renderPropertyStatsContent(id) {
     
     // Renter & Payment info
     const renterName = PropertyDataService.getValue(id, 'renterName', p.renterName || '');
-    const renterPhone = PropertyDataService.getValue(id, 'renterPhone', p.renterPhone || '');
+    const renterPhoneRaw = PropertyDataService.getValue(id, 'renterPhone', p.renterPhone || '');
+    const renterPhone = renterPhoneRaw ? renterPhoneRaw.replace(/\D/g, '') : '';
     const renterNotes = PropertyDataService.getValue(id, 'renterNotes', p.renterNotes || '');
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || 'weekly');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
@@ -671,12 +672,14 @@ window.startEditTile = function(field, propertyId, type) {
                            field === 'ownerPhone' ? 'Enter phone number' : 
                            field === 'renterName' ? 'Enter renter name' : 
                            field === 'renterPhone' ? 'Enter renter phone' : '';
+        const phoneHandler = type === 'tel' ? 'oninput="this.value = this.value.replace(/\\D/g, \'\')"' : '';
         inputHtml = `
             <input type="${inputType}" 
                    id="input-${field}-${propertyId}"
                    class="stat-input text-lg"
                    value="${rawValue}"
                    ${type === 'number' ? 'min="0"' : ''}
+                   ${phoneHandler}
                    placeholder="${placeholder}">
         `;
     }
@@ -731,7 +734,11 @@ window.saveTileEdit = async function(field, propertyId, type) {
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
         }
-    } else if (type === 'text' || type === 'tel') {
+    } else if (type === 'tel') {
+        // Remove all non-digit characters from phone numbers
+        newValue = input.value.replace(/\D/g, '');
+        input.value = newValue; // Update input to show cleaned number
+    } else if (type === 'text') {
         // Allow empty values for owner/renter info
         newValue = input.value.trim();
         // For non-contact fields, require a value
@@ -1210,9 +1217,11 @@ window.resetReminderScript = async function(propertyId) {
 
 // ==================== COPY RENTER PHONE ====================
 window.copyRenterPhone = function(phoneNumber, btn) {
+    // Sanitize phone number - remove all non-digits
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
     const originalHtml = btn.innerHTML;
     
-    navigator.clipboard.writeText(phoneNumber).then(() => {
+    navigator.clipboard.writeText(cleanPhone).then(() => {
         // Show success feedback
         btn.innerHTML = `
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -1230,7 +1239,7 @@ window.copyRenterPhone = function(phoneNumber, btn) {
         console.error('Failed to copy:', err);
         // Fallback
         const textArea = document.createElement('textarea');
-        textArea.value = phoneNumber;
+        textArea.value = cleanPhone;
         textArea.style.position = 'fixed';
         textArea.style.left = '-9999px';
         document.body.appendChild(textArea);

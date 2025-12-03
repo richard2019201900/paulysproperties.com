@@ -86,7 +86,8 @@ window.loadUsername = async function() {
                 $('ownerUsername').value = doc.data().username;
             }
             if (doc.data().phone) {
-                $('ownerPhone').value = doc.data().phone;
+                // Sanitize phone - remove all non-digits
+                $('ownerPhone').value = doc.data().phone.replace(/\D/g, '');
             }
         }
     } catch (error) {
@@ -139,7 +140,10 @@ window.saveOwnerPhone = async function() {
     const user = auth.currentUser;
     if (!user) return;
     
-    const phone = $('ownerPhone').value.trim();
+    // Remove all non-digit characters from phone
+    const phone = $('ownerPhone').value.replace(/\D/g, '');
+    $('ownerPhone').value = phone; // Update the field to show cleaned number
+    
     const btn = $('savePhoneBtn');
     const status = $('phoneStatus');
     

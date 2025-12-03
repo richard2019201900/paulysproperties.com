@@ -60,7 +60,8 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
                 if (!usersSnapshot.empty) {
                     const userData = usersSnapshot.docs[0].data();
                     if (userData.phone) {
-                        $('modalPhone').value = userData.phone;
+                        // Sanitize phone - remove all non-digits
+                        $('modalPhone').value = userData.phone.replace(/\D/g, '');
                     }
                 }
             }
