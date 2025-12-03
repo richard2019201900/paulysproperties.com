@@ -70,27 +70,47 @@ const PropertyDataService = {
     async write(propertyId, field, value) {
         console.log(`[PropertyDataService] WRITE property ${propertyId}, field: ${field}, value: ${value}`);
         
-        // CRITICAL: Read fresh data before writing to avoid overwriting newer values
-        const freshData = await this.read(propertyId);
-        console.log(`[PropertyDataService] Fresh data before write:`, freshData);
+        // Check if this is a user-created property (has ownerEmail in properties array)
+        const prop = properties.find(p => p.id === propertyId);
+        const isUserCreated = prop && prop.ownerEmail;
+        
+        console.log(`[PropertyDataService] Property ${propertyId} isUserCreated: ${isUserCreated}`);
         
         try {
-            // Build the update path: propertyId.field = value
-            const updatePath = `${propertyId}.${field}`;
-            const updateData = {
-                [updatePath]: value,
-                [`${propertyId}.updatedAt`]: firebase.firestore.FieldValue.serverTimestamp(),
-                [`${propertyId}.updatedBy`]: auth.currentUser?.email || 'unknown'
-            };
-            
-            await db.collection(this.collectionName).doc(this.docName).set(updateData, { merge: true });
-            console.log(`[PropertyDataService] WRITE success`);
-            
-            // Update local state cache for immediate UI consistency
-            if (!state.propertyOverrides[propertyId]) {
-                state.propertyOverrides[propertyId] = {};
+            if (isUserCreated) {
+                // USER-CREATED PROPERTY: Write directly to settings/properties
+                // This is the single source of truth for user-created properties
+                const updateData = {
+                    [`${propertyId}.${field}`]: value,
+                    [`${propertyId}.updatedAt`]: firebase.firestore.FieldValue.serverTimestamp(),
+                    [`${propertyId}.updatedBy`]: auth.currentUser?.email || 'unknown'
+                };
+                
+                await db.collection('settings').doc('properties').set(updateData, { merge: true });
+                console.log(`[PropertyDataService] WRITE to properties doc success`);
+                
+                // Update local property object directly
+                if (prop) {
+                    prop[field] = value;
+                }
+            } else {
+                // STATIC PROPERTY: Write to propertyOverrides (existing behavior)
+                const updatePath = `${propertyId}.${field}`;
+                const updateData = {
+                    [updatePath]: value,
+                    [`${propertyId}.updatedAt`]: firebase.firestore.FieldValue.serverTimestamp(),
+                    [`${propertyId}.updatedBy`]: auth.currentUser?.email || 'unknown'
+                };
+                
+                await db.collection(this.collectionName).doc(this.docName).set(updateData, { merge: true });
+                console.log(`[PropertyDataService] WRITE to overrides success`);
+                
+                // Update local state cache for immediate UI consistency
+                if (!state.propertyOverrides[propertyId]) {
+                    state.propertyOverrides[propertyId] = {};
+                }
+                state.propertyOverrides[propertyId][field] = value;
             }
-            state.propertyOverrides[propertyId][field] = value;
             
             return true;
         } catch (error) {
@@ -139,17 +159,25 @@ const PropertyDataService = {
     
     /**
      * Get the effective value for a property field
-     * Checks overrides first, then falls back to base property data
+     * For static properties: Checks overrides first, then falls back to base property data
+     * For user-created properties: Uses property data directly (no overrides)
      * @param {number} propertyId - The property ID
      * @param {string} field - The field name
      * @param {any} defaultValue - Default value if not found
      */
     getValue(propertyId, field, defaultValue) {
+        const prop = properties.find(p => p.id === propertyId);
+        
+        // User-created properties: Use property data directly (single source of truth)
+        if (prop && prop.ownerEmail) {
+            return prop?.[field] ?? defaultValue;
+        }
+        
+        // Static properties: Check overrides first, then property data
         const override = state.propertyOverrides[propertyId]?.[field];
         if (override !== undefined) {
             return override;
         }
-        const prop = properties.find(p => p.id === propertyId);
         return prop?.[field] ?? defaultValue;
     },
     
@@ -217,33 +245,33 @@ function setupRealtimeListener() {
             }
         });
     
-    // Listen for new user-created properties
+    // Listen for new user-created properties AND updates to existing ones
     db.collection('settings').doc('properties')
         .onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                let hasNewProperties = false;
+                let hasChanges = false;
                 Object.keys(data).forEach(key => {
                     const propId = parseInt(key);
-                    const prop = data[key];
+                    const propData = data[key];
                     
                     // Validate property has required fields
-                    if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
-                        console.warn('[Realtime] Skipping invalid property:', key, prop);
+                    if (!propData || !propData.images || !Array.isArray(propData.images) || propData.images.length === 0) {
+                        console.warn('[Realtime] Skipping invalid property:', key, propData);
                         return;
                     }
                     
                     const existingIndex = properties.findIndex(p => p.id === propId);
                     if (existingIndex === -1) {
                         // New property - add it
-                        properties.push(prop);
+                        properties.push(propData);
                         state.availability[propId] = true;
-                        hasNewProperties = true;
-                        console.log('[Realtime] Added new property:', prop.title);
+                        hasChanges = true;
+                        console.log('[Realtime] Added new property:', propData.title);
                         
                         // Set up owner mapping
-                        if (prop.ownerEmail) {
-                            const email = prop.ownerEmail.toLowerCase();
+                        if (propData.ownerEmail) {
+                            const email = propData.ownerEmail.toLowerCase();
                             if (!ownerPropertyMap[email]) {
                                 ownerPropertyMap[email] = [];
                             }
@@ -252,9 +280,24 @@ function setupRealtimeListener() {
                             }
                             propertyOwnerEmail[propId] = email;
                         }
+                    } else {
+                        // Existing property - update all fields from Firestore
+                        const existingProp = properties[existingIndex];
+                        // Only update if this is a user-created property
+                        if (existingProp.ownerEmail) {
+                            Object.keys(propData).forEach(field => {
+                                if (existingProp[field] !== propData[field]) {
+                                    existingProp[field] = propData[field];
+                                    hasChanges = true;
+                                }
+                            });
+                            if (hasChanges) {
+                                console.log('[Realtime] Updated property:', propData.title);
+                            }
+                        }
                     }
                 });
-                if (hasNewProperties) {
+                if (hasChanges) {
                     state.filteredProperties = [...properties];
                     renderProperties(state.filteredProperties);
                     if (state.currentUser === 'owner') renderOwnerDashboard();
