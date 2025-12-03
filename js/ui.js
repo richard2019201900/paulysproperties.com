@@ -195,39 +195,137 @@ function renderOwnerDashboard() {
         return;
     }
     
-    $('ownerPropertiesTable').innerHTML = ownerProps.map((p, index) => `
-        <tr class="border-b border-gray-700 hover:bg-gray-700 transition">
-            <td class="px-2 md:px-3 py-4 text-center text-gray-500 font-medium">${index + 1}</td>
-            <td class="px-4 md:px-6 py-4"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
-            <td class="px-4 md:px-6 py-4">
+    $('ownerPropertiesTable').innerHTML = ownerProps.map((p, index) => {
+        // Get renter and payment info
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+        const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
+        
+        // Calculate next due date
+        let nextDueDate = '';
+        let daysUntilDue = null;
+        let reminderScript = '';
+        let dueDateDisplay = '';
+        let dueStatusClass = 'text-gray-400';
+        
+        if (lastPaymentDate) {
+            const lastDate = new Date(lastPaymentDate);
+            const nextDate = new Date(lastDate);
+            if (paymentFrequency === 'weekly') {
+                nextDate.setDate(nextDate.getDate() + 7);
+            } else {
+                nextDate.setMonth(nextDate.getMonth() + 1);
+            }
+            nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            nextDate.setHours(0, 0, 0, 0);
+            daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntilDue < 0) {
+                dueDateDisplay = `<span class="text-red-400 font-bold">${Math.abs(daysUntilDue)}d overdue</span>`;
+                dueStatusClass = 'bg-red-900/30';
+            } else if (daysUntilDue === 0) {
+                dueDateDisplay = `<span class="text-red-400 font-bold">Due today</span>`;
+                dueStatusClass = 'bg-red-900/30';
+            } else if (daysUntilDue === 1) {
+                dueDateDisplay = `<span class="text-orange-400 font-bold">Due tomorrow</span>`;
+                dueStatusClass = 'bg-orange-900/30';
+            } else if (daysUntilDue <= 3) {
+                dueDateDisplay = `<span class="text-yellow-400">${daysUntilDue}d left</span>`;
+                dueStatusClass = 'bg-yellow-900/20';
+            } else {
+                dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
+            }
+            
+            // Generate reminder script
+            const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
+            if (renterName && daysUntilDue <= 1) {
+                const fullNextDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                if (daysUntilDue === 1) {
+                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
+                } else if (daysUntilDue === 0) {
+                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
+                } else {
+                    const daysOverdue = Math.abs(daysUntilDue);
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                }
+            }
+        }
+        
+        const lastPaidDisplay = lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
+        const isRented = state.availability[p.id] === false;
+        
+        return `
+        <tr class="border-b border-gray-700/50 hover:bg-gray-700/50 transition">
+            <td class="px-2 md:px-3 py-3 text-center text-gray-500 font-medium" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
+            <td class="px-4 md:px-6 py-3"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
+            <td class="px-4 md:px-6 py-3">
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
             </td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
+            <td class="px-4 md:px-6 py-3 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
+            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
             </td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'bathrooms', this, 'number')" title="Click to edit">
+            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'bathrooms', this, 'number')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)}</span>
             </td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
+            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</span>
             </td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
+            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</span>
             </td>
-            <td class="px-4 md:px-6 py-4 text-green-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'weeklyPrice', this, 'number')" title="Click to edit">
-                <span class="cell-value">${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</span>
+            <td class="px-4 md:px-6 py-3 text-green-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'weeklyPrice', this, 'number')" title="Click to edit">
+                <span class="cell-value">${weeklyPrice.toLocaleString()}</span>
             </td>
-            <td class="px-4 md:px-6 py-4 text-purple-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
-                <span class="cell-value">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</span>
+            <td class="px-4 md:px-6 py-3 text-purple-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
+                <span class="cell-value">${monthlyPrice.toLocaleString()}</span>
             </td>
-            <td class="px-2 md:px-3 py-4 text-center">
+            <td class="px-2 md:px-3 py-3 text-center" rowspan="${isRented ? '2' : '1'}">
                 <button onclick="confirmDeleteProperty(${p.id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded-lg transition" title="Delete property">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>
             </td>
         </tr>
-    `).join('');
+        ${isRented ? `
+        <tr class="border-b border-gray-700 ${dueStatusClass} transition">
+            <td colspan="9" class="px-4 md:px-6 py-2">
+                <div class="flex flex-wrap items-center gap-3 md:gap-6 text-sm">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        <span class="text-gray-400">Renter:</span>
+                        <span class="text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <span class="text-gray-400">Paid:</span>
+                        <span class="text-white font-semibold">${lastPaidDisplay}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="text-gray-400">Due:</span>
+                        <span class="font-semibold">${nextDueDate || '<span class="text-gray-500">-</span>'}</span>
+                        ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-400 capitalize">${paymentFrequency}</span>
+                    </div>
+                    ${reminderScript ? `
+                    <button onclick="copyDashboardReminder(${p.id}, \`${reminderScript.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" class="ml-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder message">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        Send Reminder
+                    </button>
+                    ` : ''}
+                </div>
+            </td>
+        </tr>
+        ` : ''}
+    `;
+    }).join('');
 }
 
 // ==================== INLINE CELL EDITING ====================
@@ -571,4 +669,28 @@ window.executeDeleteProperty = async function() {
         btn.disabled = false;
         btn.textContent = '🗑️ Yes, Delete';
     }
+};
+
+// ==================== COPY DASHBOARD REMINDER ====================
+window.copyDashboardReminder = function(propertyId, reminderText) {
+    navigator.clipboard.writeText(reminderText).then(() => {
+        // Show success feedback
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Copied!
+        `;
+        btn.classList.remove('from-orange-500', 'to-red-500');
+        btn.classList.add('from-green-500', 'to-emerald-500');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('from-green-500', 'to-emerald-500');
+            btn.classList.add('from-orange-500', 'to-red-500');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy. Please try again.');
+    });
 };
