@@ -235,7 +235,8 @@ function renderPropertyStatsContent(id) {
     // Calculate next due date and days until due
     let nextDueDate = '';
     let daysUntilDue = null;
-    let reminderScript = '';
+    let defaultReminderScript = '';
+    let customReminderScript = PropertyDataService.getValue(id, 'customReminderScript', p.customReminderScript || '');
     
     if (lastPaymentDate) {
         const lastDate = new Date(lastPaymentDate);
@@ -252,19 +253,23 @@ function renderPropertyStatsContent(id) {
         nextDate.setHours(0, 0, 0, 0);
         daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
         
-        // Generate reminder script if 1 day away or overdue
+        // Generate default reminder script if 1 day away or overdue
         const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
         if (renterName && daysUntilDue <= 1) {
             if (daysUntilDue === 1) {
-                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
+                defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
             } else if (daysUntilDue === 0) {
-                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
+                defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
             } else {
                 const daysOverdue = Math.abs(daysUntilDue);
-                reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                defaultReminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
             }
         }
     }
+    
+    // Use custom script if set, otherwise use default
+    const reminderScript = customReminderScript || defaultReminderScript;
+    const showReminderSection = renterName && (daysUntilDue !== null && daysUntilDue <= 1);
     
     $('propertyStatsContent').innerHTML = `
         <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8">
@@ -477,19 +482,34 @@ function renderPropertyStatsContent(id) {
                 </div>
                 
                 <!-- Reminder Script (only shows when due soon) -->
-                ${reminderScript ? `
+                ${showReminderSection ? `
                 <div class="bg-gradient-to-r from-red-900/50 to-orange-900/50 border border-red-500/50 rounded-xl p-4 mb-8">
                     <div class="flex items-center justify-between mb-3">
                         <h4 class="text-lg font-bold text-red-200 flex items-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                             Payment Reminder Script
+                            <span class="text-xs font-normal text-red-300">(Click to edit)</span>
                         </h4>
-                        <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                            Copy Script
-                        </button>
+                        <div class="flex gap-2">
+                            ${customReminderScript ? `
+                            <button onclick="resetReminderScript(${id})" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-2 rounded-lg font-bold text-sm transition flex items-center gap-1" title="Reset to default">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Reset
+                            </button>
+                            ` : ''}
+                            <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                                Copy Script
+                            </button>
+                        </div>
                     </div>
-                    <div id="reminderScript-${id}" class="bg-gray-900/50 rounded-lg p-4 text-gray-200 font-medium">${reminderScript}</div>
+                    <div id="tile-reminderScript-${id}" 
+                         class="bg-gray-900/50 rounded-lg p-4 cursor-pointer hover:bg-gray-900/70 transition"
+                         onclick="startEditReminderScript(${id})"
+                         data-default-script="${sanitize(defaultReminderScript)}"
+                         data-original-value="${sanitize(reminderScript)}">
+                        <div id="reminderScript-${id}" class="text-gray-200 font-medium whitespace-pre-wrap">${reminderScript}</div>
+                    </div>
                 </div>
                 ` : '<div class="mb-8"></div>'}
             </div>
@@ -1122,6 +1142,81 @@ window.copyReminderScript = function(propertyId, btn) {
         }
         document.body.removeChild(textArea);
     });
+};
+
+// ==================== EDIT REMINDER SCRIPT ====================
+window.startEditReminderScript = function(propertyId) {
+    const tile = $(`tile-reminderScript-${propertyId}`);
+    const scriptDiv = $(`reminderScript-${propertyId}`);
+    if (!tile || !scriptDiv) return;
+    
+    const currentValue = scriptDiv.textContent;
+    
+    tile.innerHTML = `
+        <textarea id="input-reminderScript-${propertyId}"
+                  class="w-full bg-gray-800 border-2 border-purple-500 rounded-lg p-3 text-gray-200 font-medium resize-y"
+                  rows="4"
+                  onclick="event.stopPropagation()">${currentValue}</textarea>
+        <div class="flex gap-2 mt-3">
+            <button onclick="event.stopPropagation(); saveReminderScript(${propertyId})" 
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-bold text-sm transition">
+                Save
+            </button>
+            <button onclick="event.stopPropagation(); cancelReminderEdit(${propertyId})" 
+                    class="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-3 py-2 rounded-lg font-bold text-sm transition">
+                Cancel
+            </button>
+        </div>
+    `;
+    
+    const input = $(`input-reminderScript-${propertyId}`);
+    if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+    }
+};
+
+window.saveReminderScript = async function(propertyId) {
+    const tile = $(`tile-reminderScript-${propertyId}`);
+    const input = $(`input-reminderScript-${propertyId}`);
+    if (!tile || !input) return;
+    
+    const newValue = input.value.trim();
+    
+    // Show saving state
+    tile.innerHTML = `<div id="reminderScript-${propertyId}" class="text-gray-200 font-medium opacity-70">Saving...</div>`;
+    
+    try {
+        await PropertyDataService.write(propertyId, 'customReminderScript', newValue);
+        
+        // Refresh the stats page to show updated content
+        viewPropertyStats(propertyId);
+    } catch (error) {
+        console.error('Failed to save reminder script:', error);
+        alert('Failed to save. Please try again.');
+        // Restore the input
+        startEditReminderScript(propertyId);
+    }
+};
+
+window.cancelReminderEdit = function(propertyId) {
+    const tile = $(`tile-reminderScript-${propertyId}`);
+    if (!tile) return;
+    
+    const originalValue = tile.dataset.originalValue || '';
+    tile.innerHTML = `<div id="reminderScript-${propertyId}" class="text-gray-200 font-medium whitespace-pre-wrap">${originalValue}</div>`;
+};
+
+window.resetReminderScript = async function(propertyId) {
+    if (!confirm('Reset to the auto-generated reminder script?')) return;
+    
+    try {
+        await PropertyDataService.write(propertyId, 'customReminderScript', '');
+        viewPropertyStats(propertyId);
+    } catch (error) {
+        console.error('Failed to reset reminder script:', error);
+        alert('Failed to reset. Please try again.');
+    }
 };
 
 // ==================== COPY RENTER PHONE ====================

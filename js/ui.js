@@ -202,11 +202,12 @@ function renderOwnerDashboard() {
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
         const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
+        const customReminderScript = PropertyDataService.getValue(p.id, 'customReminderScript', p.customReminderScript || '');
         
         // Calculate next due date
         let nextDueDate = '';
         let daysUntilDue = null;
-        let reminderScript = '';
+        let defaultReminderScript = '';
         let dueDateDisplay = '';
         let dueStatusClass = 'text-gray-400';
         
@@ -241,20 +242,23 @@ function renderOwnerDashboard() {
                 dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
             }
             
-            // Generate reminder script
+            // Generate default reminder script
             const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
             if (renterName && daysUntilDue <= 1) {
                 const fullNextDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 if (daysUntilDue === 1) {
-                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
+                    defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
                 } else if (daysUntilDue === 0) {
-                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
+                    defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
                 } else {
                     const daysOverdue = Math.abs(daysUntilDue);
-                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                    defaultReminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
                 }
             }
         }
+        
+        // Use custom script if set, otherwise use default
+        const reminderScript = customReminderScript || defaultReminderScript;
         
         const lastPaidDisplay = lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
         const isRented = state.availability[p.id] === false;
@@ -321,9 +325,9 @@ function renderOwnerDashboard() {
                         <span class="text-gray-400 capitalize">${paymentFrequency}</span>
                     </div>
                     ${reminderScript ? `
-                    <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder message">
+                    <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy payment reminder to clipboard">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                        Send Reminder
+                        Copy Reminder
                     </button>
                     ` : ''}
                 </div>
