@@ -192,9 +192,18 @@ function setupRealtimeListener() {
         .onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                Object.keys(data).forEach(propId => {
-                    if (!isNaN(parseInt(propId))) {
-                        state.propertyOverrides[propId] = data[propId];
+                // Parse flat structure: "1.bedrooms" -> state.propertyOverrides[1].bedrooms
+                Object.keys(data).forEach(key => {
+                    const parts = key.split('.');
+                    if (parts.length === 2) {
+                        const propId = parts[0];
+                        const field = parts[1];
+                        if (!isNaN(parseInt(propId))) {
+                            if (!state.propertyOverrides[propId]) {
+                                state.propertyOverrides[propId] = {};
+                            }
+                            state.propertyOverrides[propId][field] = data[key];
+                        }
                     }
                 });
                 renderProperties(state.filteredProperties);
@@ -259,9 +268,18 @@ async function initFirestore() {
         if (overridesDoc.exists) {
             const overridesData = overridesDoc.data();
             console.log('[initFirestore] Overrides data:', overridesData);
-            Object.keys(overridesData).forEach(propId => {
-                if (!isNaN(parseInt(propId))) {
-                    state.propertyOverrides[propId] = overridesData[propId];
+            // Parse flat structure: "1.bedrooms" -> state.propertyOverrides[1].bedrooms
+            Object.keys(overridesData).forEach(key => {
+                const parts = key.split('.');
+                if (parts.length === 2) {
+                    const propId = parts[0];
+                    const field = parts[1];
+                    if (!isNaN(parseInt(propId))) {
+                        if (!state.propertyOverrides[propId]) {
+                            state.propertyOverrides[propId] = {};
+                        }
+                        state.propertyOverrides[propId][field] = overridesData[key];
+                    }
                 }
             });
             console.log('[initFirestore] State after loading:', state.propertyOverrides);
