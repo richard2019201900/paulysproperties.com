@@ -247,14 +247,14 @@ function calculateTotals() {
             if (paymentFrequency === 'monthly') {
                 // Monthly payer contributes monthly rate
                 monthlyIncome += monthlyPrice;
-                // Weekly equivalent: monthly / 4.33
-                weeklyIncome += Math.round(monthlyPrice / 4.33);
+                // Weekly equivalent: monthly / 4
+                weeklyIncome += Math.round(monthlyPrice / 4);
                 details.monthlyPayers.push(propInfo);
             } else {
                 // Weekly payer contributes weekly rate
                 weeklyIncome += weeklyPrice;
-                // Monthly equivalent: weekly * 4.33
-                monthlyIncome += Math.round(weeklyPrice * 4.33);
+                // Monthly equivalent: weekly * 4
+                monthlyIncome += Math.round(weeklyPrice * 4);
                 details.weeklyPayers.push(propInfo);
             }
         } else {
@@ -293,9 +293,9 @@ function updateIncomeBreakdowns(details) {
         });
     }
     if (details.monthlyPayers.length > 0) {
-        weeklyHTML += '<div class="font-bold text-blue-300 mt-2 mb-1">Monthly Payers (÷4.33):</div>';
+        weeklyHTML += '<div class="font-bold text-blue-300 mt-2 mb-1">Monthly Payers (÷4):</div>';
         details.monthlyPayers.forEach(p => {
-            const weeklyEquiv = Math.round(p.monthlyPrice / 4.33);
+            const weeklyEquiv = Math.round(p.monthlyPrice / 4);
             weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
                 <span class="truncate mr-2">${p.title}</span>
                 <span class="text-yellow-300">~$${weeklyEquiv.toLocaleString()}</span>
@@ -317,9 +317,9 @@ function updateIncomeBreakdowns(details) {
         });
     }
     if (details.weeklyPayers.length > 0) {
-        monthlyHTML += '<div class="font-bold text-green-300 mt-2 mb-1">Weekly Payers (×4.33):</div>';
+        monthlyHTML += '<div class="font-bold text-green-300 mt-2 mb-1">Weekly Payers (×4):</div>';
         details.weeklyPayers.forEach(p => {
-            const monthlyEquiv = Math.round(p.weeklyPrice * 4.33);
+            const monthlyEquiv = Math.round(p.weeklyPrice * 4);
             monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
                 <span class="truncate mr-2">${p.title}</span>
                 <span class="text-yellow-300">~$${monthlyEquiv.toLocaleString()}</span>
