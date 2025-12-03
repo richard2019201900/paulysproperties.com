@@ -325,7 +325,7 @@ function renderOwnerDashboard() {
                         <span class="text-gray-400 capitalize">${paymentFrequency}</span>
                     </div>
                     ${reminderScript ? `
-                    <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy payment reminder text to clipboard - you'll need to paste and send it yourself">
+                    <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder - text in city for fastest response">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                         📋 Copy Text
                     </button>
