@@ -194,13 +194,102 @@ function renderOwnerDashboard() {
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
             </td>
             <td class="px-4 md:px-6 py-4 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</td>
-            <td class="px-4 md:px-6 py-4 text-green-400 font-bold">${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</td>
-            <td class="px-4 md:px-6 py-4 text-purple-400 font-bold">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</td>
+            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
+                <span class="cell-value">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</span>
+                <span class="edit-icon ml-1 opacity-0 group-hover:opacity-100">✏️</span>
+            </td>
+            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
+                <span class="cell-value">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</span>
+            </td>
+            <td class="px-4 md:px-6 py-4 text-green-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'weeklyPrice', this, 'number')" title="Click to edit">
+                <span class="cell-value">${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</span>
+            </td>
+            <td class="px-4 md:px-6 py-4 text-purple-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
+                <span class="cell-value">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</span>
+            </td>
         </tr>
     `).join('');
 }
+
+// ==================== INLINE CELL EDITING ====================
+window.startCellEdit = function(propertyId, field, cell, type) {
+    // Don't start if already editing
+    if (cell.querySelector('input, select')) return;
+    
+    const currentValue = PropertyDataService.getValue(propertyId, field, properties.find(p => p.id === propertyId)?.[field]);
+    const originalHTML = cell.innerHTML;
+    
+    cell.dataset.originalHTML = originalHTML;
+    cell.dataset.propertyId = propertyId;
+    cell.dataset.field = field;
+    
+    if (type === 'select' && field === 'interiorType') {
+        cell.innerHTML = `
+            <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm w-full" 
+                    onchange="saveCellEdit(this, ${propertyId}, '${field}')"
+                    onblur="setTimeout(() => cancelCellEdit(this), 150)">
+                <option value="Instance" ${currentValue === 'Instance' ? 'selected' : ''}>Instance</option>
+                <option value="Walk-in" ${currentValue === 'Walk-in' ? 'selected' : ''}>Walk-in</option>
+            </select>
+        `;
+    } else {
+        cell.innerHTML = `
+            <input type="number" 
+                   class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm w-20" 
+                   value="${currentValue}"
+                   onkeydown="handleCellKeydown(event, this, ${propertyId}, '${field}')"
+                   onblur="saveCellEdit(this, ${propertyId}, '${field}')">
+        `;
+    }
+    
+    const input = cell.querySelector('input, select');
+    input.focus();
+    if (input.select) input.select();
+};
+
+window.handleCellKeydown = function(event, input, propertyId, field) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveCellEdit(input, propertyId, field);
+    } else if (event.key === 'Escape') {
+        cancelCellEdit(input);
+    }
+};
+
+window.saveCellEdit = async function(input, propertyId, field) {
+    const cell = input.closest('td');
+    const newValue = field === 'interiorType' ? input.value : parseInt(input.value);
+    const originalHTML = cell.dataset.originalHTML;
+    
+    if (!newValue && newValue !== 0) {
+        cell.innerHTML = originalHTML;
+        return;
+    }
+    
+    // Show saving state
+    cell.innerHTML = `<span class="text-gray-500">Saving...</span>`;
+    
+    try {
+        await PropertyDataService.write(propertyId, field, newValue);
+        
+        // Re-render dashboard to show updated values
+        renderOwnerDashboard();
+        renderProperties(state.filteredProperties);
+        
+    } catch (error) {
+        console.error('Save failed:', error);
+        cell.innerHTML = originalHTML;
+        alert('Failed to save. Please try again.');
+    }
+};
+
+window.cancelCellEdit = function(input) {
+    if (!input) return;
+    const cell = input.closest('td');
+    if (cell && cell.dataset.originalHTML) {
+        cell.innerHTML = cell.dataset.originalHTML;
+    }
+};
 
 async function renderProperties(list) {
     // Update property count
