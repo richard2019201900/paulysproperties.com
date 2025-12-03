@@ -17,3 +17,12 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+
+// Set auth persistence to LOCAL (persists across browser sessions)
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .then(() => {
+        console.log('[Auth] Persistence set to LOCAL');
+    })
+    .catch((error) => {
+        console.error('[Auth] Persistence error:', error);
+    });

@@ -822,6 +822,24 @@ async function init() {
     loadReviews();
     await initFirestore();
     setupRealtimeListener();
+    
+    // Listen for auth state changes (including on page load)
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // User is signed in - restore owner session
+            console.log('[Auth] User session restored:', user.email);
+            state.currentUser = 'owner';
+            updateAuthButton(true);
+            renderOwnerDashboard();
+            loadUsername();
+        } else {
+            // No user signed in
+            console.log('[Auth] No active session');
+            state.currentUser = null;
+            updateAuthButton(false);
+        }
+    });
+    
     renderProperties(properties);
 }
 

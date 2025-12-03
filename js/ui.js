@@ -75,7 +75,7 @@ window.goBack = function() {
 };
 
 // ==================== USERNAME FUNCTIONS ====================
-async function loadUsername() {
+window.loadUsername = async function() {
     const user = auth.currentUser;
     if (!user) return;
     
