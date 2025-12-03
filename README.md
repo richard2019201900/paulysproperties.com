@@ -36,7 +36,7 @@ property-portal/
 
 This site is deployed via GitHub Pages. Any push to the `main` branch automatically updates the live site.
 
-**Live Site:** [https://richard2019201900.github.io/property-portal/](https://richard2019201900.github.io/property-portal/)
+**Live Site:** [https://richard2019201900.github.io/paulysproperties.com/](https://richard2019201900.github.io/paulysproperties.com/)
 
 ## 🛠️ Development
 
