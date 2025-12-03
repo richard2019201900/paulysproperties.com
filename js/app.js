@@ -69,8 +69,8 @@ window.viewProperty = function(id) {
         <div class="p-5 md:p-8">
             <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
                 <div>
-                    <h2 class="text-2xl md:text-4xl font-black text-white mb-2">${sanitize(p.title)}</h2>
-                    <p class="text-lg md:text-xl text-gray-300 font-semibold">Location: ${sanitize(p.location)}</p>
+                    <h2 class="text-2xl md:text-4xl font-black text-white mb-2">✨ ${sanitize(p.title)}</h2>
+                    <p class="text-lg md:text-xl text-gray-300 font-semibold">📍 Location: ${sanitize(p.location)}</p>
                 </div>
                 <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
             </div>
@@ -222,8 +222,8 @@ function renderPropertyStatsContent(id) {
             <div class="p-6 md:p-8">
                 <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
                     <div>
-                        <h2 class="text-3xl md:text-4xl font-black text-white mb-2">${sanitize(p.title)}</h2>
-                        <p class="text-lg text-gray-300 font-semibold">Location: ${sanitize(p.location)}</p>
+                        <h2 class="text-3xl md:text-4xl font-black text-white mb-2">✨ ${sanitize(p.title)}</h2>
+                        <p class="text-lg text-gray-300 font-semibold">📍 Location: ${sanitize(p.location)}</p>
                     </div>
                     <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
                 </div>
