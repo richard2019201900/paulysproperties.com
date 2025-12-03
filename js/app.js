@@ -201,6 +201,45 @@ function renderPropertyStatsContent(id) {
     const ownerName = PropertyDataService.getValue(id, 'ownerName', p.ownerName || '');
     const ownerPhone = PropertyDataService.getValue(id, 'ownerPhone', p.ownerPhone || '');
     
+    // Renter & Payment info
+    const renterName = PropertyDataService.getValue(id, 'renterName', p.renterName || '');
+    const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+    const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
+    
+    // Calculate next due date and days until due
+    let nextDueDate = '';
+    let daysUntilDue = null;
+    let reminderScript = '';
+    
+    if (lastPaymentDate) {
+        const lastDate = new Date(lastPaymentDate);
+        const nextDate = new Date(lastDate);
+        if (paymentFrequency === 'weekly') {
+            nextDate.setDate(nextDate.getDate() + 7);
+        } else {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+        }
+        nextDueDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        nextDate.setHours(0, 0, 0, 0);
+        daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        
+        // Generate reminder script if 1 day away or overdue
+        const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
+        if (renterName && daysUntilDue <= 1) {
+            if (daysUntilDue === 1) {
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
+            } else if (daysUntilDue === 0) {
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
+            } else {
+                const daysOverdue = Math.abs(daysUntilDue);
+                reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+            }
+        }
+    }
+    
     $('propertyStatsContent').innerHTML = `
         <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8">
             <!-- View Toggle Tabs -->
@@ -338,6 +377,79 @@ function renderPropertyStatsContent(id) {
                         <div class="text-xs text-pink-300 mt-2 opacity-70">Click to edit</div>
                     </div>
                 </div>
+                
+                <!-- Renter & Payment Info -->
+                <h3 class="text-xl font-bold text-gray-200 mb-4">Renter & Payment Info <span class="text-sm text-purple-400">(Click to edit)</span></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                    <!-- Renter Name -->
+                    <div id="tile-renterName-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-sky-600 to-sky-800 rounded-xl border border-sky-500 cursor-pointer"
+                         onclick="startEditTile('renterName', ${id}, 'text')"
+                         data-field="renterName"
+                         data-original-value="${sanitize(renterName)}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <span class="text-sky-200 font-semibold">Renter Name</span>
+                        </div>
+                        <div id="value-renterName-${id}" class="text-lg font-bold text-white">${renterName || '<span class="text-sky-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-sky-300 mt-2 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Payment Frequency -->
+                    <div id="tile-paymentFrequency-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-teal-600 to-teal-800 rounded-xl border border-teal-500 cursor-pointer"
+                         onclick="startEditTile('paymentFrequency', ${id}, 'frequency')"
+                         data-field="paymentFrequency"
+                         data-original-value="${paymentFrequency}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 text-teal-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="text-teal-200 font-semibold">Payment Frequency</span>
+                        </div>
+                        <div id="value-paymentFrequency-${id}" class="text-lg font-bold text-white capitalize">${paymentFrequency}</div>
+                        <div class="text-xs text-teal-300 mt-2 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Last Payment Date -->
+                    <div id="tile-lastPaymentDate-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-lime-600 to-lime-800 rounded-xl border border-lime-500 cursor-pointer"
+                         onclick="startEditTile('lastPaymentDate', ${id}, 'date')"
+                         data-field="lastPaymentDate"
+                         data-original-value="${lastPaymentDate}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 text-lime-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <span class="text-lime-200 font-semibold">Last Payment</span>
+                        </div>
+                        <div id="value-lastPaymentDate-${id}" class="text-lg font-bold text-white">${lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '<span class="text-lime-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-lime-300 mt-2 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Next Due Date (calculated, not editable) -->
+                    <div class="stat-tile p-4 bg-gradient-to-br ${daysUntilDue !== null && daysUntilDue <= 1 ? 'from-red-600 to-red-800 border-red-500' : 'from-gray-600 to-gray-800 border-gray-500'} rounded-xl border">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 ${daysUntilDue !== null && daysUntilDue <= 1 ? 'text-red-200' : 'text-gray-200'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="${daysUntilDue !== null && daysUntilDue <= 1 ? 'text-red-200' : 'text-gray-200'} font-semibold">Next Due Date</span>
+                        </div>
+                        <div class="text-lg font-bold text-white">${nextDueDate || '<span class="opacity-70">Set last payment</span>'}</div>
+                        ${daysUntilDue !== null ? `<div class="text-xs ${daysUntilDue <= 1 ? 'text-red-200 font-bold' : 'text-gray-300'} mt-2">${daysUntilDue === 0 ? '⚠️ Due today!' : daysUntilDue === 1 ? '⚠️ Due tomorrow!' : daysUntilDue < 0 ? '🚨 ' + Math.abs(daysUntilDue) + ' day(s) overdue!' : daysUntilDue + ' days remaining'}</div>` : '<div class="text-xs text-gray-400 mt-2">Auto-calculated</div>'}
+                    </div>
+                </div>
+                
+                <!-- Reminder Script (only shows when due soon) -->
+                ${reminderScript ? `
+                <div class="bg-gradient-to-r from-red-900/50 to-orange-900/50 border border-red-500/50 rounded-xl p-4 mb-8">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-lg font-bold text-red-200 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                            Payment Reminder Script
+                        </h4>
+                        <button onclick="copyReminderScript(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                            Copy Script
+                        </button>
+                    </div>
+                    <div id="reminderScript-${id}" class="bg-gray-900/50 rounded-lg p-4 text-gray-200 font-medium">${reminderScript}</div>
+                </div>
+                ` : '<div class="mb-8"></div>'}
             </div>
         </div>
         
@@ -481,6 +593,20 @@ window.startEditTile = function(field, propertyId, type) {
                 <option value="Walk-in" ${currentValue === 'Walk-in' ? 'selected' : ''}>Walk-in</option>
             </select>
         `;
+    } else if (type === 'frequency') {
+        inputHtml = `
+            <select id="input-${field}-${propertyId}" class="stat-input text-lg w-full">
+                <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
+                <option value="monthly" ${currentValue === 'monthly' ? 'selected' : ''}>Monthly</option>
+            </select>
+        `;
+    } else if (type === 'date') {
+        inputHtml = `
+            <input type="date" 
+                   id="input-${field}-${propertyId}"
+                   class="stat-input text-lg"
+                   value="${currentValue || ''}">
+        `;
     } else {
         const rawValue = typeof currentValue === 'number' ? currentValue : String(currentValue || '').replace(/[$,]/g, '');
         const inputType = type === 'number' ? 'number' : (type === 'tel' ? 'tel' : 'text');
@@ -490,7 +616,7 @@ window.startEditTile = function(field, propertyId, type) {
                    class="stat-input text-lg"
                    value="${rawValue}"
                    ${type === 'number' ? 'min="0"' : ''}
-                   placeholder="${field === 'ownerName' ? 'Enter contact name' : (field === 'ownerPhone' ? 'Enter phone number' : '')}">
+                   placeholder="${field === 'ownerName' ? 'Enter contact name' : (field === 'ownerPhone' ? 'Enter phone number' : (field === 'renterName' ? 'Enter renter name' : ''))}">
         `;
     }
     
@@ -544,17 +670,21 @@ window.saveTileEdit = async function(field, propertyId, type) {
             return;
         }
     } else if (type === 'text' || type === 'tel') {
-        // Allow empty values for owner contact info
+        // Allow empty values for owner/renter info
         newValue = input.value.trim();
         // For non-contact fields, require a value
-        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone') {
+        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone' && field !== 'renterName') {
             tile.classList.add('error');
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
         }
+    } else if (type === 'frequency') {
+        newValue = input.value;
+    } else if (type === 'date') {
+        newValue = input.value; // Keep as YYYY-MM-DD format
     } else {
         newValue = input.value.trim();
-        if (!newValue) {
+        if (!newValue && field !== 'interiorType') {
             tile.classList.add('error');
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
@@ -570,16 +700,28 @@ window.saveTileEdit = async function(field, propertyId, type) {
     let displayValue;
     if (type === 'number') {
         displayValue = field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
-    } else if ((field === 'ownerName' || field === 'ownerPhone') && !newValue) {
+    } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName') && !newValue) {
         displayValue = '<span class="opacity-70">Not set</span>';
+    } else if (type === 'date' && newValue) {
+        displayValue = new Date(newValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } else if (type === 'frequency') {
+        displayValue = newValue.charAt(0).toUpperCase() + newValue.slice(1);
     } else {
-        displayValue = newValue;
+        displayValue = newValue || '<span class="opacity-70">Not set</span>';
     }
     valueEl.innerHTML = `<span class="opacity-70">${displayValue}</span><div class="text-xs mt-1">Saving...</div>`;
     
     try {
         // CRITICAL: Write to Firestore (includes fresh read before write)
         await PropertyDataService.write(propertyId, field, newValue);
+        
+        // If payment frequency changed to weekly, auto-adjust monthly price
+        if (field === 'paymentFrequency' && newValue === 'weekly') {
+            const p = properties.find(prop => prop.id === propertyId);
+            const weeklyPrice = PropertyDataService.getValue(propertyId, 'weeklyPrice', p?.weeklyPrice || 0);
+            const newMonthlyPrice = weeklyPrice * 4;
+            await PropertyDataService.write(propertyId, 'monthlyPrice', newMonthlyPrice);
+        }
         
         // Success feedback
         tile.classList.remove('saving');
@@ -867,6 +1009,35 @@ window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
         console.error('Failed to delete image:', error);
         alert('Failed to delete image. Please try again.');
     }
+};
+
+// ==================== COPY REMINDER SCRIPT ====================
+window.copyReminderScript = function(propertyId) {
+    const scriptElement = $(`reminderScript-${propertyId}`);
+    if (!scriptElement) return;
+    
+    const text = scriptElement.textContent;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        // Show success feedback
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Copied!
+        `;
+        btn.classList.remove('from-green-500', 'to-emerald-600');
+        btn.classList.add('from-purple-500', 'to-purple-600');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('from-purple-500', 'to-purple-600');
+            btn.classList.add('from-green-500', 'to-emerald-600');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy. Please try selecting and copying manually.');
+    });
 };
 
 // ==================== INITIALIZE ====================

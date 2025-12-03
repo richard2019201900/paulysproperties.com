@@ -315,6 +315,10 @@ select option:disabled {
     font-size: inherit;
 }
 
+.stat-input[type="date"] {
+    color-scheme: dark;
+}
+
 .stat-input:focus {
     outline: none;
     border-color: #667eea;
