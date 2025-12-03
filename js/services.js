@@ -219,10 +219,17 @@ function setupRealtimeListener() {
                 let hasNewProperties = false;
                 Object.keys(data).forEach(key => {
                     const propId = parseInt(key);
+                    const prop = data[key];
+                    
+                    // Validate property has required fields
+                    if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
+                        console.warn('[Realtime] Skipping invalid property:', key, prop);
+                        return;
+                    }
+                    
                     const existingIndex = properties.findIndex(p => p.id === propId);
                     if (existingIndex === -1) {
                         // New property - add it
-                        const prop = data[key];
                         properties.push(prop);
                         state.availability[propId] = true;
                         hasNewProperties = true;
@@ -328,11 +335,18 @@ async function initFirestore() {
             console.log('[initFirestore] User properties data:', propsData);
             Object.keys(propsData).forEach(key => {
                 const propId = parseInt(key);
+                const prop = propsData[key];
+                
+                // Validate property has required fields
+                if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
+                    console.warn('[initFirestore] Skipping invalid property:', key, prop);
+                    return;
+                }
+                
                 // Check if this property already exists in the static array
                 const existingIndex = properties.findIndex(p => p.id === propId);
                 if (existingIndex === -1) {
                     // New user-created property - add to array
-                    const prop = propsData[key];
                     properties.push(prop);
                     console.log('[initFirestore] Added user property:', prop.title);
                     

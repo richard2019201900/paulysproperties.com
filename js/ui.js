@@ -315,7 +315,7 @@ async function renderProperties(list) {
     $('propertyCount').textContent = `(${list.length})`;
     
     // First render with placeholder owner
-    $('propertiesGrid').innerHTML = list.map(p => {
+    $('propertiesGrid').innerHTML = list.filter(p => p && p.images && p.images.length > 0).map(p => {
         const available = state.availability[p.id] !== false;
         return `
         <article class="property-card bg-gray-800 rounded-2xl shadow-xl overflow-hidden cursor-pointer border border-gray-700" onclick="viewProperty(${p.id})">
