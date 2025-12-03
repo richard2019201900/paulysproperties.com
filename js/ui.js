@@ -445,6 +445,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     [newId]: newProperty
                 }, { merge: true });
                 
+                // Save owner property map to Firestore
+                await db.collection('settings').doc('ownerPropertyMap').set({
+                    [ownerEmail]: ownerPropertyMap[ownerEmail]
+                }, { merge: true });
+                
                 // Update filtered properties
                 state.filteredProperties = [...properties];
                 

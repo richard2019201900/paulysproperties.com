@@ -210,6 +210,51 @@ function setupRealtimeListener() {
                 if (state.currentUser === 'owner') renderOwnerDashboard();
             }
         });
+    
+    // Listen for new user-created properties
+    db.collection('settings').doc('properties')
+        .onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                let hasNewProperties = false;
+                Object.keys(data).forEach(key => {
+                    const propId = parseInt(key);
+                    const existingIndex = properties.findIndex(p => p.id === propId);
+                    if (existingIndex === -1) {
+                        // New property - add it
+                        properties.push(data[key]);
+                        state.availability[propId] = true;
+                        hasNewProperties = true;
+                        console.log('[Realtime] Added new property:', data[key].title);
+                    }
+                });
+                if (hasNewProperties) {
+                    state.filteredProperties = [...properties];
+                    renderProperties(state.filteredProperties);
+                    if (state.currentUser === 'owner') renderOwnerDashboard();
+                }
+            }
+        });
+    
+    // Listen for owner property map changes
+    db.collection('settings').doc('ownerPropertyMap')
+        .onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                Object.keys(data).forEach(email => {
+                    if (!ownerPropertyMap[email]) {
+                        ownerPropertyMap[email] = [];
+                    }
+                    data[email].forEach(propId => {
+                        if (!ownerPropertyMap[email].includes(propId)) {
+                            ownerPropertyMap[email].push(propId);
+                            propertyOwnerEmail[propId] = email;
+                        }
+                    });
+                });
+                if (state.currentUser === 'owner') renderOwnerDashboard();
+            }
+        });
 }
 
 async function saveAvailability(id, isAvailable) {
@@ -259,6 +304,52 @@ async function initFirestore() {
         
         if (needsUpdate || !doc.exists) {
             await db.collection('settings').doc('propertyAvailability').set(updates, { merge: true });
+        }
+        
+        // Load user-created properties
+        console.log('[initFirestore] Loading user-created properties...');
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        if (propsDoc.exists) {
+            const propsData = propsDoc.data();
+            console.log('[initFirestore] User properties data:', propsData);
+            Object.keys(propsData).forEach(key => {
+                const propId = parseInt(key);
+                // Check if this property already exists in the static array
+                const existingIndex = properties.findIndex(p => p.id === propId);
+                if (existingIndex === -1) {
+                    // New user-created property - add to array
+                    const prop = propsData[key];
+                    properties.push(prop);
+                    console.log('[initFirestore] Added user property:', prop.title);
+                    
+                    // Set availability from Firestore
+                    if (data[propId] !== undefined) {
+                        state.availability[propId] = data[propId];
+                    } else {
+                        state.availability[propId] = true;
+                    }
+                }
+            });
+            // Update filtered properties
+            state.filteredProperties = [...properties];
+        }
+        
+        // Load owner property mappings for user-created properties
+        const ownerMapDoc = await db.collection('settings').doc('ownerPropertyMap').get();
+        if (ownerMapDoc.exists) {
+            const ownerMapData = ownerMapDoc.data();
+            console.log('[initFirestore] Owner map data:', ownerMapData);
+            Object.keys(ownerMapData).forEach(email => {
+                if (!ownerPropertyMap[email]) {
+                    ownerPropertyMap[email] = [];
+                }
+                ownerMapData[email].forEach(propId => {
+                    if (!ownerPropertyMap[email].includes(propId)) {
+                        ownerPropertyMap[email].push(propId);
+                        propertyOwnerEmail[propId] = email;
+                    }
+                });
+            });
         }
         
         // Load property overrides
