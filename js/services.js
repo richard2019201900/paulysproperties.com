@@ -222,10 +222,23 @@ function setupRealtimeListener() {
                     const existingIndex = properties.findIndex(p => p.id === propId);
                     if (existingIndex === -1) {
                         // New property - add it
-                        properties.push(data[key]);
+                        const prop = data[key];
+                        properties.push(prop);
                         state.availability[propId] = true;
                         hasNewProperties = true;
-                        console.log('[Realtime] Added new property:', data[key].title);
+                        console.log('[Realtime] Added new property:', prop.title);
+                        
+                        // Set up owner mapping
+                        if (prop.ownerEmail) {
+                            const email = prop.ownerEmail.toLowerCase();
+                            if (!ownerPropertyMap[email]) {
+                                ownerPropertyMap[email] = [];
+                            }
+                            if (!ownerPropertyMap[email].includes(propId)) {
+                                ownerPropertyMap[email].push(propId);
+                            }
+                            propertyOwnerEmail[propId] = email;
+                        }
                     }
                 });
                 if (hasNewProperties) {
@@ -242,13 +255,14 @@ function setupRealtimeListener() {
             if (doc.exists) {
                 const data = doc.data();
                 Object.keys(data).forEach(email => {
-                    if (!ownerPropertyMap[email]) {
-                        ownerPropertyMap[email] = [];
+                    const lowerEmail = email.toLowerCase();
+                    if (!ownerPropertyMap[lowerEmail]) {
+                        ownerPropertyMap[lowerEmail] = [];
                     }
                     data[email].forEach(propId => {
-                        if (!ownerPropertyMap[email].includes(propId)) {
-                            ownerPropertyMap[email].push(propId);
-                            propertyOwnerEmail[propId] = email;
+                        if (!ownerPropertyMap[lowerEmail].includes(propId)) {
+                            ownerPropertyMap[lowerEmail].push(propId);
+                            propertyOwnerEmail[propId] = lowerEmail;
                         }
                     });
                 });
@@ -328,6 +342,19 @@ async function initFirestore() {
                     } else {
                         state.availability[propId] = true;
                     }
+                    
+                    // Also set up owner mapping from stored ownerEmail
+                    if (prop.ownerEmail) {
+                        const email = prop.ownerEmail.toLowerCase();
+                        if (!ownerPropertyMap[email]) {
+                            ownerPropertyMap[email] = [];
+                        }
+                        if (!ownerPropertyMap[email].includes(propId)) {
+                            ownerPropertyMap[email].push(propId);
+                        }
+                        propertyOwnerEmail[propId] = email;
+                        console.log('[initFirestore] Set owner for property', propId, ':', email);
+                    }
                 }
             });
             // Update filtered properties
@@ -340,13 +367,14 @@ async function initFirestore() {
             const ownerMapData = ownerMapDoc.data();
             console.log('[initFirestore] Owner map data:', ownerMapData);
             Object.keys(ownerMapData).forEach(email => {
-                if (!ownerPropertyMap[email]) {
-                    ownerPropertyMap[email] = [];
+                const lowerEmail = email.toLowerCase();
+                if (!ownerPropertyMap[lowerEmail]) {
+                    ownerPropertyMap[lowerEmail] = [];
                 }
                 ownerMapData[email].forEach(propId => {
-                    if (!ownerPropertyMap[email].includes(propId)) {
-                        ownerPropertyMap[email].push(propId);
-                        propertyOwnerEmail[propId] = email;
+                    if (!ownerPropertyMap[lowerEmail].includes(propId)) {
+                        ownerPropertyMap[lowerEmail].push(propId);
+                        propertyOwnerEmail[propId] = lowerEmail;
                     }
                 });
             });

@@ -185,7 +185,7 @@ function renderOwnerDashboard() {
     if (ownerProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
             <tr>
-                <td colspan="9" class="px-6 py-12 text-center text-gray-400">
+                <td colspan="10" class="px-6 py-12 text-center text-gray-400">
                     <div class="text-4xl mb-4">🏠</div>
                     <p class="text-xl font-semibold">No properties assigned to this account</p>
                     <p class="text-sm mt-2">Contact the administrator to get properties assigned to your account.</p>
@@ -195,8 +195,9 @@ function renderOwnerDashboard() {
         return;
     }
     
-    $('ownerPropertiesTable').innerHTML = ownerProps.map(p => `
+    $('ownerPropertiesTable').innerHTML = ownerProps.map((p, index) => `
         <tr class="border-b border-gray-700 hover:bg-gray-700 transition">
+            <td class="px-2 md:px-3 py-4 text-center text-gray-500 font-medium">${index + 1}</td>
             <td class="px-4 md:px-6 py-4"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
             <td class="px-4 md:px-6 py-4">
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
@@ -422,14 +423,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     monthlyPrice: monthlyPrice,
                     images: images,
                     videoUrl: null,
-                    features: false
+                    features: false,
+                    ownerEmail: ownerEmail // Store owner email in property
                 };
                 
                 // Add to local properties array
                 properties.push(newProperty);
                 
-                // Add to owner map
-                const ownerEmail = auth.currentUser?.email || 'richard2019201900@gmail.com';
+                // Add to owner map (lowercase email for consistency)
+                const ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
                 if (!ownerPropertyMap[ownerEmail]) {
                     ownerPropertyMap[ownerEmail] = [];
                 }

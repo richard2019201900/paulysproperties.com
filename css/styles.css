@@ -368,7 +368,7 @@ select option:disabled {
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
-    border-left: 3px solid #a78bfa;
+    border-left: 1px solid #a78bfa;
 }
 
 .editable-cell:hover {
