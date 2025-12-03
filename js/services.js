@@ -1,3 +1,213 @@
+// ==================== TIER SYSTEM ====================
+/**
+ * User Tiers Configuration
+ * - Starter (free): 1 listing
+ * - Pro: 3 listings  
+ * - Elite: Unlimited listings
+ */
+const TIERS = {
+    starter: { 
+        maxListings: 1, 
+        icon: '🌱', 
+        name: 'Starter',
+        color: 'text-gray-400',
+        bgColor: 'bg-gray-600'
+    },
+    pro: { 
+        maxListings: 3, 
+        icon: '⭐', 
+        name: 'Pro',
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-600'
+    },
+    elite: { 
+        maxListings: Infinity, 
+        icon: '👑', 
+        name: 'Elite',
+        color: 'text-purple-400',
+        bgColor: 'bg-purple-600'
+    }
+};
+
+// Master admin email
+const MASTER_ADMIN_EMAIL = 'richard2019201900@gmail.com';
+
+/**
+ * TierService - Handles user tier operations
+ */
+const TierService = {
+    /**
+     * Get user's tier info
+     * @param {string} email - User email
+     * @returns {Promise<Object>} - Tier info {tier, tierData, listingCount}
+     */
+    async getUserTier(email) {
+        if (!email) return { tier: 'starter', tierData: TIERS.starter, listingCount: 0 };
+        
+        try {
+            const normalizedEmail = email.toLowerCase();
+            const snapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
+            
+            let tier = 'starter';
+            if (!snapshot.empty) {
+                const userData = snapshot.docs[0].data();
+                tier = userData.tier || 'starter';
+            }
+            
+            // Count user's listings
+            const listingCount = (ownerPropertyMap[normalizedEmail] || []).length;
+            
+            return {
+                tier,
+                tierData: TIERS[tier] || TIERS.starter,
+                listingCount
+            };
+        } catch (error) {
+            console.error('[TierService] Error getting user tier:', error);
+            return { tier: 'starter', tierData: TIERS.starter, listingCount: 0 };
+        }
+    },
+    
+    /**
+     * Check if user can create more listings
+     * @param {string} email - User email
+     * @returns {Promise<{canCreate: boolean, reason: string, tierInfo: Object}>}
+     */
+    async canCreateListing(email) {
+        const tierInfo = await this.getUserTier(email);
+        const { tier, tierData, listingCount } = tierInfo;
+        
+        // Master admin always can create
+        if (email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) {
+            return { canCreate: true, reason: '', tierInfo };
+        }
+        
+        if (listingCount >= tierData.maxListings) {
+            return {
+                canCreate: false,
+                reason: `Your ${tierData.name} plan allows ${tierData.maxListings} listing${tierData.maxListings > 1 ? 's' : ''}. You currently have ${listingCount}.`,
+                tierInfo
+            };
+        }
+        
+        return { canCreate: true, reason: '', tierInfo };
+    },
+    
+    /**
+     * Set user's tier (admin only)
+     * @param {string} userEmail - Target user email
+     * @param {string} newTier - New tier: 'starter', 'pro', 'elite'
+     */
+    async setUserTier(userEmail, newTier) {
+        if (!TIERS[newTier]) {
+            throw new Error('Invalid tier');
+        }
+        
+        const normalizedEmail = userEmail.toLowerCase();
+        const snapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
+        
+        if (snapshot.empty) {
+            throw new Error('User not found');
+        }
+        
+        const userDoc = snapshot.docs[0];
+        await userDoc.ref.update({
+            tier: newTier,
+            tierUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            tierUpdatedBy: auth.currentUser?.email || 'system'
+        });
+        
+        console.log(`[TierService] Updated ${userEmail} to ${newTier} tier`);
+    },
+    
+    /**
+     * Submit upgrade request
+     * @param {string} userEmail - Requesting user's email
+     * @param {string} currentTier - Current tier
+     * @param {string} requestedTier - Desired tier
+     * @param {string} message - Optional message
+     */
+    async submitUpgradeRequest(userEmail, currentTier, requestedTier, message = '') {
+        const request = {
+            userEmail: userEmail.toLowerCase(),
+            currentTier,
+            requestedTier,
+            message,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('upgradeRequests').add(request);
+        console.log('[TierService] Upgrade request submitted:', request);
+    },
+    
+    /**
+     * Get pending upgrade requests (admin only)
+     */
+    async getPendingRequests() {
+        const snapshot = await db.collection('upgradeRequests')
+            .where('status', '==', 'pending')
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    },
+    
+    /**
+     * Approve upgrade request (admin only)
+     */
+    async approveRequest(requestId) {
+        const requestDoc = await db.collection('upgradeRequests').doc(requestId).get();
+        if (!requestDoc.exists) throw new Error('Request not found');
+        
+        const request = requestDoc.data();
+        
+        // Update user's tier
+        await this.setUserTier(request.userEmail, request.requestedTier);
+        
+        // Update request status
+        await db.collection('upgradeRequests').doc(requestId).update({
+            status: 'approved',
+            processedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            processedBy: auth.currentUser?.email
+        });
+    },
+    
+    /**
+     * Deny upgrade request (admin only)
+     */
+    async denyRequest(requestId, reason = '') {
+        await db.collection('upgradeRequests').doc(requestId).update({
+            status: 'denied',
+            denyReason: reason,
+            processedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            processedBy: auth.currentUser?.email
+        });
+    },
+    
+    /**
+     * Check if user is master admin
+     */
+    isMasterAdmin(email) {
+        return email && email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase();
+    },
+    
+    /**
+     * Get tier display HTML
+     * @param {string} tier - Tier name
+     * @returns {string} - HTML with icon and badge
+     */
+    getTierBadge(tier) {
+        const t = TIERS[tier] || TIERS.starter;
+        return `<span class="inline-flex items-center gap-1 ${t.color}" title="${t.name} Member">${t.icon}</span>`;
+    }
+};
+
+// Make available globally
+window.TierService = TierService;
+window.TIERS = TIERS;
+window.MASTER_ADMIN_EMAIL = MASTER_ADMIN_EMAIL;
+
 // ==================== PROPERTY DATA SERVICE ====================
 /**
  * PropertyDataService - Handles all read/write operations to Firestore

@@ -92,9 +92,51 @@ window.loadUsername = async function() {
                 // Sanitize phone - remove all non-digits
                 $('ownerPhone').value = doc.data().phone.replace(/\D/g, '');
             }
+            
+            // Update tier badge
+            const tier = doc.data().tier || 'starter';
+            updateTierBadge(tier, user.email);
         }
     } catch (error) {
         console.error('Error loading user settings:', error);
+    }
+}
+
+window.updateTierBadge = function(tier, email) {
+    const tierData = TIERS[tier] || TIERS.starter;
+    const listingCount = (ownerPropertyMap[email.toLowerCase()] || []).length;
+    const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
+    
+    const iconEl = $('tierIcon');
+    const nameEl = $('tierName');
+    const listingsEl = $('tierListings');
+    
+    if (iconEl) iconEl.textContent = tierData.icon;
+    if (nameEl) nameEl.textContent = tierData.name;
+    if (listingsEl) listingsEl.textContent = `${listingCount}/${maxListings} Listings`;
+    
+    // Update badge background based on tier
+    const badgeEl = $('userTierBadge');
+    if (badgeEl) {
+        badgeEl.className = badgeEl.className.replace(/border-\w+-\d+/g, '');
+        if (tier === 'pro') {
+            badgeEl.classList.add('border-yellow-600');
+        } else if (tier === 'elite') {
+            badgeEl.classList.add('border-purple-600');
+        } else {
+            badgeEl.classList.add('border-gray-600');
+        }
+    }
+    
+    // Show/hide admin section
+    const adminSection = $('adminSection');
+    if (adminSection) {
+        if (TierService.isMasterAdmin(email)) {
+            showElement(adminSection);
+            loadPendingUpgradeRequests();
+        } else {
+            hideElement(adminSection);
+        }
     }
 }
 
@@ -692,9 +734,184 @@ async function renderProperties(list) {
     }
 }
 
+// ==================== TIER UPGRADE MODAL ====================
+window.openUpgradeModal = function(reason, currentTier) {
+    $('upgradeReason').textContent = reason;
+    $('upgradeCurrentTier').value = currentTier;
+    
+    // Highlight current tier
+    ['Starter', 'Pro', 'Elite'].forEach(t => {
+        const el = $('tier' + t);
+        if (el) {
+            el.classList.remove('ring-2', 'ring-white');
+            if (t.toLowerCase() === currentTier) {
+                el.classList.add('ring-2', 'ring-white');
+            }
+        }
+    });
+    
+    // Filter dropdown to only show upgrades
+    const dropdown = $('upgradeRequestedTier');
+    if (dropdown) {
+        dropdown.innerHTML = '<option value="">Choose a plan...</option>';
+        if (currentTier === 'starter') {
+            dropdown.innerHTML += '<option value="pro">⭐ Pro (3 Listings)</option>';
+            dropdown.innerHTML += '<option value="elite">👑 Elite (Unlimited)</option>';
+        } else if (currentTier === 'pro') {
+            dropdown.innerHTML += '<option value="elite">👑 Elite (Unlimited)</option>';
+        }
+    }
+    
+    hideElement($('upgradeStatus'));
+    openModal('upgradeModal');
+};
+
+window.submitUpgradeRequest = async function(e) {
+    e.preventDefault();
+    
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const currentTier = $('upgradeCurrentTier').value;
+    const requestedTier = $('upgradeRequestedTier').value;
+    const message = $('upgradeMessage').value.trim();
+    const status = $('upgradeStatus');
+    const btn = $('upgradeSubmitBtn');
+    
+    if (!requestedTier) {
+        status.textContent = 'Please select a plan.';
+        status.className = 'text-yellow-400 text-sm';
+        showElement(status);
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+    
+    try {
+        await TierService.submitUpgradeRequest(user.email, currentTier, requestedTier, message);
+        
+        status.textContent = '✓ Request submitted! We\'ll review it shortly and get back to you.';
+        status.className = 'text-green-400 text-sm';
+        showElement(status);
+        
+        btn.textContent = '✓ Submitted';
+        
+        setTimeout(() => {
+            closeModal('upgradeModal');
+            btn.disabled = false;
+            btn.textContent = '📩 Request Upgrade';
+            $('upgradeMessage').value = '';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Error submitting upgrade request:', error);
+        status.textContent = 'Error submitting request. Please try again.';
+        status.className = 'text-red-400 text-sm';
+        showElement(status);
+        btn.disabled = false;
+        btn.textContent = '📩 Request Upgrade';
+    }
+};
+
+// ==================== ADMIN FUNCTIONS ====================
+window.loadPendingUpgradeRequests = async function() {
+    const container = $('upgradeRequestsList');
+    if (!container) return;
+    
+    try {
+        const requests = await TierService.getPendingRequests();
+        
+        if (requests.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 italic">No pending upgrade requests.</p>';
+            return;
+        }
+        
+        container.innerHTML = requests.map(req => {
+            const currentTierData = TIERS[req.currentTier] || TIERS.starter;
+            const requestedTierData = TIERS[req.requestedTier] || TIERS.pro;
+            const date = req.createdAt?.toDate ? req.createdAt.toDate().toLocaleDateString() : 'Unknown';
+            
+            return `
+                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-white font-bold">${req.userEmail}</span>
+                                <span class="text-gray-500 text-sm">${date}</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="px-2 py-1 rounded bg-gray-700 ${currentTierData.color}">${currentTierData.icon} ${currentTierData.name}</span>
+                                <span class="text-gray-500">→</span>
+                                <span class="px-2 py-1 rounded bg-gray-700 ${requestedTierData.color}">${requestedTierData.icon} ${requestedTierData.name}</span>
+                            </div>
+                            ${req.message ? `<p class="text-gray-400 text-sm mt-2 italic">"${req.message}"</p>` : ''}
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="approveUpgradeRequest('${req.id}')" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition">
+                                ✓ Approve
+                            </button>
+                            <button onclick="denyUpgradeRequest('${req.id}')" class="bg-gradient-to-r from-red-500 to-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition">
+                                ✗ Deny
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Error loading upgrade requests:', error);
+        container.innerHTML = '<p class="text-red-400">Error loading requests.</p>';
+    }
+};
+
+window.approveUpgradeRequest = async function(requestId) {
+    if (!confirm('Approve this upgrade request?')) return;
+    
+    try {
+        await TierService.approveRequest(requestId);
+        alert('✓ Upgrade approved!');
+        loadPendingUpgradeRequests();
+    } catch (error) {
+        console.error('Error approving request:', error);
+        alert('Error approving request: ' + error.message);
+    }
+};
+
+window.denyUpgradeRequest = async function(requestId) {
+    const reason = prompt('Reason for denial (optional):');
+    if (reason === null) return; // User cancelled
+    
+    try {
+        await TierService.denyRequest(requestId, reason);
+        alert('Request denied.');
+        loadPendingUpgradeRequests();
+    } catch (error) {
+        console.error('Error denying request:', error);
+        alert('Error denying request: ' + error.message);
+    }
+};
+
 // ==================== CREATE LISTING ====================
-window.openCreateListingModal = function() {
+window.openCreateListingModal = async function() {
     hideElement($('mobileMenu'));
+    
+    // Check tier limits before opening
+    const user = auth.currentUser;
+    if (!user) {
+        alert('Please sign in to create a listing.');
+        return;
+    }
+    
+    const { canCreate, reason, tierInfo } = await TierService.canCreateListing(user.email);
+    
+    if (!canCreate) {
+        // Show upgrade modal instead
+        openUpgradeModal(reason, tierInfo.tier);
+        return;
+    }
+    
     // Reset form
     const form = $('createListingForm');
     if (form) form.reset();

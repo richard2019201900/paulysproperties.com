@@ -70,6 +70,31 @@ async function getPropertyOwnerUsername(propertyId) {
     return await getUsernameByEmail(email);
 }
 
+// Get owner username with tier badge for display
+async function getPropertyOwnerWithTier(propertyId) {
+    const email = getPropertyOwnerEmail(propertyId);
+    const username = await getUsernameByEmail(email);
+    
+    // Get tier from user doc
+    let tier = 'starter';
+    try {
+        const snapshot = await db.collection('users').where('email', '==', email).get();
+        if (!snapshot.empty) {
+            tier = snapshot.docs[0].data().tier || 'starter';
+        }
+    } catch (error) {
+        console.error('[getPropertyOwnerWithTier] Error:', error);
+    }
+    
+    const tierData = TIERS[tier] || TIERS.starter;
+    return {
+        username,
+        tier,
+        tierData,
+        display: `${tierData.icon} ${username}`
+    };
+}
+
 // Preload usernames for all property owners (call this after properties load)
 async function preloadOwnerUsernames() {
     const uniqueEmails = [...new Set(Object.values(propertyOwnerEmail))];

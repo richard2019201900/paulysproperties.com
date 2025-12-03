@@ -122,11 +122,11 @@ window.viewProperty = function(id) {
     
     displayReviews(id);
     
-    // Load and display owner username
-    getPropertyOwnerUsername(id).then(username => {
+    // Load and display owner username with tier badge
+    getPropertyOwnerWithTier(id).then(ownerInfo => {
         const ownerEl = document.querySelector('#propertyDetailContent .text-blue-400');
         if (ownerEl) {
-            ownerEl.textContent = `👤 Owner: ${username}`;
+            ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display}`;
         }
     });
     
@@ -195,11 +195,11 @@ async function loadStatsOwnerName(propertyId) {
     if (!ownerEl) return;
     
     try {
-        // Use cached username lookup
-        const username = await getPropertyOwnerUsername(propertyId);
+        // Use tier-aware username lookup
+        const ownerInfo = await getPropertyOwnerWithTier(propertyId);
         const spanEl = ownerEl.querySelector('span');
         if (spanEl) {
-            spanEl.textContent = username;
+            spanEl.textContent = ownerInfo.display;
         }
     } catch (error) {
         console.error('Error loading owner name:', error);
@@ -1287,12 +1287,36 @@ async function init() {
             console.log('[Auth] User session restored:', user.email);
             state.currentUser = 'owner';
             updateAuthButton(true);
+            
+            // Ensure user has tier set (default to starter for new users)
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (!userDoc.exists || !userDoc.data()?.tier) {
+                    // New user or missing tier - set to starter
+                    await db.collection('users').doc(user.uid).set({
+                        email: user.email.toLowerCase(),
+                        tier: 'starter',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    console.log('[Auth] Set default starter tier for user');
+                }
+                
+                // Store user tier in state for quick access
+                const updatedDoc = await db.collection('users').doc(user.uid).get();
+                state.userTier = updatedDoc.data()?.tier || 'starter';
+                console.log('[Auth] User tier:', state.userTier);
+            } catch (error) {
+                console.error('[Auth] Error checking user tier:', error);
+                state.userTier = 'starter';
+            }
+            
             renderOwnerDashboard();
             loadUsername();
         } else {
             // No user signed in
             console.log('[Auth] No active session');
             state.currentUser = null;
+            state.userTier = null;
             updateAuthButton(false);
         }
     });
