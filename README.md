@@ -16,7 +16,7 @@ A premium real estate rental website for Los Santos properties, featuring Fireba
 ## 📁 Project Structure
 
 ```
-property-portal/
+paulysproperties.com/
 ├── index.html              # Main HTML structure
 ├── css/
 │   └── styles.css          # Custom styles (gradients, animations, components)
