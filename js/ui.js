@@ -185,7 +185,7 @@ function renderOwnerDashboard() {
     if (ownerProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
             <tr>
-                <td colspan="10" class="px-6 py-12 text-center text-gray-400">
+                <td colspan="11" class="px-6 py-12 text-center text-gray-400">
                     <div class="text-4xl mb-4">🏠</div>
                     <p class="text-xl font-semibold">No properties assigned to this account</p>
                     <p class="text-sm mt-2">Contact the administrator to get properties assigned to your account.</p>
@@ -220,6 +220,11 @@ function renderOwnerDashboard() {
             </td>
             <td class="px-4 md:px-6 py-4 text-purple-400 font-bold editable-cell" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</span>
+            </td>
+            <td class="px-2 md:px-3 py-4 text-center">
+                <button onclick="confirmDeleteProperty(${p.id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded-lg transition" title="Delete property">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
             </td>
         </tr>
     `).join('');
@@ -479,3 +484,84 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ==================== DELETE PROPERTY ====================
+window.confirmDeleteProperty = function(propertyId, propertyTitle) {
+    // Store the property info for deletion
+    window.pendingDeleteProperty = { id: propertyId, title: propertyTitle };
+    
+    // Update modal content
+    $('deletePropertyName').textContent = propertyTitle;
+    
+    // Show the modal
+    openModal('deleteConfirmModal');
+};
+
+window.cancelDelete = function() {
+    window.pendingDeleteProperty = null;
+    closeModal('deleteConfirmModal');
+};
+
+window.executeDeleteProperty = async function() {
+    if (!window.pendingDeleteProperty) return;
+    
+    const propertyId = window.pendingDeleteProperty.id;
+    const btn = $('confirmDeleteBtn');
+    
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    
+    try {
+        // Remove from local properties array
+        const propIndex = properties.findIndex(p => p.id === propertyId);
+        if (propIndex !== -1) {
+            properties.splice(propIndex, 1);
+        }
+        
+        // Remove from owner map
+        const ownerEmail = (auth.currentUser?.email || '').toLowerCase();
+        if (ownerPropertyMap[ownerEmail]) {
+            const idx = ownerPropertyMap[ownerEmail].indexOf(propertyId);
+            if (idx !== -1) {
+                ownerPropertyMap[ownerEmail].splice(idx, 1);
+            }
+        }
+        delete propertyOwnerEmail[propertyId];
+        
+        // Remove from availability
+        delete state.availability[propertyId];
+        
+        // Remove from Firestore - properties doc
+        await db.collection('settings').doc('properties').update({
+            [propertyId]: firebase.firestore.FieldValue.delete()
+        });
+        
+        // Update owner map in Firestore
+        await db.collection('settings').doc('ownerPropertyMap').set({
+            [ownerEmail]: ownerPropertyMap[ownerEmail]
+        }, { merge: true });
+        
+        // Remove availability
+        await db.collection('settings').doc('propertyAvailability').update({
+            [propertyId]: firebase.firestore.FieldValue.delete()
+        });
+        
+        // Update filtered properties
+        state.filteredProperties = [...properties];
+        
+        // Re-render
+        renderProperties(state.filteredProperties);
+        renderOwnerDashboard();
+        
+        // Close modal
+        closeModal('deleteConfirmModal');
+        window.pendingDeleteProperty = null;
+        
+    } catch (error) {
+        console.error('Error deleting property:', error);
+        alert('Failed to delete property. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🗑️ Yes, Delete';
+    }
+};
