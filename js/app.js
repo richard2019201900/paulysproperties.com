@@ -1,3 +1,17 @@
+// ==================== DATE HELPER ====================
+// Parse date string (YYYY-MM-DD) as local time, not UTC
+window.parseLocalDate = function(dateStr) {
+    if (!dateStr) return null;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+// Format date for display
+window.formatDate = function(dateStr, options = { month: 'short', day: 'numeric', year: 'numeric' }) {
+    const date = parseLocalDate(dateStr);
+    return date ? date.toLocaleDateString('en-US', options) : '';
+}
+
 // ==================== VIEW PROPERTY ====================
 window.viewProperty = function(id) {
     const p = properties.find(prop => prop.id === id);
@@ -236,7 +250,7 @@ function renderPropertyStatsContent(id) {
     let reminderScript = '';
     
     if (lastPaymentDate) {
-        const lastDate = new Date(lastPaymentDate);
+        const lastDate = parseLocalDate(lastPaymentDate);
         const nextDate = new Date(lastDate);
         if (paymentFrequency === 'weekly') {
             nextDate.setDate(nextDate.getDate() + 7);
@@ -461,7 +475,7 @@ function renderPropertyStatsContent(id) {
                             <svg class="w-6 h-6 text-lime-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             <span class="text-lime-200 font-semibold">Last Payment</span>
                         </div>
-                        <div id="value-lastPaymentDate-${id}" class="text-lg font-bold text-white">${lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '<span class="text-lime-300 opacity-70">Not set</span>'}</div>
+                        <div id="value-lastPaymentDate-${id}" class="text-lg font-bold text-white">${lastPaymentDate ? formatDate(lastPaymentDate) : '<span class="text-lime-300 opacity-70">Not set</span>'}</div>
                         <div class="text-xs text-lime-300 mt-2 opacity-70">Click to edit</div>
                     </div>
                     
@@ -776,7 +790,7 @@ window.saveTileEdit = async function(field, propertyId, type) {
         // Show full text - CSS line-clamp will handle overflow
         displayValue = newValue;
     } else if (type === 'date' && newValue) {
-        displayValue = new Date(newValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        displayValue = formatDate(newValue);
     } else if (type === 'frequency') {
         displayValue = newValue.charAt(0).toUpperCase() + newValue.slice(1);
     } else {

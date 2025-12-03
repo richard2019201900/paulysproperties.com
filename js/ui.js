@@ -264,7 +264,7 @@ function renderOwnerDashboard() {
         let dueStatusClass = 'text-gray-400';
         
         if (lastPaymentDate) {
-            const lastDate = new Date(lastPaymentDate);
+            const lastDate = parseLocalDate(lastPaymentDate);
             const nextDate = new Date(lastDate);
             if (paymentFrequency === 'weekly') {
                 nextDate.setDate(nextDate.getDate() + 7);
@@ -309,7 +309,7 @@ function renderOwnerDashboard() {
             }
         }
         
-        const lastPaidDisplay = lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
+        const lastPaidDisplay = lastPaymentDate ? formatDate(lastPaymentDate, { month: 'short', day: 'numeric' }) : '-';
         const isRented = state.availability[p.id] === false;
         
         // Store reminder for this property
