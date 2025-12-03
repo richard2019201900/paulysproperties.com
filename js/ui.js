@@ -397,7 +397,6 @@ function renderOwnerDashboard() {
         let daysUntilDue = null;
         let reminderScript = '';
         let dueDateDisplay = '';
-        let dueStatusClass = 'text-gray-400';
         
         if (lastPaymentDate) {
             const lastDate = parseLocalDate(lastPaymentDate);
@@ -416,16 +415,12 @@ function renderOwnerDashboard() {
             
             if (daysUntilDue < 0) {
                 dueDateDisplay = `<span class="text-red-400 font-bold">${Math.abs(daysUntilDue)}d overdue</span>`;
-                dueStatusClass = 'bg-red-900/30';
             } else if (daysUntilDue === 0) {
                 dueDateDisplay = `<span class="text-red-400 font-bold">Due today</span>`;
-                dueStatusClass = 'bg-red-900/30';
             } else if (daysUntilDue === 1) {
                 dueDateDisplay = `<span class="text-orange-400 font-bold">Due tomorrow</span>`;
-                dueStatusClass = 'bg-orange-900/30';
             } else if (daysUntilDue <= 3) {
                 dueDateDisplay = `<span class="text-yellow-400">${daysUntilDue}d left</span>`;
-                dueStatusClass = 'bg-yellow-900/20';
             } else {
                 dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
             }
@@ -455,7 +450,7 @@ function renderOwnerDashboard() {
         }
         
         return `
-        <tr class="border-b border-gray-600 hover:bg-gray-700/30 transition ${isRented ? 'bg-gray-800/50' : ''}">
+        <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 transition ${index % 2 === 0 ? 'bg-gray-800/40' : 'bg-gray-900/40'}">
             <td class="px-2 md:px-3 py-3 text-center text-gray-400 font-bold text-lg" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
             <td class="px-4 md:px-6 py-3"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
             <td class="px-4 md:px-6 py-3">
@@ -487,18 +482,20 @@ function renderOwnerDashboard() {
             </td>
         </tr>
         ${isRented ? `
-        <tr class="border-b-2 border-gray-600 ${dueStatusClass} transition">
+        <tr class="border-b border-gray-700/50 ${index % 2 === 0 ? 'bg-gray-800/40' : 'bg-gray-900/40'}">
             <td colspan="9" class="px-4 md:px-6 py-2">
                 <div class="flex flex-wrap items-center gap-3 md:gap-6 text-sm">
-                    <div class="flex items-center gap-2 editable-cell cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
                         <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                         <span class="text-gray-400">Renter:</span>
-                        <span class="cell-value text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Click to set</span>'}</span>
+                        <span class="cell-value text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
+                        <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </div>
-                    <div class="flex items-center gap-2 editable-cell cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
                         <svg class="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         <span class="text-gray-400">Paid:</span>
-                        <span class="cell-value text-white font-semibold">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-500 italic">Click to set</span>'}</span>
+                        <span class="cell-value text-white font-semibold">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-500 italic">Not set</span>'}</span>
+                        <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </div>
                     <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -506,7 +503,7 @@ function renderOwnerDashboard() {
                         <span class="font-semibold">${nextDueDate || '<span class="text-gray-500">-</span>'}</span>
                         ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
                     </div>
-                    <div class="flex items-center gap-2 editable-cell cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
                         <span class="cell-value text-gray-300 capitalize">${paymentFrequency}</span>
                         <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
