@@ -319,6 +319,12 @@ select option:disabled {
     color-scheme: dark;
 }
 
+textarea.stat-input {
+    text-align: left;
+    font-weight: 500;
+    resize: vertical;
+}
+
 .stat-input:focus {
     outline: none;
     border-color: #667eea;

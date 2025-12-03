@@ -228,6 +228,7 @@ function renderPropertyStatsContent(id) {
     // Renter & Payment info
     const renterName = PropertyDataService.getValue(id, 'renterName', p.renterName || '');
     const renterPhone = PropertyDataService.getValue(id, 'renterPhone', p.renterPhone || '');
+    const renterNotes = PropertyDataService.getValue(id, 'renterNotes', p.renterNotes || '');
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || 'weekly');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
@@ -381,7 +382,7 @@ function renderPropertyStatsContent(id) {
                 <h3 class="text-xl font-bold text-gray-200 mb-4">Renter & Payment Info <span class="text-sm text-purple-400">(Click to edit)</span></h3>
                 
                 <!-- Renter Info Row -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <!-- Renter Name -->
                     <div id="tile-renterName-${id}" 
                          class="stat-tile p-4 bg-gradient-to-br from-sky-600 to-sky-800 rounded-xl border border-sky-500 cursor-pointer"
@@ -418,6 +419,20 @@ function renderPropertyStatsContent(id) {
                             <div id="value-renterPhone-${id}" class="text-lg font-bold text-white">${renterPhone || '<span class="text-pink-300 opacity-70">Not set</span>'}</div>
                             <div class="text-xs text-pink-300 mt-2 opacity-70">Click to edit</div>
                         </div>
+                    </div>
+                    
+                    <!-- Renter Notes -->
+                    <div id="tile-renterNotes-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl border border-violet-500 cursor-pointer"
+                         onclick="startEditTile('renterNotes', ${id}, 'textarea')"
+                         data-field="renterNotes"
+                         data-original-value="${sanitize(renterNotes)}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 text-violet-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            <span class="text-violet-200 font-semibold">Notes</span>
+                        </div>
+                        <div id="value-renterNotes-${id}" class="text-sm font-medium text-white" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${renterNotes || '<span class="text-violet-300 opacity-70">Add notes...</span>'}</div>
+                        <div class="text-xs text-violet-300 mt-2 opacity-70">Click to edit</div>
                     </div>
                 </div>
                 
@@ -634,6 +649,13 @@ window.startEditTile = function(field, propertyId, type) {
                    class="stat-input text-lg"
                    value="${currentValue || ''}">
         `;
+    } else if (type === 'textarea') {
+        inputHtml = `
+            <textarea id="input-${field}-${propertyId}"
+                   class="stat-input text-sm w-full"
+                   rows="3"
+                   placeholder="Add notes about this renter...">${currentValue || ''}</textarea>
+        `;
     } else {
         const rawValue = typeof currentValue === 'number' ? currentValue : String(currentValue || '').replace(/[$,]/g, '');
         const inputType = type === 'number' ? 'number' : (type === 'tel' ? 'tel' : 'text');
@@ -672,7 +694,8 @@ window.startEditTile = function(field, propertyId, type) {
         input.onclick = (e) => e.stopPropagation();
         input.onkeydown = (e) => {
             e.stopPropagation();
-            if (e.key === 'Enter') saveTileEdit(field, propertyId, type);
+            // For textarea, don't save on Enter (allow multi-line)
+            if (e.key === 'Enter' && type !== 'textarea') saveTileEdit(field, propertyId, type);
             if (e.key === 'Escape') cancelTileEdit(field, propertyId);
         };
     }
@@ -709,6 +732,9 @@ window.saveTileEdit = async function(field, propertyId, type) {
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
         }
+    } else if (type === 'textarea') {
+        // Allow empty values for notes
+        newValue = input.value.trim();
     } else if (type === 'frequency') {
         newValue = input.value;
     } else if (type === 'date') {
@@ -733,6 +759,11 @@ window.saveTileEdit = async function(field, propertyId, type) {
         displayValue = field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
     } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName' || field === 'renterPhone') && !newValue) {
         displayValue = '<span class="opacity-70">Not set</span>';
+    } else if (field === 'renterNotes' && !newValue) {
+        displayValue = '<span class="opacity-70">Add notes...</span>';
+    } else if (field === 'renterNotes' && newValue) {
+        // Show full text - CSS line-clamp will handle overflow
+        displayValue = newValue;
     } else if (type === 'date' && newValue) {
         displayValue = new Date(newValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     } else if (type === 'frequency') {
