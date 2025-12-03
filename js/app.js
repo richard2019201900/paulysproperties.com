@@ -343,7 +343,7 @@ function renderPropertyStatsContent(id) {
         
         <!-- Actions -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
-            <h3 class="text-2xl font-bold text-gray-200 mb-6">Quick Actions</h3>
+            <h3 class="text-2xl font-bold text-gray-200 mb-6">⚡ Quick Actions</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button onclick="toggleAvailability(${id}); setTimeout(() => renderPropertyStatsContent(${id}), 100);" class="flex items-center justify-center space-x-3 ${isAvailable ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-green-500 to-emerald-600'} text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
@@ -358,7 +358,7 @@ function renderPropertyStatsContent(id) {
         
         <!-- Property Images Gallery -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
-            <h3 class="text-2xl font-bold text-gray-200 mb-6">Property Images</h3>
+            <h3 class="text-2xl font-bold text-gray-200 mb-6">📸 Property Images</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 ${p.images.map((img, i) => `
                     <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
@@ -368,7 +368,7 @@ function renderPropertyStatsContent(id) {
         
         <!-- Reviews Section -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
-            <h3 class="text-2xl font-bold text-gray-200 mb-6">Property Reviews (${propertyReviews.length})</h3>
+            <h3 class="text-2xl font-bold text-gray-200 mb-6">⭐ Property Reviews (${propertyReviews.length})</h3>
             <div class="space-y-4">
                 ${propertyReviews.length > 0 ? propertyReviews.map(r => `
                     <div class="review-card p-5 rounded-xl shadow-md">
