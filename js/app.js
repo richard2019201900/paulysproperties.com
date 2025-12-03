@@ -227,6 +227,7 @@ function renderPropertyStatsContent(id) {
     
     // Renter & Payment info
     const renterName = PropertyDataService.getValue(id, 'renterName', p.renterName || '');
+    const renterPhone = PropertyDataService.getValue(id, 'renterPhone', p.renterPhone || '');
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || 'weekly');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
@@ -378,7 +379,9 @@ function renderPropertyStatsContent(id) {
                 
                 <!-- Renter & Payment Info -->
                 <h3 class="text-xl font-bold text-gray-200 mb-4">Renter & Payment Info <span class="text-sm text-purple-400">(Click to edit)</span></h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                
+                <!-- Renter Info Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <!-- Renter Name -->
                     <div id="tile-renterName-${id}" 
                          class="stat-tile p-4 bg-gradient-to-br from-sky-600 to-sky-800 rounded-xl border border-sky-500 cursor-pointer"
@@ -386,14 +389,40 @@ function renderPropertyStatsContent(id) {
                          data-field="renterName"
                          data-original-value="${sanitize(renterName)}">
                         <div class="flex items-center gap-3 mb-2">
-                            <svg class="w-6 h-6 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <svg class="w-6 h-6 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             <span class="text-sky-200 font-semibold">Renter Name</span>
                         </div>
                         <div id="value-renterName-${id}" class="text-lg font-bold text-white">${renterName || '<span class="text-sky-300 opacity-70">Not set</span>'}</div>
                         <div class="text-xs text-sky-300 mt-2 opacity-70">Click to edit</div>
                     </div>
                     
-                    <!-- Payment Frequency -->
+                    <!-- Renter Phone -->
+                    <div class="stat-tile p-4 bg-gradient-to-br from-pink-600 to-pink-800 rounded-xl border border-pink-500">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-3">
+                                <svg class="w-6 h-6 text-pink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                                <span class="text-pink-200 font-semibold">Renter Phone</span>
+                            </div>
+                            ${renterPhone ? `
+                            <button onclick="event.stopPropagation(); copyRenterPhone('${renterPhone}')" class="bg-pink-500 hover:bg-pink-400 text-white px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Copy phone number">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                                Copy
+                            </button>
+                            ` : ''}
+                        </div>
+                        <div id="tile-renterPhone-${id}" 
+                             class="cursor-pointer"
+                             onclick="startEditTile('renterPhone', ${id}, 'tel')"
+                             data-field="renterPhone"
+                             data-original-value="${sanitize(renterPhone)}">
+                            <div id="value-renterPhone-${id}" class="text-lg font-bold text-white">${renterPhone || '<span class="text-pink-300 opacity-70">Not set</span>'}</div>
+                            <div class="text-xs text-pink-300 mt-2 opacity-70">Click to edit</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Payment Info Row -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div id="tile-paymentFrequency-${id}" 
                          class="stat-tile p-4 bg-gradient-to-br from-teal-600 to-teal-800 rounded-xl border border-teal-500 cursor-pointer"
                          onclick="startEditTile('paymentFrequency', ${id}, 'frequency')"
@@ -608,13 +637,17 @@ window.startEditTile = function(field, propertyId, type) {
     } else {
         const rawValue = typeof currentValue === 'number' ? currentValue : String(currentValue || '').replace(/[$,]/g, '');
         const inputType = type === 'number' ? 'number' : (type === 'tel' ? 'tel' : 'text');
+        const placeholder = field === 'ownerName' ? 'Enter contact name' : 
+                           field === 'ownerPhone' ? 'Enter phone number' : 
+                           field === 'renterName' ? 'Enter renter name' : 
+                           field === 'renterPhone' ? 'Enter renter phone' : '';
         inputHtml = `
             <input type="${inputType}" 
                    id="input-${field}-${propertyId}"
                    class="stat-input text-lg"
                    value="${rawValue}"
                    ${type === 'number' ? 'min="0"' : ''}
-                   placeholder="${field === 'ownerName' ? 'Enter contact name' : (field === 'ownerPhone' ? 'Enter phone number' : (field === 'renterName' ? 'Enter renter name' : ''))}">
+                   placeholder="${placeholder}">
         `;
     }
     
@@ -671,7 +704,7 @@ window.saveTileEdit = async function(field, propertyId, type) {
         // Allow empty values for owner/renter info
         newValue = input.value.trim();
         // For non-contact fields, require a value
-        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone' && field !== 'renterName') {
+        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone' && field !== 'renterName' && field !== 'renterPhone') {
             tile.classList.add('error');
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
@@ -698,7 +731,7 @@ window.saveTileEdit = async function(field, propertyId, type) {
     let displayValue;
     if (type === 'number') {
         displayValue = field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
-    } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName') && !newValue) {
+    } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName' || field === 'renterPhone') && !newValue) {
         displayValue = '<span class="opacity-70">Not set</span>';
     } else if (type === 'date' && newValue) {
         displayValue = new Date(newValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -1035,6 +1068,30 @@ window.copyReminderScript = function(propertyId) {
     }).catch(err => {
         console.error('Failed to copy:', err);
         alert('Failed to copy. Please try selecting and copying manually.');
+    });
+};
+
+// ==================== COPY RENTER PHONE ====================
+window.copyRenterPhone = function(phoneNumber) {
+    navigator.clipboard.writeText(phoneNumber).then(() => {
+        // Show success feedback
+        const btn = event.target.closest('button');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            Copied!
+        `;
+        btn.classList.remove('bg-pink-500', 'hover:bg-pink-400');
+        btn.classList.add('bg-green-500');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.classList.remove('bg-green-500');
+            btn.classList.add('bg-pink-500', 'hover:bg-pink-400');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy phone number.');
     });
 };
 
