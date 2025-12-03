@@ -1,0 +1,321 @@
+// ==================== DOM ELEMENTS ====================
+const $ = id => document.getElementById(id);
+
+// ==================== UTILITY FUNCTIONS ====================
+const sanitize = str => {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+};
+
+const formatPrice = amt => amt >= 1e6 ? `$${(amt/1e6).toFixed(1)}M` : amt >= 1e3 ? `$${(amt/1e3).toFixed(0)}k` : `$${amt.toLocaleString()}`;
+
+const showElement = el => el?.classList.remove('hidden');
+const hideElement = el => el?.classList.add('hidden');
+const toggleClass = (el, cls, add) => el?.classList.toggle(cls, add);
+
+// ==================== CLIPBOARD ====================
+window.copyToClipboard = function(elementId, btn) {
+    const el = $(elementId);
+    const text = el.value || el.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = orig, 2000);
+    }).catch(() => {
+        // Fallback for older browsers
+        el.select?.();
+        document.execCommand('copy');
+    });
+};
+
+// ==================== MODAL FUNCTIONS ====================
+window.openModal = id => showElement($(id));
+window.closeModal = id => hideElement($(id));
+
+window.openContactModal = function(type, propertyTitle) {
+    const isRent = type === 'rent';
+    const colors = isRent ? ['purple', 'blue'] : ['amber', 'orange'];
+    
+    $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer';
+    $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
+    $('modalPropertyName').textContent = (isRent ? 'Rent: ' : 'Contact Us About: ') + propertyTitle;
+    $('modalMessage').value = isRent 
+        ? `Hi! I'm interested in renting ${propertyTitle}. Please contact me ASAP to discuss availability and next steps.`
+        : `Hi! I'm interested in making an offer on ${propertyTitle}. Please contact me ASAP to discuss further.`;
+    
+    const accent = $('modalAccent');
+    accent.className = `bg-gradient-to-r from-${colors[0]}-900 to-${colors[1]}-900 p-4 rounded-xl mb-6 text-center border border-${colors[0]}-700`;
+    
+    openModal('contactModal');
+};
+
+window.openRegisterContactModal = function() {
+    closeModal('loginModal');
+    
+    $('modalTitle').textContent = 'Request New Account';
+    $('modalTitle').className = 'text-3xl font-black bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent mb-4 text-center';
+    $('modalPropertyName').innerHTML = `
+        <label class="block text-gray-300 font-bold mb-2 text-left text-base">Account Type:</label>
+        <select id="accountTypeSelect" onchange="updateRegisterMessage()" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 font-medium transition">
+            <option value="Property Owner">Property Owner</option>
+            <option value="Property Renter">Property Renter</option>
+        </select>
+    `;
+    $('modalMessage').value = "Hi! I'm interested in creating a new account as a Property Owner. Please contact me to get started. Thank you!";
+    
+    const accent = $('modalAccent');
+    accent.className = 'bg-gradient-to-r from-cyan-900 to-blue-900 p-4 rounded-xl mb-6 text-center border border-cyan-700';
+    
+    openModal('contactModal');
+};
+
+window.updateRegisterMessage = function() {
+    const accountType = $('accountTypeSelect')?.value || 'Property Owner';
+    $('modalMessage').value = `Hi! I'm interested in creating a new account as a ${accountType}. Please contact me to get started. Thank you!`;
+};
+
+// ==================== LIGHTBOX ====================
+window.openLightbox = function(images, index) {
+    state.currentImages = images;
+    state.currentImageIndex = index;
+    $('lightboxImage').src = images[index];
+    $('lightbox').classList.add('active');
+    document.body.style.overflow = 'hidden';
+};
+
+window.closeLightbox = function() {
+    $('lightbox').classList.remove('active');
+    document.body.style.overflow = '';
+};
+
+window.changeImage = function(dir) {
+    const len = state.currentImages.length;
+    state.currentImageIndex = (state.currentImageIndex + dir + len) % len;
+    $('lightboxImage').src = state.currentImages[state.currentImageIndex];
+};
+
+// Keyboard navigation for lightbox
+document.addEventListener('keydown', e => {
+    if (!$('lightbox').classList.contains('active')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowRight') changeImage(1);
+    if (e.key === 'ArrowLeft') changeImage(-1);
+});
+
+// ==================== EDITABLE STAT TILE COMPONENT ====================
+/**
+ * Creates an interactive, editable stat tile
+ * Features:
+ * - Click to edit inline
+ * - Optimistic UI with rollback on failure
+ * - Real-time sync to Firestore
+ * - Visual feedback for saving/success/error states
+ */
+const EditableStatTile = {
+    /**
+     * Render a stat tile
+     * @param {Object} config - Tile configuration
+     */
+    render(config) {
+        const { id, propertyId, field, label, value, icon, gradient, prefix = '', suffix = '', type = 'number' } = config;
+        
+        return `
+            <div id="tile-${id}" 
+                 class="stat-tile bg-gradient-to-br ${gradient} rounded-2xl shadow-xl p-6 text-white border cursor-pointer"
+                 onclick="EditableStatTile.startEdit('${id}', ${propertyId}, '${field}', '${type}')"
+                 data-property-id="${propertyId}"
+                 data-field="${field}"
+                 data-original-value="${value}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold opacity-90">${label}</h3>
+                    ${icon}
+                    <span class="sync-indicator synced" id="sync-${id}">
+                        <span class="dot"></span>
+                        <span>Synced</span>
+                    </span>
+                </div>
+                <div id="value-${id}" class="text-3xl font-black">
+                    ${prefix}${typeof value === 'number' ? value.toLocaleString() : value}${suffix}
+                </div>
+                <p class="text-sm opacity-60 mt-2">Click to edit</p>
+            </div>
+        `;
+    },
+    
+    /**
+     * Start editing a tile
+     */
+    async startEdit(tileId, propertyId, field, type) {
+        const tile = $(`tile-${tileId}`);
+        const valueEl = $(`value-${tileId}`);
+        
+        if (tile.classList.contains('editing')) return;
+        
+        // Get current value from Firestore (fresh read)
+        const currentValue = PropertyDataService.getValue(propertyId, field, tile.dataset.originalValue);
+        
+        tile.classList.add('editing');
+        
+        const inputType = type === 'number' ? 'number' : 'text';
+        const rawValue = typeof currentValue === 'number' ? currentValue : currentValue.replace(/[$,]/g, '');
+        
+        valueEl.innerHTML = `
+            <input type="${inputType}" 
+                   id="input-${tileId}"
+                   class="stat-input text-2xl"
+                   value="${rawValue}"
+                   onkeydown="EditableStatTile.handleKeydown(event, '${tileId}', ${propertyId}, '${field}', '${type}')"
+                   onblur="EditableStatTile.cancelEdit('${tileId}', ${propertyId}, '${field}')">
+            <div class="flex gap-2 mt-3">
+                <button onclick="event.stopPropagation(); EditableStatTile.saveEdit('${tileId}', ${propertyId}, '${field}', '${type}')" 
+                        class="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-bold text-sm transition">
+                    Save
+                </button>
+                <button onclick="event.stopPropagation(); EditableStatTile.cancelEdit('${tileId}', ${propertyId}, '${field}')" 
+                        class="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-3 py-2 rounded-lg font-bold text-sm transition">
+                    Cancel
+                </button>
+            </div>
+        `;
+        
+        const input = $(`input-${tileId}`);
+        input.focus();
+        input.select();
+        
+        // Prevent tile click from interfering
+        input.onclick = (e) => e.stopPropagation();
+    },
+    
+    /**
+     * Handle keyboard events in edit mode
+     */
+    handleKeydown(event, tileId, propertyId, field, type) {
+        event.stopPropagation();
+        if (event.key === 'Enter') {
+            this.saveEdit(tileId, propertyId, field, type);
+        } else if (event.key === 'Escape') {
+            this.cancelEdit(tileId, propertyId, field);
+        }
+    },
+    
+    /**
+     * Save the edited value
+     * Implements optimistic UI with automatic rollback on failure
+     */
+    async saveEdit(tileId, propertyId, field, type) {
+        const tile = $(`tile-${tileId}`);
+        const valueEl = $(`value-${tileId}`);
+        const input = $(`input-${tileId}`);
+        const syncIndicator = $(`sync-${tileId}`);
+        
+        if (!input) return;
+        
+        const newValue = type === 'number' ? parseInt(input.value, 10) : input.value;
+        const originalValue = tile.dataset.originalValue;
+        
+        // Validation
+        if (type === 'number' && (isNaN(newValue) || newValue < 0)) {
+            tile.classList.add('error');
+            setTimeout(() => tile.classList.remove('error'), 500);
+            return;
+        }
+        
+        // Optimistic UI update
+        tile.classList.remove('editing');
+        tile.classList.add('saving');
+        syncIndicator.className = 'sync-indicator syncing';
+        syncIndicator.innerHTML = '<span class="dot"></span><span>Saving...</span>';
+        
+        const displayValue = type === 'number' 
+            ? `${newValue.toLocaleString()}`
+            : newValue;
+        valueEl.innerHTML = displayValue;
+        
+        try {
+            // Write to Firestore (includes fresh read before write)
+            await PropertyDataService.write(propertyId, field, newValue);
+            
+            // Success feedback
+            tile.classList.remove('saving');
+            tile.classList.add('success');
+            syncIndicator.className = 'sync-indicator synced';
+            syncIndicator.innerHTML = '<span class="dot"></span><span>Saved!</span>';
+            tile.dataset.originalValue = newValue;
+            
+            setTimeout(() => {
+                tile.classList.remove('success');
+                syncIndicator.innerHTML = '<span class="dot"></span><span>Synced</span>';
+            }, 2000);
+            
+        } catch (error) {
+            // Rollback on failure
+            console.error('Save failed, rolling back:', error);
+            tile.classList.remove('saving');
+            tile.classList.add('error');
+            syncIndicator.className = 'sync-indicator error';
+            syncIndicator.innerHTML = '<span class="dot"></span><span>Error!</span>';
+            
+            // Restore original value
+            const rollbackValue = type === 'number'
+                ? `${parseInt(originalValue).toLocaleString()}`
+                : originalValue;
+            valueEl.innerHTML = rollbackValue;
+            
+            setTimeout(() => {
+                tile.classList.remove('error');
+                syncIndicator.className = 'sync-indicator synced';
+                syncIndicator.innerHTML = '<span class="dot"></span><span>Synced</span>';
+            }, 3000);
+        }
+    },
+    
+    /**
+     * Cancel editing and restore original value
+     */
+    cancelEdit(tileId, propertyId, field) {
+        const tile = $(`tile-${tileId}`);
+        const valueEl = $(`value-${tileId}`);
+        
+        if (!tile.classList.contains('editing')) return;
+        
+        tile.classList.remove('editing');
+        
+        const originalValue = PropertyDataService.getValue(propertyId, field, tile.dataset.originalValue);
+        const displayValue = typeof originalValue === 'number'
+            ? `${originalValue.toLocaleString()}`
+            : originalValue;
+            
+        valueEl.innerHTML = displayValue;
+    }
+};
+
+// Make EditableStatTile globally accessible
+window.EditableStatTile = EditableStatTile;
+
+// ==================== REVIEWS ====================
+function loadReviews() {
+    try {
+        state.reviews = JSON.parse(localStorage.getItem('propertyReviews') || '{}');
+    } catch {
+        state.reviews = {};
+    }
+}
+
+function displayReviews(id) {
+    const reviews = state.reviews[id] || [];
+    $('reviewsDisplay').innerHTML = reviews.length 
+        ? reviews.map(r => `
+            <div class="review-card p-5 md:p-6 rounded-xl shadow-md">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <h5 class="font-bold text-white text-lg">${sanitize(r.name)}</h5>
+                        <div class="text-yellow-400 text-lg md:text-xl">${'*'.repeat(r.rating)}</div>
+                    </div>
+                    <div class="text-sm text-gray-400 font-medium">${sanitize(r.date)}</div>
+                </div>
+                <p class="text-gray-300 font-medium">${sanitize(r.text)}</p>
+            </div>
+        `).join('')
+        : '<p class="text-gray-500 text-center font-semibold">No reviews yet. Be the first to leave a review!</p>';
+}

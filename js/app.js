@@ -1,0 +1,620 @@
+// ==================== VIEW PROPERTY ====================
+window.viewProperty = function(id) {
+    const p = properties.find(prop => prop.id === id);
+    if (!p) return;
+    
+    state.currentPropertyId = id;
+    state.currentImages = p.images;
+    
+    hideElement($('renterSection'));
+    hideElement($('ownerDashboard'));
+    hideElement($('propertyStatsPage'));
+    showElement($('propertyDetailPage'));
+    
+    const luxuryFeatures = p.features ? `
+        <div class="bg-gradient-to-br from-amber-900 via-orange-900 to-red-900 p-6 md:p-10 rounded-2xl md:rounded-3xl mb-8 border-2 md:border-4 border-amber-700 shadow-2xl">
+            <h3 class="text-2xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-6 md:mb-8 flex items-center">
+                <svg class="w-8 h-8 md:w-10 md:h-10 text-amber-400 mr-3 md:mr-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                Luxury Estate Features
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                ${[
+                    {icon:'Fish', title:'500-Gallon Aquarium', desc:'Giant indoor aquarium with exotic marine life'},
+                    {icon:'Kitchen', title:'Outdoor Kitchen', desc:'Professional-grade outdoor cooking station'},
+                    {icon:'Pool', title:'Infinity Pool', desc:'Stunning infinity edge pool with ocean views'},
+                    {icon:'Helicopter', title:'Helicopter Pad', desc:'Private landing pad for ultimate convenience'}
+                ].map(f => `
+                    <div class="flex items-start space-x-3 md:space-x-4 bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl border border-amber-600/30">
+                        <div class="text-3xl md:text-5xl">${f.icon}</div>
+                        <div><h4 class="text-lg md:text-xl font-black text-white mb-1">${f.title}</h4><p class="text-gray-300 font-medium text-sm md:text-base">${f.desc}</p></div>
+                    </div>
+                `).join('')}
+                <div class="flex items-start space-x-3 md:space-x-4 bg-black/40 p-4 md:p-5 rounded-xl md:rounded-2xl md:col-span-2 border border-amber-600/30">
+                    <div class="text-3xl md:text-5xl">Road</div>
+                    <div><h4 class="text-lg md:text-xl font-black text-white mb-1">Private Driveway</h4><p class="text-gray-300 font-medium text-sm md:text-base">Long, gated driveway ensuring complete privacy and exclusivity</p></div>
+                </div>
+            </div>
+        </div>` : '';
+
+    $('propertyDetailContent').innerHTML = `
+        ${p.videoUrl ? `
+        <div class="p-4 md:p-6 bg-gradient-to-r from-red-900 to-pink-900 border-b border-gray-700">
+            <div class="flex items-center space-x-3 mb-4">
+                <svg class="w-6 h-6 md:w-8 md:h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path></svg>
+                <h3 class="text-xl md:text-2xl font-black text-white">Virtual Video Tour</h3>
+            </div>
+            <video controls autoplay muted playsinline class="w-full rounded-xl shadow-2xl border border-gray-600" poster="${p.images[0]}">
+                <source src="${p.videoUrl}" type="video/mp4">
+            </video>
+        </div>` : ''}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 p-4 md:p-6">
+            ${p.images.map((img, i) => `
+                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-60 md:h-80 object-cover rounded-xl shadow-lg border border-gray-600 ${i === 0 ? 'md:col-span-2' : ''}" loading="lazy">
+            `).join('')}
+        </div>
+        <div class="p-5 md:p-8">
+            <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+                <div>
+                    <h2 class="text-2xl md:text-4xl font-black text-white mb-2">${sanitize(p.title)}</h2>
+                    <p class="text-lg md:text-xl text-gray-300 font-semibold">Location: ${sanitize(p.location)}</p>
+                </div>
+                <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+                ${[
+                    {icon:'Bed', val:p.bedrooms, label:'Bedrooms'},
+                    {icon:'Bath', val:p.bathrooms, label:'Bathrooms'},
+                    {icon:'Box', val:p.storage.toLocaleString(), label:'Storage'},
+                    {icon:'Home', val:p.interiorType, label:'Interior'}
+                ].map(s => `
+                    <div class="text-center p-3 md:p-4 bg-gray-700 rounded-xl border border-gray-600">
+                        <div class="text-2xl md:text-3xl mb-2">${s.icon}</div>
+                        <div class="text-xl md:text-2xl font-bold text-white">${s.val}</div>
+                        <div class="text-xs md:text-sm text-gray-300 font-semibold">${s.label}</div>
+                    </div>
+                `).join('')}
+            </div>
+            ${luxuryFeatures}
+            <div class="bg-gray-800 p-5 md:p-8 rounded-2xl mb-8 border border-gray-700">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                    <div>
+                        <div class="text-gray-400 font-bold mb-2">Weekly Price</div>
+                        <div class="text-2xl md:text-3xl font-black text-green-400">$${p.weeklyPrice.toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400 font-bold mb-2">Monthly Price (Discounted)</div>
+                        <div class="text-3xl md:text-4xl font-black text-purple-400">$${p.monthlyPrice.toLocaleString()}</div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="openContactModal('rent', '${sanitize(p.title)}')" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
+            <button onclick="openContactModal('offer', '${sanitize(p.title)}')" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
+        </div>`;
+    
+    displayReviews(id);
+    
+    // Load and display owner username
+    getPropertyOwnerUsername(id).then(username => {
+        const ownerEl = document.querySelector('#propertyDetailContent .text-blue-400');
+        if (ownerEl) {
+            ownerEl.textContent = `Owner: ${username}`;
+        }
+    });
+    
+    window.scrollTo(0, 0);
+};
+
+// ==================== PROPERTY STATS PAGE ====================
+/**
+ * Renders the property stats page with EDITABLE tiles
+ * All editable fields sync in real-time with Firestore
+ */
+window.viewPropertyStats = async function(id) {
+    console.log('[viewPropertyStats] Opening stats page for property:', id);
+    
+    const p = properties.find(prop => prop.id === id);
+    if (!p) {
+        console.error('[viewPropertyStats] Property not found:', id);
+        return;
+    }
+    
+    // Check if owner owns this property
+    if (!ownsProperty(id)) {
+        console.warn('[viewPropertyStats] Access denied for property:', id);
+        alert('You do not have access to this property.');
+        return;
+    }
+    
+    console.log('[viewPropertyStats] Access granted, loading property:', p.title);
+    
+    state.currentPropertyId = id;
+    state.currentImages = p.images;
+    
+    // Fetch fresh data from Firestore
+    try {
+        const freshData = await PropertyDataService.read(id);
+        if (freshData.exists) {
+            state.propertyOverrides[id] = freshData.data;
+        }
+    } catch (error) {
+        console.error('Error fetching property data:', error);
+    }
+    
+    // Set up real-time listener for all property overrides
+    PropertyDataService.subscribeAll((data) => {
+        // Re-render when data changes from another source
+        if (state.currentPropertyId === id) {
+            console.log('Real-time update received, refreshing stats page');
+            renderPropertyStatsContent(id);
+        }
+    });
+    
+    renderPropertyStatsContent(id);
+    
+    hideElement($('ownerDashboard'));
+    hideElement($('renterSection'));
+    hideElement($('propertyDetailPage'));
+    showElement($('propertyStatsPage'));
+    window.scrollTo(0, 0);
+};
+
+/**
+ * Renders the property stats content with editable tiles
+ */
+function renderPropertyStatsContent(id) {
+    const p = properties.find(prop => prop.id === id);
+    if (!p) return;
+    
+    const isAvailable = state.availability[id] !== false;
+    const statusClass = isAvailable ? 'from-green-600 to-emerald-600' : 'from-red-600 to-pink-600';
+    const statusText = isAvailable ? 'Available' : 'Rented';
+    
+    // Get effective values (overrides or defaults)
+    const bedrooms = PropertyDataService.getValue(id, 'bedrooms', p.bedrooms);
+    const bathrooms = PropertyDataService.getValue(id, 'bathrooms', p.bathrooms);
+    const storage = PropertyDataService.getValue(id, 'storage', p.storage);
+    const interiorType = PropertyDataService.getValue(id, 'interiorType', p.interiorType);
+    const weeklyPrice = PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice);
+    const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice);
+    
+    // Get reviews for this property
+    const propertyReviews = state.reviews[id] || [];
+    const avgRating = propertyReviews.length > 0 
+        ? (propertyReviews.reduce((sum, r) => sum + r.rating, 0) / propertyReviews.length).toFixed(1)
+        : 'N/A';
+    
+    $('propertyStatsContent').innerHTML = `
+        <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8">
+            <!-- Property Header -->
+            <div class="relative">
+                <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover">
+                <div class="absolute top-4 right-4 bg-gradient-to-r ${statusClass} text-white px-4 py-2 rounded-xl font-bold shadow-lg">
+                    ${statusText}
+                </div>
+            </div>
+            
+            <div class="p-6 md:p-8">
+                <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+                    <div>
+                        <h2 class="text-3xl md:text-4xl font-black text-white mb-2">${sanitize(p.title)}</h2>
+                        <p class="text-lg text-gray-300 font-semibold">Location: ${sanitize(p.location)}</p>
+                    </div>
+                    <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
+                </div>
+                
+                <div class="bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 rounded-xl p-4 mb-6">
+                    <p class="text-purple-200 font-semibold text-center">Click any tile below to edit - Changes sync in real-time across all pages</p>
+                </div>
+                
+                <!-- EDITABLE Quick Stats Grid -->
+                <h3 class="text-xl font-bold text-gray-200 mb-4">Property Details <span class="text-sm text-purple-400">(Click to edit)</span></h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" id="editableStatsGrid">
+                    <!-- Bedrooms Tile -->
+                    <div id="tile-bedrooms-${id}" 
+                         class="stat-tile text-center p-4 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl border border-indigo-500 cursor-pointer"
+                         onclick="startEditTile('bedrooms', ${id}, 'number')"
+                         data-field="bedrooms"
+                         data-original-value="${bedrooms}">
+                        <div class="text-2xl mb-2">Bed</div>
+                        <div id="value-bedrooms-${id}" class="text-xl font-bold text-white">${bedrooms}</div>
+                        <div class="text-sm text-indigo-200">Bedrooms</div>
+                        <div class="text-xs text-indigo-300 mt-1 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Bathrooms Tile -->
+                    <div id="tile-bathrooms-${id}" 
+                         class="stat-tile text-center p-4 bg-gradient-to-br from-cyan-600 to-cyan-800 rounded-xl border border-cyan-500 cursor-pointer"
+                         onclick="startEditTile('bathrooms', ${id}, 'number')"
+                         data-field="bathrooms"
+                         data-original-value="${bathrooms}">
+                        <div class="text-2xl mb-2">Bath</div>
+                        <div id="value-bathrooms-${id}" class="text-xl font-bold text-white">${bathrooms}</div>
+                        <div class="text-sm text-cyan-200">Bathrooms</div>
+                        <div class="text-xs text-cyan-300 mt-1 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Storage Tile -->
+                    <div id="tile-storage-${id}" 
+                         class="stat-tile text-center p-4 bg-gradient-to-br from-amber-600 to-amber-800 rounded-xl border border-amber-500 cursor-pointer"
+                         onclick="startEditTile('storage', ${id}, 'number')"
+                         data-field="storage"
+                         data-original-value="${storage}">
+                        <div class="text-2xl mb-2">Box</div>
+                        <div id="value-storage-${id}" class="text-xl font-bold text-white">${storage.toLocaleString()}</div>
+                        <div class="text-sm text-amber-200">Storage</div>
+                        <div class="text-xs text-amber-300 mt-1 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Interior Type Tile -->
+                    <div id="tile-interiorType-${id}" 
+                         class="stat-tile text-center p-4 bg-gradient-to-br from-rose-600 to-rose-800 rounded-xl border border-rose-500 cursor-pointer"
+                         onclick="startEditTile('interiorType', ${id}, 'select')"
+                         data-field="interiorType"
+                         data-original-value="${interiorType}">
+                        <div class="text-2xl mb-2">Home</div>
+                        <div id="value-interiorType-${id}" class="text-xl font-bold text-white">${interiorType}</div>
+                        <div class="text-sm text-rose-200">Interior</div>
+                        <div class="text-xs text-rose-300 mt-1 opacity-70">Click to edit</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- EDITABLE Income Stats -->
+        <h3 class="text-xl font-bold text-gray-200 mb-4">Pricing & Status <span class="text-sm text-purple-400">(Click to edit)</span></h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Weekly Rate Tile -->
+            <div id="tile-weeklyPrice-${id}" 
+                 class="stat-tile bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-6 text-white border border-blue-500 cursor-pointer"
+                 onclick="startEditTile('weeklyPrice', ${id}, 'number')"
+                 data-field="weeklyPrice"
+                 data-original-value="${weeklyPrice}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold opacity-90">Weekly Rate</h3>
+                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div id="value-weeklyPrice-${id}" class="text-3xl font-black">${weeklyPrice.toLocaleString()}</div>
+                <div class="text-xs text-blue-200 mt-2 opacity-70">Click to edit</div>
+            </div>
+            
+            <!-- Monthly Rate Tile -->
+            <div id="tile-monthlyPrice-${id}" 
+                 class="stat-tile bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-xl p-6 text-white border border-green-500 cursor-pointer"
+                 onclick="startEditTile('monthlyPrice', ${id}, 'number')"
+                 data-field="monthlyPrice"
+                 data-original-value="${monthlyPrice}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold opacity-90">Monthly Rate</h3>
+                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                </div>
+                <div id="value-monthlyPrice-${id}" class="text-3xl font-black">${monthlyPrice.toLocaleString()}</div>
+                <div class="text-xs text-green-200 mt-2 opacity-70">Click to edit</div>
+            </div>
+            
+            <!-- Status Tile (toggles availability) -->
+            <div id="tile-status-${id}" 
+                 class="stat-tile bg-gradient-to-br ${isAvailable ? 'from-emerald-600 to-teal-800 border-emerald-500' : 'from-red-600 to-pink-800 border-red-500'} rounded-2xl shadow-xl p-6 text-white border cursor-pointer"
+                 onclick="togglePropertyStatus(${id})">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold opacity-90">Status</h3>
+                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div class="text-2xl font-black">${statusText}</div>
+                <div class="text-sm opacity-80 mt-1">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
+                <div class="text-xs mt-2 opacity-70">Click to toggle</div>
+            </div>
+            
+            <!-- Reviews Tile (read-only) -->
+            <div class="bg-gradient-to-br from-amber-600 to-orange-800 rounded-2xl shadow-xl p-6 text-white border border-amber-500">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold opacity-90">Reviews</h3>
+                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                </div>
+                <div class="text-2xl font-black">${avgRating} Star</div>
+                <div class="text-sm opacity-80 mt-1">${propertyReviews.length} review${propertyReviews.length !== 1 ? 's' : ''}</div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+            <h3 class="text-2xl font-bold text-gray-200 mb-6">Quick Actions</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="toggleAvailability(${id}); setTimeout(() => renderPropertyStatsContent(${id}), 100);" class="flex items-center justify-center space-x-3 ${isAvailable ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-green-500 to-emerald-600'} text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                    <span>${isAvailable ? 'Mark as Rented' : 'Mark as Available'}</span>
+                </button>
+                <button onclick="viewProperty(${id})" class="flex items-center justify-center space-x-3 gradient-bg text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    <span>View Public Listing</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Property Images Gallery -->
+        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+            <h3 class="text-2xl font-bold text-gray-200 mb-6">Property Images</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                ${p.images.map((img, i) => `
+                    <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
+                `).join('')}
+            </div>
+        </div>
+        
+        <!-- Reviews Section -->
+        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
+            <h3 class="text-2xl font-bold text-gray-200 mb-6">Property Reviews (${propertyReviews.length})</h3>
+            <div class="space-y-4">
+                ${propertyReviews.length > 0 ? propertyReviews.map(r => `
+                    <div class="review-card p-5 rounded-xl shadow-md">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h5 class="font-bold text-white text-lg">${sanitize(r.name)}</h5>
+                                <div class="text-yellow-400 text-lg">${'*'.repeat(r.rating)}</div>
+                            </div>
+                            <div class="text-sm text-gray-400 font-medium">${sanitize(r.date)}</div>
+                        </div>
+                        <p class="text-gray-300 font-medium">${sanitize(r.text)}</p>
+                    </div>
+                `).join('') : '<p class="text-gray-500 text-center font-semibold py-8">No reviews yet for this property.</p>'}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Start editing a tile - shows inline input
+ */
+window.startEditTile = function(field, propertyId, type) {
+    const tileId = `tile-${field}-${propertyId}`;
+    const valueId = `value-${field}-${propertyId}`;
+    const tile = $(tileId);
+    const valueEl = $(valueId);
+    
+    if (!tile || !valueEl || tile.classList.contains('editing')) return;
+    
+    tile.classList.add('editing');
+    
+    const currentValue = PropertyDataService.getValue(propertyId, field, tile.dataset.originalValue);
+    
+    let inputHtml;
+    if (type === 'select' && field === 'interiorType') {
+        inputHtml = `
+            <select id="input-${field}-${propertyId}" class="stat-input text-lg w-full">
+                <option value="Instance" ${currentValue === 'Instance' ? 'selected' : ''}>Instance</option>
+                <option value="Walk-in" ${currentValue === 'Walk-in' ? 'selected' : ''}>Walk-in</option>
+            </select>
+        `;
+    } else {
+        const rawValue = typeof currentValue === 'number' ? currentValue : String(currentValue).replace(/[$,]/g, '');
+        inputHtml = `
+            <input type="${type === 'number' ? 'number' : 'text'}" 
+                   id="input-${field}-${propertyId}"
+                   class="stat-input text-lg"
+                   value="${rawValue}"
+                   min="0">
+        `;
+    }
+    
+    valueEl.innerHTML = `
+        ${inputHtml}
+        <div class="flex gap-2 mt-3">
+            <button onclick="event.stopPropagation(); saveTileEdit('${field}', ${propertyId}, '${type}')" 
+                    class="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-bold text-xs transition">
+                Save
+            </button>
+            <button onclick="event.stopPropagation(); cancelTileEdit('${field}', ${propertyId})" 
+                    class="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-3 py-2 rounded-lg font-bold text-xs transition">
+                Cancel
+            </button>
+        </div>
+    `;
+    
+    const input = $(`input-${field}-${propertyId}`);
+    if (input) {
+        input.focus();
+        if (input.select) input.select();
+        input.onclick = (e) => e.stopPropagation();
+        input.onkeydown = (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') saveTileEdit(field, propertyId, type);
+            if (e.key === 'Escape') cancelTileEdit(field, propertyId);
+        };
+    }
+};
+
+/**
+ * Save tile edit - writes to Firestore with optimistic UI
+ */
+window.saveTileEdit = async function(field, propertyId, type) {
+    const tileId = `tile-${field}-${propertyId}`;
+    const valueId = `value-${field}-${propertyId}`;
+    const inputId = `input-${field}-${propertyId}`;
+    
+    const tile = $(tileId);
+    const valueEl = $(valueId);
+    const input = $(inputId);
+    
+    if (!tile || !valueEl || !input) return;
+    
+    let newValue;
+    if (type === 'number') {
+        newValue = parseInt(input.value, 10);
+        if (isNaN(newValue) || newValue < 0) {
+            tile.classList.add('error');
+            setTimeout(() => tile.classList.remove('error'), 500);
+            return;
+        }
+    } else {
+        newValue = input.value.trim();
+        if (!newValue) {
+            tile.classList.add('error');
+            setTimeout(() => tile.classList.remove('error'), 500);
+            return;
+        }
+    }
+    
+    const originalValue = tile.dataset.originalValue;
+    
+    // Optimistic UI update
+    tile.classList.remove('editing');
+    tile.classList.add('saving');
+    
+    const displayValue = type === 'number' 
+        ? (field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString())
+        : newValue;
+    valueEl.innerHTML = `<span class="opacity-70">${displayValue}</span><div class="text-xs mt-1">Saving...</div>`;
+    
+    try {
+        // CRITICAL: Write to Firestore (includes fresh read before write)
+        await PropertyDataService.write(propertyId, field, newValue);
+        
+        // Success feedback
+        tile.classList.remove('saving');
+        tile.classList.add('success');
+        tile.dataset.originalValue = newValue;
+        
+        // Update display
+        valueEl.innerHTML = displayValue;
+        
+        // Show success briefly
+        setTimeout(() => {
+            tile.classList.remove('success');
+            // Refresh the entire stats page to show synced data
+            renderPropertyStatsContent(propertyId);
+        }, 1000);
+        
+        // Also refresh properties grid and dashboard if they're using this data
+        renderProperties(state.filteredProperties);
+        if (state.currentUser === 'owner') renderOwnerDashboard();
+        
+    } catch (error) {
+        console.error('Save failed, rolling back:', error);
+        
+        // Rollback on failure
+        tile.classList.remove('saving');
+        tile.classList.add('error');
+        
+        const rollbackValue = type === 'number'
+            ? (field === 'weeklyPrice' || field === 'monthlyPrice' ? `${parseInt(originalValue).toLocaleString()}` : parseInt(originalValue).toLocaleString())
+            : originalValue;
+        valueEl.innerHTML = `${rollbackValue}<div class="text-xs mt-1 text-red-300">Error! Try again</div>`;
+        
+        setTimeout(() => {
+            tile.classList.remove('error');
+            renderPropertyStatsContent(propertyId);
+        }, 2000);
+    }
+};
+
+/**
+ * Cancel tile edit - restores original value
+ */
+window.cancelTileEdit = function(field, propertyId) {
+    const tileId = `tile-${field}-${propertyId}`;
+    const tile = $(tileId);
+    
+    if (!tile || !tile.classList.contains('editing')) return;
+    
+    tile.classList.remove('editing');
+    
+    // Re-render to restore original display
+    renderPropertyStatsContent(propertyId);
+};
+
+/**
+ * Toggle property status (available/rented)
+ */
+window.togglePropertyStatus = async function(propertyId) {
+    await toggleAvailability(propertyId);
+    setTimeout(() => renderPropertyStatsContent(propertyId), 100);
+};
+
+// ==================== EVENT LISTENERS ====================
+// Firebase login form
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = $('firebaseLoginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = $('ownerEmail').value;
+            const password = $('ownerPassword').value;
+            const btn = $('loginSubmitBtn');
+            const errorDiv = $('loginError');
+            
+            btn.disabled = true;
+            btn.textContent = 'Signing In...';
+            hideElement(errorDiv);
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => {
+                    state.currentUser = 'owner';
+                    closeModal('loginModal');
+                    hideOwnerLoginForm();
+                    hideElement($('renterSection'));
+                    hideElement($('propertyDetailPage'));
+                    hideElement($('propertyStatsPage'));
+                    showElement($('ownerDashboard'));
+                    updateAuthButton(true);
+                    renderOwnerDashboard();
+                    loadUsername();
+                    window.scrollTo(0, 0);
+                })
+                .catch(error => {
+                    const messages = {
+                        'auth/user-not-found': 'No account found with this email.',
+                        'auth/wrong-password': 'Incorrect password. Please try again.',
+                        'auth/invalid-credential': 'Invalid email or password.',
+                        'auth/too-many-requests': 'Too many failed attempts. Please try again later.'
+                    };
+                    errorDiv.textContent = messages[error.code] || 'Invalid email or password. Please try again.';
+                    showElement(errorDiv);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = 'Sign In';
+                });
+        });
+    }
+    
+    // Review form
+    const reviewForm = $('reviewForm');
+    if (reviewForm) {
+        reviewForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!state.currentPropertyId) return;
+            
+            const review = {
+                name: $('reviewerName').value.trim(),
+                rating: parseInt($('reviewRating').value),
+                text: $('reviewText').value.trim(),
+                date: new Date().toLocaleDateString()
+            };
+            
+            if (!state.reviews[state.currentPropertyId]) {
+                state.reviews[state.currentPropertyId] = [];
+            }
+            state.reviews[state.currentPropertyId].unshift(review);
+            localStorage.setItem('propertyReviews', JSON.stringify(state.reviews));
+            displayReviews(state.currentPropertyId);
+            this.reset();
+            alert('Thank you for your review!');
+        });
+    }
+    
+    // Mobile menu
+    const menuBtn = $('menuBtn');
+    if (menuBtn) {
+        menuBtn.addEventListener('click', () => $('mobileMenu').classList.toggle('hidden'));
+    }
+});
+
+// ==================== INITIALIZE ====================
+async function init() {
+    loadReviews();
+    await initFirestore();
+    setupRealtimeListener();
+    renderProperties(properties);
+}
+
+// Start the app
+init();
