@@ -444,10 +444,24 @@ textarea.stat-input {
 }
 
 /* ==================== DASHBOARD TABLE ROWS ==================== */
-#ownerPropertiesTable tr {
+#dashboardTable {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#dashboardTable tr {
     transition: background-color 0.15s ease;
 }
 
-#ownerPropertiesTable tr:hover {
+#dashboardTable tbody tr:hover {
     background-color: rgba(75, 85, 99, 0.5) !important;
+}
+
+#dashboardTable thead th {
+    border-bottom: 2px solid #4b5563;
+}
+
+/* Last row should have no bottom border */
+#dashboardTable tbody tr:last-child {
+    border-bottom: none;
 }
