@@ -165,7 +165,7 @@
     border-radius: 13px;
     cursor: pointer;
     transition: background 0.3s;
-    border: 2px solid #667eea;
+    border: 2px solid #a78bfa;
 }
 
 .toggle-switch.active { 
