@@ -4,6 +4,7 @@ function updateAuthButton(isLoggedIn) {
     const mobileBtn = $('mobileAuthBtn');
     const navCreateBtn = $('navCreateListingBtn');
     const mobileCreateBtn = $('mobileCreateListingBtn');
+    const navUserDisplay = $('navUserDisplay');
     
     if (isLoggedIn) {
         navBtn.textContent = 'Logout';
@@ -15,6 +16,11 @@ function updateAuthButton(isLoggedIn) {
         // Show Create Listing buttons
         if (navCreateBtn) navCreateBtn.className = 'hidden md:block bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-5 py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg';
         if (mobileCreateBtn) mobileCreateBtn.className = 'block px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold';
+        // Show user display
+        if (navUserDisplay) {
+            navUserDisplay.className = 'hidden md:flex items-center gap-2';
+            updateNavUserDisplay();
+        }
     } else {
         navBtn.textContent = 'Register / Sign In';
         navBtn.className = 'hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg';
@@ -25,8 +31,39 @@ function updateAuthButton(isLoggedIn) {
         // Hide Create Listing buttons completely (set className to hidden only, no md:block)
         if (navCreateBtn) navCreateBtn.className = 'hidden';
         if (mobileCreateBtn) mobileCreateBtn.className = 'hidden';
+        // Hide user display
+        if (navUserDisplay) navUserDisplay.className = 'hidden';
     }
 }
+
+// Update the nav bar user display
+async function updateNavUserDisplay() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const navUserName = $('navUserName');
+    const navUserTier = $('navUserTier');
+    
+    if (!navUserName || !navUserTier) return;
+    
+    try {
+        const doc = await db.collection('users').doc(user.uid).get();
+        const data = doc.data() || {};
+        const username = data.username || user.email.split('@')[0];
+        const tier = data.tier || 'starter';
+        const tierData = TIERS[tier] || TIERS.starter;
+        
+        navUserName.textContent = username;
+        navUserTier.innerHTML = `${tierData.icon} ${tierData.name}`;
+        navUserTier.className = `text-xs ${tierData.color}`;
+    } catch (error) {
+        console.error('Error updating nav user display:', error);
+        navUserName.textContent = user.email.split('@')[0];
+        navUserTier.textContent = '🌱 Starter';
+    }
+}
+
+window.updateNavUserDisplay = updateNavUserDisplay;
 
 window.handleAuthClick = function() {
     hideElement($('mobileMenu'));
@@ -168,6 +205,9 @@ window.saveUsername = async function() {
         status.textContent = 'Display name saved successfully!';
         status.className = 'text-green-400 text-sm mt-3';
         showElement(status);
+        
+        // Update nav bar display
+        updateNavUserDisplay();
         
         setTimeout(() => hideElement(status), 3000);
     } catch (error) {
