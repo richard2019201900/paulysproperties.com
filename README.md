@@ -1,4 +1,4 @@
-# Pauly's Property Portal
+# paulysproperties.com
 
 A premium real estate rental website for Los Santos properties, featuring Firebase authentication, Firestore database, and a modern responsive UI.
 
