@@ -311,7 +311,7 @@ function renderPropertyStatsContent(id) {
                                 class="text-3xl md:text-4xl font-black text-white cursor-pointer hover:text-purple-300 transition inline-block"
                                 onclick="startEditField('title', ${id}, this)"
                                 title="Click to edit address">
-                                ${sanitize(PropertyDataService.getValue(id, 'title', p.title))}
+                                ${sanitize(p.title)}
                             </h2>
                             <span class="text-purple-400 text-sm">✏️</span>
                         </div>
@@ -322,7 +322,7 @@ function renderPropertyStatsContent(id) {
                                   class="text-lg text-gray-300 font-semibold cursor-pointer hover:text-purple-300 transition"
                                   onclick="startEditField('location', ${id}, this)"
                                   title="Click to edit location">
-                                ${sanitize(PropertyDataService.getValue(id, 'location', p.location))}
+                                ${sanitize(p.location)}
                             </span>
                             <span class="text-purple-400 text-sm">✏️</span>
                         </div>
