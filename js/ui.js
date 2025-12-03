@@ -159,8 +159,8 @@ function calculateTotals() {
     const ownerProps = getOwnerProperties();
     return ownerProps.reduce((acc, p) => {
         if (state.availability[p.id] === false) {
-            acc.weekly += p.weeklyPrice;
-            acc.monthly += p.monthlyPrice;
+            acc.weekly += PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
+            acc.monthly += PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
         }
         return acc;
     }, { weekly: 0, monthly: 0 });
@@ -194,10 +194,10 @@ function renderOwnerDashboard() {
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
             </td>
             <td class="px-4 md:px-6 py-4 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell">${p.interiorType}</td>
-            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell">${p.storage.toLocaleString()}</td>
-            <td class="px-4 md:px-6 py-4 text-green-400 font-bold">${p.weeklyPrice.toLocaleString()}</td>
-            <td class="px-4 md:px-6 py-4 text-purple-400 font-bold">${p.monthlyPrice.toLocaleString()}</td>
+            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</td>
+            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</td>
+            <td class="px-4 md:px-6 py-4 text-green-400 font-bold">${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</td>
+            <td class="px-4 md:px-6 py-4 text-purple-400 font-bold">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</td>
         </tr>
     `).join('');
 }
@@ -225,13 +225,13 @@ async function renderProperties(list) {
                 <p class="text-xs md:text-sm text-gray-400 mb-2 font-semibold">Interior: ${p.interiorType}</p>
                 <p id="owner-${p.id}" class="text-xs md:text-sm text-blue-400 mb-4 font-semibold">Owner: Loading...</p>
                 <div class="grid grid-cols-3 gap-2 mb-4 text-xs md:text-sm text-gray-300 font-semibold">
-                    <div>${p.bedrooms} Beds</div>
-                    <div>${p.bathrooms} Baths</div>
-                    <div>${p.storage.toLocaleString()}</div>
+                    <div>${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)} Beds</div>
+                    <div>${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)} Baths</div>
+                    <div>${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</div>
                 </div>
                 <div class="mb-4">
-                    <div class="text-gray-400 font-semibold text-sm"><span class="font-bold text-gray-300">Weekly:</span> ${p.weeklyPrice.toLocaleString()}</div>
-                    <div class="text-purple-400 font-black text-xl md:text-2xl mt-1">${p.monthlyPrice.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
+                    <div class="text-gray-400 font-semibold text-sm"><span class="font-bold text-gray-300">Weekly:</span> ${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
+                    <div class="text-purple-400 font-black text-xl md:text-2xl mt-1">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
                 </div>
                 <button onclick="viewProperty(${p.id})" class="w-full gradient-bg text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
                 <button onclick="event.stopPropagation(); openContactModal('offer', '${sanitize(p.title)}')" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>

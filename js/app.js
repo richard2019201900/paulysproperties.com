@@ -62,10 +62,10 @@ window.viewProperty = function(id) {
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
                 ${[
-                    {icon:'Bed', val:p.bedrooms, label:'Bedrooms'},
-                    {icon:'Bath', val:p.bathrooms, label:'Bathrooms'},
-                    {icon:'Box', val:p.storage.toLocaleString(), label:'Storage'},
-                    {icon:'Home', val:p.interiorType, label:'Interior'}
+                    {icon:'Bed', val:PropertyDataService.getValue(id, 'bedrooms', p.bedrooms), label:'Bedrooms'},
+                    {icon:'Bath', val:PropertyDataService.getValue(id, 'bathrooms', p.bathrooms), label:'Bathrooms'},
+                    {icon:'Box', val:PropertyDataService.getValue(id, 'storage', p.storage).toLocaleString(), label:'Storage'},
+                    {icon:'Home', val:PropertyDataService.getValue(id, 'interiorType', p.interiorType), label:'Interior'}
                 ].map(s => `
                     <div class="text-center p-3 md:p-4 bg-gray-700 rounded-xl border border-gray-600">
                         <div class="text-2xl md:text-3xl mb-2">${s.icon}</div>
@@ -79,11 +79,11 @@ window.viewProperty = function(id) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     <div>
                         <div class="text-gray-400 font-bold mb-2">Weekly Price</div>
-                        <div class="text-2xl md:text-3xl font-black text-green-400">$${p.weeklyPrice.toLocaleString()}</div>
+                        <div class="text-2xl md:text-3xl font-black text-green-400">$${PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
                     </div>
                     <div>
                         <div class="text-gray-400 font-bold mb-2">Monthly Price (Discounted)</div>
-                        <div class="text-3xl md:text-4xl font-black text-purple-400">$${p.monthlyPrice.toLocaleString()}</div>
+                        <div class="text-3xl md:text-4xl font-black text-purple-400">$${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</div>
                     </div>
                 </div>
             </div>
