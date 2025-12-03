@@ -414,6 +414,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const maxId = properties.reduce((max, p) => Math.max(max, p.id), 0);
                 const newId = maxId + 1;
                 
+                // Get owner email first (lowercase for consistency)
+                const ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
+                
                 // Create new property object
                 const newProperty = {
                     id: newId,
@@ -435,8 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Add to local properties array
                 properties.push(newProperty);
                 
-                // Add to owner map (lowercase email for consistency)
-                const ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
+                // Add to owner map
                 if (!ownerPropertyMap[ownerEmail]) {
                     ownerPropertyMap[ownerEmail] = [];
                 }
