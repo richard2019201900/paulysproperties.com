@@ -283,13 +283,15 @@ function updateIncomeBreakdowns(details) {
     
     // Weekly breakdown - shows what contributes to weekly total
     let weeklyHTML = '';
+    let weeklyNum = 1;
     if (details.weeklyPayers.length > 0) {
         weeklyHTML += '<div class="font-bold text-blue-300 mb-1">Weekly Payers:</div>';
         details.weeklyPayers.forEach(p => {
             weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
-                <span class="truncate mr-2">${p.title}</span>
+                <span class="truncate mr-2"><span class="text-blue-400 mr-1">${weeklyNum}.</span>${p.title}</span>
                 <span class="text-green-300 font-bold">$${p.weeklyPrice.toLocaleString()}</span>
             </div>`;
+            weeklyNum++;
         });
     }
     if (details.monthlyPayers.length > 0) {
@@ -297,9 +299,10 @@ function updateIncomeBreakdowns(details) {
         details.monthlyPayers.forEach(p => {
             const weeklyEquiv = Math.round(p.monthlyPrice / 4);
             weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
-                <span class="truncate mr-2">${p.title}</span>
+                <span class="truncate mr-2"><span class="text-blue-400 mr-1">${weeklyNum}.</span>${p.title}</span>
                 <span class="text-yellow-300">~$${weeklyEquiv.toLocaleString()}</span>
             </div>`;
+            weeklyNum++;
         });
     }
     if (!weeklyHTML) weeklyHTML = '<div class="opacity-70">No rented properties</div>';
@@ -307,13 +310,15 @@ function updateIncomeBreakdowns(details) {
     
     // Monthly breakdown - shows what contributes to monthly total
     let monthlyHTML = '';
+    let monthlyNum = 1;
     if (details.monthlyPayers.length > 0) {
         monthlyHTML += '<div class="font-bold text-green-300 mb-1">Monthly Payers:</div>';
         details.monthlyPayers.forEach(p => {
             monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
-                <span class="truncate mr-2">${p.title}</span>
+                <span class="truncate mr-2"><span class="text-green-400 mr-1">${monthlyNum}.</span>${p.title}</span>
                 <span class="text-green-300 font-bold">$${p.monthlyPrice.toLocaleString()}</span>
             </div>`;
+            monthlyNum++;
         });
     }
     if (details.weeklyPayers.length > 0) {
@@ -321,9 +326,10 @@ function updateIncomeBreakdowns(details) {
         details.weeklyPayers.forEach(p => {
             const monthlyEquiv = Math.round(p.weeklyPrice * 4);
             monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
-                <span class="truncate mr-2">${p.title}</span>
+                <span class="truncate mr-2"><span class="text-green-400 mr-1">${monthlyNum}.</span>${p.title}</span>
                 <span class="text-yellow-300">~$${monthlyEquiv.toLocaleString()}</span>
             </div>`;
+            monthlyNum++;
         });
     }
     if (!monthlyHTML) monthlyHTML = '<div class="opacity-70">No rented properties</div>';
@@ -331,20 +337,23 @@ function updateIncomeBreakdowns(details) {
     
     // Units breakdown
     let unitsHTML = '';
+    let unitsNum = 1;
     const rented = [...details.weeklyPayers, ...details.monthlyPayers];
     if (rented.length > 0) {
         unitsHTML += '<div class="font-bold text-red-300 mb-1">🔴 Rented:</div>';
         rented.forEach(p => {
             unitsHTML += `<div class="flex justify-between py-0.5 border-b border-purple-700/30">
-                <span class="truncate mr-2">${p.title}</span>
+                <span class="truncate mr-2"><span class="text-purple-400 mr-1">${unitsNum}.</span>${p.title}</span>
                 <span class="text-sky-300">${p.renterName || 'Unknown'}</span>
             </div>`;
+            unitsNum++;
         });
     }
     if (details.available.length > 0) {
         unitsHTML += '<div class="font-bold text-green-300 mt-2 mb-1">🟢 Available:</div>';
         details.available.forEach(p => {
-            unitsHTML += `<div class="py-0.5 border-b border-purple-700/30 truncate">${p.title}</div>`;
+            unitsHTML += `<div class="py-0.5 border-b border-purple-700/30 truncate"><span class="text-purple-400 mr-1">${unitsNum}.</span>${p.title}</div>`;
+            unitsNum++;
         });
     }
     if (!unitsHTML) unitsHTML = '<div class="opacity-70">No properties</div>';
@@ -797,10 +806,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 successDiv.textContent = '✓ Listing created successfully!';
                 showElement(successDiv);
                 
+                // Change button to show success
+                btn.textContent = '✓ Created!';
+                btn.classList.remove('from-amber-500', 'to-yellow-500');
+                btn.classList.add('from-green-500', 'to-emerald-500');
+                
                 // Close modal after delay
                 setTimeout(() => {
                     closeModal('createListingModal');
                     goToDashboard();
+                    // Reset button state for next time
+                    btn.disabled = false;
+                    btn.textContent = '🏠 Create Listing';
+                    btn.classList.remove('from-green-500', 'to-emerald-500');
+                    btn.classList.add('from-amber-500', 'to-yellow-500');
                 }, 1500);
                 
             } catch (error) {
@@ -810,7 +829,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show cancel button again on error
                 const cancelBtn = $('cancelListingBtn');
                 if (cancelBtn) showElement(cancelBtn);
-            } finally {
+                // Reset button on error
                 btn.disabled = false;
                 btn.textContent = '🏠 Create Listing';
             }
