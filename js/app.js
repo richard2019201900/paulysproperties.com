@@ -235,8 +235,7 @@ function renderPropertyStatsContent(id) {
     // Calculate next due date and days until due
     let nextDueDate = '';
     let daysUntilDue = null;
-    let defaultReminderScript = '';
-    let customReminderScript = PropertyDataService.getValue(id, 'customReminderScript', p.customReminderScript || '');
+    let reminderScript = '';
     
     if (lastPaymentDate) {
         const lastDate = new Date(lastPaymentDate);
@@ -253,22 +252,20 @@ function renderPropertyStatsContent(id) {
         nextDate.setHours(0, 0, 0, 0);
         daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
         
-        // Generate default reminder script if 1 day away or overdue
+        // Generate reminder script if 1 day away or overdue
         const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
         if (renterName && daysUntilDue <= 1) {
             if (daysUntilDue === 1) {
-                defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
             } else if (daysUntilDue === 0) {
-                defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
             } else {
                 const daysOverdue = Math.abs(daysUntilDue);
-                defaultReminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
             }
         }
     }
     
-    // Use custom script if set, otherwise use default
-    const reminderScript = customReminderScript || defaultReminderScript;
     const showReminderSection = renterName && (daysUntilDue !== null && daysUntilDue <= 1);
     
     $('propertyStatsContent').innerHTML = `
@@ -488,32 +485,18 @@ function renderPropertyStatsContent(id) {
                         <h4 class="text-lg font-bold text-red-200 flex items-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                             Payment Reminder Script
-                            <span class="text-xs font-normal text-red-300">(Click to edit)</span>
+                            <span class="text-xs font-normal text-red-300">(edit as needed)</span>
                         </h4>
-                        <div class="flex gap-2">
-                            ${customReminderScript ? `
-                            <button onclick="resetReminderScript(${id})" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-2 rounded-lg font-bold text-sm transition flex items-center gap-1" title="Reset to default">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                Reset
-                            </button>
-                            ` : ''}
-                            <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2" title="Text in city for fastest response">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                                📋 Copy Script
-                            </button>
-                        </div>
+                        <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2" title="Text in city for fastest response">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                            Copy Message
+                        </button>
                     </div>
                     <div class="text-xs text-yellow-300 mb-3 flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Text in city for fastest response
                     </div>
-                    <div id="tile-reminderScript-${id}" 
-                         class="bg-gray-900/50 rounded-lg p-4 cursor-pointer hover:bg-gray-900/70 transition"
-                         onclick="startEditReminderScript(${id})"
-                         data-default-script="${sanitize(defaultReminderScript)}"
-                         data-original-value="${sanitize(reminderScript)}">
-                        <div id="reminderScript-${id}" class="text-gray-200 font-medium whitespace-pre-wrap">${reminderScript}</div>
-                    </div>
+                    <textarea id="reminderScript-${id}" rows="4" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700/80 font-medium text-white focus:ring-2 focus:ring-purple-500 transition resize-y">${reminderScript}</textarea>
                 </div>
                 ` : '<div class="mb-8"></div>'}
             </div>
@@ -1102,7 +1085,8 @@ window.copyReminderScript = function(propertyId, btn) {
     const scriptElement = $(`reminderScript-${propertyId}`);
     if (!scriptElement) return;
     
-    const text = scriptElement.textContent;
+    // Get value from textarea (or textContent if it's a div)
+    const text = scriptElement.value || scriptElement.textContent;
     const originalHtml = btn.innerHTML;
     
     navigator.clipboard.writeText(text).then(() => {

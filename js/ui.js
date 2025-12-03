@@ -202,12 +202,11 @@ function renderOwnerDashboard() {
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
         const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
-        const customReminderScript = PropertyDataService.getValue(p.id, 'customReminderScript', p.customReminderScript || '');
         
         // Calculate next due date
         let nextDueDate = '';
         let daysUntilDue = null;
-        let defaultReminderScript = '';
+        let reminderScript = '';
         let dueDateDisplay = '';
         let dueStatusClass = 'text-gray-400';
         
@@ -242,23 +241,20 @@ function renderOwnerDashboard() {
                 dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
             }
             
-            // Generate default reminder script
+            // Generate reminder script
             const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
             if (renterName && daysUntilDue <= 1) {
                 const fullNextDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 if (daysUntilDue === 1) {
-                    defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
+                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
                 } else if (daysUntilDue === 0) {
-                    defaultReminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
+                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
                 } else {
                     const daysOverdue = Math.abs(daysUntilDue);
-                    defaultReminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
                 }
             }
         }
-        
-        // Use custom script if set, otherwise use default
-        const reminderScript = customReminderScript || defaultReminderScript;
         
         const lastPaidDisplay = lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
         const isRented = state.availability[p.id] === false;
