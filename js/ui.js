@@ -455,8 +455,8 @@ function renderOwnerDashboard() {
         }
         
         return `
-        <tr class="border-b border-gray-700/50 hover:bg-gray-700/50 transition">
-            <td class="px-2 md:px-3 py-3 text-center text-gray-500 font-medium" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
+        <tr class="border-b border-gray-600 hover:bg-gray-700/30 transition ${isRented ? 'bg-gray-800/50' : ''}">
+            <td class="px-2 md:px-3 py-3 text-center text-gray-400 font-bold text-lg" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
             <td class="px-4 md:px-6 py-3"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
             <td class="px-4 md:px-6 py-3">
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
@@ -487,18 +487,18 @@ function renderOwnerDashboard() {
             </td>
         </tr>
         ${isRented ? `
-        <tr class="border-b border-gray-700 ${dueStatusClass} transition">
+        <tr class="border-b-2 border-gray-600 ${dueStatusClass} transition">
             <td colspan="9" class="px-4 md:px-6 py-2">
                 <div class="flex flex-wrap items-center gap-3 md:gap-6 text-sm">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 editable-cell cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
                         <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                         <span class="text-gray-400">Renter:</span>
-                        <span class="text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
+                        <span class="cell-value text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Click to set</span>'}</span>
                     </div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 editable-cell cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
                         <svg class="w-4 h-4 text-lime-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         <span class="text-gray-400">Paid:</span>
-                        <span class="text-white font-semibold">${lastPaidDisplay}</span>
+                        <span class="cell-value text-white font-semibold">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-500 italic">Click to set</span>'}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -506,8 +506,9 @@ function renderOwnerDashboard() {
                         <span class="font-semibold">${nextDueDate || '<span class="text-gray-500">-</span>'}</span>
                         ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-gray-400 capitalize">${paymentFrequency}</span>
+                    <div class="flex items-center gap-2 editable-cell cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
+                        <span class="cell-value text-gray-300 capitalize">${paymentFrequency}</span>
+                        <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                     ${reminderScript ? `
                     <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder - text in city for fastest response">
@@ -528,54 +529,96 @@ window.startCellEdit = function(propertyId, field, cell, type) {
     // Don't start if already editing
     if (cell.querySelector('input, select')) return;
     
-    const currentValue = PropertyDataService.getValue(propertyId, field, properties.find(p => p.id === propertyId)?.[field]);
+    const currentValue = PropertyDataService.getValue(propertyId, field, properties.find(p => p.id === propertyId)?.[field]) || '';
     const originalHTML = cell.innerHTML;
     
     cell.dataset.originalHTML = originalHTML;
     cell.dataset.propertyId = propertyId;
     cell.dataset.field = field;
+    cell.dataset.type = type;
+    
+    let inputHTML = '';
     
     if (type === 'select' && field === 'interiorType') {
-        cell.innerHTML = `
+        inputHTML = `
             <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm w-full" 
-                    onchange="saveCellEdit(this, ${propertyId}, '${field}')"
+                    onchange="saveCellEdit(this, ${propertyId}, '${field}', '${type}')"
                     onblur="setTimeout(() => cancelCellEdit(this), 150)">
                 <option value="Instance" ${currentValue === 'Instance' ? 'selected' : ''}>Instance</option>
                 <option value="Walk-in" ${currentValue === 'Walk-in' ? 'selected' : ''}>Walk-in</option>
             </select>
         `;
+    } else if (type === 'frequency') {
+        inputHTML = `
+            <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm" 
+                    onchange="saveCellEdit(this, ${propertyId}, '${field}', '${type}')"
+                    onblur="setTimeout(() => cancelCellEdit(this), 150)">
+                <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
+                <option value="monthly" ${currentValue === 'monthly' ? 'selected' : ''}>Monthly</option>
+            </select>
+        `;
+    } else if (type === 'date') {
+        inputHTML = `
+            <input type="date" 
+                   class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm" 
+                   value="${currentValue}"
+                   onkeydown="handleCellKeydown(event, this, ${propertyId}, '${field}', '${type}')"
+                   onblur="saveCellEdit(this, ${propertyId}, '${field}', '${type}')">
+        `;
+    } else if (type === 'text') {
+        inputHTML = `
+            <input type="text" 
+                   class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm w-32" 
+                   value="${currentValue}"
+                   placeholder="Enter name..."
+                   onkeydown="handleCellKeydown(event, this, ${propertyId}, '${field}', '${type}')"
+                   onblur="saveCellEdit(this, ${propertyId}, '${field}', '${type}')">
+        `;
     } else {
-        cell.innerHTML = `
+        // number type
+        inputHTML = `
             <input type="number" 
                    class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm w-20" 
                    value="${currentValue}"
-                   onkeydown="handleCellKeydown(event, this, ${propertyId}, '${field}')"
-                   onblur="saveCellEdit(this, ${propertyId}, '${field}')">
+                   onkeydown="handleCellKeydown(event, this, ${propertyId}, '${field}', '${type}')"
+                   onblur="saveCellEdit(this, ${propertyId}, '${field}', '${type}')">
         `;
     }
+    
+    cell.innerHTML = inputHTML;
     
     const input = cell.querySelector('input, select');
     input.focus();
     if (input.select) input.select();
 };
 
-window.handleCellKeydown = function(event, input, propertyId, field) {
+window.handleCellKeydown = function(event, input, propertyId, field, type) {
     if (event.key === 'Enter') {
         event.preventDefault();
-        saveCellEdit(input, propertyId, field);
+        saveCellEdit(input, propertyId, field, type);
     } else if (event.key === 'Escape') {
         cancelCellEdit(input);
     }
 };
 
-window.saveCellEdit = async function(input, propertyId, field) {
-    const cell = input.closest('td');
-    const newValue = field === 'interiorType' ? input.value : parseInt(input.value);
+window.saveCellEdit = async function(input, propertyId, field, type) {
+    const cell = input.closest('td, div');
+    let newValue = input.value;
     const originalHTML = cell.dataset.originalHTML;
     
-    if (!newValue && newValue !== 0) {
-        cell.innerHTML = originalHTML;
-        return;
+    // Parse value based on type
+    if (type === 'number') {
+        newValue = parseInt(newValue);
+        if (isNaN(newValue)) {
+            cell.innerHTML = originalHTML;
+            return;
+        }
+    } else if (type === 'text' || type === 'date' || type === 'frequency' || type === 'select') {
+        // Keep as string, allow empty for text fields
+        if (!newValue && type !== 'text') {
+            cell.innerHTML = originalHTML;
+            return;
+        }
     }
     
     // Show saving state

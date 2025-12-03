@@ -442,3 +442,22 @@ textarea.stat-input {
 .flip-card:hover .flip-card-back {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
+
+/* ==================== DASHBOARD TABLE ROWS ==================== */
+#ownerPropertiesTable tr:nth-child(odd):not(.bg-red-900\/30):not(.bg-orange-900\/30):not(.bg-yellow-900\/20) {
+    background-color: rgba(55, 65, 81, 0.3);
+}
+
+#ownerPropertiesTable tr:hover {
+    background-color: rgba(75, 85, 99, 0.4) !important;
+}
+
+/* Property row grouping - add subtle left border for rented properties */
+#ownerPropertiesTable tr.bg-gray-800\/50 {
+    border-left: 3px solid #8b5cf6;
+}
+
+/* Editable cell hover effect in renter row */
+.editable-cell:hover {
+    background-color: rgba(139, 92, 246, 0.1);
+}
