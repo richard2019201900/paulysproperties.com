@@ -69,4 +69,4 @@ Firebase config is in `js/config.js`.
 
 ## 📄 License
 
-© 2024 Pauly's Property Hub. All rights reserved.
+© 2024 paulysproperties.com. All rights reserved.
