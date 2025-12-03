@@ -199,7 +199,13 @@ function renderPropertyStatsContent(id) {
                         <h2 class="text-3xl md:text-4xl font-black text-white mb-2">${sanitize(p.title)}</h2>
                         <p class="text-lg text-gray-300 font-semibold">Location: ${sanitize(p.location)}</p>
                     </div>
-                    <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
+                            Owner Management
+                        </span>
+                        <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
+                    </div>
                 </div>
                 
                 <div class="bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30 rounded-xl p-4 mb-6">
