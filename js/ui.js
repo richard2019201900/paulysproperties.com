@@ -325,9 +325,9 @@ function renderOwnerDashboard() {
                         <span class="text-gray-400 capitalize">${paymentFrequency}</span>
                     </div>
                     ${reminderScript ? `
-                    <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy payment reminder to clipboard">
+                    <button onclick="copyDashboardReminder(${p.id}, this)" class="ml-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy payment reminder text to clipboard - you'll need to paste and send it yourself">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                        Copy Reminder
+                        📋 Copy Text
                     </button>
                     ` : ''}
                 </div>
@@ -695,15 +695,15 @@ window.copyDashboardReminder = function(propertyId, btn) {
         // Show success feedback
         btn.innerHTML = `
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            Copied!
+            ✓ Copied!
         `;
-        btn.classList.remove('from-orange-500', 'to-red-500');
+        btn.classList.remove('from-blue-500', 'to-blue-600');
         btn.classList.add('from-green-500', 'to-emerald-500');
         
         setTimeout(() => {
             btn.innerHTML = originalHtml;
             btn.classList.remove('from-green-500', 'to-emerald-500');
-            btn.classList.add('from-orange-500', 'to-red-500');
+            btn.classList.add('from-blue-500', 'to-blue-600');
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
@@ -718,14 +718,14 @@ window.copyDashboardReminder = function(propertyId, btn) {
             document.execCommand('copy');
             btn.innerHTML = `
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                Copied!
+                ✓ Copied!
             `;
-            btn.classList.remove('from-orange-500', 'to-red-500');
+            btn.classList.remove('from-blue-500', 'to-blue-600');
             btn.classList.add('from-green-500', 'to-emerald-500');
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
                 btn.classList.remove('from-green-500', 'to-emerald-500');
-                btn.classList.add('from-orange-500', 'to-red-500');
+                btn.classList.add('from-blue-500', 'to-blue-600');
             }, 2000);
         } catch (e) {
             alert('Failed to copy. Please copy manually.');
