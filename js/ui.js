@@ -517,6 +517,22 @@ window.openCreateListingModal = function() {
     // Reset form
     const form = $('createListingForm');
     if (form) form.reset();
+    
+    // Explicitly clear all input values to prevent browser autocomplete
+    const inputs = ['newListingTitle', 'newListingLocation', 'newListingBedrooms', 
+                    'newListingBathrooms', 'newListingStorage', 'newListingWeekly', 
+                    'newListingMonthly', 'newListingImages'];
+    inputs.forEach(id => {
+        const el = $(id);
+        if (el) el.value = '';
+    });
+    
+    // Reset selects to first option
+    const typeSelect = $('newListingType');
+    if (typeSelect) typeSelect.selectedIndex = 0;
+    const interiorSelect = $('newListingInterior');
+    if (interiorSelect) interiorSelect.selectedIndex = 0;
+    
     hideElement($('createListingError'));
     hideElement($('createListingSuccess'));
     openModal('createListingModal');
@@ -547,6 +563,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const weeklyPrice = parseInt($('newListingWeekly').value);
             const monthlyPrice = parseInt($('newListingMonthly').value);
             const imagesText = $('newListingImages').value.trim();
+            
+            // Debug logging
+            console.log('[CreateListing] Form values:', {
+                title, type, location, bedrooms, bathrooms, storage, 
+                interiorType, weeklyPrice, monthlyPrice
+            });
             
             // Parse images
             const images = imagesText 
@@ -602,6 +624,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Set availability to true
                 state.availability[newId] = true;
                 await db.collection('settings').doc('propertyAvailability').set({ [newId]: true }, { merge: true });
+                
+                // CRITICAL: Clear any stale property overrides for this ID
+                delete state.propertyOverrides[newId];
+                await db.collection('settings').doc('propertyOverrides').update({
+                    [newId]: firebase.firestore.FieldValue.delete()
+                }).catch(err => {
+                    // Ignore if field doesn't exist
+                    console.log('[CreateListing] No stale overrides to clean up for property', newId);
+                });
                 
                 // Save property to Firestore
                 await db.collection('settings').doc('properties').set({
@@ -687,6 +718,9 @@ window.executeDeleteProperty = async function() {
         // Remove from availability
         delete state.availability[propertyId];
         
+        // Remove from local propertyOverrides
+        delete state.propertyOverrides[propertyId];
+        
         // Remove from Firestore - properties doc
         await db.collection('settings').doc('properties').update({
             [propertyId]: firebase.firestore.FieldValue.delete()
@@ -700,6 +734,14 @@ window.executeDeleteProperty = async function() {
         // Remove availability
         await db.collection('settings').doc('propertyAvailability').update({
             [propertyId]: firebase.firestore.FieldValue.delete()
+        });
+        
+        // CRITICAL: Remove propertyOverrides for this property
+        await db.collection('settings').doc('propertyOverrides').update({
+            [propertyId]: firebase.firestore.FieldValue.delete()
+        }).catch(err => {
+            // Ignore if field doesn't exist
+            console.log('[Delete] No overrides to clean up for property', propertyId);
         });
         
         // Update filtered properties

@@ -119,11 +119,11 @@
         <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 border border-amber-700/50">
             <h2 class="text-3xl font-black bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 text-center">✨ Create New Listing</h2>
             
-            <form id="createListingForm" class="space-y-4">
+            <form id="createListingForm" class="space-y-4" autocomplete="off">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Property Address *</label>
-                        <input type="text" id="newListingTitle" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. 1234 Eclipse Blvd, Apt 105">
+                        <input type="text" id="newListingTitle" required autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. 1234 Eclipse Blvd, Apt 105">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Property Type *</label>
@@ -139,21 +139,21 @@
                 
                 <div>
                     <label class="block text-gray-300 font-semibold mb-2">Location *</label>
-                    <input type="text" id="newListingLocation" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Eclipse Blvd, LS">
+                    <input type="text" id="newListingLocation" required autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Eclipse Blvd, LS">
                 </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Bedrooms *</label>
-                        <input type="number" id="newListingBedrooms" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                        <input type="number" id="newListingBedrooms" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Bathrooms *</label>
-                        <input type="number" id="newListingBathrooms" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                        <input type="number" id="newListingBathrooms" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Storage</label>
-                        <input type="number" id="newListingStorage" min="0" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="600">
+                        <input type="number" id="newListingStorage" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="600">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Interior</label>
@@ -167,17 +167,17 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Weekly Price *</label>
-                        <input type="number" id="newListingWeekly" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000">
+                        <input type="number" id="newListingWeekly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Monthly Price *</label>
-                        <input type="number" id="newListingMonthly" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000">
+                        <input type="number" id="newListingMonthly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000">
                     </div>
                 </div>
                 
                 <div>
                     <label class="block text-gray-300 font-semibold mb-2">Image URLs (one per line)</label>
-                    <textarea id="newListingImages" rows="3" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
+                    <textarea id="newListingImages" rows="3" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
                     <p class="text-gray-500 text-xs mt-1">Add image URLs for your property photos</p>
                 </div>
                 
