@@ -778,11 +778,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 await db.collection('settings').doc('propertyAvailability').set({ [newId]: true }, { merge: true });
                 
                 // CRITICAL: Clear any stale property overrides for this ID
+                // The overrides are stored in flat format: "15.bedrooms", "15.storage", etc.
                 delete state.propertyOverrides[newId];
-                await db.collection('settings').doc('propertyOverrides').update({
-                    [newId]: firebase.firestore.FieldValue.delete()
-                }).catch(err => {
-                    // Ignore if field doesn't exist
+                
+                // Get all fields that need to be deleted
+                const overrideFields = ['bedrooms', 'bathrooms', 'storage', 'weeklyPrice', 'monthlyPrice', 
+                                       'interiorType', 'renterName', 'renterPhone', 'renterNotes',
+                                       'lastPaymentDate', 'paymentFrequency'];
+                const deleteUpdates = {};
+                overrideFields.forEach(field => {
+                    deleteUpdates[`${newId}.${field}`] = firebase.firestore.FieldValue.delete();
+                });
+                
+                await db.collection('settings').doc('propertyOverrides').update(deleteUpdates).catch(err => {
+                    // Ignore if fields don't exist
                     console.log('[CreateListing] No stale overrides to clean up for property', newId);
                 });
                 
@@ -902,10 +911,17 @@ window.executeDeleteProperty = async function() {
         });
         
         // CRITICAL: Remove propertyOverrides for this property
-        await db.collection('settings').doc('propertyOverrides').update({
-            [propertyId]: firebase.firestore.FieldValue.delete()
-        }).catch(err => {
-            // Ignore if field doesn't exist
+        // The overrides are stored in flat format: "15.bedrooms", "15.storage", etc.
+        const overrideFields = ['bedrooms', 'bathrooms', 'storage', 'weeklyPrice', 'monthlyPrice', 
+                               'interiorType', 'renterName', 'renterPhone', 'renterNotes',
+                               'lastPaymentDate', 'paymentFrequency'];
+        const deleteUpdates = {};
+        overrideFields.forEach(field => {
+            deleteUpdates[`${propertyId}.${field}`] = firebase.firestore.FieldValue.delete();
+        });
+        
+        await db.collection('settings').doc('propertyOverrides').update(deleteUpdates).catch(err => {
+            // Ignore if fields don't exist
             console.log('[Delete] No overrides to clean up for property', propertyId);
         });
         

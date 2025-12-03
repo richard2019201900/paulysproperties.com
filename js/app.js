@@ -682,7 +682,7 @@ window.startEditTile = function(field, propertyId, type) {
                            field === 'ownerPhone' ? 'Enter phone number' : 
                            field === 'renterName' ? 'Enter renter name' : 
                            field === 'renterPhone' ? 'Enter renter phone' : '';
-        const phoneHandler = type === 'tel' ? 'oninput="this.value = this.value.replace(/\\D/g, \'\')"' : '';
+        const phoneHandler = type === 'tel' ? 'oninput="this.value = this.value.replace(/\\D/g, \'\')" maxlength="10"' : '';
         inputHtml = `
             <input type="${inputType}" 
                    id="input-${field}-${propertyId}"
