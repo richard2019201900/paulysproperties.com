@@ -492,7 +492,7 @@ function renderOwnerDashboard() {
         }
         
         return `
-        <tr class="border-b-2 border-gray-600 hover:bg-gray-700/30 transition ${index % 2 === 0 ? 'bg-gray-800/40' : 'bg-gray-900/40'}">
+        <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'} hover:bg-gray-700/30 transition">
             <td class="px-2 md:px-3 py-3 text-center text-gray-400 font-bold text-lg border-r border-gray-700" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
             <td class="px-4 md:px-6 py-3 border-r border-gray-700/50"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
             <td class="px-4 md:px-6 py-3 border-r border-gray-700/50">
@@ -524,20 +524,20 @@ function renderOwnerDashboard() {
             </td>
         </tr>
         ${isRented ? `
-        <tr class="border-b-2 border-gray-600 ${index % 2 === 0 ? 'bg-gray-800/40' : 'bg-gray-900/40'}">
+        <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'}">
             <td colspan="9" class="px-4 md:px-6 py-2">
-                <div class="grid grid-cols-[200px_140px_200px_100px_auto] items-center gap-2 text-sm">
-                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
+                <div class="flex flex-wrap items-center text-sm gap-x-8 gap-y-2">
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg min-w-[180px]" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
                         <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                         <span class="text-gray-400">Renter:</span>
-                        <span class="cell-value text-white font-semibold truncate">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
-                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        <span class="cell-value text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
+                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </div>
                     <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
                         <svg class="w-4 h-4 text-lime-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         <span class="text-gray-400">Paid:</span>
                         <span class="cell-value text-white font-semibold">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-500 italic">-</span>'}</span>
-                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </div>
                     <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -550,13 +550,13 @@ function renderOwnerDashboard() {
                         <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                     ${reminderScript ? `
-                    <div class="flex justify-end">
+                    <div class="ml-auto">
                         <button onclick="copyDashboardReminder(${p.id}, this)" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder - text in city for fastest response">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                             📋 Copy Text
                         </button>
                     </div>
-                    ` : '<div></div>'}
+                    ` : ''}
                 </div>
             </td>
         </tr>
