@@ -186,6 +186,21 @@ function setupRealtimeListener() {
                 renderProperties(state.filteredProperties);
             }
         });
+    
+    // Also listen for property overrides changes
+    db.collection('settings').doc('propertyOverrides')
+        .onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                Object.keys(data).forEach(propId => {
+                    if (!isNaN(parseInt(propId))) {
+                        state.propertyOverrides[propId] = data[propId];
+                    }
+                });
+                renderProperties(state.filteredProperties);
+                if (state.currentUser === 'owner') renderOwnerDashboard();
+            }
+        });
 }
 
 async function saveAvailability(id, isAvailable) {
@@ -235,6 +250,17 @@ async function initFirestore() {
         
         if (needsUpdate || !doc.exists) {
             await db.collection('settings').doc('propertyAvailability').set(updates, { merge: true });
+        }
+        
+        // Load property overrides
+        const overridesDoc = await db.collection('settings').doc('propertyOverrides').get();
+        if (overridesDoc.exists) {
+            const overridesData = overridesDoc.data();
+            Object.keys(overridesData).forEach(propId => {
+                if (!isNaN(parseInt(propId))) {
+                    state.propertyOverrides[propId] = overridesData[propId];
+                }
+            });
         }
     } catch (error) {
         console.error('Init error:', error);
