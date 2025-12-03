@@ -221,9 +221,28 @@ function renderPropertyStatsContent(id) {
             
             <div class="p-6 md:p-8">
                 <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
-                    <div>
-                        <h2 class="text-3xl md:text-4xl font-black text-white mb-2">✨ ${sanitize(p.title)}</h2>
-                        <p class="text-lg text-gray-300 font-semibold">📍 Location: ${sanitize(p.location)}</p>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-2xl">✨</span>
+                            <h2 id="editable-title-${id}" 
+                                class="text-3xl md:text-4xl font-black text-white cursor-pointer hover:text-purple-300 transition inline-block"
+                                onclick="startEditField('title', ${id}, this)"
+                                title="Click to edit address">
+                                ${sanitize(PropertyDataService.getValue(id, 'title', p.title))}
+                            </h2>
+                            <span class="text-purple-400 text-sm">✏️</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span>📍</span>
+                            <span class="text-lg text-gray-300 font-semibold">Location:</span>
+                            <span id="editable-location-${id}" 
+                                  class="text-lg text-gray-300 font-semibold cursor-pointer hover:text-purple-300 transition"
+                                  onclick="startEditField('location', ${id}, this)"
+                                  title="Click to edit location">
+                                ${sanitize(PropertyDataService.getValue(id, 'location', p.location))}
+                            </span>
+                            <span class="text-purple-400 text-sm">✏️</span>
+                        </div>
                     </div>
                     <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
                 </div>
@@ -344,7 +363,7 @@ function renderPropertyStatsContent(id) {
         <!-- Actions -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
             <h3 class="text-2xl font-bold text-gray-200 mb-6">⚡ Quick Actions</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button onclick="toggleAvailability(${id}); setTimeout(() => renderPropertyStatsContent(${id}), 100);" class="flex items-center justify-center space-x-3 ${isAvailable ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-green-500 to-emerald-600'} text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     <span>${isAvailable ? 'Mark as Rented' : 'Mark as Available'}</span>
@@ -353,17 +372,33 @@ function renderPropertyStatsContent(id) {
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     <span>View Public Listing</span>
                 </button>
+                <button onclick="confirmDeleteProperty(${id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="flex items-center justify-center space-x-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-red-600 hover:to-red-700 text-white px-6 py-4 rounded-xl font-bold transition shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <span>Delete Property</span>
+                </button>
             </div>
         </div>
         
         <!-- Property Images Gallery -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
-            <h3 class="text-2xl font-bold text-gray-200 mb-6">📸 Property Images</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
+                <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Add Image
+                </button>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="images-grid-${id}">
                 ${p.images.map((img, i) => `
-                    <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
+                    <div class="relative group">
+                        <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
+                        <button onclick="deletePropertyImage(${id}, ${i}, '${img.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg" title="Delete image">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
                 `).join('')}
             </div>
+            ${p.images.length === 0 ? '<p class="text-gray-500 text-center py-8">No images yet. Add some images to showcase your property!</p>' : ''}
         </div>
         
         <!-- Reviews Section -->
@@ -633,6 +668,154 @@ document.addEventListener('DOMContentLoaded', function() {
         menuBtn.addEventListener('click', () => $('mobileMenu').classList.toggle('hidden'));
     }
 });
+
+// ==================== EDIT TITLE/LOCATION ====================
+window.startEditField = function(field, propertyId, element) {
+    const currentValue = PropertyDataService.getValue(propertyId, field, properties.find(p => p.id === propertyId)?.[field]);
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentValue;
+    input.className = 'bg-gray-800 border-2 border-purple-500 rounded-lg px-3 py-2 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-purple-400';
+    input.style.width = Math.max(200, element.offsetWidth + 50) + 'px';
+    
+    const originalContent = element.innerHTML;
+    element.innerHTML = '';
+    element.appendChild(input);
+    input.focus();
+    input.select();
+    
+    const saveField = async () => {
+        const newValue = input.value.trim();
+        if (newValue && newValue !== currentValue) {
+            element.innerHTML = '<span class="text-gray-400">Saving...</span>';
+            try {
+                await PropertyDataService.write(propertyId, field, newValue);
+                
+                // Update local property object
+                const prop = properties.find(p => p.id === propertyId);
+                if (prop) prop[field] = newValue;
+                
+                // Update Firestore properties doc for user-created properties
+                await db.collection('settings').doc('properties').set({
+                    [propertyId]: properties.find(p => p.id === propertyId)
+                }, { merge: true });
+                
+                renderPropertyStatsContent(propertyId);
+                renderProperties(state.filteredProperties);
+            } catch (error) {
+                console.error('Failed to save:', error);
+                element.innerHTML = originalContent;
+            }
+        } else {
+            element.innerHTML = currentValue;
+        }
+    };
+    
+    input.addEventListener('blur', saveField);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            element.innerHTML = currentValue;
+        }
+    });
+};
+
+// ==================== IMAGE MANAGEMENT ====================
+window.openAddImageModal = function(propertyId) {
+    window.currentImagePropertyId = propertyId;
+    $('newImageUrl').value = '';
+    hideElement($('addImageError'));
+    openModal('addImageModal');
+};
+
+window.closeAddImageModal = function() {
+    closeModal('addImageModal');
+    window.currentImagePropertyId = null;
+};
+
+window.saveNewImage = async function() {
+    const propertyId = window.currentImagePropertyId;
+    if (!propertyId) return;
+    
+    const imageUrl = $('newImageUrl').value.trim();
+    const errorDiv = $('addImageError');
+    
+    if (!imageUrl) {
+        errorDiv.textContent = 'Please enter an image URL';
+        showElement(errorDiv);
+        return;
+    }
+    
+    // Basic URL validation
+    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+        errorDiv.textContent = 'Please enter a valid URL starting with http:// or https://';
+        showElement(errorDiv);
+        return;
+    }
+    
+    const btn = $('saveImageBtn');
+    btn.disabled = true;
+    btn.textContent = 'Adding...';
+    
+    try {
+        const prop = properties.find(p => p.id === propertyId);
+        if (!prop) throw new Error('Property not found');
+        
+        // Add new image to array
+        prop.images.push(imageUrl);
+        state.currentImages = prop.images;
+        
+        // Save to Firestore
+        await db.collection('settings').doc('properties').set({
+            [propertyId]: prop
+        }, { merge: true });
+        
+        // Re-render
+        renderPropertyStatsContent(propertyId);
+        closeAddImageModal();
+        
+    } catch (error) {
+        console.error('Failed to add image:', error);
+        errorDiv.textContent = 'Failed to add image. Please try again.';
+        showElement(errorDiv);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Add Image';
+    }
+};
+
+window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
+    const prop = properties.find(p => p.id === propertyId);
+    if (!prop || !prop.images || prop.images.length <= 1) {
+        alert('Cannot delete the last image. Properties must have at least one image.');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this image?')) {
+        return;
+    }
+    
+    try {
+        // Remove image from array
+        prop.images.splice(imageIndex, 1);
+        state.currentImages = prop.images;
+        
+        // Save to Firestore
+        await db.collection('settings').doc('properties').set({
+            [propertyId]: prop
+        }, { merge: true });
+        
+        // Re-render
+        renderPropertyStatsContent(propertyId);
+        
+    } catch (error) {
+        console.error('Failed to delete image:', error);
+        alert('Failed to delete image. Please try again.');
+    }
+};
 
 // ==================== INITIALIZE ====================
 async function init() {

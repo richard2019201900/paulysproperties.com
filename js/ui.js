@@ -555,9 +555,14 @@ window.executeDeleteProperty = async function() {
         renderProperties(state.filteredProperties);
         renderOwnerDashboard();
         
-        // Close modal
+        // Close modal and go to dashboard
         closeModal('deleteConfirmModal');
         window.pendingDeleteProperty = null;
+        
+        // If we're on the stats page for this property, go back to dashboard
+        if (state.currentPropertyId === propertyId) {
+            goToDashboard();
+        }
         
     } catch (error) {
         console.error('Error deleting property:', error);
