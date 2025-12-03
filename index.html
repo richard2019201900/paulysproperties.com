@@ -114,6 +114,86 @@
         </div>
     </div>
 
+    <!-- Create Listing Modal -->
+    <div id="createListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden overflow-y-auto py-8" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 border border-amber-700/50">
+            <h2 class="text-3xl font-black bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 text-center">✨ Create New Listing</h2>
+            
+            <form id="createListingForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Property Title *</label>
+                        <input type="text" id="newListingTitle" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Eclipse Towers, Apt 105">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Property Type *</label>
+                        <select id="newListingType" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition">
+                            <option value="">Select type...</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="house">House</option>
+                            <option value="condo">Condo</option>
+                            <option value="villa">Villa</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Location *</label>
+                    <input type="text" id="newListingLocation" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Eclipse Blvd, LS">
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Bedrooms *</label>
+                        <input type="number" id="newListingBedrooms" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Bathrooms *</label>
+                        <input type="number" id="newListingBathrooms" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Storage</label>
+                        <input type="number" id="newListingStorage" min="0" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="600">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Interior</label>
+                        <select id="newListingInterior" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition">
+                            <option value="Instance">Instance</option>
+                            <option value="Walk-in">Walk-in</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Weekly Price *</label>
+                        <input type="number" id="newListingWeekly" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Monthly Price *</label>
+                        <input type="number" id="newListingMonthly" required min="1" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Image URLs (one per line)</label>
+                    <textarea id="newListingImages" rows="3" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
+                    <p class="text-gray-500 text-xs mt-1">Add image URLs for your property photos</p>
+                </div>
+                
+                <div id="createListingError" class="hidden text-red-400 text-sm font-medium"></div>
+                <div id="createListingSuccess" class="hidden text-green-400 text-sm font-medium"></div>
+                
+                <div class="flex gap-4 pt-4">
+                    <button type="submit" id="createListingBtn" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                        🏠 Create Listing
+                    </button>
+                    <button type="button" onclick="closeModal('createListingModal')" class="flex-1 bg-gray-700 text-gray-200 px-6 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Login Modal -->
     <div id="loginModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
         <div class="glass-effect rounded-2xl shadow-2xl p-10 max-w-md w-full mx-4 border border-gray-700">
@@ -195,6 +275,7 @@
                     <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition" role="button" tabindex="0">Dashboard</a>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden md:none bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-5 py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg">+ New Listing</button>
                     <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg">Register / Sign In</button>
                     <button id="menuBtn" class="md:hidden text-gray-300" aria-label="Toggle menu">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -208,6 +289,7 @@
             <a onclick="navigateTo('about')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">About</a>
             <a onclick="navigateTo('contact')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Contact</a>
             <a id="mobileDashboardLink" onclick="goToDashboard()" class="hidden px-4 py-3 text-purple-400 hover:bg-gray-800 cursor-pointer font-semibold">Dashboard</a>
+            <a id="mobileCreateListingBtn" onclick="openCreateListingModal()" class="hidden px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold">+ New Listing</a>
             <button id="mobileAuthBtn" onclick="handleAuthClick()" class="block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold">Register / Sign In</button>
         </div>
     </nav>
@@ -278,6 +360,8 @@
                                 <th class="px-4 md:px-6 py-4 font-bold rounded-tl-xl">Available</th>
                                 <th class="px-4 md:px-6 py-4 font-bold">Property</th>
                                 <th class="px-4 md:px-6 py-4 font-bold hidden md:table-cell">Type</th>
+                                <th class="px-4 md:px-6 py-4 font-bold hidden lg:table-cell">Bed</th>
+                                <th class="px-4 md:px-6 py-4 font-bold hidden lg:table-cell">Bath</th>
                                 <th class="px-4 md:px-6 py-4 font-bold hidden lg:table-cell">Interior</th>
                                 <th class="px-4 md:px-6 py-4 font-bold hidden lg:table-cell">Storage</th>
                                 <th class="px-4 md:px-6 py-4 font-bold">Weekly</th>

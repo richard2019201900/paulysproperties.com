@@ -2,6 +2,8 @@
 function updateAuthButton(isLoggedIn) {
     const navBtn = $('navAuthBtn');
     const mobileBtn = $('mobileAuthBtn');
+    const navCreateBtn = $('navCreateListingBtn');
+    const mobileCreateBtn = $('mobileCreateListingBtn');
     
     if (isLoggedIn) {
         navBtn.textContent = 'Logout';
@@ -10,6 +12,9 @@ function updateAuthButton(isLoggedIn) {
         mobileBtn.className = 'block w-full text-left px-4 py-3 text-red-400 hover:bg-gray-800 font-semibold';
         showElement($('navDashboardLink'));
         showElement($('mobileDashboardLink'));
+        // Show Create Listing buttons
+        if (navCreateBtn) navCreateBtn.className = 'hidden md:block bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-5 py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg';
+        if (mobileCreateBtn) showElement(mobileCreateBtn);
     } else {
         navBtn.textContent = 'Register / Sign In';
         navBtn.className = 'hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg';
@@ -17,6 +22,9 @@ function updateAuthButton(isLoggedIn) {
         mobileBtn.className = 'block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold';
         hideElement($('navDashboardLink'));
         hideElement($('mobileDashboardLink'));
+        // Hide Create Listing buttons
+        if (navCreateBtn) hideElement(navCreateBtn);
+        if (mobileCreateBtn) hideElement(mobileCreateBtn);
     }
 }
 
@@ -177,8 +185,8 @@ function renderOwnerDashboard() {
     if (ownerProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
             <tr>
-                <td colspan="7" class="px-6 py-12 text-center text-gray-400">
-                    <div class="text-4xl mb-4">House</div>
+                <td colspan="9" class="px-6 py-12 text-center text-gray-400">
+                    <div class="text-4xl mb-4">🏠</div>
                     <p class="text-xl font-semibold">No properties assigned to this account</p>
                     <p class="text-sm mt-2">Contact the administrator to get properties assigned to your account.</p>
                 </td>
@@ -194,9 +202,14 @@ function renderOwnerDashboard() {
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
             </td>
             <td class="px-4 md:px-6 py-4 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
+            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
+                <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
+            </td>
+            <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'bathrooms', this, 'number')" title="Click to edit">
+                <span class="cell-value">${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)}</span>
+            </td>
             <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</span>
-                <span class="edit-icon ml-1 opacity-0 group-hover:opacity-100">✏️</span>
             </td>
             <td class="px-4 md:px-6 py-4 text-gray-300 hidden lg:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</span>
@@ -337,3 +350,125 @@ async function renderProperties(list) {
         }
     }
 }
+
+// ==================== CREATE LISTING ====================
+window.openCreateListingModal = function() {
+    hideElement($('mobileMenu'));
+    // Reset form
+    const form = $('createListingForm');
+    if (form) form.reset();
+    hideElement($('createListingError'));
+    hideElement($('createListingSuccess'));
+    openModal('createListingModal');
+};
+
+// Handle create listing form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const createForm = $('createListingForm');
+    if (createForm) {
+        createForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const errorDiv = $('createListingError');
+            const successDiv = $('createListingSuccess');
+            const btn = $('createListingBtn');
+            
+            hideElement(errorDiv);
+            hideElement(successDiv);
+            
+            // Get form values
+            const title = $('newListingTitle').value.trim();
+            const type = $('newListingType').value;
+            const location = $('newListingLocation').value.trim();
+            const bedrooms = parseInt($('newListingBedrooms').value);
+            const bathrooms = parseInt($('newListingBathrooms').value);
+            const storage = parseInt($('newListingStorage').value) || 600;
+            const interiorType = $('newListingInterior').value;
+            const weeklyPrice = parseInt($('newListingWeekly').value);
+            const monthlyPrice = parseInt($('newListingMonthly').value);
+            const imagesText = $('newListingImages').value.trim();
+            
+            // Parse images
+            const images = imagesText 
+                ? imagesText.split('\n').map(url => url.trim()).filter(url => url)
+                : ['images/placeholder.jpg'];
+            
+            // Validate
+            if (!title || !type || !location || !bedrooms || !bathrooms || !weeklyPrice || !monthlyPrice) {
+                errorDiv.textContent = 'Please fill in all required fields.';
+                showElement(errorDiv);
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            
+            try {
+                // Generate new ID (find max ID + 1)
+                const maxId = properties.reduce((max, p) => Math.max(max, p.id), 0);
+                const newId = maxId + 1;
+                
+                // Create new property object
+                const newProperty = {
+                    id: newId,
+                    title: title,
+                    type: type,
+                    location: location,
+                    bedrooms: bedrooms,
+                    bathrooms: bathrooms,
+                    storage: storage,
+                    interiorType: interiorType,
+                    weeklyPrice: weeklyPrice,
+                    monthlyPrice: monthlyPrice,
+                    images: images,
+                    videoUrl: null,
+                    features: false
+                };
+                
+                // Add to local properties array
+                properties.push(newProperty);
+                
+                // Add to owner map
+                const ownerEmail = auth.currentUser?.email || 'richard2019201900@gmail.com';
+                if (!ownerPropertyMap[ownerEmail]) {
+                    ownerPropertyMap[ownerEmail] = [];
+                }
+                ownerPropertyMap[ownerEmail].push(newId);
+                propertyOwnerEmail[newId] = ownerEmail;
+                
+                // Set availability to true
+                state.availability[newId] = true;
+                await db.collection('settings').doc('propertyAvailability').set({ [newId]: true }, { merge: true });
+                
+                // Save property to Firestore
+                await db.collection('settings').doc('properties').set({
+                    [newId]: newProperty
+                }, { merge: true });
+                
+                // Update filtered properties
+                state.filteredProperties = [...properties];
+                
+                // Re-render
+                renderProperties(state.filteredProperties);
+                renderOwnerDashboard();
+                
+                successDiv.textContent = '✓ Listing created successfully!';
+                showElement(successDiv);
+                
+                // Close modal after delay
+                setTimeout(() => {
+                    closeModal('createListingModal');
+                    goToDashboard();
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Error creating listing:', error);
+                errorDiv.textContent = 'Failed to create listing. Please try again.';
+                showElement(errorDiv);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🏠 Create Listing';
+            }
+        });
+    }
+});
