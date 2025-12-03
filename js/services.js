@@ -417,6 +417,9 @@ async function initFirestore() {
             });
             console.log('[initFirestore] State after loading:', state.propertyOverrides);
         }
+        
+        // Preload owner usernames in background for faster display
+        preloadOwnerUsernames().catch(err => console.warn('[initFirestore] Username preload failed:', err));
     } catch (error) {
         console.error('Init error:', error);
     }

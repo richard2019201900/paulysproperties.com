@@ -84,6 +84,9 @@ window.loadUsername = async function() {
         if (doc.exists) {
             if (doc.data().username) {
                 $('ownerUsername').value = doc.data().username;
+                // Pre-populate cache for this user
+                window.ownerUsernameCache = window.ownerUsernameCache || {};
+                window.ownerUsernameCache[user.email.toLowerCase()] = doc.data().username;
             }
             if (doc.data().phone) {
                 // Sanitize phone - remove all non-digits
@@ -533,6 +536,15 @@ window.openCreateListingModal = function() {
     const interiorSelect = $('newListingInterior');
     if (interiorSelect) interiorSelect.selectedIndex = 0;
     
+    // Reset buttons to initial state
+    const createBtn = $('createListingBtn');
+    if (createBtn) {
+        createBtn.disabled = false;
+        createBtn.textContent = '🏠 Create Listing';
+    }
+    const cancelBtn = $('cancelListingBtn');
+    if (cancelBtn) showElement(cancelBtn);
+    
     hideElement($('createListingError'));
     hideElement($('createListingSuccess'));
     openModal('createListingModal');
@@ -584,6 +596,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             btn.disabled = true;
             btn.textContent = 'Creating...';
+            
+            // Hide cancel button immediately to prevent accidental clicks
+            const cancelBtn = $('cancelListingBtn');
+            if (cancelBtn) hideElement(cancelBtn);
             
             try {
                 // Generate new ID (find max ID + 1)
@@ -664,6 +680,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error creating listing:', error);
                 errorDiv.textContent = 'Failed to create listing. Please try again.';
                 showElement(errorDiv);
+                // Show cancel button again on error
+                const cancelBtn = $('cancelListingBtn');
+                if (cancelBtn) showElement(cancelBtn);
             } finally {
                 btn.disabled = false;
                 btn.textContent = '🏠 Create Listing';

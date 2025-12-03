@@ -32,8 +32,8 @@ Object.keys(ownerPropertyMap).forEach(email => {
     });
 });
 
-// Cache for owner usernames
-const ownerUsernameCache = {};
+// Cache for owner usernames (global for access from other modules)
+window.ownerUsernameCache = window.ownerUsernameCache || {};
 
 // Get owner email for a property
 function getPropertyOwnerEmail(propertyId) {
@@ -45,8 +45,8 @@ async function getUsernameByEmail(email) {
     if (!email) return 'Property Owner';
     
     // Check cache first
-    if (ownerUsernameCache[email]) {
-        return ownerUsernameCache[email];
+    if (window.ownerUsernameCache[email]) {
+        return window.ownerUsernameCache[email];
     }
 
     try {
@@ -54,7 +54,7 @@ async function getUsernameByEmail(email) {
         if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
             const username = userData.username || 'Property Owner';
-            ownerUsernameCache[email] = username; // Cache it
+            window.ownerUsernameCache[email] = username; // Cache it
             return username;
         }
     } catch (error) {
@@ -68,6 +68,16 @@ async function getUsernameByEmail(email) {
 async function getPropertyOwnerUsername(propertyId) {
     const email = getPropertyOwnerEmail(propertyId);
     return await getUsernameByEmail(email);
+}
+
+// Preload usernames for all property owners (call this after properties load)
+async function preloadOwnerUsernames() {
+    const uniqueEmails = [...new Set(Object.values(propertyOwnerEmail))];
+    console.log('[Cache] Preloading usernames for', uniqueEmails.length, 'owners');
+    
+    // Load all in parallel
+    await Promise.all(uniqueEmails.map(email => getUsernameByEmail(email)));
+    console.log('[Cache] Preload complete');
 }
 
 // Get properties for the current logged-in owner

@@ -180,24 +180,20 @@ async function loadStatsOwnerName(propertyId) {
     const ownerEl = $(`stats-owner-${propertyId}`);
     if (!ownerEl) return;
     
-    const ownerEmail = propertyOwnerEmail[propertyId];
-    if (!ownerEmail) {
-        ownerEl.querySelector('span').textContent = 'Unknown';
-        return;
-    }
-    
     try {
-        // Find user by email
-        const usersSnapshot = await db.collection('users').where('email', '==', ownerEmail).get();
-        if (!usersSnapshot.empty) {
-            const userData = usersSnapshot.docs[0].data();
-            ownerEl.querySelector('span').textContent = userData.username || ownerEmail.split('@')[0];
-        } else {
-            ownerEl.querySelector('span').textContent = ownerEmail.split('@')[0];
+        // Use cached username lookup
+        const username = await getPropertyOwnerUsername(propertyId);
+        const spanEl = ownerEl.querySelector('span');
+        if (spanEl) {
+            spanEl.textContent = username;
         }
     } catch (error) {
         console.error('Error loading owner name:', error);
-        ownerEl.querySelector('span').textContent = ownerEmail.split('@')[0];
+        const ownerEmail = propertyOwnerEmail[propertyId];
+        const spanEl = ownerEl.querySelector('span');
+        if (spanEl) {
+            spanEl.textContent = ownerEmail ? ownerEmail.split('@')[0] : 'Unknown';
+        }
     }
 }
 
