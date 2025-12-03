@@ -192,6 +192,8 @@ function setupRealtimeListener() {
         .onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
+                // CRITICAL: Reset state before re-parsing to remove deleted fields
+                state.propertyOverrides = {};
                 // Parse flat structure: "1.bedrooms" -> state.propertyOverrides[1].bedrooms
                 Object.keys(data).forEach(key => {
                     const parts = key.split('.');
@@ -206,8 +208,12 @@ function setupRealtimeListener() {
                         }
                     }
                 });
+                console.log('[Realtime] PropertyOverrides updated:', state.propertyOverrides);
                 renderProperties(state.filteredProperties);
                 if (state.currentUser === 'owner') renderOwnerDashboard();
+            } else {
+                // Document doesn't exist, clear all overrides
+                state.propertyOverrides = {};
             }
         });
     
