@@ -222,7 +222,7 @@ async function renderProperties(list) {
                     <span class="badge text-white text-xs font-bold px-2 md:px-3 py-1 rounded-full uppercase shrink-0">${p.type}</span>
                 </div>
                 <p class="text-gray-300 mb-2 font-medium text-sm md:text-base">Location: ${sanitize(p.location)}</p>
-                <p class="text-xs md:text-sm text-gray-400 mb-2 font-semibold">Interior: ${p.interiorType}</p>
+                <p class="text-xs md:text-sm text-gray-400 mb-2 font-semibold">Interior: ${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</p>
                 <p id="owner-${p.id}" class="text-xs md:text-sm text-blue-400 mb-4 font-semibold">Owner: Loading...</p>
                 <div class="grid grid-cols-3 gap-2 mb-4 text-xs md:text-sm text-gray-300 font-semibold">
                     <div>${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)} Beds</div>
