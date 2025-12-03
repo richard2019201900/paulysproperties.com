@@ -2,7 +2,7 @@
 
 A premium real estate rental website for Los Santos properties, featuring Firebase authentication, Firestore database, and a modern responsive UI.
 
-## 🏠 Features
+## Features
 
 - **14+ Premium Properties** - Luxury apartments, houses, condos & villas
 - **Firebase Authentication** - Secure owner login system
@@ -13,32 +13,32 @@ A premium real estate rental website for Los Santos properties, featuring Fireba
 - **Responsive Design** - Mobile-first with Tailwind CSS
 - **Contact System** - Text-based contact for quick responses
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 paulysproperties.com/
-├── index.html              # Main HTML structure
-├── css/
-│   └── styles.css          # Custom styles (gradients, animations, components)
-├── js/
-│   ├── config.js           # Firebase configuration
-│   ├── data.js             # Property data & owner mappings
-│   ├── state.js            # Application state management
-│   ├── services.js         # PropertyDataService & Firestore operations
-│   ├── ui.js               # UI rendering functions
-│   ├── components.js       # Lightbox, modals, filters, reviews
-│   └── app.js              # Main initialization & event handlers
-├── images/                 # Property images
-└── README.md               # This file
+|-- index.html              # Main HTML structure
+|-- css/
+|   |-- styles.css          # Custom styles (gradients, animations, components)
+|-- js/
+|   |-- config.js           # Firebase configuration
+|   |-- data.js             # Property data & owner mappings
+|   |-- state.js            # Application state management
+|   |-- services.js         # PropertyDataService & Firestore operations
+|   |-- ui.js               # UI rendering functions
+|   |-- components.js       # Lightbox, modals, filters, reviews
+|   |-- app.js              # Main initialization & event handlers
+|-- images/                 # Property images
+|-- README.md               # This file
 ```
 
-## 🚀 Deployment
+## Deployment
 
 This site is deployed via GitHub Pages. Any push to the `main` branch automatically updates the live site.
 
-**Live Site:** [https://richard2019201900.github.io/paulysproperties.com/](https://richard2019201900.github.io/paulysproperties.com/)
+**Live Site:** https://richard2019201900.github.io/paulysproperties.com/
 
-## 🛠️ Development
+## Development
 
 ### Prerequisites
 - Modern web browser
@@ -57,7 +57,7 @@ The site uses Firebase for:
 
 Firebase config is in `js/config.js`.
 
-## 📝 Changelog
+## Changelog
 
 ### v2.0.0 (Current)
 - Refactored from single-file to modular architecture
@@ -67,6 +67,6 @@ Firebase config is in `js/config.js`.
 ### v1.0.0
 - Initial release (single index.html file)
 
-## 📄 License
+## License
 
-© 2024 paulysproperties.com. All rights reserved.
+(c) 2024 paulysproperties.com. All rights reserved.
