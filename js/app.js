@@ -1048,11 +1048,11 @@ window.copyReminderScript = function(propertyId) {
     if (!scriptElement) return;
     
     const text = scriptElement.textContent;
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
     
     navigator.clipboard.writeText(text).then(() => {
         // Show success feedback
-        const btn = event.target.closest('button');
-        const originalHtml = btn.innerHTML;
         btn.innerHTML = `
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
             Copied!
@@ -1067,16 +1067,40 @@ window.copyReminderScript = function(propertyId) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy. Please try selecting and copying manually.');
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            btn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Copied!
+            `;
+            btn.classList.remove('from-green-500', 'to-emerald-600');
+            btn.classList.add('from-purple-500', 'to-purple-600');
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('from-purple-500', 'to-purple-600');
+                btn.classList.add('from-green-500', 'to-emerald-600');
+            }, 2000);
+        } catch(e) {
+            alert('Failed to copy. Please select and copy manually.');
+        }
+        document.body.removeChild(textArea);
     });
 };
 
 // ==================== COPY RENTER PHONE ====================
 window.copyRenterPhone = function(phoneNumber) {
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    
     navigator.clipboard.writeText(phoneNumber).then(() => {
         // Show success feedback
-        const btn = event.target.closest('button');
-        const originalHtml = btn.innerHTML;
         btn.innerHTML = `
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
             Copied!
@@ -1091,7 +1115,30 @@ window.copyRenterPhone = function(phoneNumber) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy phone number.');
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = phoneNumber;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            btn.innerHTML = `
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Copied!
+            `;
+            btn.classList.remove('bg-pink-500', 'hover:bg-pink-400');
+            btn.classList.add('bg-green-500');
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('bg-green-500');
+                btn.classList.add('bg-pink-500', 'hover:bg-pink-400');
+            }, 2000);
+        } catch(e) {
+            alert('Failed to copy phone number.');
+        }
+        document.body.removeChild(textArea);
     });
 };
 

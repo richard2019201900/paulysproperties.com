@@ -259,6 +259,12 @@ function renderOwnerDashboard() {
         const lastPaidDisplay = lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-';
         const isRented = state.availability[p.id] === false;
         
+        // Store reminder for this property
+        if (reminderScript) {
+            window.dashboardReminders = window.dashboardReminders || {};
+            window.dashboardReminders[p.id] = reminderScript;
+        }
+        
         return `
         <tr class="border-b border-gray-700/50 hover:bg-gray-700/50 transition">
             <td class="px-2 md:px-3 py-3 text-center text-gray-500 font-medium" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
@@ -315,7 +321,7 @@ function renderOwnerDashboard() {
                         <span class="text-gray-400 capitalize">${paymentFrequency}</span>
                     </div>
                     ${reminderScript ? `
-                    <button onclick="copyDashboardReminder(${p.id}, \`${reminderScript.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" class="ml-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder message">
+                    <button onclick="copyDashboardReminder(${p.id})" class="ml-auto bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder message">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                         Send Reminder
                     </button>
@@ -672,10 +678,17 @@ window.executeDeleteProperty = async function() {
 };
 
 // ==================== COPY DASHBOARD REMINDER ====================
-window.copyDashboardReminder = function(propertyId, reminderText) {
+window.copyDashboardReminder = function(propertyId) {
+    const reminderText = window.dashboardReminders && window.dashboardReminders[propertyId];
+    if (!reminderText) {
+        alert('No reminder text found.');
+        return;
+    }
+    
+    const btn = event.target.closest('button');
+    
     navigator.clipboard.writeText(reminderText).then(() => {
         // Show success feedback
-        const btn = event.target.closest('button');
         const originalHtml = btn.innerHTML;
         btn.innerHTML = `
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -691,6 +704,30 @@ window.copyDashboardReminder = function(propertyId, reminderText) {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy:', err);
-        alert('Failed to copy. Please try again.');
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = reminderText;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Copied!
+            `;
+            btn.classList.remove('from-orange-500', 'to-red-500');
+            btn.classList.add('from-green-500', 'to-emerald-500');
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('from-green-500', 'to-emerald-500');
+                btn.classList.add('from-orange-500', 'to-red-500');
+            }, 2000);
+        } catch (e) {
+            alert('Failed to copy. Please copy manually.');
+        }
+        document.body.removeChild(textArea);
     });
 };
