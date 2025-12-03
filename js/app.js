@@ -404,7 +404,7 @@ function renderPropertyStatsContent(id) {
                                 <span class="text-pink-200 font-semibold">Renter Phone</span>
                             </div>
                             ${renterPhone ? `
-                            <button onclick="event.stopPropagation(); copyRenterPhone('${renterPhone}')" class="bg-pink-500 hover:bg-pink-400 text-white px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Copy phone number">
+                            <button onclick="event.stopPropagation(); copyRenterPhone('${renterPhone}', this)" class="bg-pink-500 hover:bg-pink-400 text-white px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1" title="Copy phone number">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                                 Copy
                             </button>
@@ -469,7 +469,7 @@ function renderPropertyStatsContent(id) {
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                             Payment Reminder Script
                         </h4>
-                        <button onclick="copyReminderScript(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2">
+                        <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                             Copy Script
                         </button>
@@ -1043,12 +1043,11 @@ window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
 };
 
 // ==================== COPY REMINDER SCRIPT ====================
-window.copyReminderScript = function(propertyId) {
+window.copyReminderScript = function(propertyId, btn) {
     const scriptElement = $(`reminderScript-${propertyId}`);
     if (!scriptElement) return;
     
     const text = scriptElement.textContent;
-    const btn = event.target.closest('button');
     const originalHtml = btn.innerHTML;
     
     navigator.clipboard.writeText(text).then(() => {
@@ -1095,8 +1094,7 @@ window.copyReminderScript = function(propertyId) {
 };
 
 // ==================== COPY RENTER PHONE ====================
-window.copyRenterPhone = function(phoneNumber) {
-    const btn = event.target.closest('button');
+window.copyRenterPhone = function(phoneNumber, btn) {
     const originalHtml = btn.innerHTML;
     
     navigator.clipboard.writeText(phoneNumber).then(() => {
