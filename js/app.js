@@ -197,6 +197,10 @@ function renderPropertyStatsContent(id) {
         ? (propertyReviews.reduce((sum, r) => sum + r.rating, 0) / propertyReviews.length).toFixed(1)
         : 'N/A';
     
+    // Owner contact info
+    const ownerName = PropertyDataService.getValue(id, 'ownerName', p.ownerName || '');
+    const ownerPhone = PropertyDataService.getValue(id, 'ownerPhone', p.ownerPhone || '');
+    
     $('propertyStatsContent').innerHTML = `
         <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8">
             <!-- View Toggle Tabs -->
@@ -300,6 +304,38 @@ function renderPropertyStatsContent(id) {
                         <div id="value-interiorType-${id}" class="text-xl font-bold text-white">${interiorType}</div>
                         <div class="text-sm text-rose-200">Interior</div>
                         <div class="text-xs text-rose-300 mt-1 opacity-70">Click to edit</div>
+                    </div>
+                </div>
+                
+                <!-- Owner Contact Info -->
+                <h3 class="text-xl font-bold text-gray-200 mb-4">Owner Contact <span class="text-sm text-purple-400">(Click to edit)</span></h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <!-- Owner Name -->
+                    <div id="tile-ownerName-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl border border-violet-500 cursor-pointer"
+                         onclick="startEditTile('ownerName', ${id}, 'text')"
+                         data-field="ownerName"
+                         data-original-value="${sanitize(ownerName)}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 text-violet-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            <span class="text-violet-200 font-semibold">Contact Name</span>
+                        </div>
+                        <div id="value-ownerName-${id}" class="text-xl font-bold text-white">${ownerName || '<span class="text-violet-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-violet-300 mt-2 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Owner Phone -->
+                    <div id="tile-ownerPhone-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-pink-600 to-pink-800 rounded-xl border border-pink-500 cursor-pointer"
+                         onclick="startEditTile('ownerPhone', ${id}, 'tel')"
+                         data-field="ownerPhone"
+                         data-original-value="${sanitize(ownerPhone)}">
+                        <div class="flex items-center gap-3 mb-2">
+                            <svg class="w-6 h-6 text-pink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                            <span class="text-pink-200 font-semibold">Contact Phone</span>
+                        </div>
+                        <div id="value-ownerPhone-${id}" class="text-xl font-bold text-white">${ownerPhone || '<span class="text-pink-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-pink-300 mt-2 opacity-70">Click to edit</div>
                     </div>
                 </div>
             </div>
@@ -446,13 +482,15 @@ window.startEditTile = function(field, propertyId, type) {
             </select>
         `;
     } else {
-        const rawValue = typeof currentValue === 'number' ? currentValue : String(currentValue).replace(/[$,]/g, '');
+        const rawValue = typeof currentValue === 'number' ? currentValue : String(currentValue || '').replace(/[$,]/g, '');
+        const inputType = type === 'number' ? 'number' : (type === 'tel' ? 'tel' : 'text');
         inputHtml = `
-            <input type="${type === 'number' ? 'number' : 'text'}" 
+            <input type="${inputType}" 
                    id="input-${field}-${propertyId}"
                    class="stat-input text-lg"
                    value="${rawValue}"
-                   min="0">
+                   ${type === 'number' ? 'min="0"' : ''}
+                   placeholder="${field === 'ownerName' ? 'Enter contact name' : (field === 'ownerPhone' ? 'Enter phone number' : '')}">
         `;
     }
     
@@ -505,6 +543,15 @@ window.saveTileEdit = async function(field, propertyId, type) {
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
         }
+    } else if (type === 'text' || type === 'tel') {
+        // Allow empty values for owner contact info
+        newValue = input.value.trim();
+        // For non-contact fields, require a value
+        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone') {
+            tile.classList.add('error');
+            setTimeout(() => tile.classList.remove('error'), 500);
+            return;
+        }
     } else {
         newValue = input.value.trim();
         if (!newValue) {
@@ -520,9 +567,14 @@ window.saveTileEdit = async function(field, propertyId, type) {
     tile.classList.remove('editing');
     tile.classList.add('saving');
     
-    const displayValue = type === 'number' 
-        ? (field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString())
-        : newValue;
+    let displayValue;
+    if (type === 'number') {
+        displayValue = field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
+    } else if ((field === 'ownerName' || field === 'ownerPhone') && !newValue) {
+        displayValue = '<span class="opacity-70">Not set</span>';
+    } else {
+        displayValue = newValue;
+    }
     valueEl.innerHTML = `<span class="opacity-70">${displayValue}</span><div class="text-xs mt-1">Saving...</div>`;
     
     try {
