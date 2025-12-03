@@ -81,11 +81,16 @@ window.loadUsername = async function() {
     
     try {
         const doc = await db.collection('users').doc(user.uid).get();
-        if (doc.exists && doc.data().username) {
-            $('ownerUsername').value = doc.data().username;
+        if (doc.exists) {
+            if (doc.data().username) {
+                $('ownerUsername').value = doc.data().username;
+            }
+            if (doc.data().phone) {
+                $('ownerPhone').value = doc.data().phone;
+            }
         }
     } catch (error) {
-        console.error('Error loading username:', error);
+        console.error('Error loading user settings:', error);
     }
 }
 
@@ -127,6 +132,47 @@ window.saveUsername = async function() {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Save Name';
+    }
+};
+
+window.saveOwnerPhone = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const phone = $('ownerPhone').value.trim();
+    const btn = $('savePhoneBtn');
+    const status = $('phoneStatus');
+    
+    if (!phone) {
+        status.textContent = 'Please enter a phone number';
+        status.className = 'text-yellow-400 text-sm mt-3';
+        showElement(status);
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    
+    try {
+        await db.collection('users').doc(user.uid).set({
+            phone: phone,
+            email: user.email,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        
+        status.textContent = 'Phone number saved successfully!';
+        status.className = 'text-green-400 text-sm mt-3';
+        showElement(status);
+        
+        setTimeout(() => hideElement(status), 3000);
+    } catch (error) {
+        console.error('Error saving phone:', error);
+        status.textContent = 'Error saving phone number. Please try again.';
+        status.className = 'text-red-400 text-sm mt-3';
+        showElement(status);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Phone';
     }
 };
 
@@ -446,7 +492,7 @@ async function renderProperties(list) {
                     <div class="text-purple-400 font-black text-xl md:text-2xl mt-1">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
                 </div>
                 <button onclick="viewProperty(${p.id})" class="w-full gradient-bg text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
-                <button onclick="event.stopPropagation(); openContactModal('offer', '${sanitize(p.title)}')" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
+                <button onclick="event.stopPropagation(); openContactModal('offer', '${sanitize(p.title)}', ${p.id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
             </div>
         </article>`;
     }).join('');

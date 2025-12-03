@@ -101,8 +101,8 @@ window.viewProperty = function(id) {
                     </div>
                 </div>
             </div>
-            <button onclick="openContactModal('rent', '${sanitize(p.title)}')" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
-            <button onclick="openContactModal('offer', '${sanitize(p.title)}')" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
+            <button onclick="openContactModal('rent', '${sanitize(p.title)}', ${id})" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
+            <button onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
         </div>`;
     
     displayReviews(id);

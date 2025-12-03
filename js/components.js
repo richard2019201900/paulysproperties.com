@@ -33,9 +33,10 @@ window.copyToClipboard = function(elementId, btn) {
 window.openModal = id => showElement($(id));
 window.closeModal = id => hideElement($(id));
 
-window.openContactModal = function(type, propertyTitle) {
+window.openContactModal = async function(type, propertyTitle, propertyId) {
     const isRent = type === 'rent';
     const colors = isRent ? ['purple', 'blue'] : ['amber', 'orange'];
+    const defaultPhone = '2057028233';
     
     $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer';
     $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
@@ -47,11 +48,34 @@ window.openContactModal = function(type, propertyTitle) {
     const accent = $('modalAccent');
     accent.className = `bg-gradient-to-r from-${colors[0]}-900 to-${colors[1]}-900 p-4 rounded-xl mb-6 text-center border border-${colors[0]}-700`;
     
+    // Reset to default phone first
+    $('modalPhone').value = defaultPhone;
+    
+    // Load owner's phone number if property ID is provided
+    if (propertyId) {
+        try {
+            const ownerEmail = getPropertyOwnerEmail(propertyId);
+            if (ownerEmail) {
+                const usersSnapshot = await db.collection('users').where('email', '==', ownerEmail).get();
+                if (!usersSnapshot.empty) {
+                    const userData = usersSnapshot.docs[0].data();
+                    if (userData.phone) {
+                        $('modalPhone').value = userData.phone;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading owner phone:', error);
+        }
+    }
+    
     openModal('contactModal');
 };
 
 window.openRegisterContactModal = function() {
     closeModal('loginModal');
+    
+    const defaultPhone = '2057028233';
     
     $('modalTitle').textContent = 'Request New Account';
     $('modalTitle').className = 'text-3xl font-black bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent mb-4 text-center';
@@ -63,6 +87,7 @@ window.openRegisterContactModal = function() {
         </select>
     `;
     $('modalMessage').value = "Hi! I'm interested in creating a new account as a Property Owner. Please contact me to get started. Thank you!";
+    $('modalPhone').value = defaultPhone;
     
     const accent = $('modalAccent');
     accent.className = 'bg-gradient-to-r from-cyan-900 to-blue-900 p-4 rounded-xl mb-6 text-center border border-cyan-700';
