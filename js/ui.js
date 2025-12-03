@@ -218,13 +218,137 @@ function getAvailableCount() {
 
 function calculateTotals() {
     const ownerProps = getOwnerProperties();
-    return ownerProps.reduce((acc, p) => {
-        if (state.availability[p.id] === false) {
-            acc.weekly += PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
-            acc.monthly += PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
+    const details = {
+        weeklyPayers: [],   // Properties where renter pays weekly
+        monthlyPayers: [],  // Properties where renter pays monthly
+        available: []       // Available properties
+    };
+    
+    let weeklyIncome = 0;
+    let monthlyIncome = 0;
+    
+    ownerProps.forEach(p => {
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const isRented = state.availability[p.id] === false;
+        
+        const propInfo = {
+            id: p.id,
+            title: p.title,
+            weeklyPrice,
+            monthlyPrice,
+            renterName,
+            paymentFrequency
+        };
+        
+        if (isRented) {
+            if (paymentFrequency === 'monthly') {
+                // Monthly payer contributes monthly rate
+                monthlyIncome += monthlyPrice;
+                // Weekly equivalent: monthly / 4.33
+                weeklyIncome += Math.round(monthlyPrice / 4.33);
+                details.monthlyPayers.push(propInfo);
+            } else {
+                // Weekly payer contributes weekly rate
+                weeklyIncome += weeklyPrice;
+                // Monthly equivalent: weekly * 4.33
+                monthlyIncome += Math.round(weeklyPrice * 4.33);
+                details.weeklyPayers.push(propInfo);
+            }
+        } else {
+            details.available.push(propInfo);
         }
-        return acc;
-    }, { weekly: 0, monthly: 0 });
+    });
+    
+    // Store details globally for the flip cards
+    window.incomeDetails = details;
+    
+    return { weekly: weeklyIncome, monthly: monthlyIncome, details };
+}
+
+// Flip card toggle
+window.flipCard = function(card) {
+    card.classList.toggle('flipped');
+};
+
+// Update breakdown panels
+function updateIncomeBreakdowns(details) {
+    const weeklyEl = $('weeklyBreakdown');
+    const monthlyEl = $('monthlyBreakdown');
+    const unitsEl = $('unitsBreakdown');
+    
+    if (!weeklyEl || !monthlyEl || !unitsEl) return;
+    
+    // Weekly breakdown - shows what contributes to weekly total
+    let weeklyHTML = '';
+    if (details.weeklyPayers.length > 0) {
+        weeklyHTML += '<div class="font-bold text-blue-300 mb-1">Weekly Payers:</div>';
+        details.weeklyPayers.forEach(p => {
+            weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
+                <span class="truncate mr-2">${p.title}</span>
+                <span class="text-green-300 font-bold">$${p.weeklyPrice.toLocaleString()}</span>
+            </div>`;
+        });
+    }
+    if (details.monthlyPayers.length > 0) {
+        weeklyHTML += '<div class="font-bold text-blue-300 mt-2 mb-1">Monthly Payers (÷4.33):</div>';
+        details.monthlyPayers.forEach(p => {
+            const weeklyEquiv = Math.round(p.monthlyPrice / 4.33);
+            weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
+                <span class="truncate mr-2">${p.title}</span>
+                <span class="text-yellow-300">~$${weeklyEquiv.toLocaleString()}</span>
+            </div>`;
+        });
+    }
+    if (!weeklyHTML) weeklyHTML = '<div class="opacity-70">No rented properties</div>';
+    weeklyEl.innerHTML = weeklyHTML;
+    
+    // Monthly breakdown - shows what contributes to monthly total
+    let monthlyHTML = '';
+    if (details.monthlyPayers.length > 0) {
+        monthlyHTML += '<div class="font-bold text-green-300 mb-1">Monthly Payers:</div>';
+        details.monthlyPayers.forEach(p => {
+            monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
+                <span class="truncate mr-2">${p.title}</span>
+                <span class="text-green-300 font-bold">$${p.monthlyPrice.toLocaleString()}</span>
+            </div>`;
+        });
+    }
+    if (details.weeklyPayers.length > 0) {
+        monthlyHTML += '<div class="font-bold text-green-300 mt-2 mb-1">Weekly Payers (×4.33):</div>';
+        details.weeklyPayers.forEach(p => {
+            const monthlyEquiv = Math.round(p.weeklyPrice * 4.33);
+            monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
+                <span class="truncate mr-2">${p.title}</span>
+                <span class="text-yellow-300">~$${monthlyEquiv.toLocaleString()}</span>
+            </div>`;
+        });
+    }
+    if (!monthlyHTML) monthlyHTML = '<div class="opacity-70">No rented properties</div>';
+    monthlyEl.innerHTML = monthlyHTML;
+    
+    // Units breakdown
+    let unitsHTML = '';
+    const rented = [...details.weeklyPayers, ...details.monthlyPayers];
+    if (rented.length > 0) {
+        unitsHTML += '<div class="font-bold text-red-300 mb-1">🔴 Rented:</div>';
+        rented.forEach(p => {
+            unitsHTML += `<div class="flex justify-between py-0.5 border-b border-purple-700/30">
+                <span class="truncate mr-2">${p.title}</span>
+                <span class="text-sky-300">${p.renterName || 'Unknown'}</span>
+            </div>`;
+        });
+    }
+    if (details.available.length > 0) {
+        unitsHTML += '<div class="font-bold text-green-300 mt-2 mb-1">🟢 Available:</div>';
+        details.available.forEach(p => {
+            unitsHTML += `<div class="py-0.5 border-b border-purple-700/30 truncate">${p.title}</div>`;
+        });
+    }
+    if (!unitsHTML) unitsHTML = '<div class="opacity-70">No properties</div>';
+    unitsEl.innerHTML = unitsHTML;
 }
 
 // ==================== RENDER FUNCTIONS ====================
@@ -234,6 +358,9 @@ function renderOwnerDashboard() {
     $('weeklyIncomeDisplay').textContent = formatPrice(totals.weekly);
     $('monthlyIncomeDisplay').textContent = formatPrice(totals.monthly);
     $('unitsAvailableDisplay').textContent = `${getAvailableCount()}/${ownerProps.length}`;
+    
+    // Populate breakdown panels
+    updateIncomeBreakdowns(totals.details);
     
     if (ownerProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
