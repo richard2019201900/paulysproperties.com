@@ -253,14 +253,18 @@ async function initFirestore() {
         }
         
         // Load property overrides
+        console.log('[initFirestore] Loading property overrides...');
         const overridesDoc = await db.collection('settings').doc('propertyOverrides').get();
+        console.log('[initFirestore] Overrides doc exists:', overridesDoc.exists);
         if (overridesDoc.exists) {
             const overridesData = overridesDoc.data();
+            console.log('[initFirestore] Overrides data:', overridesData);
             Object.keys(overridesData).forEach(propId => {
                 if (!isNaN(parseInt(propId))) {
                     state.propertyOverrides[propId] = overridesData[propId];
                 }
             });
+            console.log('[initFirestore] State after loading:', state.propertyOverrides);
         }
     } catch (error) {
         console.error('Init error:', error);
