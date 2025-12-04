@@ -1809,12 +1809,6 @@ window.showPersistentAdminAlert = function(count, newestRequest) {
     
     console.log('[AdminAlert] Persistent alert shown');
 };
-            
-    } catch (error) {
-        console.log('No upgrade notifications collection yet');
-        updateRequestsBadge(0);
-    }
-};
 
 // Show global alert bar
 window.showGlobalAlert = function(title, message, navigateTo) {
