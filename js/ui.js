@@ -523,6 +523,12 @@ window.updateTierBadge = function(tier, email) {
         if (isMasterAdmin) {
             showElement(adminSection);
             loadPendingUpgradeRequests();
+            // Also check for subscription alerts after a delay (to allow user list to load)
+            setTimeout(() => {
+                if (window.adminUsersData) {
+                    showSubscriptionAlert();
+                }
+            }, 2000);
         } else {
             hideElement(adminSection);
         }
@@ -1678,6 +1684,18 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
         // Update user tier
         await TierService.setUserTier(userEmail, newTier, currentTier, paymentNote);
         
+        // Set subscription payment date to today
+        const snapshot = await db.collection('users').where('email', '==', userEmail).get();
+        if (!snapshot.empty) {
+            const userId = snapshot.docs[0].id;
+            const today = new Date().toISOString().split('T')[0];
+            await db.collection('users').doc(userId).update({
+                subscriptionLastPaid: today,
+                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`[Subscription] Set initial payment date for ${userEmail}: ${today}`);
+        }
+        
         // Mark request as approved
         await db.collection('upgradeNotifications').doc(requestId).update({
             status: 'approved',
@@ -1697,7 +1715,7 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
             read: false
         });
         
-        alert(`✓ ${userEmail} upgraded to ${newTier}! User will be notified.`);
+        alert(`✓ ${userEmail} upgraded to ${newTier}!\n\nSubscription payment date set to today.\nUser will be notified.`);
         loadUpgradeRequests();
         loadAllUsers();
         
@@ -2092,6 +2110,9 @@ window.loadAllUsers = async function() {
         
         renderAdminUsersList(users);
         
+        // Check for subscription alerts
+        checkSubscriptionAlerts();
+        
     } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = '<p class="text-red-400">Error loading users.</p>';
@@ -2154,6 +2175,92 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             </span>
         ` : '';
         
+        // === SUBSCRIPTION TRACKING FOR PRO/ELITE USERS ===
+        let subscriptionHTML = '';
+        if (!isUserMasterAdmin && (user.tier === 'pro' || user.tier === 'elite')) {
+            const subLastPaid = user.subscriptionLastPaid || '';
+            const tierPrice = user.tier === 'pro' ? '$25,000' : '$50,000';
+            
+            // Calculate next due date (monthly)
+            let nextDueDate = '';
+            let daysUntilDue = null;
+            let statusColor = 'text-gray-400';
+            let statusBg = 'bg-gray-700';
+            let statusIcon = '📅';
+            
+            if (subLastPaid) {
+                const lastDate = new Date(subLastPaid);
+                const nextDate = new Date(lastDate);
+                nextDate.setMonth(nextDate.getMonth() + 1);
+                nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                nextDate.setHours(0, 0, 0, 0);
+                daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+                
+                if (daysUntilDue < 0) {
+                    statusColor = 'text-red-400';
+                    statusBg = 'bg-red-900/50 border-red-500';
+                    statusIcon = '🚨';
+                } else if (daysUntilDue <= 3) {
+                    statusColor = 'text-orange-400';
+                    statusBg = 'bg-orange-900/50 border-orange-500';
+                    statusIcon = '⚠️';
+                } else if (daysUntilDue <= 7) {
+                    statusColor = 'text-yellow-400';
+                    statusBg = 'bg-yellow-900/30 border-yellow-600';
+                    statusIcon = '📆';
+                } else {
+                    statusColor = 'text-green-400';
+                    statusBg = 'bg-green-900/30 border-green-600';
+                    statusIcon = '✅';
+                }
+            }
+            
+            const lastPaidDisplay = subLastPaid 
+                ? new Date(subLastPaid).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'Never';
+            
+            const dueDisplay = daysUntilDue !== null
+                ? (daysUntilDue < 0 
+                    ? `<span class="text-red-400 font-bold">${Math.abs(daysUntilDue)}d OVERDUE!</span>`
+                    : daysUntilDue === 0
+                        ? `<span class="text-orange-400 font-bold">DUE TODAY!</span>`
+                        : `<span class="${statusColor}">${daysUntilDue}d left</span>`)
+                : '<span class="text-gray-500">Not set</span>';
+            
+            subscriptionHTML = `
+                <div class="mt-3 p-3 rounded-lg border ${statusBg}">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">${statusIcon}</span>
+                            <span class="text-white font-bold text-sm">Subscription: ${tierPrice}/mo</span>
+                        </div>
+                        <button onclick="copySubscriptionReminder('${escapedEmail}', '${displayName}', '${user.tier}', '${tierPrice}')" 
+                            class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition">
+                            📋 Copy Reminder
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                            <span class="text-gray-400">Last Paid:</span>
+                            <span class="text-white ml-1 cursor-pointer hover:text-cyan-400" 
+                                  onclick="editSubscriptionDate('${escapedId}', '${escapedEmail}', '${subLastPaid}')"
+                                  title="Click to edit">
+                                ${lastPaidDisplay} ✏️
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Next Due:</span>
+                            <span class="ml-1">${nextDueDate || '-'}</span>
+                            ${dueDisplay}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
         // Don't show action buttons for master admin
         const actionButtons = isUserMasterAdmin ? '' : `
             <div class="flex flex-wrap gap-2">
@@ -2193,7 +2300,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         
         return `
             <div class="bg-gray-800 rounded-xl p-4 border ${cardBorder} admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
-                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-3 mb-2">
                             <span class="text-2xl">${tierData.icon}</span>
@@ -2214,6 +2321,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         <div id="propList_${escapedId}" class="hidden mt-3 bg-gray-900/50 rounded-lg p-3 max-h-32 overflow-y-auto">
                             ${propertiesHTML}
                         </div>
+                        ${subscriptionHTML}
                     </div>
                     ${actionButtons}
                 </div>
@@ -2243,6 +2351,189 @@ window.filterAdminUsers = function() {
                (user.username || '').toLowerCase().includes(searchTerm);
     });
     renderAdminUsersList(filtered);
+};
+
+// ==================== SUBSCRIPTION TRACKING ====================
+
+// Edit subscription last paid date
+window.editSubscriptionDate = function(userId, email, currentDate) {
+    const newDate = prompt(
+        `Enter last subscription payment date for ${email}:\n\n` +
+        `Format: YYYY-MM-DD (e.g., 2025-12-04)\n` +
+        `Current value: ${currentDate || 'Not set'}`,
+        currentDate || new Date().toISOString().split('T')[0]
+    );
+    
+    if (newDate !== null) {
+        // Validate date format
+        if (newDate && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+            alert('Invalid date format. Please use YYYY-MM-DD');
+            return;
+        }
+        
+        saveSubscriptionDate(userId, email, newDate);
+    }
+};
+
+// Save subscription date to Firestore
+window.saveSubscriptionDate = async function(userId, email, date) {
+    try {
+        await db.collection('users').doc(userId).update({
+            subscriptionLastPaid: date || '',
+            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log(`[Subscription] Updated last paid for ${email}: ${date}`);
+        
+        // Update local cache and re-render
+        if (window.adminUsersData) {
+            const userIndex = window.adminUsersData.findIndex(u => u.id === userId);
+            if (userIndex !== -1) {
+                window.adminUsersData[userIndex].subscriptionLastPaid = date;
+            }
+        }
+        
+        // Re-render the user list
+        loadAllUsers();
+        
+    } catch (error) {
+        console.error('Error saving subscription date:', error);
+        alert('Error saving subscription date: ' + error.message);
+    }
+};
+
+// Copy subscription reminder text
+window.copySubscriptionReminder = function(email, displayName, tier, price) {
+    const tierName = tier === 'pro' ? 'Pro ⭐' : 'Elite 👑';
+    
+    const reminderText = `Hey ${displayName}! 👋
+
+This is a friendly reminder that your PaulysProperties.com ${tierName} subscription payment is coming up!
+
+💰 Amount Due: ${price}
+📅 Subscription: ${tierName} Tier
+🏠 Benefits: ${tier === 'pro' ? '3 property listings' : 'Unlimited property listings'}
+
+Please meet up to make your monthly payment when you're available. Let me know what works for you!
+
+Thanks for being a valued member! 🙏`;
+
+    navigator.clipboard.writeText(reminderText).then(() => {
+        // Show success feedback
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2';
+        toast.innerHTML = `<span class="text-lg">✅</span> Reminder copied for ${displayName}!`;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    }).catch(err => {
+        console.error('Copy failed:', err);
+        alert('Failed to copy. Please try manually.');
+    });
+};
+
+// Check for overdue subscriptions and show alerts
+window.checkSubscriptionAlerts = function() {
+    if (!window.adminUsersData) return;
+    
+    const overdueUsers = [];
+    const dueSoonUsers = [];
+    
+    window.adminUsersData.forEach(user => {
+        if (user.tier !== 'pro' && user.tier !== 'elite') return;
+        if (TierService.isMasterAdmin(user.email)) return;
+        
+        const subLastPaid = user.subscriptionLastPaid;
+        if (!subLastPaid) {
+            // Never paid - consider overdue
+            overdueUsers.push({
+                name: user.username || user.email.split('@')[0],
+                email: user.email,
+                tier: user.tier,
+                daysOverdue: 'Never paid'
+            });
+            return;
+        }
+        
+        const lastDate = new Date(subLastPaid);
+        const nextDate = new Date(lastDate);
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        nextDate.setHours(0, 0, 0, 0);
+        const daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilDue < 0) {
+            overdueUsers.push({
+                name: user.username || user.email.split('@')[0],
+                email: user.email,
+                tier: user.tier,
+                daysOverdue: Math.abs(daysUntilDue)
+            });
+        } else if (daysUntilDue <= 3) {
+            dueSoonUsers.push({
+                name: user.username || user.email.split('@')[0],
+                email: user.email,
+                tier: user.tier,
+                daysLeft: daysUntilDue
+            });
+        }
+    });
+    
+    // Store for display
+    window.overdueSubscriptions = overdueUsers;
+    window.dueSoonSubscriptions = dueSoonUsers;
+    
+    // Update subscription alert badge
+    updateSubscriptionAlertBadge(overdueUsers.length, dueSoonUsers.length);
+    
+    return { overdue: overdueUsers, dueSoon: dueSoonUsers };
+};
+
+// Update subscription alert badge on All Users tab
+window.updateSubscriptionAlertBadge = function(overdueCount, dueSoonCount) {
+    // Add badge to the All Users tab if there are issues
+    const allUsersTab = document.querySelector('button[onclick*="switchAdminTab"][onclick*="users"]');
+    if (!allUsersTab) return;
+    
+    // Remove existing badge
+    const existingBadge = allUsersTab.querySelector('.sub-alert-badge');
+    if (existingBadge) existingBadge.remove();
+    
+    if (overdueCount > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'sub-alert-badge bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2 animate-pulse';
+        badge.textContent = `🚨 ${overdueCount}`;
+        badge.title = `${overdueCount} overdue subscription(s)`;
+        allUsersTab.appendChild(badge);
+    } else if (dueSoonCount > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'sub-alert-badge bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2';
+        badge.textContent = `⚠️ ${dueSoonCount}`;
+        badge.title = `${dueSoonCount} subscription(s) due soon`;
+        allUsersTab.appendChild(badge);
+    }
+};
+
+// Show global subscription alert if there are overdue subscriptions
+window.showSubscriptionAlert = function() {
+    const { overdue, dueSoon } = checkSubscriptionAlerts();
+    
+    if (overdue.length > 0) {
+        const names = overdue.slice(0, 3).map(u => u.name).join(', ');
+        const more = overdue.length > 3 ? ` +${overdue.length - 3} more` : '';
+        
+        showGlobalAlert(
+            '🚨 Overdue Subscriptions!',
+            `${names}${more} - Click to view`,
+            'users'
+        );
+    }
 };
 
 window.updateAdminUserField = async function(userId, email, field, value) {
@@ -2877,7 +3168,20 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
     
     try {
         await TierService.setUserTier(email, newTier, currentTier, paymentNote);
-        alert(`✓ ${email} upgraded to ${tierData.name}!`);
+        
+        // Also set the subscription last paid date to today
+        const snapshot = await db.collection('users').where('email', '==', email).get();
+        if (!snapshot.empty) {
+            const userId = snapshot.docs[0].id;
+            const today = new Date().toISOString().split('T')[0];
+            await db.collection('users').doc(userId).update({
+                subscriptionLastPaid: today,
+                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log(`[Subscription] Set initial payment date for ${email}: ${today}`);
+        }
+        
+        alert(`✓ ${email} upgraded to ${tierData.name}!\n\nSubscription payment date set to today.`);
         loadAllUsers();
     } catch (error) {
         console.error('Error upgrading user:', error);
@@ -2886,13 +3190,24 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
 };
 
 window.adminDowngradeUser = async function(email, currentTier) {
-    if (!confirm(`Are you sure you want to reset ${email} to Starter tier?`)) return;
+    if (!confirm(`Are you sure you want to reset ${email} to Starter tier?\n\nThis will also clear their subscription payment history.`)) return;
     
     const reason = prompt('Reason for downgrade (optional):');
     if (reason === null) return;
     
     try {
         await TierService.setUserTier(email, 'starter', currentTier, `Downgraded: ${reason || 'No reason given'}`);
+        
+        // Clear subscription data when downgrading
+        const snapshot = await db.collection('users').where('email', '==', email).get();
+        if (!snapshot.empty) {
+            const userId = snapshot.docs[0].id;
+            await db.collection('users').doc(userId).update({
+                subscriptionLastPaid: '',
+                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
         alert(`${email} reset to Starter tier.`);
         loadAllUsers();
     } catch (error) {
