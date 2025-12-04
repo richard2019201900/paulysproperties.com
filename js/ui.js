@@ -429,17 +429,27 @@ window.hideProfileCompletionOverlay = function() {
 
 window.scrollToProfileSettings = function() {
     hideProfileCompletionOverlay();
-    const profileSection = $('ownerUsername')?.closest('.glass-effect');
-    if (profileSection) {
-        profileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Flash the profile section to draw attention
-        profileSection.classList.add('ring-2', 'ring-yellow-500');
-        setTimeout(() => {
-            profileSection.classList.remove('ring-2', 'ring-yellow-500');
-        }, 3000);
-    } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    
+    // Navigate to dashboard first
+    goToDashboard();
+    
+    // Wait for dashboard to render, then scroll and highlight
+    setTimeout(() => {
+        const profileSection = $('profileSettingsSection');
+        if (profileSection) {
+            profileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Add gold border effect to draw attention
+            profileSection.classList.add('ring-4', 'ring-yellow-500', 'ring-opacity-100');
+            profileSection.style.boxShadow = '0 0 20px rgba(234, 179, 8, 0.5)';
+            setTimeout(() => {
+                profileSection.classList.remove('ring-4', 'ring-yellow-500', 'ring-opacity-100');
+                profileSection.style.boxShadow = '';
+            }, 5000);
+        } else {
+            // Fallback - scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, 300);
 }
 
 // Check if navigation should be blocked
@@ -718,12 +728,38 @@ window.forceLogout = function() {
     updateAuthButton(false);
     dismissGlobalAlert();
     
-    // Sign out and redirect
+    // Sign out and go to home page as guest
     auth.signOut().then(() => {
-        window.location.href = '/';
+        // Show a temporary toast message instead of blocking alert
+        showDeletedAccountToast();
+        goHome();
     }).catch(() => {
-        window.location.href = '/';
+        showDeletedAccountToast();
+        goHome();
     });
+};
+
+// Show toast message when account is deleted
+window.showDeletedAccountToast = function() {
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-3';
+    toast.innerHTML = `
+        <span class="text-2xl">👋</span>
+        <div>
+            <div class="font-bold">Account Removed</div>
+            <div class="text-sm opacity-90">Your account has been deleted by an administrator.</div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        toast.style.transition = 'all 0.3s ease';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(-20px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
 };
 
 // ==================== CALCULATIONS ====================
@@ -3464,7 +3500,6 @@ window.startUserTierListener = function() {
                 if (!doc.exists) {
                     // User document was deleted - force logout
                     console.log('[UserSync] User document deleted - forcing logout');
-                    alert('Your account has been deleted by an administrator. You will be logged out.');
                     forceLogout();
                     return;
                 }
