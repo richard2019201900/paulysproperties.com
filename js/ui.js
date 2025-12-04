@@ -1730,6 +1730,16 @@ window.adminDeleteUser = async function(userId, email) {
         // Delete user document from Firestore
         await db.collection('users').doc(userId).delete();
         
+        // Delete from Firebase Auth using Cloud Function
+        try {
+            const deleteAuthUser = functions.httpsCallable('deleteAuthUser');
+            const result = await deleteAuthUser({ email: email });
+            console.log('[Admin] Auth user deleted:', result.data);
+        } catch (authError) {
+            console.warn('[Admin] Could not delete Auth user (Cloud Function may not be deployed):', authError.message);
+            // Continue - Firestore deletion was successful
+        }
+        
         // Remove from ownerPropertyMap
         delete ownerPropertyMap[email.toLowerCase()];
         
@@ -1739,8 +1749,8 @@ window.adminDeleteUser = async function(userId, email) {
         }
         
         const resultMsg = deleteProperties && propertyCount > 0
-            ? `User ${email} and their ${propertyCount} properties deleted.\n\n⚠️ IMPORTANT: Also delete this user from Firebase Console → Authentication → Users`
-            : `User ${email} deleted.${propertyCount > 0 ? ` Their ${propertyCount} properties are now unassigned.` : ''}\n\n⚠️ IMPORTANT: Also delete this user from Firebase Console → Authentication → Users`;
+            ? `✓ User ${email} and their ${propertyCount} properties deleted.`
+            : `✓ User ${email} deleted.${propertyCount > 0 ? ` Their ${propertyCount} properties are now unassigned.` : ''}`;
         
         alert(resultMsg);
         loadAllUsers();
@@ -1894,48 +1904,60 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 window.adminCreateUser = async function(email, password, displayName, tier) {
-    // Create a secondary Firebase Auth instance to create users without signing out admin
-    const secondaryApp = firebase.apps.find(app => app.name === 'Secondary') || 
-        firebase.initializeApp(firebase.app().options, 'Secondary');
-    const secondaryAuth = secondaryApp.auth();
+    let uid;
     
+    // Try Cloud Function first (preferred method)
     try {
-        // Create user with secondary auth
-        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Create user document
-        await db.collection('users').doc(user.uid).set({
-            email: email.toLowerCase(),
-            username: displayName,
-            tier: tier,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: auth.currentUser?.email || 'admin'
+        const createAuthUser = functions.httpsCallable('createAuthUser');
+        const result = await createAuthUser({ 
+            email: email, 
+            password: password, 
+            displayName: displayName 
         });
+        uid = result.data.uid;
+        console.log('[Admin] User created via Cloud Function:', uid);
+    } catch (cfError) {
+        console.warn('[Admin] Cloud Function not available, using secondary auth:', cfError.message);
         
-        // Sign out from secondary auth
-        await secondaryAuth.signOut();
+        // Fallback: Create a secondary Firebase Auth instance
+        const secondaryApp = firebase.apps.find(app => app.name === 'Secondary') || 
+            firebase.initializeApp(firebase.app().options, 'Secondary');
+        const secondaryAuth = secondaryApp.auth();
         
-        // Log to upgrade history if not starter
-        if (tier !== 'starter') {
-            await db.collection('upgradeHistory').add({
-                userEmail: email.toLowerCase(),
-                previousTier: 'starter',
-                newTier: tier,
-                upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                upgradedBy: auth.currentUser?.email || 'admin',
-                paymentNote: 'Account created by admin',
-                price: tier === 'pro' ? 25000 : (tier === 'elite' ? 50000 : 0)
-            });
+        try {
+            const userCredential = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+            uid = userCredential.user.uid;
+            await secondaryAuth.signOut();
+            console.log('[Admin] User created via secondary auth:', uid);
+        } catch (authError) {
+            try { await secondaryAuth.signOut(); } catch(e) {}
+            throw authError;
         }
-        
-        return { uid: user.uid, email: email };
-        
-    } catch (error) {
-        // Sign out secondary auth on error too
-        try { await secondaryAuth.signOut(); } catch(e) {}
-        throw error;
     }
+    
+    // Create user document in Firestore
+    await db.collection('users').doc(uid).set({
+        email: email.toLowerCase(),
+        username: displayName,
+        tier: tier,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: auth.currentUser?.email || 'admin'
+    });
+    
+    // Log to upgrade history if not starter
+    if (tier !== 'starter') {
+        await db.collection('upgradeHistory').add({
+            userEmail: email.toLowerCase(),
+            previousTier: 'starter',
+            newTier: tier,
+            upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            upgradedBy: auth.currentUser?.email || 'admin',
+            paymentNote: 'Account created by admin',
+            price: tier === 'pro' ? 25000 : (tier === 'elite' ? 50000 : 0)
+        });
+    }
+    
+    return { uid: uid, email: email };
 };
 
 window.generateRandomPassword = function() {

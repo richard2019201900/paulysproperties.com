@@ -17,6 +17,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const functions = firebase.functions();
 
 // Set auth persistence to LOCAL (persists across browser sessions)
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
