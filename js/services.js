@@ -626,6 +626,22 @@ async function saveAvailability(id, isAvailable) {
 }
 
 window.toggleAvailability = async function(id) {
+    const currentlyRented = state.availability[id] === false;
+    
+    // If trying to mark as Available, check if renter info exists
+    if (currentlyRented) {
+        const renterName = PropertyDataService.getValue(id, 'renterName', '');
+        const renterPhone = PropertyDataService.getValue(id, 'renterPhone', '');
+        
+        if (renterName || renterPhone) {
+            alert('⚠️ Cannot mark as Available\n\nThis property has renter information set:\n' + 
+                  (renterName ? `• Renter Name: ${renterName}\n` : '') +
+                  (renterPhone ? `• Renter Phone: ${renterPhone}\n` : '') +
+                  '\nTo mark this property as Available, first clear the renter name and phone fields on the property stats page.');
+            return;
+        }
+    }
+    
     state.availability[id] = !state.availability[id];
     renderOwnerDashboard();
     renderProperties(state.filteredProperties);

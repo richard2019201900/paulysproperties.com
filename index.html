@@ -468,9 +468,10 @@
     <!-- Navigation -->
     <nav class="glass-effect shadow-xl sticky top-0 z-40 border-b border-gray-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-20">
-                <div class="flex items-center space-x-3 cursor-pointer" onclick="goHome()" role="button" tabindex="0" aria-label="Go to home">
-                    <div class="relative w-16 h-16 md:w-20 md:h-20">
+            <div class="flex justify-between items-center h-16 md:h-20">
+                <!-- Logo -->
+                <div class="flex items-center space-x-2 cursor-pointer flex-shrink-0" onclick="goHome()" role="button" tabindex="0" aria-label="Go to home">
+                    <div class="relative w-10 h-10 md:w-14 md:h-14 lg:w-20 lg:h-20">
                         <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-lg" xmlns="http://www.w3.org/2000/svg">
                             <defs>
                                 <linearGradient id="logoGradientNav" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -488,32 +489,39 @@
                             <rect x="68" y="60" width="12" height="12" rx="2" fill="url(#logoGradientNav)" />
                         </svg>
                     </div>
-                    <h1 class="text-lg md:text-2xl font-black bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent tracking-tight">PaulysProperties.com</h1>
+                    <h1 class="hidden sm:block text-base md:text-lg lg:text-2xl font-black bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent tracking-tight whitespace-nowrap">PaulysProperties.com</h1>
                 </div>
-                <div class="hidden md:flex space-x-8">
+                
+                <!-- Center nav links (hidden on mobile) -->
+                <div class="hidden lg:flex space-x-6 xl:space-x-8">
                     <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Home</a>
                     <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Properties</a>
                     <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">About</a>
                     <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Contact</a>
                     <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition" role="button" tabindex="0">Dashboard</a>
                 </div>
-                <div class="flex items-center space-x-4">
+                
+                <!-- Right side: buttons + user -->
+                <div class="flex items-center gap-2 md:gap-3">
                     <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden">+ New Listing</button>
-                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg">Register / Sign In</button>
-                    <!-- Logged-in user display (after logout button) -->
+                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base">Register / Sign In</button>
+                    
+                    <!-- Logged-in user display -->
                     <div id="navUserDisplay" class="hidden items-center gap-2">
                         <div class="text-right">
-                            <div id="navUserName" class="text-white font-semibold text-sm"></div>
+                            <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
                             <div id="navUserTier" class="text-xs text-gray-400"></div>
                         </div>
                     </div>
-                    <button id="menuBtn" class="md:hidden text-gray-300" aria-label="Toggle menu">
+                    
+                    <!-- Mobile menu button -->
+                    <button id="menuBtn" class="lg:hidden text-gray-300 p-2" aria-label="Toggle menu">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                     </button>
                 </div>
             </div>
         </div>
-        <div id="mobileMenu" class="hidden md:hidden bg-gray-900 border-t border-gray-700">
+        <div id="mobileMenu" class="hidden lg:hidden bg-gray-900 border-t border-gray-700">
             <a onclick="navigateTo('home')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Home</a>
             <a onclick="navigateTo('properties')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Properties</a>
             <a onclick="navigateTo('about')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">About</a>

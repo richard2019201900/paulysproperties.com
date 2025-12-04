@@ -8,13 +8,13 @@ function updateAuthButton(isLoggedIn) {
     
     if (isLoggedIn) {
         navBtn.textContent = 'Logout';
-        navBtn.className = 'hidden md:block bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg';
+        navBtn.className = 'hidden md:block bg-gradient-to-r from-red-500 to-pink-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base';
         mobileBtn.textContent = 'Logout';
         mobileBtn.className = 'block w-full text-left px-4 py-3 text-red-400 hover:bg-gray-800 font-semibold';
         showElement($('navDashboardLink'));
         showElement($('mobileDashboardLink'));
         // Show Create Listing buttons
-        if (navCreateBtn) navCreateBtn.className = 'hidden md:block bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-5 py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg';
+        if (navCreateBtn) navCreateBtn.className = 'hidden md:block bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-3 lg:px-5 py-2 lg:py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg text-xs lg:text-sm';
         if (mobileCreateBtn) mobileCreateBtn.className = 'block px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold';
         // Show user display
         if (navUserDisplay) {
@@ -23,7 +23,7 @@ function updateAuthButton(isLoggedIn) {
         }
     } else {
         navBtn.textContent = 'Register / Sign In';
-        navBtn.className = 'hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg';
+        navBtn.className = 'hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base';
         mobileBtn.textContent = 'Register / Sign In';
         mobileBtn.className = 'block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold';
         hideElement($('navDashboardLink'));
