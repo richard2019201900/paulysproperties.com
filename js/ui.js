@@ -777,10 +777,7 @@ function renderOwnerDashboard() {
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
             </td>
             <td class="px-4 md:px-6 py-3 text-gray-300 capitalize hidden md:table-cell border-r border-gray-700/50">${p.type}</td>
-            <td class="px-4 md:px-6 py-3 hidden xl:table-cell border-r border-gray-700/50 editable-cell" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit">
-                <span class="cell-value ${renterName ? 'text-sky-400 font-semibold' : 'text-gray-500 italic'}">${renterName || 'Not set'}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 hidden xl:table-cell border-r border-gray-700/50">
+            <td class="px-4 md:px-6 py-3 hidden lg:table-cell border-r border-gray-700/50">
                 ${dueDateDisplay || '<span class="text-gray-500">-</span>'}
             </td>
             <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
@@ -809,7 +806,7 @@ function renderOwnerDashboard() {
         </tr>
         ${isRented ? `
         <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'}">
-            <td colspan="11" class="px-4 md:px-6 py-2">
+            <td colspan="10" class="px-4 md:px-6 py-2">
                 <div class="flex flex-wrap items-center text-sm gap-x-8 gap-y-2">
                     <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg min-w-[180px]" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
                         <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
