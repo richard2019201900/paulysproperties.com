@@ -70,29 +70,82 @@ window.handleAuthClick = function() {
     state.currentUser === 'owner' ? logout() : openModal('loginModal');
 };
 
-window.signInWithGoogle = async function() {
-    try {
-        const provider = new firebase.auth.GoogleAuthProvider();
-        const result = await auth.signInWithPopup(provider);
-        
-        console.log('[Auth] Google sign-in successful:', result.user.email);
-        closeModal('loginModal');
-        
-        // The onAuthStateChanged handler will handle the rest
-        // (creating user doc, setting tier, etc.)
-    } catch (error) {
-        console.error('[Auth] Google sign-in error:', error);
-        
-        // Show error to user
-        const loginError = $('loginError');
-        if (loginError) {
-            loginError.textContent = error.message || 'Sign-in failed. Please try again.';
-            showElement(loginError);
-        } else {
-            alert('Sign-in failed: ' + (error.message || 'Please try again.'));
-        }
-    }
+window.showCreateAccountForm = function() {
+    hideElement($('loginOptions'));
+    hideElement($('ownerLoginForm'));
+    showElement($('createAccountForm'));
+    hideElement($('createAccountError'));
 };
+
+window.hideCreateAccountForm = function() {
+    hideElement($('createAccountForm'));
+    showElement($('loginOptions'));
+};
+
+// Handle create account form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const createForm = $('createAccountFormEl');
+    if (createForm) {
+        createForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = $('newAccountEmail').value.trim();
+            const password = $('newAccountPassword').value;
+            const displayName = $('newAccountDisplayName').value.trim();
+            const errorDiv = $('createAccountError');
+            const btn = $('createAccountBtn');
+            
+            hideElement(errorDiv);
+            
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters.';
+                showElement(errorDiv);
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Creating Account...';
+            
+            try {
+                // Create the user with Firebase Auth
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                console.log('[Auth] Account created:', user.email);
+                
+                // Create user document with starter tier and display name
+                await db.collection('users').doc(user.uid).set({
+                    email: user.email.toLowerCase(),
+                    username: displayName,
+                    tier: 'starter',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('[Auth] User document created with starter tier');
+                
+                // Close modal - onAuthStateChanged will handle the rest
+                closeModal('loginModal');
+                
+            } catch (error) {
+                console.error('[Auth] Create account error:', error);
+                
+                let errorMessage = 'Failed to create account. Please try again.';
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'This email is already registered. Try signing in instead.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Please enter a valid email address.';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'Password must be at least 6 characters.';
+                }
+                
+                errorDiv.textContent = errorMessage;
+                showElement(errorDiv);
+                btn.disabled = false;
+                btn.textContent = '🌱 Create Starter Account';
+            }
+        });
+    }
+});
 
 window.goToDashboard = function() {
     hideElement($('mobileMenu'));
