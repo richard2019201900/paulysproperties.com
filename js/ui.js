@@ -2117,14 +2117,31 @@ window.dismissGlobalAlert = function() {
     }
 };
 
-window.updateAdminStats = function(users) {
+window.updateAdminStats = async function(users) {
     const totalUsers = users.length;
     const proUsers = users.filter(u => u.tier === 'pro');
     const eliteUsers = users.filter(u => u.tier === 'elite');
     const starterUsers = users.filter(u => u.tier === 'starter' || !u.tier);
-    const totalListings = Object.values(ownerPropertyMap).reduce((sum, props) => sum + props.length, 0);
-    const availableListings = properties.filter(p => p.available).length;
-    const rentedListings = properties.filter(p => !p.available).length;
+    
+    // Refresh availability data from Firestore for accuracy
+    try {
+        const availDoc = await db.collection('settings').doc('propertyAvailability').get();
+        if (availDoc.exists) {
+            const availData = availDoc.data();
+            Object.keys(availData).forEach(key => {
+                state.availability[key] = availData[key];
+            });
+        }
+    } catch (err) {
+        console.warn('[AdminStats] Could not refresh availability:', err);
+    }
+    
+    // Get accurate listing count from properties array
+    const totalListings = properties.length;
+    
+    // Use state.availability for accurate available/rented counts
+    const availableListings = properties.filter(p => state.availability[p.id] !== false).length;
+    const rentedListings = properties.filter(p => state.availability[p.id] === false).length;
     
     // Front stats
     const statUsers = $('adminStatUsers');
@@ -2212,7 +2229,7 @@ window.loadAllUsers = async function() {
         const users = await TierService.getAllUsers();
         window.adminUsersData = users;
         
-        updateAdminStats(users);
+        await updateAdminStats(users);
         
         if (users.length === 0) {
             container.innerHTML = '<p class="text-gray-500 italic">No users found.</p>';
