@@ -50,12 +50,20 @@ async function updateNavUserDisplay() {
         const doc = await db.collection('users').doc(user.uid).get();
         const data = doc.data() || {};
         const username = data.username || user.email.split('@')[0];
-        const tier = data.tier || 'starter';
-        const tierData = TIERS[tier] || TIERS.starter;
         
-        navUserName.textContent = username;
-        navUserTier.innerHTML = `${tierData.icon} ${tierData.name}`;
-        navUserTier.className = `text-xs ${tierData.color}`;
+        // Check if master admin
+        if (TierService.isMasterAdmin(user.email)) {
+            navUserName.textContent = username;
+            navUserTier.innerHTML = '👑 Admin';
+            navUserTier.className = 'text-xs text-red-400';
+        } else {
+            const tier = data.tier || 'starter';
+            const tierData = TIERS[tier] || TIERS.starter;
+            
+            navUserName.textContent = username;
+            navUserTier.innerHTML = `${tierData.icon} ${tierData.name}`;
+            navUserTier.className = `text-xs ${tierData.color}`;
+        }
     } catch (error) {
         console.error('Error updating nav user display:', error);
         navUserName.textContent = user.email.split('@')[0];
@@ -239,35 +247,52 @@ window.loadUsername = async function() {
 }
 
 window.updateTierBadge = function(tier, email) {
-    const tierData = TIERS[tier] || TIERS.starter;
+    const isMasterAdmin = TierService.isMasterAdmin(email);
     const listingCount = (ownerPropertyMap[email.toLowerCase()] || []).length;
-    const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
     
     const iconEl = $('tierIcon');
     const nameEl = $('tierName');
     const listingsEl = $('tierListings');
-    
-    if (iconEl) iconEl.textContent = tierData.icon;
-    if (nameEl) nameEl.textContent = tierData.name;
-    if (listingsEl) listingsEl.textContent = `${listingCount}/${maxListings} Listings`;
-    
-    // Update badge background based on tier
     const badgeEl = $('userTierBadge');
-    if (badgeEl) {
-        badgeEl.className = badgeEl.className.replace(/border-\w+-\d+/g, '');
-        if (tier === 'pro') {
-            badgeEl.classList.add('border-yellow-600');
-        } else if (tier === 'elite') {
-            badgeEl.classList.add('border-purple-600');
-        } else {
-            badgeEl.classList.add('border-gray-600');
+    const upgradeBtn = $('tierUpgradeBtn');
+    
+    if (isMasterAdmin) {
+        // Master admin gets special display
+        if (iconEl) iconEl.textContent = '👑';
+        if (nameEl) nameEl.textContent = 'Admin';
+        if (listingsEl) listingsEl.textContent = `${listingCount}/∞ Listings`;
+        if (upgradeBtn) hideElement(upgradeBtn);
+        
+        if (badgeEl) {
+            badgeEl.className = badgeEl.className.replace(/border-\w+-\d+/g, '');
+            badgeEl.classList.add('border-red-600');
+        }
+    } else {
+        const tierData = TIERS[tier] || TIERS.starter;
+        const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
+        
+        if (iconEl) iconEl.textContent = tierData.icon;
+        if (nameEl) nameEl.textContent = tierData.name;
+        if (listingsEl) listingsEl.textContent = `${listingCount}/${maxListings} Listings`;
+        if (upgradeBtn) showElement(upgradeBtn);
+        
+        // Update badge background based on tier
+        if (badgeEl) {
+            badgeEl.className = badgeEl.className.replace(/border-\w+-\d+/g, '');
+            if (tier === 'pro') {
+                badgeEl.classList.add('border-yellow-600');
+            } else if (tier === 'elite') {
+                badgeEl.classList.add('border-purple-600');
+            } else {
+                badgeEl.classList.add('border-gray-600');
+            }
         }
     }
     
     // Show/hide admin section
     const adminSection = $('adminSection');
     if (adminSection) {
-        if (TierService.isMasterAdmin(email)) {
+        if (isMasterAdmin) {
             showElement(adminSection);
             loadPendingUpgradeRequests();
         } else {
