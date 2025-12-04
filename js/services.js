@@ -152,7 +152,8 @@ const TierService = {
                 tier: data.tier || 'starter',
                 tierUpdatedAt: data.tierUpdatedAt,
                 tierUpdatedBy: data.tierUpdatedBy,
-                createdAt: data.createdAt
+                createdAt: data.createdAt,
+                subscriptionLastPaid: data.subscriptionLastPaid || ''
             };
         });
     },

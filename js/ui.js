@@ -91,6 +91,14 @@ window.showCreateAccountForm = function() {
     hideElement($('ownerLoginForm'));
     showElement($('createAccountForm'));
     hideElement($('createAccountError'));
+    
+    // Clear form fields to prevent cached data
+    const emailField = $('newAccountEmail');
+    const passwordField = $('newAccountPassword');
+    const displayNameField = $('newAccountDisplayName');
+    if (emailField) emailField.value = '';
+    if (passwordField) passwordField.value = '';
+    if (displayNameField) displayNameField.value = '';
 };
 
 window.showLoginForm = function() {
@@ -98,11 +106,25 @@ window.showLoginForm = function() {
     hideElement($('createAccountForm'));
     showElement($('ownerLoginForm'));
     hideElement($('loginError'));
+    
+    // Clear form fields to prevent cached data
+    const emailField = $('ownerEmail');
+    const passwordField = $('ownerPassword');
+    if (emailField) emailField.value = '';
+    if (passwordField) passwordField.value = '';
 };
 
 window.hideCreateAccountForm = function() {
     hideElement($('createAccountForm'));
     showElement($('loginOptions'));
+    
+    // Clear form fields
+    const emailField = $('newAccountEmail');
+    const passwordField = $('newAccountPassword');
+    const displayNameField = $('newAccountDisplayName');
+    if (emailField) emailField.value = '';
+    if (passwordField) passwordField.value = '';
+    if (displayNameField) displayNameField.value = '';
 };
 
 // Handle create account form submission
@@ -660,11 +682,23 @@ window.showOwnerLoginForm = function() {
     hideElement($('loginOptions'));
     showElement($('ownerLoginForm'));
     hideElement($('loginError'));
+    
+    // Clear form fields to prevent cached data
+    const emailField = $('ownerEmail');
+    const passwordField = $('ownerPassword');
+    if (emailField) emailField.value = '';
+    if (passwordField) passwordField.value = '';
 };
 
 window.hideOwnerLoginForm = function() {
     showElement($('loginOptions'));
     hideElement($('ownerLoginForm'));
+    
+    // Clear form fields
+    const emailField = $('ownerEmail');
+    const passwordField = $('ownerPassword');
+    if (emailField) emailField.value = '';
+    if (passwordField) passwordField.value = '';
 };
 
 window.loginAsRenter = function() {
@@ -2413,12 +2447,25 @@ window.confirmSubscriptionDate = async function(userId, email) {
 // Save subscription date to Firestore
 window.saveSubscriptionDate = async function(userId, email, date) {
     try {
+        console.log(`[Subscription] Attempting to save for userId: ${userId}, email: ${email}, date: ${date}`);
+        
         await db.collection('users').doc(userId).update({
             subscriptionLastPaid: date || '',
             subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        console.log(`[Subscription] Updated last paid for ${email}: ${date}`);
+        console.log(`[Subscription] Successfully updated last paid for ${email}: ${date}`);
+        
+        // Show success toast
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2';
+        toast.innerHTML = `<span class="text-lg">✅</span> Payment date saved for ${email.split('@')[0]}!`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
         
         // Update local cache and re-render
         if (window.adminUsersData) {
@@ -2433,7 +2480,16 @@ window.saveSubscriptionDate = async function(userId, email, date) {
         
     } catch (error) {
         console.error('Error saving subscription date:', error);
-        alert('Error saving subscription date: ' + error.message);
+        // Show error toast
+        const toast = document.createElement('div');
+        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2';
+        toast.innerHTML = `<span class="text-lg">❌</span> Failed to save: ${error.message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 };
 

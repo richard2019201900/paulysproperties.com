@@ -30,8 +30,52 @@ window.copyToClipboard = function(elementId, btn) {
 };
 
 // ==================== MODAL FUNCTIONS ====================
-window.openModal = id => showElement($(id));
-window.closeModal = id => hideElement($(id));
+window.openModal = function(id) {
+    showElement($(id));
+    
+    // If opening login modal, clear all forms and show login options
+    if (id === 'loginModal') {
+        // Clear login form
+        const ownerEmail = $('ownerEmail');
+        const ownerPassword = $('ownerPassword');
+        if (ownerEmail) ownerEmail.value = '';
+        if (ownerPassword) ownerPassword.value = '';
+        
+        // Clear create account form
+        const newAccountEmail = $('newAccountEmail');
+        const newAccountPassword = $('newAccountPassword');
+        const newAccountDisplayName = $('newAccountDisplayName');
+        if (newAccountEmail) newAccountEmail.value = '';
+        if (newAccountPassword) newAccountPassword.value = '';
+        if (newAccountDisplayName) newAccountDisplayName.value = '';
+        
+        // Hide error messages
+        hideElement($('loginError'));
+        hideElement($('createAccountError'));
+        
+        // Reset to show login options (not a specific form)
+        showElement($('loginOptions'));
+        hideElement($('ownerLoginForm'));
+        hideElement($('createAccountForm'));
+    }
+};
+window.closeModal = function(id) {
+    hideElement($(id));
+    
+    // If closing login modal, clear all forms
+    if (id === 'loginModal') {
+        const ownerEmail = $('ownerEmail');
+        const ownerPassword = $('ownerPassword');
+        const newAccountEmail = $('newAccountEmail');
+        const newAccountPassword = $('newAccountPassword');
+        const newAccountDisplayName = $('newAccountDisplayName');
+        if (ownerEmail) ownerEmail.value = '';
+        if (ownerPassword) ownerPassword.value = '';
+        if (newAccountEmail) newAccountEmail.value = '';
+        if (newAccountPassword) newAccountPassword.value = '';
+        if (newAccountDisplayName) newAccountDisplayName.value = '';
+    }
+};
 
 window.openContactModal = async function(type, propertyTitle, propertyId) {
     const isRent = type === 'rent';
