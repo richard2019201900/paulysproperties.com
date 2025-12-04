@@ -1070,7 +1070,7 @@ window.copyUpgradeMessage = async function() {
     const messageBox = $('upgradeMessage');
     const status = $('upgradeStatus');
     const btn = $('upgradeSubmitBtn');
-    const tierSelect = $('upgradeTierSelect');
+    const tierSelect = $('upgradeRequestedTier');
     
     if (!messageBox.value || !tierSelect.value) {
         status.textContent = 'Please select a plan first.';
@@ -1111,7 +1111,7 @@ window.copyUpgradeMessage = async function() {
         
         setTimeout(() => {
             closeModal('upgradeModal');
-            btn.innerHTML = '🔔 Notify & Copy Message';
+            btn.innerHTML = '🔔 Notify & Copy';
             btn.className = btn.className.replace('from-green-500 to-green-600', 'from-blue-500 to-blue-600');
             btn.disabled = false;
         }, 2000);
