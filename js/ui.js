@@ -1805,6 +1805,172 @@ window.orphanProperty = async function(propertyId) {
     }
 };
 
+// ==================== ADMIN PROPERTY REASSIGNMENT ====================
+// Store current property being reassigned
+window.reassignPropertyId = null;
+
+window.openReassignModal = async function(propertyId) {
+    if (!TierService.isMasterAdmin()) {
+        alert('Only admin can reassign properties');
+        return;
+    }
+    
+    window.reassignPropertyId = propertyId;
+    const prop = properties.find(p => p.id === propertyId);
+    
+    if (!prop) {
+        alert('Property not found');
+        return;
+    }
+    
+    // Set property title in modal
+    $('reassignPropertyTitle').textContent = prop.title;
+    
+    // Clear previous state
+    hideElement($('reassignError'));
+    hideElement($('reassignSuccess'));
+    $('reassignBtn').disabled = false;
+    $('reassignBtn').textContent = '✓ Reassign Property';
+    
+    // Load users into dropdown
+    const select = $('reassignOwnerSelect');
+    select.innerHTML = '<option value="">-- Loading Users --</option>';
+    
+    try {
+        const snapshot = await db.collection('users').get();
+        select.innerHTML = '<option value="">-- Select Owner --</option><option value="unassigned">🚫 Unassigned (No Owner)</option>';
+        
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            const tierData = TIERS[user.tier] || TIERS.starter;
+            const displayName = user.username || user.email.split('@')[0];
+            const option = document.createElement('option');
+            option.value = user.email;
+            option.textContent = `${tierData.icon} ${displayName} (${user.email})`;
+            select.appendChild(option);
+        });
+        
+        // Pre-select current owner if exists
+        const currentOwnerEmail = prop.ownerEmail || getPropertyOwnerEmail(propertyId);
+        if (currentOwnerEmail) {
+            select.value = currentOwnerEmail;
+        }
+        
+    } catch (error) {
+        console.error('Error loading users:', error);
+        select.innerHTML = '<option value="">-- Error Loading Users --</option>';
+    }
+    
+    openModal('reassignModal');
+};
+
+window.confirmReassignProperty = async function() {
+    const propertyId = window.reassignPropertyId;
+    const newOwnerEmail = $('reassignOwnerSelect').value;
+    const errorDiv = $('reassignError');
+    const successDiv = $('reassignSuccess');
+    const btn = $('reassignBtn');
+    
+    hideElement(errorDiv);
+    hideElement(successDiv);
+    
+    if (!newOwnerEmail) {
+        errorDiv.textContent = 'Please select an owner';
+        showElement(errorDiv);
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.textContent = 'Reassigning...';
+    
+    try {
+        const prop = properties.find(p => p.id === propertyId);
+        const oldOwnerEmail = prop?.ownerEmail || getPropertyOwnerEmail(propertyId);
+        
+        // Handle "unassigned" selection
+        const actualNewEmail = newOwnerEmail === 'unassigned' ? null : newOwnerEmail.toLowerCase();
+        
+        // Update property in memory
+        if (prop) {
+            prop.ownerEmail = actualNewEmail;
+        }
+        
+        // Update in Firestore
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        if (propsDoc.exists) {
+            const propsData = propsDoc.data();
+            if (propsData[propertyId]) {
+                propsData[propertyId].ownerEmail = actualNewEmail;
+                await db.collection('settings').doc('properties').set(propsData);
+            }
+        }
+        
+        // Update propertyOwnerEmail mapping
+        if (typeof propertyOwnerEmail !== 'undefined') {
+            if (actualNewEmail) {
+                propertyOwnerEmail[propertyId] = actualNewEmail;
+            } else {
+                delete propertyOwnerEmail[propertyId];
+            }
+        }
+        
+        // Remove from old owner's property list
+        if (oldOwnerEmail) {
+            const oldLower = oldOwnerEmail.toLowerCase();
+            if (ownerPropertyMap[oldLower]) {
+                ownerPropertyMap[oldLower] = ownerPropertyMap[oldLower].filter(id => id !== propertyId);
+            }
+        }
+        
+        // Add to new owner's property list
+        if (actualNewEmail) {
+            if (!ownerPropertyMap[actualNewEmail]) {
+                ownerPropertyMap[actualNewEmail] = [];
+            }
+            if (!ownerPropertyMap[actualNewEmail].includes(propertyId)) {
+                ownerPropertyMap[actualNewEmail].push(propertyId);
+            }
+        }
+        
+        // Clear username cache for this property to force refresh
+        if (window.ownerUsernameCache && oldOwnerEmail) {
+            delete window.ownerUsernameCache[oldOwnerEmail.toLowerCase()];
+        }
+        
+        console.log(`[Admin] Property ${propertyId} reassigned from ${oldOwnerEmail || 'unassigned'} to ${actualNewEmail || 'unassigned'}`);
+        
+        successDiv.textContent = '✓ Property reassigned successfully!';
+        showElement(successDiv);
+        btn.textContent = '✓ Done!';
+        btn.classList.remove('from-purple-600', 'to-purple-700');
+        btn.classList.add('from-green-600', 'to-green-700');
+        
+        // Refresh the property detail page after a short delay
+        setTimeout(() => {
+            closeModal('reassignModal');
+            viewProperty(propertyId); // Reload property view
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Error reassigning property:', error);
+        errorDiv.textContent = 'Error: ' + error.message;
+        showElement(errorDiv);
+        btn.disabled = false;
+        btn.textContent = '✓ Reassign Property';
+    }
+};
+
+// Helper to get property owner email (check both sources)
+function getPropertyOwnerEmail(propertyId) {
+    // Check static mapping first
+    if (typeof propertyOwnerEmail !== 'undefined' && propertyOwnerEmail[propertyId]) {
+        return propertyOwnerEmail[propertyId];
+    }
+    // Check property object
+    const prop = properties.find(p => p.id === propertyId);
+    return prop?.ownerEmail || null;
+}
+
 // Helper to completely delete a property
 window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
     try {
