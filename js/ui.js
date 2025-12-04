@@ -129,6 +129,11 @@ window.hideCreateAccountForm = function() {
 
 // Handle create account form submission
 document.addEventListener('DOMContentLoaded', function() {
+    // Clean up any stale state on page load
+    window.isCreatingAccount = false;
+    const staleToast = document.getElementById('deletedAccountToast');
+    if (staleToast) staleToast.remove();
+    
     const createForm = $('createAccountFormEl');
     if (createForm) {
         createForm.addEventListener('submit', async function(e) {
@@ -166,6 +171,9 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.textContent = 'Creating Account...';
             
             try {
+                // Set flag to prevent false "deleted account" detection
+                window.isCreatingAccount = true;
+                
                 // Create the user with Firebase Auth
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
@@ -182,6 +190,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('[Auth] User document created with starter tier');
                 
+                // Clear the flag after document is created
+                window.isCreatingAccount = false;
+                
                 // Show success with credentials reminder
                 errorDiv.className = 'text-green-400 text-sm font-medium text-center p-3 bg-green-900/30 rounded-xl';
                 errorDiv.innerHTML = `✓ Account created!<br><strong>Save these credentials:</strong><br>Username: ${username}@pma.network<br>Password: (what you entered)`;
@@ -194,6 +205,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 3000);
                 
             } catch (error) {
+                // Clear flag on error too
+                window.isCreatingAccount = false;
+                
                 console.error('[Auth] Create account error:', error);
                 
                 let errorMessage = 'Failed to create account. Please try again.';
@@ -713,6 +727,8 @@ window.logout = function() {
     // Clear username field and status
     $('ownerUsername').value = '';
     hideElement($('usernameStatus'));
+    // Reset account creation flag
+    window.isCreatingAccount = false;
     // Clean up notification listener
     if (window.userNotificationUnsubscribe) {
         window.userNotificationUnsubscribe();
@@ -789,8 +805,21 @@ window.forceLogout = function() {
 
 // Show toast message when account is deleted
 window.showDeletedAccountToast = function() {
+    // Remove any existing deleted account toast first
+    const existingToast = document.getElementById('deletedAccountToast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Don't show if we're in the middle of creating an account
+    if (window.isCreatingAccount) {
+        console.log('[Toast] Suppressing deleted account toast during account creation');
+        return;
+    }
+    
     // Create toast element
     const toast = document.createElement('div');
+    toast.id = 'deletedAccountToast';
     toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-3';
     toast.innerHTML = `
         <span class="text-2xl">👋</span>
@@ -4131,6 +4160,7 @@ window.dismissNotification = async function(notificationId) {
 
 // ==================== USER TIER REAL-TIME SYNC ====================
 window.userTierUnsubscribe = null;
+window.isCreatingAccount = false; // Flag to prevent false "deleted" detection during account creation
 
 window.startUserTierListener = function() {
     const user = auth.currentUser;
@@ -4149,6 +4179,11 @@ window.startUserTierListener = function() {
         window.userTierUnsubscribe = db.collection('users').doc(user.uid)
             .onSnapshot((doc) => {
                 if (!doc.exists) {
+                    // Check if we're in the middle of creating an account
+                    if (window.isCreatingAccount) {
+                        console.log('[UserSync] Document not found but account is being created - ignoring');
+                        return;
+                    }
                     // User document was deleted - force logout
                     console.log('[UserSync] User document deleted - forcing logout');
                     forceLogout();
