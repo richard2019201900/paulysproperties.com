@@ -2472,81 +2472,171 @@ window.openSubscriptionReminderModal = function(userId, email, displayName, tier
         reminderBg = 'bg-green-900/30 border-green-600';
     }
     
-    // Generate different reminder scripts
-    const scripts = {
-        friendly: `Hey ${displayName}! 👋
+    // Generate contextual payment reminder based on status
+    let paymentScript = '';
+    if (daysUntilDue === null || daysUntilDue === undefined) {
+        // Never paid
+        paymentScript = `Hey ${displayName}! 👋
 
-Just a friendly heads up - your PaulysProperties.com ${tierName} subscription payment is coming up!
+Welcome to PaulysProperties.com ${tierName}! We're excited to have you on board.
 
-💰 Amount: ${price}
-${tierEmoji} Plan: ${tierName}
+Just a quick note - we haven't received your first subscription payment yet.
+
+💰 Amount Due: ${price}
+${tierEmoji} Your Plan: ${tierName}
 🏠 Benefits: ${benefits}
 
-Let me know when you're free to meet up and handle the payment. No rush! 😊`,
+Let's meet up whenever you're free to get this sorted out. Looking forward to helping you grow your rental business! 🏠✨`;
+    } else if (daysUntilDue < 0) {
+        // Overdue
+        paymentScript = `Hey ${displayName},
 
-        urgent: `Hey ${displayName}! ⚠️
-
-Your PaulysProperties.com ${tierName} subscription is ${daysUntilDue !== null && daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} days OVERDUE` : daysUntilDue === 0 ? 'DUE TODAY' : `due in ${daysUntilDue} days`}!
+Hope you're doing well! Just wanted to reach out - your PaulysProperties.com subscription is ${Math.abs(daysUntilDue)} days past due.
 
 💰 Amount Due: ${price}
 ${tierEmoji} Plan: ${tierName}
+📅 Was Due: ${Math.abs(daysUntilDue)} days ago
 
-Please get in touch ASAP so we can sort out your payment and keep your listings active.
+I want to make sure your listings stay active and visible to renters. Can we meet up soon to get this sorted?
 
-Thanks! 🙏`,
+Let me know what works for you! 🙏`;
+    } else if (daysUntilDue === 0) {
+        // Due today
+        paymentScript = `Hey ${displayName}! 👋
 
-        final_warning: `${displayName},
-
-URGENT: Your PaulysProperties.com ${tierName} subscription is seriously overdue.
+Quick reminder - your PaulysProperties.com ${tierName} subscription is due today!
 
 💰 Amount: ${price}
-⚠️ Status: ${daysUntilDue !== null && daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} DAYS OVERDUE` : 'PAYMENT REQUIRED'}
+${tierEmoji} Plan: ${tierName}
+📅 Due: TODAY
 
-Your property listings may be suspended if payment is not received soon.
+Are you free to meet up later? Let me know what time works and we can get this taken care of. 
 
-Please contact me immediately to resolve this.`
-    };
+Thanks for being a valued member! 🙏`;
+    } else if (daysUntilDue <= 7) {
+        // Due soon (1-7 days)
+        paymentScript = `Hey ${displayName}! 👋
+
+Just a friendly heads up - your PaulysProperties.com ${tierName} subscription payment is coming up in ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''}!
+
+💰 Amount: ${price}
+${tierEmoji} Plan: ${tierName}
+📅 Due: ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''} from now
+
+No rush - just wanted to give you a heads up so we can plan to meet up. Let me know when you're available!
+
+Thanks! 😊`;
+    } else {
+        // Not due yet (8+ days)
+        paymentScript = `Hey ${displayName}! 👋
+
+Just checking in! Your PaulysProperties.com ${tierName} subscription is all good - next payment isn't due for another ${daysUntilDue} days.
+
+💰 Amount: ${price}
+${tierEmoji} Plan: ${tierName}
+📅 Next Due: ${daysUntilDue} days
+
+No action needed right now. Just wanted to say thanks for being part of the platform! 🏠✨
+
+Let me know if you need anything!`;
+    }
     
-    // Create modal HTML
+    // Generate upsell script (only if not already Elite)
+    let upsellScript = '';
+    if (tier === 'pro') {
+        upsellScript = `Hey ${displayName}! 🌟
+
+I wanted to share something with you - I've noticed you're doing great with your ${benefits} on the Pro plan!
+
+Have you considered upgrading to Elite? Here's what you'd get:
+
+👑 ELITE TIER - $50,000/month
+✨ UNLIMITED property listings (no cap!)
+🎯 Priority placement in search results
+🏆 Elite badge on all your listings
+💼 Perfect for scaling your rental empire
+
+You're already at 2/3 listings on Pro. With Elite, you could list ALL your properties and really dominate the market here.
+
+The extra $25k/month pays for itself when you think about the additional rental income from more listings!
+
+Want to chat about upgrading? I can switch you over anytime. 🚀`;
+    } else {
+        // Already Elite - thank them instead
+        upsellScript = `Hey ${displayName}! 👑
+
+Just wanted to say THANK YOU for being an Elite member!
+
+You're one of our top property owners on PaulysProperties.com, and we really appreciate your business.
+
+🏆 Your Status: Elite Member
+✨ Your Benefits: Unlimited Listings
+🎯 Priority Placement: Active
+
+Your properties are getting maximum visibility, and renters love what you're offering.
+
+If there's anything we can do to help you succeed even more, just let me know. We're here for you!
+
+Keep crushing it! 💪🏠`;
+    }
+    
+    // Generate referral/thank you script
+    const referralScript = `Hey ${displayName}! 🤝
+
+Quick question - do you know any other property owners who might benefit from PaulysProperties.com?
+
+Here's the deal:
+🎁 For every owner you refer who signs up for Pro or Elite, I'll give you a $5,000 credit toward your next subscription payment!
+
+It's a win-win:
+✅ Your friend gets a great platform for their rentals
+✅ You save money on your subscription
+✅ More properties means more options for renters
+
+Just have them mention your name when they sign up, and I'll apply the credit to your account.
+
+Know anyone who might be interested? 🏠💰`;
+    
+    // Create modal HTML with larger text areas
     const modalHTML = `
         <div id="subscriptionReminderModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeModal('subscriptionReminderModal')">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border ${reminderBg}">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[95vh] overflow-y-auto border ${reminderBg}">
                 <div class="p-6">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h2 class="text-xl font-bold text-white">${tierEmoji} ${displayName}</h2>
                             <p class="text-gray-400 text-sm">${email}</p>
-                            <p class="text-lg font-bold mt-2 ${daysUntilDue !== null && daysUntilDue < 0 ? 'text-red-400' : daysUntilDue <= 3 ? 'text-orange-400' : 'text-green-400'}">${reminderTitle}</p>
+                            <p class="text-lg font-bold mt-2 ${daysUntilDue !== null && daysUntilDue < 0 ? 'text-red-400' : daysUntilDue !== null && daysUntilDue <= 3 ? 'text-orange-400' : 'text-green-400'}">${reminderTitle}</p>
                         </div>
                         <button onclick="closeModal('subscriptionReminderModal')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
                     </div>
                     
                     <div class="space-y-4">
-                        <!-- Friendly Reminder -->
+                        <!-- Payment Reminder -->
                         <div class="bg-gray-700/50 rounded-xl p-4">
                             <div class="flex justify-between items-center mb-2">
-                                <span class="text-green-400 font-bold text-sm">😊 Friendly Reminder</span>
-                                <button onclick="copySubscriptionScript('friendly', '${displayName}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-bold">📋 Copy</button>
+                                <span class="text-cyan-400 font-bold">💰 Payment Reminder</span>
+                                <button onclick="copySubscriptionScript('payment', '${displayName}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-1.5 rounded font-bold">📋 Copy</button>
                             </div>
-                            <textarea id="subScript_friendly" class="w-full bg-gray-900 text-gray-300 text-xs p-3 rounded-lg border border-gray-600 resize-none" rows="6">${scripts.friendly}</textarea>
+                            <textarea id="subScript_payment" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="10">${paymentScript}</textarea>
                         </div>
                         
-                        <!-- Urgent Reminder -->
+                        <!-- Upsell / Thank You -->
                         <div class="bg-gray-700/50 rounded-xl p-4">
                             <div class="flex justify-between items-center mb-2">
-                                <span class="text-orange-400 font-bold text-sm">⚠️ Urgent Reminder</span>
-                                <button onclick="copySubscriptionScript('urgent', '${displayName}')" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-xs font-bold">📋 Copy</button>
+                                <span class="${tier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tier === 'pro' ? '🚀 Upgrade to Elite' : '👑 VIP Thank You'}</span>
+                                <button onclick="copySubscriptionScript('upsell', '${displayName}')" class="${tier === 'pro' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white px-4 py-1.5 rounded font-bold">📋 Copy</button>
                             </div>
-                            <textarea id="subScript_urgent" class="w-full bg-gray-900 text-gray-300 text-xs p-3 rounded-lg border border-gray-600 resize-none" rows="5">${scripts.urgent}</textarea>
+                            <textarea id="subScript_upsell" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="10">${upsellScript}</textarea>
                         </div>
                         
-                        <!-- Final Warning -->
+                        <!-- Referral Program -->
                         <div class="bg-gray-700/50 rounded-xl p-4">
                             <div class="flex justify-between items-center mb-2">
-                                <span class="text-red-400 font-bold text-sm">🚨 Final Warning</span>
-                                <button onclick="copySubscriptionScript('final_warning', '${displayName}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-bold">📋 Copy</button>
+                                <span class="text-green-400 font-bold">🤝 Referral Bonus</span>
+                                <button onclick="copySubscriptionScript('referral', '${displayName}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded font-bold">📋 Copy</button>
                             </div>
-                            <textarea id="subScript_final_warning" class="w-full bg-gray-900 text-gray-300 text-xs p-3 rounded-lg border border-gray-600 resize-none" rows="4">${scripts.final_warning}</textarea>
+                            <textarea id="subScript_referral" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="10">${referralScript}</textarea>
                         </div>
                     </div>
                     
@@ -2571,11 +2661,17 @@ window.copySubscriptionScript = function(scriptType, displayName) {
     const textarea = $(`subScript_${scriptType}`);
     if (!textarea) return;
     
+    const scriptLabels = {
+        payment: '💰 Payment Reminder',
+        upsell: '🚀 Upgrade/VIP Message',
+        referral: '🤝 Referral Bonus'
+    };
+    
     navigator.clipboard.writeText(textarea.value).then(() => {
         // Show success toast
         const toast = document.createElement('div');
         toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2';
-        toast.innerHTML = `<span class="text-lg">✅</span> ${scriptType === 'friendly' ? 'Friendly' : scriptType === 'urgent' ? 'Urgent' : 'Final warning'} reminder copied!`;
+        toast.innerHTML = `<span class="text-lg">✅</span> ${scriptLabels[scriptType] || 'Message'} copied!`;
         document.body.appendChild(toast);
         
         setTimeout(() => {
