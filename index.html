@@ -83,8 +83,13 @@
             from { transform: translateY(0); opacity: 1; }
             to { transform: translateY(-100%); opacity: 0; }
         }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
         #globalAlertBar {
-            animation: slideDown 0.3s ease-out;
+            animation: slideDown 0.3s ease-out, gradientShift 2s ease infinite;
         }
     </style>
 </head>
@@ -480,18 +485,18 @@
 
     <!-- Navigation -->
     <!-- Global Urgent Alert Bar (for admin notifications) -->
-    <div id="globalAlertBar" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-orange-600 to-red-600 text-white cursor-pointer shadow-lg" onclick="handleGlobalAlertClick()">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div id="globalAlertBar" class="hidden fixed top-0 left-0 right-0 z-50 cursor-pointer shadow-2xl" onclick="handleGlobalAlertClick()" style="background: linear-gradient(90deg, #ea580c, #dc2626, #ea580c); background-size: 200% 200%; animation: gradientShift 2s ease infinite;">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="text-2xl animate-pulse">🔔</span>
+                <span class="text-3xl animate-bounce">💰</span>
                 <div>
-                    <span id="globalAlertTitle" class="font-bold">New Upgrade Request!</span>
-                    <span id="globalAlertMessage" class="ml-2 opacity-90"></span>
+                    <span id="globalAlertTitle" class="font-black text-lg text-white">New Upgrade Request!</span>
+                    <span id="globalAlertMessage" class="ml-2 text-white/90 font-medium"></span>
                 </div>
             </div>
             <div class="flex items-center gap-4">
-                <span class="text-sm opacity-75">Click to view</span>
-                <button onclick="event.stopPropagation(); dismissGlobalAlert()" class="hover:bg-white/20 rounded-full p-1 transition" title="Dismiss">
+                <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold text-white">Click to view →</span>
+                <button onclick="event.stopPropagation(); dismissGlobalAlert()" class="hover:bg-white/20 rounded-full p-2 transition text-white" title="Dismiss (will reappear if requests pending)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>

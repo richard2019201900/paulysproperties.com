@@ -672,9 +672,10 @@ window.logout = function() {
     }
     // Hide global alert
     dismissGlobalAlert();
-    // Reset request count
+    // Reset all admin alert state
     window.lastKnownRequestCount = -1;
     window.adminPendingRequests = [];
+    window.adminAlertShownForRequests = new Set();
     
     auth.signOut().then(() => window.goHome()).catch(() => window.goHome());
 };
@@ -1533,19 +1534,31 @@ window.loadUpgradeRequests = async function() {
 
 // Update request badge counts
 window.updateRequestsBadge = function(count) {
+    console.log('[AdminAlert] updateRequestsBadge called with count:', count);
+    
     const badge = $('requestsTabBadge');
     const notificationBadge = $('upgradeNotificationBadge');
     const notificationCount = $('upgradeNotificationCount');
     const alertBox = $('pendingUpgradesAlert');
     const alertCount = $('pendingUpgradesCount');
     
+    console.log('[AdminAlert] Badge elements found:', {
+        badge: !!badge,
+        notificationBadge: !!notificationBadge,
+        alertBox: !!alertBox
+    });
+    
     if (badge) {
         if (count > 0) {
             badge.textContent = count;
             badge.classList.remove('hidden');
+            console.log('[AdminAlert] Badge shown with count:', count);
         } else {
             badge.classList.add('hidden');
+            console.log('[AdminAlert] Badge hidden');
         }
+    } else {
+        console.log('[AdminAlert] WARNING: requestsTabBadge element not found!');
     }
     
     if (notificationBadge) {
@@ -1662,14 +1675,26 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
 window.upgradeRequestUnsubscribe = null;
 window.lastKnownRequestCount = -1; // Start at -1 so first load doesn't trigger alert
 window.adminPendingRequests = []; // Store pending requests globally
+window.adminAlertShownForRequests = new Set(); // Track which requests we've alerted about
 
 // Load pending requests with real-time listener (for admin)
 window.loadPendingUpgradeRequests = function() {
+    console.log('[AdminAlert] loadPendingUpgradeRequests called');
+    
     // Only set up listener for master admin
-    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    const currentEmail = auth.currentUser?.email;
+    console.log('[AdminAlert] Current user:', currentEmail);
+    
+    if (!TierService.isMasterAdmin(currentEmail)) {
+        console.log('[AdminAlert] Not master admin, skipping');
+        return;
+    }
+    
+    console.log('[AdminAlert] Setting up real-time listener for pending requests');
     
     // Unsubscribe from previous listener if exists
     if (window.upgradeRequestUnsubscribe) {
+        console.log('[AdminAlert] Unsubscribing from previous listener');
         window.upgradeRequestUnsubscribe();
         window.upgradeRequestUnsubscribe = null;
     }
@@ -1678,16 +1703,20 @@ window.loadPendingUpgradeRequests = function() {
         window.upgradeRequestUnsubscribe = db.collection('upgradeNotifications')
             .where('status', '==', 'pending')
             .onSnapshot((snapshot) => {
+                console.log('[AdminAlert] Snapshot received, count:', snapshot.size);
                 const count = snapshot.size;
                 
                 // Store all pending requests for user list display
                 const pendingRequests = [];
                 snapshot.forEach(doc => {
-                    pendingRequests.push({ id: doc.id, ...doc.data() });
+                    const data = doc.data();
+                    pendingRequests.push({ id: doc.id, ...data });
+                    console.log('[AdminAlert] Pending request:', doc.id, data.userEmail, data.requestedTier);
                 });
                 window.adminPendingRequests = pendingRequests;
                 
-                // Update the badge count
+                // Update the badge count immediately
+                console.log('[AdminAlert] Updating badge with count:', count);
                 updateRequestsBadge(count);
                 
                 // Refresh user list if it's visible to show/hide pending indicators
@@ -1701,32 +1730,80 @@ window.loadPendingUpgradeRequests = function() {
                     renderAdminUsersList(filtered, pendingRequests);
                 }
                 
-                // Check if there are NEW requests (count increased from known count)
-                if (window.lastKnownRequestCount >= 0 && count > window.lastKnownRequestCount) {
-                    // Find the newest request
-                    let newestRequest = null;
-                    pendingRequests.forEach(req => {
-                        if (!newestRequest || (req.createdAt && newestRequest.createdAt && req.createdAt > newestRequest.createdAt)) {
-                            newestRequest = req;
+                // Check for NEW requests we haven't alerted about yet
+                pendingRequests.forEach(req => {
+                    if (!window.adminAlertShownForRequests.has(req.id)) {
+                        console.log('[AdminAlert] New request found, showing alert for:', req.id);
+                        window.adminAlertShownForRequests.add(req.id);
+                        
+                        // Only show alert if this isn't the initial page load
+                        if (window.lastKnownRequestCount >= 0) {
+                            showGlobalAlert(
+                                '💰 New Upgrade Request!',
+                                `${req.displayName || req.userEmail} wants to upgrade to ${(TIERS[req.requestedTier]?.name || req.requestedTier)}`,
+                                'requests'
+                            );
                         }
-                    });
-                    
-                    if (newestRequest) {
-                        // Show global alert for new request
-                        showGlobalAlert(
-                            '🔔 New Upgrade Request!',
-                            `${newestRequest.displayName || newestRequest.userEmail} wants to upgrade to ${(TIERS[newestRequest.requestedTier]?.name || newestRequest.requestedTier)}`,
-                            'requests'
-                        );
                     }
-                }
+                });
+                
+                // Clean up alerts for requests that are no longer pending
+                const currentIds = new Set(pendingRequests.map(r => r.id));
+                window.adminAlertShownForRequests.forEach(id => {
+                    if (!currentIds.has(id)) {
+                        window.adminAlertShownForRequests.delete(id);
+                    }
+                });
                 
                 window.lastKnownRequestCount = count;
                 
+                // If there are pending requests, keep showing global alert persistently
+                if (count > 0) {
+                    showPersistentAdminAlert(count, pendingRequests[0]);
+                } else {
+                    dismissGlobalAlert();
+                }
+                
             }, (error) => {
-                console.log('Upgrade request listener error:', error.message);
+                console.error('[AdminAlert] Listener error:', error);
                 updateRequestsBadge(0);
             });
+            
+        console.log('[AdminAlert] Listener setup complete');
+            
+    } catch (error) {
+        console.error('[AdminAlert] Error setting up listener:', error);
+        updateRequestsBadge(0);
+    }
+};
+
+// Show persistent admin alert for pending requests
+window.showPersistentAdminAlert = function(count, newestRequest) {
+    const alertBar = $('globalAlertBar');
+    const alertTitle = $('globalAlertTitle');
+    const alertMessage = $('globalAlertMessage');
+    
+    if (!alertBar) {
+        console.log('[AdminAlert] Alert bar element not found!');
+        return;
+    }
+    
+    const title = count === 1 
+        ? '💰 Upgrade Request Pending!' 
+        : `💰 ${count} Upgrade Requests Pending!`;
+    const message = count === 1 
+        ? `${newestRequest?.displayName || newestRequest?.userEmail} wants ${TIERS[newestRequest?.requestedTier]?.name || 'upgrade'}`
+        : `Click to review all pending requests`;
+    
+    if (alertTitle) alertTitle.textContent = title;
+    if (alertMessage) alertMessage.textContent = message;
+    
+    alertBar.dataset.navigateTo = 'requests';
+    alertBar.classList.remove('hidden');
+    alertBar.classList.add('animate-pulse');
+    
+    console.log('[AdminAlert] Persistent alert shown');
+};
             
     } catch (error) {
         console.log('No upgrade notifications collection yet');
@@ -1779,14 +1856,25 @@ window.handleGlobalAlertClick = function() {
     dismissGlobalAlert();
 };
 
-// Dismiss global alert
+// Dismiss global alert (temporarily - will reappear if still pending)
 window.dismissGlobalAlert = function() {
     const alertBar = $('globalAlertBar');
     if (alertBar) {
         alertBar.style.animation = 'slideUp 0.3s ease-out';
         setTimeout(() => {
             alertBar.classList.add('hidden');
-            alertBar.classList.remove('animate-pulse');
+            
+            // If there are still pending requests, show again after 30 seconds
+            if (window.adminPendingRequests && window.adminPendingRequests.length > 0) {
+                setTimeout(() => {
+                    if (window.adminPendingRequests && window.adminPendingRequests.length > 0) {
+                        showPersistentAdminAlert(
+                            window.adminPendingRequests.length, 
+                            window.adminPendingRequests[0]
+                        );
+                    }
+                }, 30000); // Re-show after 30 seconds
+            }
         }, 250);
     }
 };
