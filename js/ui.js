@@ -1484,7 +1484,9 @@ window.renderAdminUsersList = function(users) {
     
     container.innerHTML = users.map(user => {
         const tierData = TIERS[user.tier] || TIERS.starter;
-        const userProperties = ownerPropertyMap[user.email?.toLowerCase()] || [];
+        // ownerPropertyMap contains property IDs, need to look up actual property objects
+        const userPropertyIds = ownerPropertyMap[user.email?.toLowerCase()] || [];
+        const userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
         const listingCount = userProperties.length;
         const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
         const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
@@ -1492,15 +1494,19 @@ window.renderAdminUsersList = function(users) {
         const escapedId = user.id;
         const displayName = user.username || user.email.split('@')[0];
         
-        // Build properties list HTML - handle missing title gracefully
+        // Build properties list HTML with numbering and proper data
         const propertiesHTML = userProperties.length > 0 
-            ? userProperties.map(p => {
+            ? userProperties.map((p, index) => {
                 const title = p.title || p.name || 'Unnamed Property';
-                const isAvailable = p.available !== false;
+                // Check available status - PropertyDataService overrides take precedence
+                const isAvailable = PropertyDataService.getValue(p.id, 'available', p.available) !== false;
                 return `
-                    <div class="flex items-center justify-between py-1 border-b border-gray-700/50 last:border-0">
-                        <span class="text-gray-300 text-xs">${title}</span>
-                        <span class="text-xs">${isAvailable ? '🟢 Available' : '🔴 Rented'}</span>
+                    <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0">
+                        <span class="text-gray-300 text-xs">
+                            <span class="text-gray-500 mr-2">${index + 1}.</span>
+                            ${title}
+                        </span>
+                        <span class="text-xs ${isAvailable ? 'text-green-400' : 'text-red-400'}">${isAvailable ? '🟢 Available' : '🔴 Rented'}</span>
                     </div>
                 `;
             }).join('')
