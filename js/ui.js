@@ -357,7 +357,7 @@ window.updateTierBadge = function(tier, email) {
     if (isMasterAdmin) {
         // Master admin gets special display
         if (iconEl) iconEl.textContent = '👑';
-        if (nameEl) nameEl.textContent = 'Admin';
+        if (nameEl) nameEl.textContent = 'Owner';
         if (listingsEl) listingsEl.textContent = `${listingCount}/∞ Listings`;
         if (upgradeBtn) hideElement(upgradeBtn);
         
