@@ -541,6 +541,9 @@ function setupRealtimeListener() {
                     const propId = parseInt(key);
                     const propData = data[key];
                     
+                    // Ensure propData has the correct numeric ID
+                    propData.id = propId;
+                    
                     // Validate property has required fields
                     if (!propData || !propData.images || !Array.isArray(propData.images) || propData.images.length === 0) {
                         console.warn('[Realtime] Skipping invalid property:', key, propData);
@@ -553,7 +556,7 @@ function setupRealtimeListener() {
                         properties.push(propData);
                         state.availability[propId] = true;
                         hasChanges = true;
-                        console.log('[Realtime] Added new property:', propData.title);
+                        console.log('[Realtime] Added new property:', propData.title, 'with id:', propId);
                         
                         // Set up owner mapping
                         if (propData.ownerEmail) {
@@ -565,6 +568,7 @@ function setupRealtimeListener() {
                                 ownerPropertyMap[email].push(propId);
                             }
                             propertyOwnerEmail[propId] = email;
+                            console.log('[Realtime] Set owner for property', propId, ':', email);
                         }
                     } else {
                         // Existing property - update all fields from Firestore
@@ -688,6 +692,9 @@ async function initFirestore() {
                 const propId = parseInt(key);
                 const prop = propsData[key];
                 
+                // Ensure prop has the correct numeric ID
+                prop.id = propId;
+                
                 // Validate property has required fields
                 if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
                     console.warn('[initFirestore] Skipping invalid property:', key, prop);
@@ -699,7 +706,7 @@ async function initFirestore() {
                 if (existingIndex === -1) {
                     // New user-created property - add to array
                     properties.push(prop);
-                    console.log('[initFirestore] Added user property:', prop.title);
+                    console.log('[initFirestore] Added user property:', prop.title, 'with id:', propId);
                     
                     // Set availability from Firestore
                     if (data[propId] !== undefined) {

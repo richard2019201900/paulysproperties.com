@@ -37,15 +37,20 @@ window.ownerUsernameCache = window.ownerUsernameCache || {};
 
 // Get owner email for a property
 function getPropertyOwnerEmail(propertyId) {
+    // Ensure we're comparing with numeric ID
+    const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
+    
     // First check the static mapping
-    if (propertyOwnerEmail[propertyId]) {
-        return propertyOwnerEmail[propertyId];
+    if (propertyOwnerEmail[numericId]) {
+        return propertyOwnerEmail[numericId];
     }
     
     // Then check the property object itself (for user-created properties)
-    const prop = properties.find(p => p.id === propertyId);
+    const prop = properties.find(p => p.id === numericId);
     if (prop && prop.ownerEmail) {
-        return prop.ownerEmail;
+        // Cache it for future lookups
+        propertyOwnerEmail[numericId] = prop.ownerEmail.toLowerCase();
+        return prop.ownerEmail.toLowerCase();
     }
     
     return null;
