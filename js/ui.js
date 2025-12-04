@@ -1841,13 +1841,23 @@ window.processRequestSnapshot = function(snapshot) {
         const data = doc.data();
         pendingRequests.push({ id: doc.id, ...data });
     });
+    
+    // Check if pending requests have actually changed
+    const currentIds = new Set(pendingRequests.map(r => r.id));
+    const previousIds = new Set((window.adminPendingRequests || []).map(r => r.id));
+    const hasChanged = currentIds.size !== previousIds.size || 
+                       [...currentIds].some(id => !previousIds.has(id)) ||
+                       [...previousIds].some(id => !currentIds.has(id));
+    
     window.adminPendingRequests = pendingRequests;
     
-    // Update the badge count
+    // Update the badge count (always)
     updateRequestsBadge(count);
     
-    // Refresh user list if visible
-    if (window.adminUsersData && window.adminUsersData.length > 0) {
+    // Only refresh user list if pending requests have actually changed
+    // This prevents collapsing open property lists during polling
+    if (hasChanged && window.adminUsersData && window.adminUsersData.length > 0) {
+        console.log('[AdminAlert] Pending requests changed - refreshing user list');
         const searchTerm = ($('adminUserSearch')?.value || '').toLowerCase();
         const filtered = searchTerm 
             ? window.adminUsersData.filter(user => 
@@ -1875,7 +1885,6 @@ window.processRequestSnapshot = function(snapshot) {
     });
     
     // Clean up old request IDs
-    const currentIds = new Set(pendingRequests.map(r => r.id));
     window.adminAlertShownForRequests.forEach(id => {
         if (!currentIds.has(id)) {
             window.adminAlertShownForRequests.delete(id);
