@@ -2141,6 +2141,9 @@ window.loadUpgradeHistory = async function() {
     
     container.innerHTML = '<p class="text-gray-500 italic">Loading history...</p>';
     
+    // Check if current user is the master owner (not just any admin)
+    const isMasterOwner = auth.currentUser?.email === 'richard2019201900@gmail.com';
+    
     try {
         const history = await TierService.getUpgradeHistory();
         
@@ -2155,8 +2158,17 @@ window.loadUpgradeHistory = async function() {
             const date = entry.upgradedAt?.toDate ? entry.upgradedAt.toDate().toLocaleString() : 'Unknown';
             const price = entry.price ? `$${entry.price.toLocaleString()}` : '-';
             
+            // Only master owner can delete history entries
+            const deleteBtn = isMasterOwner ? `
+                <button onclick="deleteUpgradeHistory('${entry.id}')" 
+                    class="ml-2 text-red-400 hover:text-red-300 text-xs opacity-50 hover:opacity-100 transition"
+                    title="Delete this entry">
+                    🗑️
+                </button>
+            ` : '';
+            
             return `
-                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div id="history-${entry.id}" class="bg-gray-800 rounded-xl p-4 border border-gray-700">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2">
@@ -2170,9 +2182,12 @@ window.loadUpgradeHistory = async function() {
                             </div>
                             ${entry.paymentNote ? `<p class="text-gray-400 text-sm mt-1 italic">${entry.paymentNote}</p>` : ''}
                         </div>
-                        <div class="text-right text-sm">
-                            <div class="text-gray-400">${date}</div>
-                            <div class="text-gray-500 text-xs">by ${entry.upgradedBy || 'system'}</div>
+                        <div class="text-right text-sm flex items-start gap-2">
+                            <div>
+                                <div class="text-gray-400">${date}</div>
+                                <div class="text-gray-500 text-xs">by ${entry.upgradedBy || 'system'}</div>
+                            </div>
+                            ${deleteBtn}
                         </div>
                     </div>
                 </div>
@@ -2182,6 +2197,37 @@ window.loadUpgradeHistory = async function() {
     } catch (error) {
         console.error('Error loading upgrade history:', error);
         container.innerHTML = '<p class="text-red-400">Error loading history.</p>';
+    }
+};
+
+// Delete upgrade history entry (master owner only)
+window.deleteUpgradeHistory = async function(entryId) {
+    // Double-check permission
+    if (auth.currentUser?.email !== 'richard2019201900@gmail.com') {
+        alert('Only the master owner can delete history entries.');
+        return;
+    }
+    
+    if (!confirm('Delete this upgrade history entry? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        await db.collection('upgradeHistory').doc(entryId).delete();
+        
+        // Remove from UI with animation
+        const entryEl = $(`history-${entryId}`);
+        if (entryEl) {
+            entryEl.style.transition = 'all 0.3s ease';
+            entryEl.style.opacity = '0';
+            entryEl.style.transform = 'translateX(20px)';
+            setTimeout(() => entryEl.remove(), 300);
+        }
+        
+        console.log('[Admin] Deleted upgrade history entry:', entryId);
+    } catch (error) {
+        console.error('Error deleting history entry:', error);
+        alert('Error deleting entry: ' + error.message);
     }
 };
 
