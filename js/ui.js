@@ -897,76 +897,85 @@ function renderOwnerDashboard() {
             window.dashboardReminders[p.id] = reminderScript;
         }
         
+        // Alternating color scheme - solid backgrounds for clarity
+        const isEven = index % 2 === 0;
+        const mainBg = isEven ? 'bg-slate-800' : 'bg-gray-800';
+        const subBg = isEven ? 'bg-slate-900/80' : 'bg-gray-900/80';
+        const accentColor = isEven ? 'border-l-purple-500' : 'border-l-blue-500';
+        
         return `
-        <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'} hover:bg-gray-700/30 transition">
-            <td class="px-2 md:px-3 py-3 text-center text-gray-400 font-bold text-lg border-r border-gray-700" rowspan="2">${index + 1}</td>
-            <td class="px-4 md:px-6 py-3 border-r border-gray-700/50"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
-            <td class="px-4 md:px-6 py-3 border-r border-gray-700/50">
-                <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 text-gray-300 capitalize hidden md:table-cell border-r border-gray-700/50">${p.type}</td>
-            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
-                <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'bathrooms', this, 'number')" title="Click to edit">
-                <span class="cell-value">${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
-                <span class="cell-value">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
-                <span class="cell-value">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 text-green-400 font-bold editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'weeklyPrice', this, 'number')" title="Click to edit">
-                <span class="cell-value">${weeklyPrice.toLocaleString()}</span>
-            </td>
-            <td class="px-4 md:px-6 py-3 text-purple-400 font-bold editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
-                <span class="cell-value">${monthlyPrice.toLocaleString()}</span>
-            </td>
-            <td class="px-2 md:px-3 py-3 text-center" rowspan="2">
-                <button onclick="confirmDeleteProperty(${p.id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded-lg transition" title="Delete property">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                </button>
-            </td>
-        </tr>
-        <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'}">
-            <td colspan="9" class="px-4 md:px-6 py-2">
-                <div class="flex flex-wrap items-center text-sm gap-x-6 gap-y-2">
-                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg min-w-[300px]" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
-                        <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                        <span class="text-gray-400">Renter:</span>
-                        <span class="cell-value text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
-                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+        <tbody class="property-group">
+            <tr class="${mainBg} border-l-4 ${accentColor}">
+                <td class="px-3 py-4 text-center text-white font-bold text-lg" rowspan="2">${index + 1}</td>
+                <td class="px-4 py-4"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
+                <td class="px-4 py-4">
+                    <span class="property-name-link font-bold text-white text-base" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
+                </td>
+                <td class="px-4 py-4 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
+                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
+                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
+                </td>
+                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'bathrooms', this, 'number')" title="Click to edit">
+                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)}</span>
+                </td>
+                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
+                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</span>
+                </td>
+                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
+                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</span>
+                </td>
+                <td class="px-4 py-4 text-green-400 font-bold editable-cell text-center" onclick="startCellEdit(${p.id}, 'weeklyPrice', this, 'number')" title="Click to edit">
+                    <span class="cell-value">${weeklyPrice.toLocaleString()}</span>
+                </td>
+                <td class="px-4 py-4 text-purple-400 font-bold editable-cell text-center" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
+                    <span class="cell-value">${monthlyPrice.toLocaleString()}</span>
+                </td>
+                <td class="px-3 py-4 text-center" rowspan="2">
+                    <button onclick="confirmDeleteProperty(${p.id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded-lg transition" title="Delete property">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </td>
+            </tr>
+            <tr class="${subBg} border-l-4 ${accentColor}">
+                <td colspan="9" class="px-4 py-3">
+                    <div class="flex flex-wrap items-center text-sm gap-x-6 gap-y-2">
+                        <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg min-w-[280px] border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
+                            <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            <span class="text-gray-500">Renter:</span>
+                            <span class="cell-value text-white font-medium">${renterName || '<span class="text-gray-600 italic">Not set</span>'}</span>
+                            <svg class="w-3 h-3 text-gray-600 flex-shrink-0 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </div>
+                        <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
+                            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="text-gray-500">Frequency:</span>
+                            <span class="cell-value text-white font-medium capitalize">${paymentFrequency}</span>
+                            <svg class="w-3 h-3 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                        <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
+                            <svg class="w-4 h-4 text-lime-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            <span class="text-gray-500">Paid:</span>
+                            <span class="cell-value text-white font-medium">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-600 italic">-</span>'}</span>
+                            <svg class="w-3 h-3 text-gray-600 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </div>
+                        <div class="flex items-center gap-2 px-3 py-1.5">
+                            <svg class="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span class="text-gray-500">Due:</span>
+                            <span class="font-medium text-white">${nextDueDate || '<span class="text-gray-600">-</span>'}</span>
+                            ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
+                        </div>
+                        ${reminderScript ? `
+                        <div class="ml-auto">
+                            <button onclick="copyDashboardReminder(${p.id}, this)" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1 shadow-lg" title="Copy reminder - text in city for fastest response">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                                📋 Copy Text
+                            </button>
+                        </div>
+                        ` : ''}
                     </div>
-                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
-                        <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span class="text-gray-400">Frequency:</span>
-                        <span class="cell-value text-white font-semibold capitalize">${paymentFrequency}</span>
-                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
-                        <svg class="w-4 h-4 text-lime-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        <span class="text-gray-400">Paid:</span>
-                        <span class="cell-value text-white font-semibold">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-500 italic">-</span>'}</span>
-                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <svg class="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        <span class="text-gray-400">Due:</span>
-                        <span class="font-semibold">${nextDueDate || '<span class="text-gray-500">-</span>'}</span>
-                        ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
-                    </div>
-                    ${reminderScript ? `
-                    <div class="ml-auto">
-                        <button onclick="copyDashboardReminder(${p.id}, this)" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1" title="Copy reminder - text in city for fastest response">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                            📋 Copy Text
-                        </button>
-                    </div>
-                    ` : ''}
-                </div>
-            </td>
-        </tr>
+                </td>
+            </tr>
+        </tbody>
+        <tbody><tr class="h-2"><td colspan="11"></td></tr></tbody>
     `;
     }).join('');
 }
