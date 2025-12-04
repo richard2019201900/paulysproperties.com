@@ -943,8 +943,9 @@ function renderOwnerDashboard() {
     ownerProps.forEach(p => {
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const renterPhone = PropertyDataService.getValue(p.id, 'renterPhone', p.renterPhone || '');
-        if ((renterName || renterPhone) && state.availability[p.id] !== false) {
-            console.log(`[Auto-fix] Property ${p.id} has renter info but was marked available - fixing to rented`);
+        const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
+        if ((renterName || renterPhone || lastPaymentDate) && state.availability[p.id] !== false) {
+            console.log(`[Auto-fix] Property ${p.id} has renter/payment info but was marked available - fixing to rented`);
             state.availability[p.id] = false;
             PropertyDataService.write(p.id, 'isAvailable', false);
         }
@@ -1200,13 +1201,13 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
     try {
         await PropertyDataService.write(propertyId, field, newValue);
         
-        // Auto-flip to "rented" when setting renter name or phone
-        if ((field === 'renterName' || field === 'renterPhone') && newValue) {
+        // Auto-flip to "rented" when setting renter name, phone, or payment date
+        if ((field === 'renterName' || field === 'renterPhone' || field === 'lastPaymentDate') && newValue) {
             if (state.availability[propertyId] !== false) {
                 // Property is currently available, flip to rented
                 state.availability[propertyId] = false;
                 await PropertyDataService.write(propertyId, 'isAvailable', false);
-                console.log(`Auto-flipped property ${propertyId} to rented (renter info set)`);
+                console.log(`Auto-flipped property ${propertyId} to rented (${field} set)`);
             }
         }
         
