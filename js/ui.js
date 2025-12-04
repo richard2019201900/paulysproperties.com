@@ -479,7 +479,15 @@ window.updateTierBadge = function(tier, email) {
         if (iconEl) iconEl.textContent = tierData.icon;
         if (nameEl) nameEl.textContent = tierData.name;
         if (listingsEl) listingsEl.textContent = `${listingCount}/${maxListings} Listings`;
-        if (upgradeBtn) showElement(upgradeBtn);
+        
+        // Hide upgrade button if already at Elite (max tier)
+        if (upgradeBtn) {
+            if (tier === 'elite') {
+                hideElement(upgradeBtn);
+            } else {
+                showElement(upgradeBtn);
+            }
+        }
         
         // Update badge background based on tier
         if (badgeEl) {
@@ -642,6 +650,11 @@ window.logout = function() {
     // Clear username field and status
     $('ownerUsername').value = '';
     hideElement($('usernameStatus'));
+    // Clean up notification listener
+    if (window.userNotificationUnsubscribe) {
+        window.userNotificationUnsubscribe();
+        window.userNotificationUnsubscribe = null;
+    }
     auth.signOut().then(() => window.goHome()).catch(() => window.goHome());
 };
 
@@ -2930,6 +2943,9 @@ window.copyDashboardReminder = function(propertyId, btn) {
 };
 
 // ==================== USER NOTIFICATIONS ====================
+// Store the listener unsubscribe function
+window.userNotificationUnsubscribe = null;
+
 window.loadUserNotifications = async function() {
     const user = auth.currentUser;
     if (!user) return;
@@ -2938,56 +2954,76 @@ window.loadUserNotifications = async function() {
     const container = $('userNotificationsContainer');
     if (!banner || !container) return;
     
+    // Unsubscribe from previous listener if exists
+    if (window.userNotificationUnsubscribe) {
+        window.userNotificationUnsubscribe();
+        window.userNotificationUnsubscribe = null;
+    }
+    
     try {
-        const snapshot = await db.collection('userNotifications')
+        // Set up real-time listener for user's notifications
+        window.userNotificationUnsubscribe = db.collection('userNotifications')
             .where('userEmail', '==', user.email.toLowerCase())
             .where('read', '==', false)
-            .orderBy('createdAt', 'desc')
-            .limit(5)
-            .get();
-        
-        if (snapshot.empty) {
-            hideElement(banner);
-            return;
-        }
-        
-        const notifications = [];
-        snapshot.forEach(doc => {
-            notifications.push({ id: doc.id, ...doc.data() });
-        });
-        
-        container.innerHTML = notifications.map(notif => {
-            const isApproval = notif.type === 'upgrade_approved';
-            const bgColor = isApproval ? 'from-green-600/20 to-emerald-600/20' : 'from-red-600/20 to-orange-600/20';
-            const borderColor = isApproval ? 'border-green-500/50' : 'border-red-500/50';
-            const icon = isApproval ? '🎉' : '❌';
-            
-            return `
-                <div id="notif-${notif.id}" class="bg-gradient-to-r ${bgColor} border ${borderColor} rounded-xl p-4 flex items-start justify-between gap-4">
-                    <div class="flex items-start gap-3">
-                        <span class="text-2xl">${icon}</span>
-                        <div>
-                            <h4 class="text-white font-bold">${notif.title}</h4>
-                            <p class="text-gray-300 text-sm mt-1">${notif.message}</p>
-                            ${notif.createdAt ? `<p class="text-gray-500 text-xs mt-2">${notif.createdAt.toDate().toLocaleString()}</p>` : ''}
+            .onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    hideElement(banner);
+                    container.innerHTML = '';
+                    return;
+                }
+                
+                const notifications = [];
+                snapshot.forEach(doc => {
+                    notifications.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Sort by createdAt descending (client-side to avoid index requirement)
+                notifications.sort((a, b) => {
+                    const aTime = a.createdAt?.toDate?.() || new Date(0);
+                    const bTime = b.createdAt?.toDate?.() || new Date(0);
+                    return bTime - aTime;
+                });
+                
+                // Limit to 5 most recent
+                const recentNotifs = notifications.slice(0, 5);
+                
+                container.innerHTML = recentNotifs.map(notif => {
+                    const isApproval = notif.type === 'upgrade_approved';
+                    const bgColor = isApproval ? 'from-green-600/20 to-emerald-600/20' : 'from-red-600/20 to-orange-600/20';
+                    const borderColor = isApproval ? 'border-green-500/50' : 'border-red-500/50';
+                    const icon = isApproval ? '🎉' : '❌';
+                    
+                    return `
+                        <div id="notif-${notif.id}" class="bg-gradient-to-r ${bgColor} border ${borderColor} rounded-xl p-4 flex items-start justify-between gap-4">
+                            <div class="flex items-start gap-3">
+                                <span class="text-2xl">${icon}</span>
+                                <div>
+                                    <h4 class="text-white font-bold">${notif.title}</h4>
+                                    <p class="text-gray-300 text-sm mt-1">${notif.message}</p>
+                                    ${notif.createdAt?.toDate ? `<p class="text-gray-500 text-xs mt-2">${notif.createdAt.toDate().toLocaleString()}</p>` : ''}
+                                </div>
+                            </div>
+                            <button onclick="dismissNotification('${notif.id}')" 
+                                class="text-gray-400 hover:text-white transition p-1 flex-shrink-0"
+                                title="Dismiss notification">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
                         </div>
-                    </div>
-                    <button onclick="dismissNotification('${notif.id}')" 
-                        class="text-gray-400 hover:text-white transition p-1 flex-shrink-0"
-                        title="Dismiss notification">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-            `;
-        }).join('');
-        
-        showElement(banner);
+                    `;
+                }).join('');
+                
+                showElement(banner);
+                
+            }, (error) => {
+                // Handle permission errors silently - user just won't see notifications
+                console.log('Notification listener error (may need Firestore rules):', error.message);
+                hideElement(banner);
+            });
         
     } catch (error) {
-        console.error('Error loading user notifications:', error);
-        // Silently fail - notifications are not critical
+        console.error('Error setting up user notifications:', error);
         hideElement(banner);
     }
 };
