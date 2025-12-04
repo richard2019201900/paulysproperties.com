@@ -878,10 +878,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginForm) {
         loginForm.addEventListener('submit', function(e) {
             e.preventDefault();
-            const email = $('ownerEmail').value;
+            let email = $('ownerEmail').value.trim().toLowerCase();
             const password = $('ownerPassword').value;
             const btn = $('loginSubmitBtn');
             const errorDiv = $('loginError');
+            
+            // Auto-append @pma.network if no @ symbol
+            if (!email.includes('@')) {
+                email = email + '@pma.network';
+            }
             
             btn.disabled = true;
             btn.textContent = 'Signing In...';
@@ -903,12 +908,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .catch(error => {
                     const messages = {
-                        'auth/user-not-found': 'No account found with this email.',
+                        'auth/user-not-found': 'No account found with this username.',
                         'auth/wrong-password': 'Incorrect password. Please try again.',
-                        'auth/invalid-credential': 'Invalid email or password.',
+                        'auth/invalid-credential': 'Invalid username or password.',
                         'auth/too-many-requests': 'Too many failed attempts. Please try again later.'
                     };
-                    errorDiv.textContent = messages[error.code] || 'Invalid email or password. Please try again.';
+                    errorDiv.textContent = messages[error.code] || 'Invalid username or password. Please try again.';
                     showElement(errorDiv);
                 })
                 .finally(() => {

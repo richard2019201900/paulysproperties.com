@@ -89,13 +89,27 @@ document.addEventListener('DOMContentLoaded', function() {
         createForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const email = $('newAccountEmail').value.trim();
+            const username = $('newAccountEmail').value.trim().toLowerCase();
+            const email = username + '@pma.network'; // Append domain
             const password = $('newAccountPassword').value;
             const displayName = $('newAccountDisplayName').value.trim();
             const errorDiv = $('createAccountError');
             const btn = $('createAccountBtn');
             
             hideElement(errorDiv);
+            
+            // Validate username format
+            if (!/^[a-zA-Z0-9_.]+$/.test(username)) {
+                errorDiv.textContent = 'Username can only contain letters, numbers, dots and underscores.';
+                showElement(errorDiv);
+                return;
+            }
+            
+            if (username.length < 3) {
+                errorDiv.textContent = 'Username must be at least 3 characters.';
+                showElement(errorDiv);
+                return;
+            }
             
             if (password.length < 6) {
                 errorDiv.textContent = 'Password must be at least 6 characters.';
@@ -123,17 +137,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('[Auth] User document created with starter tier');
                 
-                // Close modal - onAuthStateChanged will handle the rest
-                closeModal('loginModal');
+                // Show success with credentials reminder
+                errorDiv.className = 'text-green-400 text-sm font-medium text-center p-3 bg-green-900/30 rounded-xl';
+                errorDiv.innerHTML = `✓ Account created!<br><strong>Save these credentials:</strong><br>Username: ${username}@pma.network<br>Password: (what you entered)`;
+                showElement(errorDiv);
+                
+                // Close modal after delay
+                setTimeout(() => {
+                    closeModal('loginModal');
+                    errorDiv.className = 'hidden text-red-400 text-sm font-medium text-center p-3 bg-red-900/30 rounded-xl';
+                }, 3000);
                 
             } catch (error) {
                 console.error('[Auth] Create account error:', error);
                 
                 let errorMessage = 'Failed to create account. Please try again.';
                 if (error.code === 'auth/email-already-in-use') {
-                    errorMessage = 'This email is already registered. Try signing in instead.';
+                    errorMessage = 'This username is already taken. Try a different one or sign in.';
                 } else if (error.code === 'auth/invalid-email') {
-                    errorMessage = 'Please enter a valid email address.';
+                    errorMessage = 'Invalid username. Use only letters, numbers, dots and underscores.';
                 } else if (error.code === 'auth/weak-password') {
                     errorMessage = 'Password must be at least 6 characters.';
                 }
@@ -142,6 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 showElement(errorDiv);
                 btn.disabled = false;
                 btn.textContent = '🌱 Create Starter Account';
+            }
             }
         });
     }
@@ -1149,7 +1172,8 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const email = $('adminNewEmail').value.trim();
+            const username = $('adminNewEmail').value.trim().toLowerCase();
+            const email = username + '@pma.network'; // Append domain
             const password = $('adminNewPassword').value;
             const displayName = $('adminNewDisplayName').value.trim();
             const tier = $('adminNewTier').value;
@@ -1167,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Use Firebase Admin SDK workaround - create via secondary auth
                 const result = await adminCreateUser(email, password, displayName, tier);
                 
-                successDiv.innerHTML = `✓ Account created!<br><strong>Email:</strong> ${email}<br><strong>Password:</strong> ${password}<br><strong>Tier:</strong> ${tier}`;
+                successDiv.innerHTML = `✓ Account created!<br><strong>Username:</strong> ${username}@pma.network<br><strong>Password:</strong> ${password}<br><strong>Tier:</strong> ${tier}`;
                 showElement(successDiv);
                 
                 // Clear form
