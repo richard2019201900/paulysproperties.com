@@ -1188,8 +1188,8 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
             return;
         }
     } else if (type === 'text' || type === 'date' || type === 'frequency' || type === 'select') {
-        // Keep as string, allow empty for text fields
-        if (!newValue && type !== 'text') {
+        // Keep as string, allow empty for text and date fields (so they can be cleared)
+        if (!newValue && type !== 'text' && type !== 'date') {
             cell.innerHTML = originalHTML;
             return;
         }
@@ -1199,6 +1199,7 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
     cell.innerHTML = `<span class="text-gray-500">Saving...</span>`;
     
     try {
+        // For empty date values, save empty string to clear the field
         await PropertyDataService.write(propertyId, field, newValue);
         
         // Auto-flip to "rented" when setting renter name, phone, or payment date
