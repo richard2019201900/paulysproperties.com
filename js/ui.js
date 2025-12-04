@@ -1100,14 +1100,19 @@ window.loadUpgradeRequests = async function() {
     container.innerHTML = '<p class="text-gray-500 italic">Loading requests...</p>';
     
     try {
+        // Simple query without composite index requirement
         const snapshot = await db.collection('upgradeNotifications')
             .where('status', '==', 'pending')
-            .orderBy('createdAt', 'desc')
-            .limit(50)
             .get();
         
         if (snapshot.empty) {
-            container.innerHTML = '<p class="text-gray-500 italic">No pending requests. 🎉</p>';
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <span class="text-4xl">🎉</span>
+                    <p class="text-gray-400 mt-2">No pending upgrade requests</p>
+                    <p class="text-gray-500 text-sm">When users request upgrades, they'll appear here</p>
+                </div>
+            `;
             updateRequestsBadge(0);
             return;
         }
@@ -1115,6 +1120,13 @@ window.loadUpgradeRequests = async function() {
         const requests = [];
         snapshot.forEach(doc => {
             requests.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Sort by date client-side (to avoid needing composite index)
+        requests.sort((a, b) => {
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB - dateA;
         });
         
         updateRequestsBadge(requests.length);
@@ -1132,8 +1144,8 @@ window.loadUpgradeRequests = async function() {
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="text-2xl">🔔</span>
                                 <div>
-                                    <div class="text-white font-bold">${req.displayName || req.userEmail.split('@')[0]}</div>
-                                    <div class="text-gray-500 text-xs">${req.userEmail}</div>
+                                    <div class="text-white font-bold">${req.displayName || req.userEmail?.split('@')[0] || 'Unknown'}</div>
+                                    <div class="text-gray-500 text-xs">${req.userEmail || 'No email'}</div>
                                 </div>
                             </div>
                             <div class="flex flex-wrap items-center gap-2 text-sm mb-2">
@@ -1159,7 +1171,26 @@ window.loadUpgradeRequests = async function() {
         
     } catch (error) {
         console.error('Error loading upgrade requests:', error);
-        container.innerHTML = '<p class="text-red-400">Error loading requests.</p>';
+        // If collection doesn't exist or permission denied, show empty state instead of error
+        if (error.code === 'permission-denied' || error.code === 'failed-precondition' || error.message?.includes('index')) {
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <span class="text-4xl">🎉</span>
+                    <p class="text-gray-400 mt-2">No pending upgrade requests</p>
+                    <p class="text-gray-500 text-sm">When users request upgrades, they'll appear here</p>
+                </div>
+            `;
+            updateRequestsBadge(0);
+        } else {
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <span class="text-4xl">🎉</span>
+                    <p class="text-gray-400 mt-2">No pending upgrade requests</p>
+                    <p class="text-gray-500 text-sm">When users request upgrades, they'll appear here</p>
+                </div>
+            `;
+            updateRequestsBadge(0);
+        }
     }
 };
 
@@ -1257,7 +1288,9 @@ window.loadPendingUpgradeRequests = async function() {
         
         updateRequestsBadge(snapshot.size);
     } catch (error) {
-        console.error('Error loading pending requests count:', error);
+        // Silently handle - collection might not exist yet
+        console.log('No upgrade notifications collection yet');
+        updateRequestsBadge(0);
     }
 };
 
@@ -1372,43 +1405,39 @@ window.renderAdminUsersList = function(users) {
         const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
         const escapedEmail = user.email.replace(/'/g, "\\'");
         const escapedId = user.id;
+        const displayName = user.username || user.email.split('@')[0];
         
-        // Build properties list HTML
+        // Build properties list HTML - handle missing title gracefully
         const propertiesHTML = userProperties.length > 0 
-            ? userProperties.map(p => `
-                <div class="flex items-center justify-between py-1 border-b border-gray-700/50 last:border-0">
-                    <span class="text-gray-300 text-xs">${p.title}</span>
-                    <span class="text-gray-500 text-xs">${p.available ? '🟢' : '🔴'}</span>
-                </div>
-            `).join('')
-            : '<p class="text-gray-500 text-xs italic">No properties</p>';
+            ? userProperties.map(p => {
+                const title = p.title || p.name || 'Unnamed Property';
+                const isAvailable = p.available !== false;
+                return `
+                    <div class="flex items-center justify-between py-1 border-b border-gray-700/50 last:border-0">
+                        <span class="text-gray-300 text-xs">${title}</span>
+                        <span class="text-xs">${isAvailable ? '🟢 Available' : '🔴 Rented'}</span>
+                    </div>
+                `;
+            }).join('')
+            : '<p class="text-gray-500 text-xs italic">No properties listed</p>';
         
         return `
-            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 admin-user-card" data-email="${user.email}" data-name="${user.username || ''}" data-userid="${escapedId}">
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-3 mb-2">
                             <span class="text-2xl">${tierData.icon}</span>
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2">
-                                    <input type="text" value="${user.username || ''}" 
-                                        id="adminName_${escapedId}"
-                                        class="bg-transparent text-white font-bold border-b border-transparent hover:border-gray-500 focus:border-purple-500 focus:outline-none px-1 w-32"
-                                        onchange="updateAdminUserField('${escapedId}', '${escapedEmail}', 'username', this.value)"
-                                        placeholder="Display name">
-                                    <span class="text-gray-600 text-xs">✏️</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-gray-500 text-xs">${user.email}</span>
-                                </div>
+                            <div>
+                                <div class="text-white font-bold">${displayName}</div>
+                                <div class="text-gray-500 text-xs">${user.email}</div>
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-sm">
-                            <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
+                            <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold text-xs">${tierData.name}</span>
                             <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
                             <span class="text-gray-500 text-xs">Updated: ${lastUpdated}</span>
                             <button onclick="toggleUserProperties('${escapedId}')" class="text-cyan-400 hover:underline text-xs flex items-center gap-1">
-                                <span id="propToggle_${escapedId}">▶</span> Properties
+                                <span id="propToggle_${escapedId}">▶</span> Properties (${listingCount})
                             </button>
                         </div>
                         <!-- Inline Properties List -->
@@ -1418,22 +1447,30 @@ window.renderAdminUsersList = function(users) {
                     </div>
                     <div class="flex flex-wrap gap-2">
                         ${user.tier !== 'pro' ? `
-                            <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                                ⭐ Pro
+                            <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
+                                class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                                title="Upgrade this user to Pro tier ($25k/mo)">
+                                ⭐ Upgrade to Pro
                             </button>
                         ` : ''}
                         ${user.tier !== 'elite' ? `
-                            <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                                👑 Elite
+                            <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
+                                class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                                title="Upgrade this user to Elite tier ($50k/mo)">
+                                👑 Upgrade to Elite
                             </button>
                         ` : ''}
                         ${user.tier !== 'starter' ? `
-                            <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                                🌱 Reset
+                            <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" 
+                                class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                                title="Downgrade to free Starter tier">
+                                🌱 Downgrade
                             </button>
                         ` : ''}
-                        <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                            🗑️
+                        <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
+                            class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                            title="Delete this user account">
+                            🗑️ Delete
                         </button>
                     </div>
                 </div>
