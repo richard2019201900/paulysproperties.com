@@ -465,29 +465,91 @@
                     <span class="text-3xl">🔐</span>
                     <div>
                         <h3 class="text-xl md:text-2xl font-bold text-red-400">Admin Panel</h3>
-                        <p class="text-gray-400 text-sm">Manage users and subscriptions</p>
+                        <p class="text-gray-400 text-sm">Manage users, accounts, and subscriptions</p>
+                    </div>
+                </div>
+                
+                <!-- Admin Stats Row -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-800/50 rounded-xl p-4 text-center border border-gray-700">
+                        <div id="adminStatUsers" class="text-2xl font-bold text-purple-400">-</div>
+                        <div class="text-gray-400 text-sm">Total Users</div>
+                    </div>
+                    <div class="bg-gray-800/50 rounded-xl p-4 text-center border border-gray-700">
+                        <div id="adminStatPro" class="text-2xl font-bold text-yellow-400">-</div>
+                        <div class="text-gray-400 text-sm">Pro Users</div>
+                    </div>
+                    <div class="bg-gray-800/50 rounded-xl p-4 text-center border border-gray-700">
+                        <div id="adminStatElite" class="text-2xl font-bold text-purple-500">-</div>
+                        <div class="text-gray-400 text-sm">Elite Users</div>
+                    </div>
+                    <div class="bg-gray-800/50 rounded-xl p-4 text-center border border-gray-700">
+                        <div id="adminStatListings" class="text-2xl font-bold text-green-400">-</div>
+                        <div class="text-gray-400 text-sm">Total Listings</div>
                     </div>
                 </div>
                 
                 <!-- Admin Tabs -->
-                <div class="flex gap-2 mb-6 border-b border-gray-700 pb-4">
+                <div class="flex flex-wrap gap-2 mb-6 border-b border-gray-700 pb-4">
                     <button id="adminTabUsers" onclick="switchAdminTab('users')" class="px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white">
                         👥 All Users
                     </button>
+                    <button id="adminTabCreate" onclick="switchAdminTab('create')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">
+                        ➕ Create User
+                    </button>
                     <button id="adminTabHistory" onclick="switchAdminTab('history')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">
                         📜 Upgrade History
+                    </button>
+                    <button id="adminTabTools" onclick="switchAdminTab('tools')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">
+                        🛠️ Tools
                     </button>
                 </div>
                 
                 <!-- All Users Tab -->
                 <div id="adminUsersTab" class="space-y-4">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
                         <h4 class="text-lg font-bold text-gray-200">Registered Users</h4>
-                        <button onclick="loadAllUsers()" class="text-purple-400 hover:text-purple-300 text-sm font-bold">🔄 Refresh</button>
+                        <div class="flex gap-2">
+                            <input type="text" id="adminUserSearch" placeholder="Search users..." onkeyup="filterAdminUsers()" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm w-48">
+                            <button onclick="loadAllUsers()" class="text-purple-400 hover:text-purple-300 text-sm font-bold px-3 py-2 bg-gray-700 rounded-lg">🔄 Refresh</button>
+                        </div>
                     </div>
                     <div id="allUsersList" class="space-y-3">
                         <p class="text-gray-500 italic">Loading users...</p>
                     </div>
+                </div>
+                
+                <!-- Create User Tab -->
+                <div id="adminCreateTab" class="hidden">
+                    <h4 class="text-lg font-bold text-gray-200 mb-4">Create New User Account</h4>
+                    <form id="adminCreateUserForm" class="space-y-4 max-w-md">
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-2">Email</label>
+                            <input type="email" id="adminNewEmail" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="user@email.com">
+                        </div>
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-2">Password</label>
+                            <input type="text" id="adminNewPassword" required minlength="6" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="At least 6 characters">
+                            <button type="button" onclick="generateRandomPassword()" class="text-cyan-400 text-sm mt-1 hover:underline">Generate random password</button>
+                        </div>
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-2">Display Name</label>
+                            <input type="text" id="adminNewDisplayName" required maxlength="30" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="Their in-city name">
+                        </div>
+                        <div>
+                            <label class="block text-gray-300 font-semibold mb-2">Starting Tier</label>
+                            <select id="adminNewTier" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500">
+                                <option value="starter">🌱 Starter (1 listing - Free)</option>
+                                <option value="pro">⭐ Pro (3 listings - $25k/mo)</option>
+                                <option value="elite">👑 Elite (Unlimited - $50k/mo)</option>
+                            </select>
+                        </div>
+                        <div id="adminCreateUserError" class="hidden text-red-400 text-sm font-medium p-3 bg-red-900/30 rounded-xl"></div>
+                        <div id="adminCreateUserSuccess" class="hidden text-green-400 text-sm font-medium p-3 bg-green-900/30 rounded-xl"></div>
+                        <button type="submit" id="adminCreateUserBtn" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                            ➕ Create Account
+                        </button>
+                    </form>
                 </div>
                 
                 <!-- Upgrade History Tab -->
@@ -498,6 +560,37 @@
                     </div>
                     <div id="upgradeHistoryList" class="space-y-3">
                         <p class="text-gray-500 italic">Loading history...</p>
+                    </div>
+                </div>
+                
+                <!-- Tools Tab -->
+                <div id="adminToolsTab" class="hidden space-y-4">
+                    <h4 class="text-lg font-bold text-gray-200 mb-4">Admin Tools</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                            <h5 class="text-white font-bold mb-2">📧 Bulk Message</h5>
+                            <p class="text-gray-400 text-sm mb-3">Generate a message to send to all users</p>
+                            <textarea id="adminBulkMessage" rows="3" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm mb-2" placeholder="Type your announcement..."></textarea>
+                            <button onclick="copyBulkEmailList()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90">📋 Copy All Emails</button>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                            <h5 class="text-white font-bold mb-2">📊 Export Data</h5>
+                            <p class="text-gray-400 text-sm mb-3">Download user and listing data</p>
+                            <button onclick="exportUsersCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 mr-2 mb-2">📥 Export Users CSV</button>
+                            <button onclick="exportListingsCSV()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90">📥 Export Listings CSV</button>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                            <h5 class="text-white font-bold mb-2">🔍 Find User by Property</h5>
+                            <p class="text-gray-400 text-sm mb-3">Enter a property address to find the owner</p>
+                            <input type="text" id="adminFindByProperty" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white text-sm mb-2" placeholder="Property title or address...">
+                            <button onclick="findUserByProperty()" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90">🔍 Find Owner</button>
+                            <div id="adminFindResult" class="mt-2 text-sm"></div>
+                        </div>
+                        <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                            <h5 class="text-white font-bold mb-2">⚠️ Danger Zone</h5>
+                            <p class="text-gray-400 text-sm mb-3">Careful - these actions are permanent</p>
+                            <button onclick="cleanupOrphanedListings()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 mr-2 mb-2">🧹 Cleanup Orphaned Listings</button>
+                        </div>
                     </div>
                 </div>
             </div>

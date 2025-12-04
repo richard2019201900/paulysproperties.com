@@ -948,25 +948,56 @@ window.copyUpgradeMessage = function() {
 };
 
 // ==================== ADMIN FUNCTIONS ====================
+// Store users for filtering
+window.adminUsersData = [];
+
 window.switchAdminTab = function(tab) {
-    const usersTab = $('adminUsersTab');
-    const historyTab = $('adminHistoryTab');
-    const usersBtn = $('adminTabUsers');
-    const historyBtn = $('adminTabHistory');
+    const tabs = ['users', 'create', 'history', 'tools'];
+    const tabElements = {
+        users: $('adminUsersTab'),
+        create: $('adminCreateTab'),
+        history: $('adminHistoryTab'),
+        tools: $('adminToolsTab')
+    };
+    const tabButtons = {
+        users: $('adminTabUsers'),
+        create: $('adminTabCreate'),
+        history: $('adminTabHistory'),
+        tools: $('adminTabTools')
+    };
     
-    if (tab === 'users') {
-        showElement(usersTab);
-        hideElement(historyTab);
-        usersBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white';
-        historyBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600';
-        loadAllUsers();
-    } else {
-        hideElement(usersTab);
-        showElement(historyTab);
-        historyBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white';
-        usersBtn.className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600';
-        loadUpgradeHistory();
-    }
+    tabs.forEach(t => {
+        if (tabElements[t]) {
+            if (t === tab) {
+                showElement(tabElements[t]);
+                if (tabButtons[t]) tabButtons[t].className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white';
+            } else {
+                hideElement(tabElements[t]);
+                if (tabButtons[t]) tabButtons[t].className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600';
+            }
+        }
+    });
+    
+    // Load data for the tab
+    if (tab === 'users') loadAllUsers();
+    else if (tab === 'history') loadUpgradeHistory();
+};
+
+window.updateAdminStats = function(users) {
+    const totalUsers = users.length;
+    const proUsers = users.filter(u => u.tier === 'pro').length;
+    const eliteUsers = users.filter(u => u.tier === 'elite').length;
+    const totalListings = Object.values(ownerPropertyMap).reduce((sum, props) => sum + props.length, 0);
+    
+    const statUsers = $('adminStatUsers');
+    const statPro = $('adminStatPro');
+    const statElite = $('adminStatElite');
+    const statListings = $('adminStatListings');
+    
+    if (statUsers) statUsers.textContent = totalUsers;
+    if (statPro) statPro.textContent = proUsers;
+    if (statElite) statElite.textContent = eliteUsers;
+    if (statListings) statListings.textContent = totalListings;
 };
 
 window.loadAllUsers = async function() {
@@ -977,61 +1008,241 @@ window.loadAllUsers = async function() {
     
     try {
         const users = await TierService.getAllUsers();
+        window.adminUsersData = users;
+        
+        updateAdminStats(users);
         
         if (users.length === 0) {
             container.innerHTML = '<p class="text-gray-500 italic">No users found.</p>';
             return;
         }
         
-        container.innerHTML = users.map(user => {
-            const tierData = TIERS[user.tier] || TIERS.starter;
-            const listingCount = (ownerPropertyMap[user.email?.toLowerCase()] || []).length;
-            const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
-            const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
-            
-            return `
-                <div class="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="text-2xl">${tierData.icon}</span>
-                                <div>
-                                    <div class="text-white font-bold">${user.username || user.email}</div>
-                                    <div class="text-gray-500 text-xs">${user.email}</div>
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap items-center gap-3 text-sm">
-                                <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
-                                <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
-                                <span class="text-gray-500 text-xs">Last updated: ${lastUpdated}</span>
-                            </div>
-                        </div>
-                        <div class="flex gap-2">
-                            ${user.tier !== 'pro' ? `
-                                <button onclick="adminUpgradeUser('${user.email}', 'pro', '${user.tier}')" class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                                    ⭐ Set Pro
-                                </button>
-                            ` : ''}
-                            ${user.tier !== 'elite' ? `
-                                <button onclick="adminUpgradeUser('${user.email}', 'elite', '${user.tier}')" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                                    👑 Set Elite
-                                </button>
-                            ` : ''}
-                            ${user.tier !== 'starter' ? `
-                                <button onclick="adminDowngradeUser('${user.email}', '${user.tier}')" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                                    🌱 Reset
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        renderAdminUsersList(users);
         
     } catch (error) {
         console.error('Error loading users:', error);
         container.innerHTML = '<p class="text-red-400">Error loading users.</p>';
     }
+};
+
+window.renderAdminUsersList = function(users) {
+    const container = $('allUsersList');
+    if (!container) return;
+    
+    container.innerHTML = users.map(user => {
+        const tierData = TIERS[user.tier] || TIERS.starter;
+        const listingCount = (ownerPropertyMap[user.email?.toLowerCase()] || []).length;
+        const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
+        const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
+        const escapedEmail = user.email.replace(/'/g, "\\'");
+        const escapedId = user.id;
+        
+        return `
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 admin-user-card" data-email="${user.email}" data-name="${user.username || ''}">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-2xl">${tierData.icon}</span>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <input type="text" value="${user.username || ''}" 
+                                        id="adminName_${escapedId}"
+                                        class="bg-transparent text-white font-bold border-b border-transparent hover:border-gray-500 focus:border-purple-500 focus:outline-none px-1 w-32"
+                                        onchange="updateAdminUserField('${escapedId}', '${escapedEmail}', 'username', this.value)"
+                                        placeholder="Display name">
+                                    <span class="text-gray-600 text-xs">✏️</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-gray-500 text-xs">${user.email}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 text-sm">
+                            <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
+                            <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
+                            <span class="text-gray-500 text-xs">Updated: ${lastUpdated}</span>
+                            <button onclick="viewUserProperties('${escapedEmail}')" class="text-cyan-400 hover:underline text-xs">View Properties</button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        ${user.tier !== 'pro' ? `
+                            <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                                ⭐ Pro
+                            </button>
+                        ` : ''}
+                        ${user.tier !== 'elite' ? `
+                            <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                                👑 Elite
+                            </button>
+                        ` : ''}
+                        ${user.tier !== 'starter' ? `
+                            <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                                🌱 Reset
+                            </button>
+                        ` : ''}
+                        <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+window.filterAdminUsers = function() {
+    const searchTerm = ($('adminUserSearch')?.value || '').toLowerCase();
+    const filtered = window.adminUsersData.filter(user => {
+        return user.email.toLowerCase().includes(searchTerm) ||
+               (user.username || '').toLowerCase().includes(searchTerm);
+    });
+    renderAdminUsersList(filtered);
+};
+
+window.updateAdminUserField = async function(userId, email, field, value) {
+    try {
+        await db.collection('users').doc(userId).update({
+            [field]: value,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log(`[Admin] Updated ${field} for ${email}`);
+        
+        // Update cache
+        if (field === 'username') {
+            window.ownerUsernameCache = window.ownerUsernameCache || {};
+            window.ownerUsernameCache[email.toLowerCase()] = value;
+        }
+    } catch (error) {
+        console.error('Error updating user field:', error);
+        alert('Error updating field: ' + error.message);
+    }
+};
+
+window.viewUserProperties = function(email) {
+    const properties = ownerPropertyMap[email.toLowerCase()] || [];
+    if (properties.length === 0) {
+        alert(`${email} has no properties.`);
+        return;
+    }
+    
+    const propList = properties.map(p => `• ${p.title}`).join('\n');
+    alert(`Properties for ${email}:\n\n${propList}`);
+};
+
+window.adminDeleteUser = async function(userId, email) {
+    if (!confirm(`⚠️ DELETE USER: ${email}\n\nThis will remove their account. Their properties will remain but become unassigned.\n\nContinue?`)) return;
+    
+    try {
+        await db.collection('users').doc(userId).delete();
+        alert(`User ${email} deleted.`);
+        loadAllUsers();
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Error deleting user: ' + error.message);
+    }
+};
+
+// Admin Create User Form
+document.addEventListener('DOMContentLoaded', function() {
+    const form = $('adminCreateUserForm');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = $('adminNewEmail').value.trim();
+            const password = $('adminNewPassword').value;
+            const displayName = $('adminNewDisplayName').value.trim();
+            const tier = $('adminNewTier').value;
+            const errorDiv = $('adminCreateUserError');
+            const successDiv = $('adminCreateUserSuccess');
+            const btn = $('adminCreateUserBtn');
+            
+            hideElement(errorDiv);
+            hideElement(successDiv);
+            
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            
+            try {
+                // Use Firebase Admin SDK workaround - create via secondary auth
+                const result = await adminCreateUser(email, password, displayName, tier);
+                
+                successDiv.innerHTML = `✓ Account created!<br><strong>Email:</strong> ${email}<br><strong>Password:</strong> ${password}<br><strong>Tier:</strong> ${tier}`;
+                showElement(successDiv);
+                
+                // Clear form
+                $('adminNewEmail').value = '';
+                $('adminNewPassword').value = '';
+                $('adminNewDisplayName').value = '';
+                $('adminNewTier').value = 'starter';
+                
+                // Refresh users list
+                loadAllUsers();
+                
+            } catch (error) {
+                console.error('Error creating user:', error);
+                errorDiv.textContent = error.message || 'Failed to create account.';
+                showElement(errorDiv);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '➕ Create Account';
+            }
+        });
+    }
+});
+
+window.adminCreateUser = async function(email, password, displayName, tier) {
+    // Create a secondary Firebase Auth instance to create users without signing out admin
+    const secondaryApp = firebase.apps.find(app => app.name === 'Secondary') || 
+        firebase.initializeApp(firebase.app().options, 'Secondary');
+    const secondaryAuth = secondaryApp.auth();
+    
+    try {
+        // Create user with secondary auth
+        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Create user document
+        await db.collection('users').doc(user.uid).set({
+            email: email.toLowerCase(),
+            username: displayName,
+            tier: tier,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: auth.currentUser?.email || 'admin'
+        });
+        
+        // Sign out from secondary auth
+        await secondaryAuth.signOut();
+        
+        // Log to upgrade history if not starter
+        if (tier !== 'starter') {
+            await db.collection('upgradeHistory').add({
+                userEmail: email.toLowerCase(),
+                previousTier: 'starter',
+                newTier: tier,
+                upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                upgradedBy: auth.currentUser?.email || 'admin',
+                paymentNote: 'Account created by admin',
+                price: tier === 'pro' ? 25000 : (tier === 'elite' ? 50000 : 0)
+            });
+        }
+        
+        return { uid: user.uid, email: email };
+        
+    } catch (error) {
+        // Sign out secondary auth on error too
+        try { await secondaryAuth.signOut(); } catch(e) {}
+        throw error;
+    }
+};
+
+window.generateRandomPassword = function() {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let password = '';
+    for (let i = 0; i < 10; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    $('adminNewPassword').value = password;
 };
 
 window.loadUpgradeHistory = async function() {
@@ -1089,7 +1300,7 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
     const price = newTier === 'pro' ? '$25,000' : '$50,000';
     
     const paymentNote = prompt(`Upgrading ${email} to ${tierData.name} (${price}/month)\n\nEnter payment confirmation or notes:`);
-    if (paymentNote === null) return; // User cancelled
+    if (paymentNote === null) return;
     
     try {
         await TierService.setUserTier(email, newTier, currentTier, paymentNote);
@@ -1114,6 +1325,84 @@ window.adminDowngradeUser = async function(email, currentTier) {
     } catch (error) {
         console.error('Error downgrading user:', error);
         alert('Error: ' + error.message);
+    }
+};
+
+// Admin Tools Functions
+window.copyBulkEmailList = function() {
+    const emails = window.adminUsersData.map(u => u.email).join(', ');
+    navigator.clipboard.writeText(emails).then(() => {
+        alert(`Copied ${window.adminUsersData.length} emails to clipboard!`);
+    });
+};
+
+window.exportUsersCSV = function() {
+    const headers = ['Email', 'Display Name', 'Tier', 'Created', 'Listings'];
+    const rows = window.adminUsersData.map(u => {
+        const listingCount = (ownerPropertyMap[u.email?.toLowerCase()] || []).length;
+        const created = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString() : 'Unknown';
+        return [u.email, u.username || '', u.tier, created, listingCount];
+    });
+    
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+    downloadFile('users.csv', csv, 'text/csv');
+};
+
+window.exportListingsCSV = function() {
+    const headers = ['Title', 'Location', 'Type', 'Owner Email', 'Weekly', 'Monthly', 'Available'];
+    const rows = properties.map(p => {
+        return [p.title, p.location, p.type, p.owner || '', p.weekly || '', p.monthly || '', p.available ? 'Yes' : 'No'];
+    });
+    
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
+    downloadFile('listings.csv', csv, 'text/csv');
+};
+
+window.downloadFile = function(filename, content, type) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+window.findUserByProperty = function() {
+    const searchTerm = ($('adminFindByProperty')?.value || '').toLowerCase();
+    const resultDiv = $('adminFindResult');
+    
+    if (!searchTerm) {
+        resultDiv.innerHTML = '<span class="text-yellow-400">Enter a property name or address.</span>';
+        return;
+    }
+    
+    const found = properties.find(p => 
+        p.title.toLowerCase().includes(searchTerm) || 
+        (p.location || '').toLowerCase().includes(searchTerm)
+    );
+    
+    if (found) {
+        resultDiv.innerHTML = `<span class="text-green-400">Found: <strong>${found.title}</strong><br>Owner: ${found.owner || 'Unknown'}</span>`;
+    } else {
+        resultDiv.innerHTML = '<span class="text-red-400">No property found matching that search.</span>';
+    }
+};
+
+window.cleanupOrphanedListings = async function() {
+    if (!confirm('This will identify listings with invalid or missing owners. Continue?')) return;
+    
+    const orphaned = properties.filter(p => {
+        if (!p.owner) return true;
+        const user = window.adminUsersData.find(u => u.email.toLowerCase() === p.owner.toLowerCase());
+        return !user;
+    });
+    
+    if (orphaned.length === 0) {
+        alert('No orphaned listings found. All properties have valid owners.');
+    } else {
+        const list = orphaned.map(p => `• ${p.title} (owner: ${p.owner || 'none'})`).join('\n');
+        alert(`Found ${orphaned.length} orphaned listings:\n\n${list}\n\nYou can manually reassign these from the property pages.`);
     }
 };
 
