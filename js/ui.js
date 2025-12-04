@@ -797,6 +797,9 @@ function updateIncomeBreakdowns(details) {
 
 // ==================== RENDER FUNCTIONS ====================
 function renderOwnerDashboard() {
+    // Load user notifications
+    loadUserNotifications();
+    
     const ownerProps = getOwnerProperties();
     const totals = calculateTotals();
     $('weeklyIncomeDisplay').textContent = formatPrice(totals.weekly);
@@ -1480,7 +1483,18 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
             paymentNote: paymentNote
         });
         
-        alert(`✓ ${userEmail} upgraded to ${newTier}!`);
+        // Create notification for user
+        await db.collection('userNotifications').add({
+            userEmail: userEmail.toLowerCase(),
+            type: 'upgrade_approved',
+            title: '🎉 Upgrade Approved!',
+            message: `Your upgrade to ${TIERS[newTier]?.name || newTier} has been approved! You now have access to ${TIERS[newTier]?.maxListings === Infinity ? 'unlimited' : TIERS[newTier]?.maxListings} listings.`,
+            newTier: newTier,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+        });
+        
+        alert(`✓ ${userEmail} upgraded to ${newTier}! User will be notified.`);
         loadUpgradeRequests();
         loadAllUsers();
         
@@ -1520,7 +1534,20 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
             type: 'denial'
         });
         
-        alert(`Request from ${userEmail} has been denied and logged.`);
+        // Create notification for user
+        const requestedTierName = TIERS[requestData?.requestedTier]?.name || requestData?.requestedTier || 'requested tier';
+        await db.collection('userNotifications').add({
+            userEmail: userEmail.toLowerCase(),
+            type: 'upgrade_denied',
+            title: '❌ Upgrade Request Denied',
+            message: `Your upgrade request to ${requestedTierName} was not approved.${reason ? ' Reason: ' + reason : ''} Please contact the site owner if you have questions.`,
+            requestedTier: requestData?.requestedTier,
+            reason: reason || 'No reason provided',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+        });
+        
+        alert(`Request from ${userEmail} has been denied. User will be notified.`);
         loadUpgradeRequests();
         loadUpgradeHistory(); // Refresh history to show denial
         
@@ -2891,4 +2918,96 @@ window.copyDashboardReminder = function(propertyId, btn) {
         }
         document.body.removeChild(textArea);
     });
+};
+
+// ==================== USER NOTIFICATIONS ====================
+window.loadUserNotifications = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const banner = $('userNotificationsBanner');
+    const container = $('userNotificationsContainer');
+    if (!banner || !container) return;
+    
+    try {
+        const snapshot = await db.collection('userNotifications')
+            .where('userEmail', '==', user.email.toLowerCase())
+            .where('read', '==', false)
+            .orderBy('createdAt', 'desc')
+            .limit(5)
+            .get();
+        
+        if (snapshot.empty) {
+            hideElement(banner);
+            return;
+        }
+        
+        const notifications = [];
+        snapshot.forEach(doc => {
+            notifications.push({ id: doc.id, ...doc.data() });
+        });
+        
+        container.innerHTML = notifications.map(notif => {
+            const isApproval = notif.type === 'upgrade_approved';
+            const bgColor = isApproval ? 'from-green-600/20 to-emerald-600/20' : 'from-red-600/20 to-orange-600/20';
+            const borderColor = isApproval ? 'border-green-500/50' : 'border-red-500/50';
+            const icon = isApproval ? '🎉' : '❌';
+            
+            return `
+                <div id="notif-${notif.id}" class="bg-gradient-to-r ${bgColor} border ${borderColor} rounded-xl p-4 flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">${icon}</span>
+                        <div>
+                            <h4 class="text-white font-bold">${notif.title}</h4>
+                            <p class="text-gray-300 text-sm mt-1">${notif.message}</p>
+                            ${notif.createdAt ? `<p class="text-gray-500 text-xs mt-2">${notif.createdAt.toDate().toLocaleString()}</p>` : ''}
+                        </div>
+                    </div>
+                    <button onclick="dismissNotification('${notif.id}')" 
+                        class="text-gray-400 hover:text-white transition p-1 flex-shrink-0"
+                        title="Dismiss notification">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }).join('');
+        
+        showElement(banner);
+        
+    } catch (error) {
+        console.error('Error loading user notifications:', error);
+        // Silently fail - notifications are not critical
+        hideElement(banner);
+    }
+};
+
+window.dismissNotification = async function(notificationId) {
+    try {
+        // Mark as read in Firestore
+        await db.collection('userNotifications').doc(notificationId).update({
+            read: true,
+            readAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Animate out
+        const notifEl = $(`notif-${notificationId}`);
+        if (notifEl) {
+            notifEl.style.transition = 'all 0.3s ease';
+            notifEl.style.opacity = '0';
+            notifEl.style.transform = 'translateX(20px)';
+            setTimeout(() => {
+                notifEl.remove();
+                // Check if any notifications remain
+                const container = $('userNotificationsContainer');
+                if (container && container.children.length === 0) {
+                    hideElement($('userNotificationsBanner'));
+                }
+            }, 300);
+        }
+        
+    } catch (error) {
+        console.error('Error dismissing notification:', error);
+    }
 };
