@@ -1496,6 +1496,11 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
     if (reason === null) return;
     
     try {
+        // Get the request details first
+        const requestDoc = await db.collection('upgradeNotifications').doc(requestId).get();
+        const requestData = requestDoc.data();
+        
+        // Update the request status
         await db.collection('upgradeNotifications').doc(requestId).update({
             status: 'denied',
             deniedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1503,8 +1508,21 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
             denyReason: reason || 'No reason provided'
         });
         
-        alert(`Request from ${userEmail} has been denied.`);
+        // Log denial to upgradeHistory
+        await db.collection('upgradeHistory').add({
+            userEmail: userEmail.toLowerCase(),
+            previousTier: requestData?.currentTier || 'starter',
+            newTier: 'DENIED: ' + (requestData?.requestedTier || 'unknown'),
+            upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            upgradedBy: auth.currentUser?.email || 'admin',
+            paymentNote: `❌ Request denied${reason ? ': ' + reason : ''}`,
+            price: 0,
+            type: 'denial'
+        });
+        
+        alert(`Request from ${userEmail} has been denied and logged.`);
         loadUpgradeRequests();
+        loadUpgradeHistory(); // Refresh history to show denial
         
     } catch (error) {
         console.error('Error denying request:', error);
@@ -2283,9 +2301,25 @@ window.loadUpgradeHistory = async function() {
         
         container.innerHTML = history.map(entry => {
             const prevTierData = TIERS[entry.previousTier] || TIERS.starter;
-            const newTierData = TIERS[entry.newTier] || TIERS.starter;
             const date = entry.upgradedAt?.toDate ? entry.upgradedAt.toDate().toLocaleString() : 'Unknown';
-            const price = entry.price ? `$${entry.price.toLocaleString()}` : '-';
+            const isDenial = entry.type === 'denial' || entry.newTier?.startsWith('DENIED:');
+            
+            // Handle denial entries differently
+            let newTierDisplay;
+            let priceDisplay;
+            let borderColor = 'border-gray-700';
+            
+            if (isDenial) {
+                const requestedTier = entry.newTier?.replace('DENIED: ', '') || 'unknown';
+                const requestedTierData = TIERS[requestedTier] || { icon: '❓', name: requestedTier, color: 'text-gray-400' };
+                newTierDisplay = `<span class="px-2 py-1 rounded bg-red-900/50 text-red-400">❌ Denied ${requestedTierData.icon} ${requestedTierData.name}</span>`;
+                priceDisplay = '<span class="text-red-400 font-bold">$0</span>';
+                borderColor = 'border-red-700/50';
+            } else {
+                const newTierData = TIERS[entry.newTier] || TIERS.starter;
+                newTierDisplay = `<span class="px-2 py-1 rounded bg-gray-700 ${newTierData.color}">${newTierData.icon} ${newTierData.name}</span>`;
+                priceDisplay = entry.price ? `<span class="text-green-400 font-bold">$${entry.price.toLocaleString()}</span>` : '<span class="text-gray-500">-</span>';
+            }
             
             // Only master owner can delete history entries
             const deleteBtn = isMasterOwner ? `
@@ -2297,7 +2331,7 @@ window.loadUpgradeHistory = async function() {
             ` : '';
             
             return `
-                <div id="history-${entry.id}" class="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div id="history-${entry.id}" class="bg-gray-800 rounded-xl p-4 border ${borderColor}">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 mb-2">
@@ -2306,8 +2340,8 @@ window.loadUpgradeHistory = async function() {
                             <div class="flex flex-wrap items-center gap-2 text-sm">
                                 <span class="px-2 py-1 rounded bg-gray-700 ${prevTierData.color}">${prevTierData.icon} ${prevTierData.name}</span>
                                 <span class="text-gray-500">→</span>
-                                <span class="px-2 py-1 rounded bg-gray-700 ${newTierData.color}">${newTierData.icon} ${newTierData.name}</span>
-                                <span class="text-green-400 font-bold">${price}</span>
+                                ${newTierDisplay}
+                                ${priceDisplay}
                             </div>
                             ${entry.paymentNote ? `<p class="text-gray-400 text-sm mt-1 italic">${entry.paymentNote}</p>` : ''}
                         </div>
