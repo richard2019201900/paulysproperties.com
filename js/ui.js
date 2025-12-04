@@ -85,6 +85,13 @@ window.showCreateAccountForm = function() {
     hideElement($('createAccountError'));
 };
 
+window.showLoginForm = function() {
+    hideElement($('loginOptions'));
+    hideElement($('createAccountForm'));
+    showElement($('ownerLoginForm'));
+    hideElement($('loginError'));
+};
+
 window.hideCreateAccountForm = function() {
     hideElement($('createAccountForm'));
     showElement($('loginOptions'));
@@ -161,7 +168,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 let errorMessage = 'Failed to create account. Please try again.';
                 if (error.code === 'auth/email-already-in-use') {
-                    errorMessage = 'This username is already taken. Try a different one or sign in.';
+                    errorMessage = 'This username is already registered. Try signing in instead, or use a different username.';
+                    // Add a sign-in link
+                    errorDiv.innerHTML = `${errorMessage}<br><button onclick="showLoginForm()" class="text-purple-400 underline mt-2">→ Sign In</button>`;
+                    showElement(errorDiv);
+                    btn.disabled = false;
+                    btn.textContent = '🌱 Create Starter Account';
+                    return;
                 } else if (error.code === 'auth/invalid-email') {
                     errorMessage = 'Invalid username. Use only letters, numbers, dots and underscores.';
                 } else if (error.code === 'auth/weak-password') {
