@@ -267,6 +267,7 @@ window.goToDashboard = function() {
         // Load admin users if master admin
         const user = auth.currentUser;
         if (user && TierService.isMasterAdmin(user.email)) {
+            resetAdminTiles(); // Reset tiles to front view
             loadAllUsers();
         }
         
@@ -586,6 +587,7 @@ window.updateTierBadge = function(tier, email) {
     if (adminSection) {
         if (isMasterAdmin) {
             showElement(adminSection);
+            resetAdminTiles(); // Reset tiles to front view
             loadPendingUpgradeRequests();
             loadAllUsers(); // Load users immediately when dashboard loads
             // Also check for subscription alerts after a delay (to allow user list to load)
@@ -2187,6 +2189,17 @@ window.flipAdminTile = function(tileType) {
         const isFlipped = tile.style.transform === 'rotateY(180deg)';
         tile.style.transform = isFlipped ? 'rotateY(0deg)' : 'rotateY(180deg)';
     }
+};
+
+// Reset all admin tiles to show front (unflipped) state
+window.resetAdminTiles = function() {
+    const tiles = ['Users', 'Pro', 'Elite', 'Listings'];
+    tiles.forEach(tileName => {
+        const tile = $('adminTile' + tileName);
+        if (tile) {
+            tile.style.transform = 'rotateY(0deg)';
+        }
+    });
 };
 
 window.loadAllUsers = async function() {
