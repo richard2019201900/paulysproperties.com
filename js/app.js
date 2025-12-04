@@ -254,6 +254,16 @@ function renderPropertyStatsContent(id) {
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || 'weekly');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
+    // AUTO-FIX: If renter info exists but property is marked available, fix it
+    if ((renterName || renterPhone) && state.availability[id] !== false) {
+        console.log(`[Auto-fix] Property ${id} has renter info but was marked available - fixing to rented`);
+        state.availability[id] = false;
+        PropertyDataService.write(id, 'isAvailable', false);
+        // Re-render with corrected status
+        setTimeout(() => renderPropertyStatsContent(id), 100);
+        return;
+    }
+    
     // Calculate next due date and days until due
     let nextDueDate = '';
     let daysUntilDue = null;

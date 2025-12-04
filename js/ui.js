@@ -811,6 +811,17 @@ function renderOwnerDashboard() {
         return;
     }
     
+    // AUTO-FIX: Check all properties for inconsistent renter/availability status
+    ownerProps.forEach(p => {
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const renterPhone = PropertyDataService.getValue(p.id, 'renterPhone', p.renterPhone || '');
+        if ((renterName || renterPhone) && state.availability[p.id] !== false) {
+            console.log(`[Auto-fix] Property ${p.id} has renter info but was marked available - fixing to rented`);
+            state.availability[p.id] = false;
+            PropertyDataService.write(p.id, 'isAvailable', false);
+        }
+    });
+    
     $('ownerPropertiesTable').innerHTML = ownerProps.map((p, index) => {
         // Get renter and payment info
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
