@@ -909,12 +909,18 @@ function renderOwnerDashboard() {
         </tr>
         <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'}">
             <td colspan="9" class="px-4 md:px-6 py-2">
-                <div class="flex flex-wrap items-center text-sm gap-x-8 gap-y-2">
-                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg min-w-[180px]" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
+                <div class="flex flex-wrap items-center text-sm gap-x-6 gap-y-2">
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg min-w-[300px]" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
                         <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                         <span class="text-gray-400">Renter:</span>
                         <span class="cell-value text-white font-semibold">${renterName || '<span class="text-gray-500 italic">Not set</span>'}</span>
                         <svg class="w-3 h-3 text-gray-500 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                    </div>
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
+                        <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="text-gray-400">Frequency:</span>
+                        <span class="cell-value text-white font-semibold capitalize">${paymentFrequency}</span>
+                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                     <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
                         <svg class="w-4 h-4 text-lime-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -927,10 +933,6 @@ function renderOwnerDashboard() {
                         <span class="text-gray-400">Due:</span>
                         <span class="font-semibold">${nextDueDate || '<span class="text-gray-500">-</span>'}</span>
                         ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
-                        <span class="cell-value text-gray-300 capitalize">${paymentFrequency}</span>
-                        <svg class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                     ${reminderScript ? `
                     <div class="ml-auto">
