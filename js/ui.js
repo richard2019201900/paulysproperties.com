@@ -981,33 +981,72 @@ I'm ready to pay and start listing more properties!`;
     messageBox.value = message;
 };
 
-window.copyUpgradeMessage = function() {
+window.copyUpgradeMessage = async function() {
     const messageBox = $('upgradeMessage');
     const status = $('upgradeStatus');
     const btn = $('upgradeSubmitBtn');
+    const tierSelect = $('upgradeTierSelect');
     
-    if (!messageBox.value) {
+    if (!messageBox.value || !tierSelect.value) {
         status.textContent = 'Please select a plan first.';
         status.className = 'text-yellow-400 text-sm';
         showElement(status);
         return;
     }
     
-    navigator.clipboard.writeText(messageBox.value).then(() => {
-        status.textContent = '✓ Message copied! Now send it to Pauly in-city.';
+    const user = auth.currentUser;
+    const requestedTier = tierSelect.value;
+    const displayName = $('ownerUsername')?.value || user?.email?.split('@')[0] || 'Unknown';
+    
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Sending...';
+    
+    try {
+        // Save notification to Firestore
+        await db.collection('upgradeNotifications').add({
+            userEmail: user.email,
+            userId: user.uid,
+            displayName: displayName,
+            currentTier: state.userTier || 'starter',
+            requestedTier: requestedTier,
+            message: messageBox.value,
+            status: 'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Copy to clipboard
+        await navigator.clipboard.writeText(messageBox.value);
+        
+        status.textContent = '✓ Request sent & copied! Pauly has been notified.';
         status.className = 'text-green-400 text-sm';
         showElement(status);
         
-        btn.innerHTML = '✓ Copied!';
+        btn.innerHTML = '✓ Sent & Copied!';
+        btn.className = btn.className.replace('from-blue-500 to-blue-600', 'from-green-500 to-green-600');
+        
         setTimeout(() => {
-            btn.innerHTML = '📋 Copy Message';
+            closeModal('upgradeModal');
+            btn.innerHTML = '🔔 Notify & Copy Message';
+            btn.className = btn.className.replace('from-green-500 to-green-600', 'from-blue-500 to-blue-600');
+            btn.disabled = false;
         }, 2000);
-    }).catch(err => {
-        console.error('Copy failed:', err);
-        status.textContent = 'Failed to copy. Please select and copy manually.';
-        status.className = 'text-red-400 text-sm';
+        
+    } catch (err) {
+        console.error('Error sending upgrade request:', err);
+        
+        // Still try to copy even if notification fails
+        try {
+            await navigator.clipboard.writeText(messageBox.value);
+            status.textContent = '✓ Copied! (Notification failed - please contact Pauly directly)';
+            status.className = 'text-yellow-400 text-sm';
+        } catch {
+            status.textContent = 'Failed to send. Please try again.';
+            status.className = 'text-red-400 text-sm';
+        }
         showElement(status);
-    });
+        btn.innerHTML = '🔔 Notify & Copy Message';
+        btn.disabled = false;
+    }
 };
 
 // ==================== ADMIN FUNCTIONS ====================
@@ -1015,15 +1054,17 @@ window.copyUpgradeMessage = function() {
 window.adminUsersData = [];
 
 window.switchAdminTab = function(tab) {
-    const tabs = ['users', 'create', 'history', 'tools'];
+    const tabs = ['users', 'requests', 'create', 'history', 'tools'];
     const tabElements = {
         users: $('adminUsersTab'),
+        requests: $('adminRequestsTab'),
         create: $('adminCreateTab'),
         history: $('adminHistoryTab'),
         tools: $('adminToolsTab')
     };
     const tabButtons = {
         users: $('adminTabUsers'),
+        requests: $('adminTabRequests'),
         create: $('adminTabCreate'),
         history: $('adminTabHistory'),
         tools: $('adminTabTools')
@@ -1033,17 +1074,191 @@ window.switchAdminTab = function(tab) {
         if (tabElements[t]) {
             if (t === tab) {
                 showElement(tabElements[t]);
-                if (tabButtons[t]) tabButtons[t].className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white';
+                if (tabButtons[t]) {
+                    tabButtons[t].className = 'px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white relative';
+                }
             } else {
                 hideElement(tabElements[t]);
-                if (tabButtons[t]) tabButtons[t].className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600';
+                if (tabButtons[t]) {
+                    tabButtons[t].className = 'px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 relative';
+                }
             }
         }
     });
     
     // Load data for the tab
     if (tab === 'users') loadAllUsers();
+    else if (tab === 'requests') loadUpgradeRequests();
     else if (tab === 'history') loadUpgradeHistory();
+};
+
+// Load and display pending upgrade requests
+window.loadUpgradeRequests = async function() {
+    const container = $('upgradeRequestsList');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-gray-500 italic">Loading requests...</p>';
+    
+    try {
+        const snapshot = await db.collection('upgradeNotifications')
+            .where('status', '==', 'pending')
+            .orderBy('createdAt', 'desc')
+            .limit(50)
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="text-gray-500 italic">No pending requests. 🎉</p>';
+            updateRequestsBadge(0);
+            return;
+        }
+        
+        const requests = [];
+        snapshot.forEach(doc => {
+            requests.push({ id: doc.id, ...doc.data() });
+        });
+        
+        updateRequestsBadge(requests.length);
+        
+        container.innerHTML = requests.map(req => {
+            const currentTierData = TIERS[req.currentTier] || TIERS.starter;
+            const requestedTierData = TIERS[req.requestedTier] || TIERS.pro;
+            const date = req.createdAt?.toDate ? req.createdAt.toDate().toLocaleString() : 'Unknown';
+            const price = req.requestedTier === 'pro' ? '$25,000' : '$50,000';
+            
+            return `
+                <div class="bg-gray-800 rounded-xl p-4 border border-orange-600/50">
+                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-2xl">🔔</span>
+                                <div>
+                                    <div class="text-white font-bold">${req.displayName || req.userEmail.split('@')[0]}</div>
+                                    <div class="text-gray-500 text-xs">${req.userEmail}</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 text-sm mb-2">
+                                <span class="px-2 py-1 rounded ${currentTierData.bgColor} text-white font-bold text-xs">${currentTierData.icon} ${currentTierData.name}</span>
+                                <span class="text-gray-500">→</span>
+                                <span class="px-2 py-1 rounded ${requestedTierData.bgColor} text-white font-bold text-xs">${requestedTierData.icon} ${requestedTierData.name}</span>
+                                <span class="text-green-400 font-bold">${price}/mo</span>
+                            </div>
+                            <div class="text-gray-500 text-xs">${date}</div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="approveUpgradeRequest('${req.id}', '${req.userEmail}', '${req.requestedTier}', '${req.currentTier}')" class="bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition">
+                                ✓ Approve
+                            </button>
+                            <button onclick="denyUpgradeRequest('${req.id}', '${req.userEmail}')" class="bg-gradient-to-r from-red-500 to-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition">
+                                ✕ Deny
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Error loading upgrade requests:', error);
+        container.innerHTML = '<p class="text-red-400">Error loading requests.</p>';
+    }
+};
+
+// Update request badge counts
+window.updateRequestsBadge = function(count) {
+    const badge = $('requestsTabBadge');
+    const notificationBadge = $('upgradeNotificationBadge');
+    const notificationCount = $('upgradeNotificationCount');
+    const alertBox = $('pendingUpgradesAlert');
+    const alertCount = $('pendingUpgradesCount');
+    
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+    
+    if (notificationBadge) {
+        if (count > 0) {
+            notificationBadge.classList.remove('hidden');
+            if (notificationCount) notificationCount.textContent = `${count} pending`;
+        } else {
+            notificationBadge.classList.add('hidden');
+        }
+    }
+    
+    if (alertBox) {
+        if (count > 0) {
+            alertBox.classList.remove('hidden');
+            if (alertCount) alertCount.textContent = `${count} user${count > 1 ? 's' : ''} waiting for approval`;
+        } else {
+            alertBox.classList.add('hidden');
+        }
+    }
+};
+
+// Approve upgrade request
+window.approveUpgradeRequest = async function(requestId, userEmail, newTier, currentTier) {
+    const paymentNote = prompt(`Approving upgrade to ${newTier.toUpperCase()} for ${userEmail}\n\nEnter payment confirmation:`);
+    if (paymentNote === null) return;
+    
+    try {
+        // Update user tier
+        await TierService.setUserTier(userEmail, newTier, currentTier, paymentNote);
+        
+        // Mark request as approved
+        await db.collection('upgradeNotifications').doc(requestId).update({
+            status: 'approved',
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            approvedBy: auth.currentUser?.email,
+            paymentNote: paymentNote
+        });
+        
+        alert(`✓ ${userEmail} upgraded to ${newTier}!`);
+        loadUpgradeRequests();
+        loadAllUsers();
+        
+    } catch (error) {
+        console.error('Error approving request:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
+// Deny upgrade request
+window.denyUpgradeRequest = async function(requestId, userEmail) {
+    const reason = prompt(`Denying request from ${userEmail}\n\nReason (optional):`);
+    if (reason === null) return;
+    
+    try {
+        await db.collection('upgradeNotifications').doc(requestId).update({
+            status: 'denied',
+            deniedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            deniedBy: auth.currentUser?.email,
+            denyReason: reason || 'No reason provided'
+        });
+        
+        alert(`Request from ${userEmail} has been denied.`);
+        loadUpgradeRequests();
+        
+    } catch (error) {
+        console.error('Error denying request:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
+// Load pending requests on admin panel load (called from loadPendingUpgradeRequests)
+window.loadPendingUpgradeRequests = async function() {
+    try {
+        const snapshot = await db.collection('upgradeNotifications')
+            .where('status', '==', 'pending')
+            .get();
+        
+        updateRequestsBadge(snapshot.size);
+    } catch (error) {
+        console.error('Error loading pending requests count:', error);
+    }
 };
 
 window.updateAdminStats = function(users) {
