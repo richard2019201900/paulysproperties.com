@@ -206,6 +206,13 @@ window.goToDashboard = function() {
         hideElement($('propertyStatsPage'));
         showElement($('ownerDashboard'));
         renderOwnerDashboard();
+        
+        // Load admin users if master admin
+        const user = auth.currentUser;
+        if (user && TierService.isMasterAdmin(user.email)) {
+            loadAllUsers();
+        }
+        
         window.scrollTo(0, 0);
     }
 };
@@ -523,6 +530,7 @@ window.updateTierBadge = function(tier, email) {
         if (isMasterAdmin) {
             showElement(adminSection);
             loadPendingUpgradeRequests();
+            loadAllUsers(); // Load users immediately when dashboard loads
             // Also check for subscription alerts after a delay (to allow user list to load)
             setTimeout(() => {
                 if (window.adminUsersData) {
