@@ -1350,9 +1350,14 @@ window.checkPendingUpgradeRequest = async function(email) {
             .get();
         
         if (snapshot.empty) {
-            // No pending request
+            // No pending request - hide pending indicators
             if (pendingBadge) hideElement(pendingBadge);
             if (pendingBanner) hideElement(pendingBanner);
+            
+            // Show upgrade button again (unless at Elite tier)
+            if (upgradeBtn && state.userTier !== 'elite') {
+                showElement(upgradeBtn);
+            }
             return;
         }
         
