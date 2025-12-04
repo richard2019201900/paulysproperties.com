@@ -1347,6 +1347,11 @@ async function init() {
             
             renderOwnerDashboard();
             loadUsername();
+            
+            // Start real-time listener for upgrade requests (admin only)
+            if (typeof loadPendingUpgradeRequests === 'function') {
+                loadPendingUpgradeRequests();
+            }
         } else {
             // No user signed in
             console.log('[Auth] No active session');

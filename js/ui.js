@@ -660,6 +660,16 @@ window.logout = function() {
         window.userNotificationUnsubscribe();
         window.userNotificationUnsubscribe = null;
     }
+    // Clean up upgrade request listener
+    if (window.upgradeRequestUnsubscribe) {
+        window.upgradeRequestUnsubscribe();
+        window.upgradeRequestUnsubscribe = null;
+    }
+    // Hide global alert
+    dismissGlobalAlert();
+    // Reset request count
+    window.lastKnownRequestCount = 0;
+    
     auth.signOut().then(() => window.goHome()).catch(() => window.goHome());
 };
 
@@ -1642,18 +1652,116 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
     }
 };
 
-// Load pending requests on admin panel load (called from loadPendingUpgradeRequests)
-window.loadPendingUpgradeRequests = async function() {
+// Store upgrade request listener unsubscribe function
+window.upgradeRequestUnsubscribe = null;
+window.lastKnownRequestCount = 0;
+
+// Load pending requests with real-time listener (for admin)
+window.loadPendingUpgradeRequests = function() {
+    // Only set up listener for master admin
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    
+    // Unsubscribe from previous listener if exists
+    if (window.upgradeRequestUnsubscribe) {
+        window.upgradeRequestUnsubscribe();
+        window.upgradeRequestUnsubscribe = null;
+    }
+    
     try {
-        const snapshot = await db.collection('upgradeNotifications')
+        window.upgradeRequestUnsubscribe = db.collection('upgradeNotifications')
             .where('status', '==', 'pending')
-            .get();
-        
-        updateRequestsBadge(snapshot.size);
+            .onSnapshot((snapshot) => {
+                const count = snapshot.size;
+                updateRequestsBadge(count);
+                
+                // Check if there are NEW requests (count increased)
+                if (count > window.lastKnownRequestCount && window.lastKnownRequestCount >= 0) {
+                    // Get the newest request to show in alert
+                    let newestRequest = null;
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        if (!newestRequest || (data.createdAt && newestRequest.createdAt && data.createdAt > newestRequest.createdAt)) {
+                            newestRequest = data;
+                        }
+                    });
+                    
+                    if (newestRequest && window.lastKnownRequestCount > 0) {
+                        // Show global alert for new request
+                        showGlobalAlert(
+                            '🔔 New Upgrade Request!',
+                            `${newestRequest.displayName || newestRequest.userEmail} wants to upgrade to ${(TIERS[newestRequest.requestedTier]?.name || newestRequest.requestedTier)}`,
+                            'requests'
+                        );
+                    }
+                }
+                
+                window.lastKnownRequestCount = count;
+                
+            }, (error) => {
+                console.log('Upgrade request listener error:', error.message);
+                updateRequestsBadge(0);
+            });
+            
     } catch (error) {
-        // Silently handle - collection might not exist yet
         console.log('No upgrade notifications collection yet');
         updateRequestsBadge(0);
+    }
+};
+
+// Show global alert bar
+window.showGlobalAlert = function(title, message, navigateTo) {
+    const alertBar = $('globalAlertBar');
+    const alertTitle = $('globalAlertTitle');
+    const alertMessage = $('globalAlertMessage');
+    
+    if (!alertBar) return;
+    
+    if (alertTitle) alertTitle.textContent = title;
+    if (alertMessage) alertMessage.textContent = message;
+    
+    // Store where to navigate
+    alertBar.dataset.navigateTo = navigateTo || '';
+    
+    // Show with animation
+    alertBar.classList.remove('hidden');
+    alertBar.style.animation = 'slideDown 0.3s ease-out';
+    
+    // Add flashing effect
+    alertBar.classList.add('animate-pulse');
+    
+    // Play notification sound (optional - browser may block)
+    try {
+        const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU9vT18=');
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+    } catch (e) {}
+};
+
+// Handle click on global alert
+window.handleGlobalAlertClick = function() {
+    const alertBar = $('globalAlertBar');
+    const navigateTo = alertBar?.dataset.navigateTo;
+    
+    if (navigateTo === 'requests') {
+        // Navigate to dashboard and open requests tab
+        goToDashboard();
+        setTimeout(() => {
+            switchAdminTab('requests');
+        }, 100);
+    }
+    
+    dismissGlobalAlert();
+};
+
+// Dismiss global alert
+window.dismissGlobalAlert = function() {
+    const alertBar = $('globalAlertBar');
+    if (alertBar) {
+        alertBar.style.animation = 'slideUp 0.3s ease-out';
+        setTimeout(() => {
+            alertBar.classList.add('hidden');
+            alertBar.classList.remove('animate-pulse');
+        }, 250);
     }
 };
 

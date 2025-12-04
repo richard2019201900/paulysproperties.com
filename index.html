@@ -74,6 +74,19 @@
     
     <!-- Custom Styles -->
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(-100%); opacity: 0; }
+        }
+        #globalAlertBar {
+            animation: slideDown 0.3s ease-out;
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-gray-100">
     <!-- Image Lightbox -->
@@ -466,6 +479,25 @@
     </div>
 
     <!-- Navigation -->
+    <!-- Global Urgent Alert Bar (for admin notifications) -->
+    <div id="globalAlertBar" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-orange-600 to-red-600 text-white cursor-pointer shadow-lg" onclick="handleGlobalAlertClick()">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl animate-pulse">🔔</span>
+                <div>
+                    <span id="globalAlertTitle" class="font-bold">New Upgrade Request!</span>
+                    <span id="globalAlertMessage" class="ml-2 opacity-90"></span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm opacity-75">Click to view</span>
+                <button onclick="event.stopPropagation(); dismissGlobalAlert()" class="hover:bg-white/20 rounded-full p-1 transition" title="Dismiss">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <nav class="glass-effect shadow-xl sticky top-0 z-40 border-b border-gray-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16 md:h-20">
