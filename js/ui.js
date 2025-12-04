@@ -21,6 +21,9 @@ function updateAuthButton(isLoggedIn) {
             navUserDisplay.className = 'hidden md:flex items-center gap-2';
             updateNavUserDisplay();
         }
+        // Show "My Properties" filter
+        const myPropertiesFilter = $('myPropertiesFilter');
+        if (myPropertiesFilter) myPropertiesFilter.className = 'flex items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition';
     } else {
         navBtn.textContent = 'Register / Sign In';
         navBtn.className = 'hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base';
@@ -33,6 +36,11 @@ function updateAuthButton(isLoggedIn) {
         if (mobileCreateBtn) mobileCreateBtn.className = 'hidden';
         // Hide user display
         if (navUserDisplay) navUserDisplay.className = 'hidden';
+        // Hide "My Properties" filter and uncheck it
+        const myPropertiesFilter = $('myPropertiesFilter');
+        const showMyProperties = $('showMyProperties');
+        if (myPropertiesFilter) myPropertiesFilter.className = 'hidden';
+        if (showMyProperties) showMyProperties.checked = false;
     }
 }
 

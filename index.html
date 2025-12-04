@@ -1031,6 +1031,10 @@
                     <button onclick="filterProperties('villa', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Villas</button>
                 </div>
                 <div class="flex flex-wrap gap-3 md:gap-4 items-center">
+                    <label id="myPropertiesFilter" class="hidden items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition">
+                        <input type="checkbox" id="showMyProperties" onchange="toggleMyProperties()" class="w-4 h-4 md:w-5 md:h-5 rounded border-2 border-purple-500 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                        <span>My Properties</span>
+                    </label>
                     <label class="flex items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition">
                         <input type="checkbox" id="hideUnavailable" onchange="toggleHideUnavailable()" class="w-4 h-4 md:w-5 md:h-5 rounded border-2 border-gray-600 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer">
                         <span>Hide Unavailable</span>

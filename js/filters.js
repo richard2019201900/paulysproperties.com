@@ -1,21 +1,46 @@
 // ==================== FILTER & SORT ====================
-window.toggleHideUnavailable = function() {
-    const checkbox = $('hideUnavailable');
-    const hideUnavailable = checkbox.checked;
+
+// Central function to apply all active filters
+window.applyAllFilters = function() {
+    // Start with all properties
+    let filtered = [...properties];
     
-    // Apply type filter first
+    // Apply type filter
     const activeFilterBtn = document.querySelector('.filter-btn.active');
     const activeFilter = activeFilterBtn ? activeFilterBtn.textContent.toLowerCase() : 'all';
+    if (activeFilter !== 'all') {
+        // Map button text to property types
+        const typeMap = { 'houses': 'house', 'apartments': 'apartment', 'condos': 'condo', 'villas': 'villa' };
+        const filterType = typeMap[activeFilter] || activeFilter;
+        filtered = filtered.filter(p => p.type === filterType);
+    }
     
-    let filtered = activeFilter === 'all' ? [...properties] : properties.filter(p => p.type === activeFilter);
+    // Apply "My Properties" filter if checked
+    const showMyProperties = $('showMyProperties')?.checked;
+    if (showMyProperties && auth.currentUser) {
+        const userEmail = auth.currentUser.email.toLowerCase();
+        filtered = filtered.filter(p => {
+            const ownerEmail = propertyOwnerEmail[p.id];
+            return ownerEmail && ownerEmail.toLowerCase() === userEmail;
+        });
+    }
     
-    // Then apply unavailable filter if checked
+    // Apply "Hide Unavailable" filter if checked
+    const hideUnavailable = $('hideUnavailable')?.checked;
     if (hideUnavailable) {
         filtered = filtered.filter(p => state.availability[p.id] !== false);
     }
     
     state.filteredProperties = filtered;
     renderProperties(state.filteredProperties);
+};
+
+window.toggleHideUnavailable = function() {
+    applyAllFilters();
+};
+
+window.toggleMyProperties = function() {
+    applyAllFilters();
 };
 
 window.filterProperties = function(type, btn) {
@@ -26,16 +51,7 @@ window.filterProperties = function(type, btn) {
     btn.classList.remove('bg-gray-700', 'text-gray-200');
     btn.classList.add('active', 'gradient-bg', 'text-white');
     
-    let filtered = type === 'all' ? [...properties] : properties.filter(p => p.type === type);
-    
-    // Apply hide unavailable filter if checkbox is checked
-    const hideUnavailable = $('hideUnavailable')?.checked;
-    if (hideUnavailable) {
-        filtered = filtered.filter(p => state.availability[p.id] !== false);
-    }
-    
-    state.filteredProperties = filtered;
-    renderProperties(state.filteredProperties);
+    applyAllFilters();
 };
 
 window.sortProperties = function() {
@@ -53,6 +69,12 @@ window.sortProperties = function() {
 
 window.clearFilters = function() {
     ['searchType', 'searchInterior', 'searchPrice', 'sortBy'].forEach(id => $(id).value = '');
+    // Uncheck the filter checkboxes
+    const hideUnavailable = $('hideUnavailable');
+    const showMyProperties = $('showMyProperties');
+    if (hideUnavailable) hideUnavailable.checked = false;
+    if (showMyProperties) showMyProperties.checked = false;
+    
     document.querySelectorAll('.filter-btn').forEach((btn, i) => {
         toggleClass(btn, 'active', i === 0);
         toggleClass(btn, 'gradient-bg', i === 0);
