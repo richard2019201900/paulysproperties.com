@@ -685,6 +685,47 @@ window.logout = function() {
     auth.signOut().then(() => window.goHome()).catch(() => window.goHome());
 };
 
+// Force logout - used when user is deleted by admin
+window.forceLogout = function() {
+    console.log('[ForceLogout] User account deleted - forcing logout');
+    
+    // Clean up all listeners first (prevent further callbacks)
+    if (window.userNotificationUnsubscribe) {
+        window.userNotificationUnsubscribe();
+        window.userNotificationUnsubscribe = null;
+    }
+    if (window.upgradeRequestUnsubscribe) {
+        window.upgradeRequestUnsubscribe();
+        window.upgradeRequestUnsubscribe = null;
+    }
+    if (window.adminPollInterval) {
+        clearInterval(window.adminPollInterval);
+        window.adminPollInterval = null;
+    }
+    if (window.userTierUnsubscribe) {
+        window.userTierUnsubscribe();
+        window.userTierUnsubscribe = null;
+    }
+    
+    // Reset state
+    state.currentUser = null;
+    state.userTier = null;
+    window.lastKnownRequestCount = -1;
+    window.adminPendingRequests = [];
+    window.adminAlertShownForRequests = new Set();
+    
+    // Update UI
+    updateAuthButton(false);
+    dismissGlobalAlert();
+    
+    // Sign out and redirect
+    auth.signOut().then(() => {
+        window.location.href = '/';
+    }).catch(() => {
+        window.location.href = '/';
+    });
+};
+
 // ==================== CALCULATIONS ====================
 function getAvailableCount() {
     const ownerProps = getOwnerProperties();
@@ -3420,31 +3461,42 @@ window.startUserTierListener = function() {
     try {
         window.userTierUnsubscribe = db.collection('users').doc(user.uid)
             .onSnapshot((doc) => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    const newTier = data.tier || 'starter';
+                if (!doc.exists) {
+                    // User document was deleted - force logout
+                    console.log('[UserSync] User document deleted - forcing logout');
+                    alert('Your account has been deleted by an administrator. You will be logged out.');
+                    forceLogout();
+                    return;
+                }
+                
+                const data = doc.data();
+                const newTier = data.tier || 'starter';
+                
+                // Check if tier changed
+                if (state.userTier && state.userTier !== newTier) {
+                    console.log('[TierSync] Tier changed from', state.userTier, 'to', newTier);
                     
-                    // Check if tier changed
-                    if (state.userTier && state.userTier !== newTier) {
-                        console.log('[TierSync] Tier changed from', state.userTier, 'to', newTier);
-                        
-                        // Update state
-                        state.userTier = newTier;
-                        
-                        // Update tier badge in dashboard
-                        updateTierBadge(newTier, user.email);
-                        
-                        // Update navbar tier display
-                        updateNavTierDisplay(newTier);
-                        
-                        // Re-check pending requests (should disappear now)
-                        checkPendingUpgradeRequest(user.email);
-                    } else if (!state.userTier) {
-                        state.userTier = newTier;
-                    }
+                    // Update state
+                    state.userTier = newTier;
+                    
+                    // Update tier badge in dashboard
+                    updateTierBadge(newTier, user.email);
+                    
+                    // Update navbar tier display
+                    updateNavTierDisplay(newTier);
+                    
+                    // Re-check pending requests (should disappear now)
+                    checkPendingUpgradeRequest(user.email);
+                } else if (!state.userTier) {
+                    state.userTier = newTier;
                 }
             }, (error) => {
                 console.log('User tier listener error:', error.message);
+                // If permission denied, user may have been deleted
+                if (error.code === 'permission-denied') {
+                    console.log('[UserSync] Permission denied - user may have been deleted');
+                    forceLogout();
+                }
             });
     } catch (error) {
         console.error('Error setting up tier listener:', error);
