@@ -2237,7 +2237,9 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             let statusIcon = '📅';
             
             if (subLastPaid) {
-                const lastDate = new Date(subLastPaid);
+                // Parse date parts to avoid timezone shift
+                const [year, month, day] = subLastPaid.split('-').map(Number);
+                const lastDate = new Date(year, month - 1, day);
                 const nextDate = new Date(lastDate);
                 nextDate.setDate(nextDate.getDate() + 30); // 30 days from last payment
                 nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -2267,7 +2269,12 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             }
             
             const lastPaidDisplay = subLastPaid 
-                ? new Date(subLastPaid).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                ? (() => {
+                    // Parse date parts to avoid timezone shift
+                    const [year, month, day] = subLastPaid.split('-').map(Number);
+                    const localDate = new Date(year, month - 1, day);
+                    return localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })()
                 : 'Never';
             
             const dueDisplay = daysUntilDue !== null
@@ -2764,7 +2771,9 @@ window.checkSubscriptionAlerts = function() {
             return;
         }
         
-        const lastDate = new Date(subLastPaid);
+        // Parse date parts to avoid timezone shift
+        const [year, month, day] = subLastPaid.split('-').map(Number);
+        const lastDate = new Date(year, month - 1, day);
         const nextDate = new Date(lastDate);
         nextDate.setDate(nextDate.getDate() + 30); // 30 days from last payment
         
