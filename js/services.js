@@ -276,22 +276,47 @@ const PropertyDataService = {
     
     /**
      * READ: Fetch fresh property data from Firestore
-     * Never uses cached data - always hits the canonical datastore
+     * For user-created properties: reads from settings/properties
+     * For static properties: reads from propertyOverrides
      * @param {number} propertyId - The property ID to read
      * @returns {Promise<Object>} - Fresh property data for this property
      */
     async read(propertyId) {
         console.log(`[PropertyDataService] READ property ${propertyId}`);
+        
+        // Check if this is a user-created property
+        const prop = properties.find(p => p.id === propertyId);
+        const isUserCreated = prop && prop.ownerEmail;
+        
         try {
-            const doc = await db.collection(this.collectionName).doc(this.docName).get();
-            if (doc.exists) {
-                const allData = doc.data();
-                const propertyData = allData[String(propertyId)] || null;
-                console.log(`[PropertyDataService] READ success for property ${propertyId}:`, propertyData);
-                return { exists: propertyData !== null, data: propertyData };
+            if (isUserCreated) {
+                // User-created property: read from settings/properties
+                const doc = await db.collection('settings').doc('properties').get();
+                if (doc.exists) {
+                    const allData = doc.data();
+                    const propertyData = allData[String(propertyId)] || null;
+                    console.log(`[PropertyDataService] READ user property ${propertyId}:`, propertyData);
+                    
+                    // Update local property object with fresh data
+                    if (propertyData && prop) {
+                        Object.assign(prop, propertyData);
+                    }
+                    
+                    return { exists: propertyData !== null, data: propertyData };
+                }
+                return { exists: false, data: null };
+            } else {
+                // Static property: read from propertyOverrides
+                const doc = await db.collection(this.collectionName).doc(this.docName).get();
+                if (doc.exists) {
+                    const allData = doc.data();
+                    const propertyData = allData[String(propertyId)] || null;
+                    console.log(`[PropertyDataService] READ static property ${propertyId}:`, propertyData);
+                    return { exists: propertyData !== null, data: propertyData };
+                }
+                console.log(`[PropertyDataService] READ: No overrides document exists yet`);
+                return { exists: false, data: null };
             }
-            console.log(`[PropertyDataService] READ: No overrides document exists yet`);
-            return { exists: false, data: null };
         } catch (error) {
             console.error(`[PropertyDataService] READ error:`, error);
             throw error;
@@ -338,19 +363,21 @@ const PropertyDataService = {
         try {
             if (isUserCreated) {
                 // USER-CREATED PROPERTY: Write directly to settings/properties
-                // This is the single source of truth for user-created properties
+                // Use update() with dot notation for proper nested field updates
                 const updateData = {
                     [`${propertyId}.${field}`]: value,
                     [`${propertyId}.updatedAt`]: firebase.firestore.FieldValue.serverTimestamp(),
                     [`${propertyId}.updatedBy`]: auth.currentUser?.email || 'unknown'
                 };
                 
-                await db.collection('settings').doc('properties').set(updateData, { merge: true });
+                // Use update() - it properly interprets dot notation as field paths
+                await db.collection('settings').doc('properties').update(updateData);
                 console.log(`[PropertyDataService] WRITE to properties doc success`);
                 
                 // Update local property object directly
                 if (prop) {
                     prop[field] = value;
+                    console.log(`[PropertyDataService] Local prop updated: ${field} = ${value}`);
                 }
             } else {
                 // STATIC PROPERTY: Write to propertyOverrides (existing behavior)
