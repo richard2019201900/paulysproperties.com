@@ -460,6 +460,7 @@ window.updateTierBadge = function(tier, email) {
     const listingsEl = $('tierListings');
     const badgeEl = $('userTierBadge');
     const upgradeBtn = $('tierUpgradeBtn');
+    const pendingBadge = $('tierPendingBadge');
     
     if (isMasterAdmin) {
         // Master admin gets special display
@@ -467,6 +468,7 @@ window.updateTierBadge = function(tier, email) {
         if (nameEl) nameEl.textContent = 'Owner';
         if (listingsEl) listingsEl.textContent = `${listingCount}/∞ Listings`;
         if (upgradeBtn) hideElement(upgradeBtn);
+        if (pendingBadge) hideElement(pendingBadge);
         
         if (badgeEl) {
             badgeEl.className = badgeEl.className.replace(/border-\w+-\d+/g, '');
@@ -500,6 +502,9 @@ window.updateTierBadge = function(tier, email) {
                 badgeEl.classList.add('border-gray-600');
             }
         }
+        
+        // Check for pending upgrade request
+        checkPendingUpgradeRequest(email);
     }
     
     // Show/hide admin section
@@ -1282,6 +1287,9 @@ window.copyUpgradeMessage = async function() {
         btn.innerHTML = '✓ Sent & Copied!';
         btn.className = btn.className.replace('from-blue-500 to-blue-600', 'from-green-500 to-green-600');
         
+        // Refresh pending indicator
+        checkPendingUpgradeRequest(user.email);
+        
         setTimeout(() => {
             closeModal('upgradeModal');
             btn.innerHTML = '🔔 Notify & Copy';
@@ -1304,6 +1312,61 @@ window.copyUpgradeMessage = async function() {
         showElement(status);
         btn.innerHTML = '🔔 Notify & Copy Message';
         btn.disabled = false;
+    }
+};
+
+// Check for pending upgrade request and show indicator
+window.checkPendingUpgradeRequest = async function(email) {
+    const pendingBadge = $('tierPendingBadge');
+    const pendingBanner = $('pendingUpgradeUserBanner');
+    const pendingMessage = $('pendingUpgradeUserMessage');
+    const pendingDate = $('pendingUpgradeUserDate');
+    const upgradeBtn = $('tierUpgradeBtn');
+    
+    if (!email) return;
+    
+    try {
+        const snapshot = await db.collection('upgradeNotifications')
+            .where('userEmail', '==', email.toLowerCase())
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+        
+        if (snapshot.empty) {
+            // No pending request
+            if (pendingBadge) hideElement(pendingBadge);
+            if (pendingBanner) hideElement(pendingBanner);
+            return;
+        }
+        
+        // There's a pending request
+        const request = snapshot.docs[0].data();
+        const currentTierData = TIERS[request.currentTier] || TIERS.starter;
+        const requestedTierData = TIERS[request.requestedTier] || TIERS.pro;
+        const requestDate = request.createdAt?.toDate ? request.createdAt.toDate().toLocaleString() : 'Recently';
+        
+        // Show pending badge
+        if (pendingBadge) showElement(pendingBadge);
+        
+        // Hide upgrade button while request is pending
+        if (upgradeBtn) hideElement(upgradeBtn);
+        
+        // Show pending banner
+        if (pendingBanner) {
+            showElement(pendingBanner);
+            if (pendingMessage) {
+                pendingMessage.innerHTML = `You've requested to upgrade from <span class="font-bold ${currentTierData.color}">${currentTierData.icon} ${currentTierData.name}</span> to <span class="font-bold ${requestedTierData.color}">${requestedTierData.icon} ${requestedTierData.name}</span>. Waiting for owner approval.`;
+            }
+            if (pendingDate) {
+                pendingDate.textContent = `Submitted: ${requestDate}`;
+            }
+        }
+        
+    } catch (error) {
+        console.log('Could not check pending upgrade request:', error.message);
+        // Hide indicators on error
+        if (pendingBadge) hideElement(pendingBadge);
+        if (pendingBanner) hideElement(pendingBanner);
     }
 };
 
