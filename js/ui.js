@@ -665,10 +665,16 @@ window.logout = function() {
         window.upgradeRequestUnsubscribe();
         window.upgradeRequestUnsubscribe = null;
     }
+    // Clean up user tier listener
+    if (window.userTierUnsubscribe) {
+        window.userTierUnsubscribe();
+        window.userTierUnsubscribe = null;
+    }
     // Hide global alert
     dismissGlobalAlert();
     // Reset request count
-    window.lastKnownRequestCount = 0;
+    window.lastKnownRequestCount = -1;
+    window.adminPendingRequests = [];
     
     auth.signOut().then(() => window.goHome()).catch(() => window.goHome());
 };
@@ -1654,7 +1660,8 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
 
 // Store upgrade request listener unsubscribe function
 window.upgradeRequestUnsubscribe = null;
-window.lastKnownRequestCount = 0;
+window.lastKnownRequestCount = -1; // Start at -1 so first load doesn't trigger alert
+window.adminPendingRequests = []; // Store pending requests globally
 
 // Load pending requests with real-time listener (for admin)
 window.loadPendingUpgradeRequests = function() {
@@ -1672,20 +1679,39 @@ window.loadPendingUpgradeRequests = function() {
             .where('status', '==', 'pending')
             .onSnapshot((snapshot) => {
                 const count = snapshot.size;
+                
+                // Store all pending requests for user list display
+                const pendingRequests = [];
+                snapshot.forEach(doc => {
+                    pendingRequests.push({ id: doc.id, ...doc.data() });
+                });
+                window.adminPendingRequests = pendingRequests;
+                
+                // Update the badge count
                 updateRequestsBadge(count);
                 
-                // Check if there are NEW requests (count increased)
-                if (count > window.lastKnownRequestCount && window.lastKnownRequestCount >= 0) {
-                    // Get the newest request to show in alert
+                // Refresh user list if it's visible to show/hide pending indicators
+                if (window.adminUsersData && window.adminUsersData.length > 0) {
+                    const searchTerm = ($('adminUserSearch')?.value || '').toLowerCase();
+                    const filtered = searchTerm 
+                        ? window.adminUsersData.filter(user => 
+                            user.email.toLowerCase().includes(searchTerm) ||
+                            (user.username || '').toLowerCase().includes(searchTerm))
+                        : window.adminUsersData;
+                    renderAdminUsersList(filtered, pendingRequests);
+                }
+                
+                // Check if there are NEW requests (count increased from known count)
+                if (window.lastKnownRequestCount >= 0 && count > window.lastKnownRequestCount) {
+                    // Find the newest request
                     let newestRequest = null;
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        if (!newestRequest || (data.createdAt && newestRequest.createdAt && data.createdAt > newestRequest.createdAt)) {
-                            newestRequest = data;
+                    pendingRequests.forEach(req => {
+                        if (!newestRequest || (req.createdAt && newestRequest.createdAt && req.createdAt > newestRequest.createdAt)) {
+                            newestRequest = req;
                         }
                     });
                     
-                    if (newestRequest && window.lastKnownRequestCount > 0) {
+                    if (newestRequest) {
                         // Show global alert for new request
                         showGlobalAlert(
                             '🔔 New Upgrade Request!',
@@ -1864,13 +1890,21 @@ window.loadAllUsers = async function() {
     }
 };
 
-window.renderAdminUsersList = function(users) {
+window.renderAdminUsersList = function(users, pendingRequests = null) {
     const container = $('allUsersList');
     if (!container) return;
+    
+    // Use stored pending requests if not provided
+    const pending = pendingRequests || window.adminPendingRequests || [];
+    const pendingEmails = pending.map(r => r.userEmail?.toLowerCase());
     
     container.innerHTML = users.map(user => {
         // Check if this user is the master admin
         const isUserMasterAdmin = TierService.isMasterAdmin(user.email);
+        
+        // Check if user has pending upgrade request
+        const hasPendingRequest = pendingEmails.includes(user.email?.toLowerCase());
+        const pendingRequest = pending.find(r => r.userEmail?.toLowerCase() === user.email?.toLowerCase());
         
         // Use Admin tier display for master admin, otherwise use their actual tier
         const tierData = isUserMasterAdmin 
@@ -1905,6 +1939,13 @@ window.renderAdminUsersList = function(users) {
             }).join('')
             : '<p class="text-gray-500 text-xs italic">No properties listed</p>';
         
+        // Pending upgrade badge
+        const pendingBadge = hasPendingRequest ? `
+            <span class="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse ml-2">
+                💰 WANTS ${(TIERS[pendingRequest?.requestedTier]?.name || 'Upgrade').toUpperCase()}
+            </span>
+        ` : '';
+        
         // Don't show action buttons for master admin
         const actionButtons = isUserMasterAdmin ? '' : `
             <div class="flex flex-wrap gap-2">
@@ -1937,14 +1978,19 @@ window.renderAdminUsersList = function(users) {
             </div>
         `;
         
+        // Card border styling - highlight users with pending requests
+        const cardBorder = hasPendingRequest 
+            ? 'border-orange-500 ring-2 ring-orange-500/50 animate-pulse'
+            : (isUserMasterAdmin ? 'border-red-600/50' : 'border-gray-700');
+        
         return `
-            <div class="bg-gray-800 rounded-xl p-4 border ${isUserMasterAdmin ? 'border-red-600/50' : 'border-gray-700'} admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
+            <div class="bg-gray-800 rounded-xl p-4 border ${cardBorder} admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-3 mb-2">
                             <span class="text-2xl">${tierData.icon}</span>
                             <div>
-                                <div class="text-white font-bold">${displayName}</div>
+                                <div class="text-white font-bold flex items-center flex-wrap">${displayName}${pendingBadge}</div>
                                 <div class="text-gray-500 text-xs">${user.email}</div>
                             </div>
                         </div>
@@ -3121,6 +3167,9 @@ window.loadUserNotifications = async function() {
     const user = auth.currentUser;
     if (!user) return;
     
+    // Start tier listener for real-time tier updates
+    startUserTierListener();
+    
     const banner = $('userNotificationsBanner');
     const container = $('userNotificationsContainer');
     if (!banner || !container) return;
@@ -3147,6 +3196,15 @@ window.loadUserNotifications = async function() {
                 snapshot.forEach(doc => {
                     notifications.push({ id: doc.id, ...doc.data() });
                 });
+                
+                // Check for upgrade-related notifications to refresh pending status
+                const hasUpgradeNotification = notifications.some(n => 
+                    n.type === 'upgrade_approved' || n.type === 'upgrade_denied'
+                );
+                if (hasUpgradeNotification) {
+                    // Refresh pending upgrade request status
+                    checkPendingUpgradeRequest(user.email);
+                }
                 
                 // Sort by createdAt descending (client-side to avoid index requirement)
                 notifications.sort((a, b) => {
@@ -3225,5 +3283,74 @@ window.dismissNotification = async function(notificationId) {
         
     } catch (error) {
         console.error('Error dismissing notification:', error);
+    }
+};
+
+// ==================== USER TIER REAL-TIME SYNC ====================
+window.userTierUnsubscribe = null;
+
+window.startUserTierListener = function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    // Don't listen for master admin
+    if (TierService.isMasterAdmin(user.email)) return;
+    
+    // Unsubscribe from previous listener
+    if (window.userTierUnsubscribe) {
+        window.userTierUnsubscribe();
+        window.userTierUnsubscribe = null;
+    }
+    
+    try {
+        window.userTierUnsubscribe = db.collection('users').doc(user.uid)
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const newTier = data.tier || 'starter';
+                    
+                    // Check if tier changed
+                    if (state.userTier && state.userTier !== newTier) {
+                        console.log('[TierSync] Tier changed from', state.userTier, 'to', newTier);
+                        
+                        // Update state
+                        state.userTier = newTier;
+                        
+                        // Update tier badge in dashboard
+                        updateTierBadge(newTier, user.email);
+                        
+                        // Update navbar tier display
+                        updateNavTierDisplay(newTier);
+                        
+                        // Re-check pending requests (should disappear now)
+                        checkPendingUpgradeRequest(user.email);
+                    } else if (!state.userTier) {
+                        state.userTier = newTier;
+                    }
+                }
+            }, (error) => {
+                console.log('User tier listener error:', error.message);
+            });
+    } catch (error) {
+        console.error('Error setting up tier listener:', error);
+    }
+};
+
+// Update navbar tier display
+window.updateNavTierDisplay = function(tier) {
+    const navTierEl = $('navUserTier');
+    if (!navTierEl) return;
+    
+    const tierData = TIERS[tier] || TIERS.starter;
+    navTierEl.innerHTML = `${tierData.icon} ${tierData.name}`;
+    
+    // Update color classes
+    navTierEl.className = 'text-xs';
+    if (tier === 'pro') {
+        navTierEl.classList.add('text-yellow-400');
+    } else if (tier === 'elite') {
+        navTierEl.classList.add('text-purple-400');
+    } else {
+        navTierEl.classList.add('text-gray-400');
     }
 };
