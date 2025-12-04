@@ -1678,15 +1678,113 @@ window.syncOwnerNameEverywhere = function(email, newName) {
 };
 
 window.adminDeleteUser = async function(userId, email) {
-    if (!confirm(`⚠️ DELETE USER: ${email}\n\nThis will remove their account. Their properties will remain but become unassigned.\n\nContinue?`)) return;
+    // Get user's properties
+    const userPropertyIds = ownerPropertyMap[email.toLowerCase()] || [];
+    const userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+    const propertyCount = userProperties.length;
+    
+    // Build confirmation message
+    let message = `⚠️ DELETE USER: ${email}\n\n`;
+    
+    if (propertyCount > 0) {
+        message += `This user has ${propertyCount} propert${propertyCount > 1 ? 'ies' : 'y'}:\n`;
+        userProperties.slice(0, 5).forEach((p, i) => {
+            message += `  ${i + 1}. ${p.title}\n`;
+        });
+        if (propertyCount > 5) {
+            message += `  ... and ${propertyCount - 5} more\n`;
+        }
+        message += `\nWhat would you like to do with their properties?\n\n`;
+        message += `Click OK to DELETE properties too\n`;
+        message += `Click Cancel to keep properties (unassigned)`;
+    } else {
+        message += `This user has no properties.\n\nContinue with deletion?`;
+    }
+    
+    const deleteProperties = propertyCount > 0 ? confirm(message) : null;
+    
+    // If they clicked Cancel on property question, ask if they still want to delete user
+    if (propertyCount > 0 && !deleteProperties) {
+        if (!confirm(`Delete ${email} but KEEP their ${propertyCount} properties unassigned?\n\nClick OK to continue, Cancel to abort.`)) {
+            return;
+        }
+    } else if (propertyCount === 0) {
+        if (!confirm(message)) return;
+    }
     
     try {
+        // Delete properties if requested
+        if (deleteProperties && propertyCount > 0) {
+            for (const prop of userProperties) {
+                await deletePropertyCompletely(prop.id, email);
+            }
+            console.log(`[Admin] Deleted ${propertyCount} properties for ${email}`);
+        }
+        
+        // Delete user document from Firestore
         await db.collection('users').doc(userId).delete();
-        alert(`User ${email} deleted.`);
+        
+        // Remove from ownerPropertyMap
+        delete ownerPropertyMap[email.toLowerCase()];
+        
+        const resultMsg = deleteProperties && propertyCount > 0
+            ? `User ${email} and their ${propertyCount} properties deleted.`
+            : `User ${email} deleted.${propertyCount > 0 ? ` Their ${propertyCount} properties are now unassigned.` : ''}`;
+        
+        alert(resultMsg);
         loadAllUsers();
+        
     } catch (error) {
         console.error('Error deleting user:', error);
         alert('Error deleting user: ' + error.message);
+    }
+};
+
+// Helper to completely delete a property
+window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
+    try {
+        // Remove from properties array
+        const index = properties.findIndex(p => p.id === propertyId);
+        if (index !== -1) {
+            properties.splice(index, 1);
+        }
+        
+        // Remove from Firestore properties collection
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        if (propsDoc.exists) {
+            const propsData = propsDoc.data();
+            if (propsData[propertyId]) {
+                delete propsData[propertyId];
+                await db.collection('settings').doc('properties').set(propsData);
+            }
+        }
+        
+        // Remove availability entry
+        const availDoc = await db.collection('settings').doc('propertyAvailability').get();
+        if (availDoc.exists) {
+            const availData = availDoc.data();
+            if (availData[propertyId] !== undefined) {
+                delete availData[propertyId];
+                await db.collection('settings').doc('propertyAvailability').set(availData);
+            }
+        }
+        
+        // Remove from state
+        delete state.availability[propertyId];
+        
+        // Remove from owner map
+        if (ownerEmail) {
+            const lowerEmail = ownerEmail.toLowerCase();
+            if (ownerPropertyMap[lowerEmail]) {
+                ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== propertyId);
+            }
+        }
+        
+        console.log(`[Admin] Property ${propertyId} deleted completely`);
+        return true;
+    } catch (error) {
+        console.error(`Error deleting property ${propertyId}:`, error);
+        throw error;
     }
 };
 
