@@ -440,14 +440,14 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden">+ New Listing</button>
-                    <!-- Logged-in user display -->
+                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg">Register / Sign In</button>
+                    <!-- Logged-in user display (after logout button) -->
                     <div id="navUserDisplay" class="hidden items-center gap-2">
                         <div class="text-right">
                             <div id="navUserName" class="text-white font-semibold text-sm"></div>
                             <div id="navUserTier" class="text-xs text-gray-400"></div>
                         </div>
                     </div>
-                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg">Register / Sign In</button>
                     <button id="menuBtn" class="md:hidden text-gray-300" aria-label="Toggle menu">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                     </button>
