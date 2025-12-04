@@ -115,6 +115,40 @@
         </div>
     </div>
 
+    <!-- Profile Completion Overlay (blocks navigation until complete) -->
+    <div id="profileCompletionOverlay" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 border-2 border-yellow-500/50">
+            <div class="text-center mb-6">
+                <div class="text-5xl mb-4">⚠️</div>
+                <h2 class="text-2xl font-black text-yellow-400 mb-2">Complete Your Profile</h2>
+                <p class="text-gray-300">Before you can browse the site, please complete your profile settings. This information is required so renters can contact you about your properties.</p>
+            </div>
+            
+            <div class="bg-gray-800/50 rounded-xl p-4 mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div id="profileCheckName" class="w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs">
+                        <span class="text-gray-500">✗</span>
+                    </div>
+                    <span class="text-gray-300">Display Name</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="profileCheckPhone" class="w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs">
+                        <span class="text-gray-500">✗</span>
+                    </div>
+                    <span class="text-gray-300">In-City Phone Number</span>
+                </div>
+            </div>
+            
+            <p class="text-sm text-gray-400 text-center mb-4">
+                👆 Scroll up to "Your Profile Settings" and fill in both fields, then click Save for each.
+            </p>
+            
+            <button onclick="scrollToProfileSettings()" class="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                ↑ Go to Profile Settings
+            </button>
+        </div>
+    </div>
+
     <!-- Reassign Property Modal (Admin Only) -->
     <div id="reassignModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
         <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-purple-700/50">

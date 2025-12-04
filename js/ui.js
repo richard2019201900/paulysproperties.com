@@ -209,6 +209,11 @@ window.backToDashboard = function() {
 };
 
 window.goHome = function() {
+    // Block navigation if profile is incomplete
+    if (!canNavigateAway()) {
+        showProfileCompletionOverlay();
+        return;
+    }
     hideElement($('ownerDashboard'));
     hideElement($('propertyDetailPage'));
     hideElement($('propertyStatsPage'));
@@ -217,6 +222,11 @@ window.goHome = function() {
 };
 
 window.navigateTo = function(section) {
+    // Block navigation if profile is incomplete
+    if (!canNavigateAway()) {
+        showProfileCompletionOverlay();
+        return;
+    }
     hideElement($('mobileMenu'));
     hideElement($('ownerDashboard'));
     hideElement($('propertyDetailPage'));
@@ -324,25 +334,114 @@ window.loadUsername = async function() {
     try {
         const doc = await db.collection('users').doc(user.uid).get();
         if (doc.exists) {
-            if (doc.data().username) {
-                $('ownerUsername').value = doc.data().username;
+            const data = doc.data();
+            if (data.username) {
+                $('ownerUsername').value = data.username;
                 // Pre-populate cache for this user
                 window.ownerUsernameCache = window.ownerUsernameCache || {};
-                window.ownerUsernameCache[user.email.toLowerCase()] = doc.data().username;
+                window.ownerUsernameCache[user.email.toLowerCase()] = data.username;
             }
-            if (doc.data().phone) {
+            if (data.phone) {
                 // Sanitize phone - remove all non-digits
-                $('ownerPhone').value = doc.data().phone.replace(/\D/g, '');
+                $('ownerPhone').value = data.phone.replace(/\D/g, '');
             }
             
             // Update tier badge
-            const tier = doc.data().tier || 'starter';
+            const tier = data.tier || 'starter';
             updateTierBadge(tier, user.email);
+            
+            // Check profile completion (skip for master owner)
+            if (!TierService.isMasterAdmin(user.email)) {
+                checkProfileCompletion(data.username, data.phone);
+            }
+        } else {
+            // New user with no document - show profile completion
+            if (!TierService.isMasterAdmin(user.email)) {
+                checkProfileCompletion(null, null);
+            }
         }
     } catch (error) {
         console.error('Error loading user settings:', error);
     }
 }
+
+// ==================== PROFILE COMPLETION CHECK ====================
+window.isProfileComplete = false;
+
+window.checkProfileCompletion = function(username, phone) {
+    const hasUsername = username && username.trim().length > 0;
+    const hasPhone = phone && phone.replace(/\D/g, '').length > 0;
+    
+    window.isProfileComplete = hasUsername && hasPhone;
+    
+    // Update checkmarks in overlay
+    const nameCheck = $('profileCheckName');
+    const phoneCheck = $('profileCheckPhone');
+    
+    if (nameCheck) {
+        if (hasUsername) {
+            nameCheck.className = 'w-6 h-6 rounded-full border-2 border-green-500 bg-green-500 flex items-center justify-center text-xs';
+            nameCheck.innerHTML = '<span class="text-white">✓</span>';
+        } else {
+            nameCheck.className = 'w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs';
+            nameCheck.innerHTML = '<span class="text-gray-500">✗</span>';
+        }
+    }
+    
+    if (phoneCheck) {
+        if (hasPhone) {
+            phoneCheck.className = 'w-6 h-6 rounded-full border-2 border-green-500 bg-green-500 flex items-center justify-center text-xs';
+            phoneCheck.innerHTML = '<span class="text-white">✓</span>';
+        } else {
+            phoneCheck.className = 'w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs';
+            phoneCheck.innerHTML = '<span class="text-gray-500">✗</span>';
+        }
+    }
+    
+    if (!window.isProfileComplete) {
+        showProfileCompletionOverlay();
+    } else {
+        hideProfileCompletionOverlay();
+    }
+}
+
+window.showProfileCompletionOverlay = function() {
+    let overlay = $('profileCompletionOverlay');
+    if (overlay) {
+        showElement(overlay);
+    }
+}
+
+window.hideProfileCompletionOverlay = function() {
+    let overlay = $('profileCompletionOverlay');
+    if (overlay) {
+        hideElement(overlay);
+    }
+}
+
+window.scrollToProfileSettings = function() {
+    hideProfileCompletionOverlay();
+    const profileSection = $('ownerUsername')?.closest('.glass-effect');
+    if (profileSection) {
+        profileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Flash the profile section to draw attention
+        profileSection.classList.add('ring-2', 'ring-yellow-500');
+        setTimeout(() => {
+            profileSection.classList.remove('ring-2', 'ring-yellow-500');
+        }, 3000);
+    } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+// Check if navigation should be blocked
+window.canNavigateAway = function() {
+    const user = auth.currentUser;
+    if (!user) return true; // Not logged in, can navigate
+    if (TierService.isMasterAdmin(user.email)) return true; // Owner can always navigate
+    return window.isProfileComplete;
+}
+
 
 window.updateTierBadge = function(tier, email) {
     const isMasterAdmin = TierService.isMasterAdmin(email);
@@ -447,6 +546,10 @@ window.saveUsername = async function() {
             }
         }
         
+        // Re-check profile completion
+        const phone = $('ownerPhone')?.value?.replace(/\D/g, '') || '';
+        checkProfileCompletion(username, phone);
+        
         setTimeout(() => hideElement(status), 3000);
     } catch (error) {
         console.error('Error saving username:', error);
@@ -490,6 +593,10 @@ window.saveOwnerPhone = async function() {
         status.textContent = 'Phone number saved successfully!';
         status.className = 'text-green-400 text-sm mt-3';
         showElement(status);
+        
+        // Re-check profile completion
+        const username = $('ownerUsername')?.value?.trim() || '';
+        checkProfileCompletion(username, phone);
         
         setTimeout(() => hideElement(status), 3000);
     } catch (error) {
@@ -2356,6 +2463,12 @@ window.openCreateListingModal = async function() {
     const user = auth.currentUser;
     if (!user) {
         alert('Please sign in to create a listing.');
+        return;
+    }
+    
+    // Check profile completion first (skip for master owner)
+    if (!TierService.isMasterAdmin(user.email) && !window.isProfileComplete) {
+        showProfileCompletionOverlay();
         return;
     }
     
