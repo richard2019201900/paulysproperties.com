@@ -761,7 +761,6 @@ function renderOwnerDashboard() {
         }
         
         const lastPaidDisplay = lastPaymentDate ? formatDate(lastPaymentDate, { month: 'short', day: 'numeric' }) : '-';
-        const isRented = state.availability[p.id] === false;
         
         // Store reminder for this property
         if (reminderScript) {
@@ -771,15 +770,12 @@ function renderOwnerDashboard() {
         
         return `
         <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'} hover:bg-gray-700/30 transition">
-            <td class="px-2 md:px-3 py-3 text-center text-gray-400 font-bold text-lg border-r border-gray-700" rowspan="${isRented ? '2' : '1'}">${index + 1}</td>
+            <td class="px-2 md:px-3 py-3 text-center text-gray-400 font-bold text-lg border-r border-gray-700" rowspan="2">${index + 1}</td>
             <td class="px-4 md:px-6 py-3 border-r border-gray-700/50"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
             <td class="px-4 md:px-6 py-3 border-r border-gray-700/50">
                 <span class="property-name-link font-bold text-gray-200" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
             </td>
             <td class="px-4 md:px-6 py-3 text-gray-300 capitalize hidden md:table-cell border-r border-gray-700/50">${p.type}</td>
-            <td class="px-4 md:px-6 py-3 hidden lg:table-cell border-r border-gray-700/50">
-                ${dueDateDisplay || '<span class="text-gray-500">-</span>'}
-            </td>
             <td class="px-4 md:px-6 py-3 text-gray-300 hidden lg:table-cell editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
                 <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
             </td>
@@ -798,15 +794,14 @@ function renderOwnerDashboard() {
             <td class="px-4 md:px-6 py-3 text-purple-400 font-bold editable-cell border-r border-gray-700/50" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
                 <span class="cell-value">${monthlyPrice.toLocaleString()}</span>
             </td>
-            <td class="px-2 md:px-3 py-3 text-center" rowspan="${isRented ? '2' : '1'}">
+            <td class="px-2 md:px-3 py-3 text-center" rowspan="2">
                 <button onclick="confirmDeleteProperty(${p.id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded-lg transition" title="Delete property">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 </button>
             </td>
         </tr>
-        ${isRented ? `
         <tr class="border-b-2 ${index % 2 === 0 ? 'border-purple-700/50 bg-gray-800/40' : 'border-blue-700/50 bg-gray-900/40'}">
-            <td colspan="10" class="px-4 md:px-6 py-2">
+            <td colspan="9" class="px-4 md:px-6 py-2">
                 <div class="flex flex-wrap items-center text-sm gap-x-8 gap-y-2">
                     <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-600/30 px-2 py-1 rounded-lg min-w-[180px]" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
                         <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
@@ -841,7 +836,6 @@ function renderOwnerDashboard() {
                 </div>
             </td>
         </tr>
-        ` : ''}
     `;
     }).join('');
 }
@@ -948,6 +942,16 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
     
     try {
         await PropertyDataService.write(propertyId, field, newValue);
+        
+        // Auto-flip to "rented" when setting renter name or phone
+        if ((field === 'renterName' || field === 'renterPhone') && newValue) {
+            if (state.availability[propertyId] !== false) {
+                // Property is currently available, flip to rented
+                state.availability[propertyId] = false;
+                await PropertyDataService.write(propertyId, 'isAvailable', false);
+                console.log(`Auto-flipped property ${propertyId} to rented (renter info set)`);
+            }
+        }
         
         // Re-render dashboard to show updated values
         renderOwnerDashboard();

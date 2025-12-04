@@ -812,6 +812,16 @@ window.saveTileEdit = async function(field, propertyId, type) {
         // CRITICAL: Write to Firestore (includes fresh read before write)
         await PropertyDataService.write(propertyId, field, newValue);
         
+        // Auto-flip to "rented" when setting renter name or phone
+        if ((field === 'renterName' || field === 'renterPhone') && newValue) {
+            if (state.availability[propertyId] !== false) {
+                // Property is currently available, flip to rented
+                state.availability[propertyId] = false;
+                await PropertyDataService.write(propertyId, 'isAvailable', false);
+                console.log(`Auto-flipped property ${propertyId} to rented (renter info set)`);
+            }
+        }
+        
         // If payment frequency changed to weekly, auto-adjust monthly price
         if (field === 'paymentFrequency' && newValue === 'weekly') {
             const p = properties.find(prop => prop.id === propertyId);
