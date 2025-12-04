@@ -87,12 +87,32 @@ async function getPropertyOwnerWithTier(propertyId) {
     const email = getPropertyOwnerEmail(propertyId);
     const username = await getUsernameByEmail(email);
     
+    // Handle unassigned properties
+    if (username === 'Unassigned' || !email) {
+        return {
+            username: 'Unassigned',
+            tier: null,
+            tierData: null,
+            display: '🚫 Unassigned'
+        };
+    }
+    
     // Get tier from user doc
     let tier = 'starter';
     try {
         const snapshot = await db.collection('users').where('email', '==', email).get();
         if (!snapshot.empty) {
-            tier = snapshot.docs[0].data().tier || 'starter';
+            const userData = snapshot.docs[0].data();
+            tier = userData.tier || 'starter';
+            // Check if master admin
+            if (TierService.isMasterAdmin(email)) {
+                return {
+                    username,
+                    tier: 'admin',
+                    tierData: { icon: '👑', name: 'Admin' },
+                    display: `👑 ${username}`
+                };
+            }
         }
     } catch (error) {
         console.error('[getPropertyOwnerWithTier] Error:', error);

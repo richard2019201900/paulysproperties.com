@@ -992,7 +992,7 @@ async function renderProperties(list) {
                 </div>
                 <p class="text-gray-300 mb-2 font-medium text-sm md:text-base">Location: ${sanitize(p.location)}</p>
                 <p class="text-xs md:text-sm text-gray-400 mb-2 font-semibold">Interior: ${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</p>
-                <p id="owner-${p.id}" class="text-xs md:text-sm text-blue-400 mb-4 font-semibold">Owner: Loading...</p>
+                <p id="owner-${p.id}" class="text-xs md:text-sm text-blue-400 mb-4 font-semibold">👤 Owner: Loading...</p>
                 <div class="grid grid-cols-3 gap-2 mb-4 text-xs md:text-sm text-gray-300 font-semibold">
                     <div>${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)} Beds</div>
                     <div>${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)} Baths</div>
@@ -1008,12 +1008,12 @@ async function renderProperties(list) {
         </article>`;
     }).join('');
     
-    // Then fetch and update owner names asynchronously
+    // Then fetch and update owner names with tier icons asynchronously
     for (const p of list) {
-        const username = await getPropertyOwnerUsername(p.id);
+        const ownerInfo = await getPropertyOwnerWithTier(p.id);
         const ownerEl = $(`owner-${p.id}`);
         if (ownerEl) {
-            ownerEl.textContent = `Owner: ${username}`;
+            ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display}`;
         }
     }
 }
