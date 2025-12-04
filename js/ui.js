@@ -3169,6 +3169,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderProperties(state.filteredProperties);
                 renderOwnerDashboard();
                 
+                // Update tier badge to reflect new listing count
+                updateTierBadge(state.userTier || 'starter', ownerEmail);
+                
                 successDiv.textContent = '✓ Listing created successfully!';
                 showElement(successDiv);
                 
@@ -3290,6 +3293,10 @@ window.executeDeleteProperty = async function() {
         // Re-render
         renderProperties(state.filteredProperties);
         renderOwnerDashboard();
+        
+        // Update tier badge to reflect new listing count
+        const currentEmail = (auth.currentUser?.email || '').toLowerCase();
+        updateTierBadge(state.userTier || 'starter', currentEmail);
         
         // Close modal and go to dashboard
         closeModal('deleteConfirmModal');
