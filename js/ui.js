@@ -1997,6 +1997,12 @@ window.handleGlobalAlertClick = function() {
         setTimeout(() => {
             switchAdminTab('requests');
         }, 100);
+    } else if (navigateTo === 'users') {
+        // Navigate to dashboard and open users tab
+        goToDashboard();
+        setTimeout(() => {
+            switchAdminTab('users');
+        }, 100);
     }
     
     dismissGlobalAlert();
@@ -2374,22 +2380,34 @@ window.editSubscriptionDate = function(userId, email, currentDate) {
     
     // Create inline date picker
     const today = new Date().toISOString().split('T')[0];
+    const escapedEmail = email.replace(/'/g, "\\'");
     lastPaidSpan.innerHTML = `
         <input type="date" 
                id="subDatePicker_${userId}" 
                value="${currentDate || today}"
                max="${today}"
-               class="bg-gray-700 text-white px-2 py-1 rounded border border-cyan-500 text-xs"
-               onchange="saveSubscriptionDate('${userId}', '${email}', this.value)"
-               onblur="this.parentElement.innerHTML = this.value ? new Date(this.value).toLocaleDateString('en-US', {month:'short',day:'numeric'}) + ' ✏️' : 'Never ✏️'">
+               class="bg-gray-700 text-white px-2 py-1 rounded border border-cyan-500 text-xs">
+        <button onclick="confirmSubscriptionDate('${userId}', '${escapedEmail}')" 
+                class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs ml-1">✓</button>
+        <button onclick="loadAllUsers()" 
+                class="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs">✗</button>
     `;
     
-    // Focus and open the date picker
+    // Focus the date picker
     const input = $(`subDatePicker_${userId}`);
     if (input) {
         input.focus();
         input.showPicker?.(); // Opens the native date picker if supported
     }
+};
+
+// Confirm and save the subscription date
+window.confirmSubscriptionDate = async function(userId, email) {
+    const input = $(`subDatePicker_${userId}`);
+    if (!input) return;
+    
+    const date = input.value;
+    await saveSubscriptionDate(userId, email, date);
 };
 
 // Save subscription date to Firestore
@@ -2573,10 +2591,11 @@ window.copySubscriptionScript = function(scriptType, displayName) {
 
 // Check for overdue subscriptions and show alerts
 window.checkSubscriptionAlerts = function() {
-    if (!window.adminUsersData) return;
+    if (!window.adminUsersData) return { overdue: [], dueSoon: [], neverPaid: [] };
     
     const overdueUsers = [];
     const dueSoonUsers = [];
+    const neverPaidUsers = [];
     
     window.adminUsersData.forEach(user => {
         if (user.tier !== 'pro' && user.tier !== 'elite') return;
@@ -2584,12 +2603,11 @@ window.checkSubscriptionAlerts = function() {
         
         const subLastPaid = user.subscriptionLastPaid;
         if (!subLastPaid) {
-            // Never paid - consider overdue
-            overdueUsers.push({
+            // Never paid - track separately (don't trigger urgent alert)
+            neverPaidUsers.push({
                 name: user.username || user.email.split('@')[0],
                 email: user.email,
-                tier: user.tier,
-                daysOverdue: 'Never paid'
+                tier: user.tier
             });
             return;
         }
@@ -2623,11 +2641,13 @@ window.checkSubscriptionAlerts = function() {
     // Store for display
     window.overdueSubscriptions = overdueUsers;
     window.dueSoonSubscriptions = dueSoonUsers;
+    window.neverPaidSubscriptions = neverPaidUsers;
     
-    // Update subscription alert badge
-    updateSubscriptionAlertBadge(overdueUsers.length, dueSoonUsers.length);
+    // Update subscription alert badge (include never-paid in count for attention)
+    const attentionNeeded = overdueUsers.length + neverPaidUsers.length;
+    updateSubscriptionAlertBadge(attentionNeeded, dueSoonUsers.length);
     
-    return { overdue: overdueUsers, dueSoon: dueSoonUsers };
+    return { overdue: overdueUsers, dueSoon: dueSoonUsers, neverPaid: neverPaidUsers };
 };
 
 // Update subscription alert badge on All Users tab
@@ -2655,10 +2675,12 @@ window.updateSubscriptionAlertBadge = function(overdueCount, dueSoonCount) {
     }
 };
 
-// Show global subscription alert if there are overdue subscriptions
+// Show global subscription alert if there are overdue subscriptions (not just never-paid)
 window.showSubscriptionAlert = function() {
-    const { overdue, dueSoon } = checkSubscriptionAlerts();
+    const { overdue, dueSoon, neverPaid } = checkSubscriptionAlerts();
     
+    // Only show global alert for users who are actually past their due date
+    // (not for never-paid users - those just show in the badge)
     if (overdue.length > 0) {
         const names = overdue.slice(0, 3).map(u => u.name).join(', ');
         const more = overdue.length > 3 ? ` +${overdue.length - 3} more` : '';
