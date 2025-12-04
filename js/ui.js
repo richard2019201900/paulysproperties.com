@@ -54,7 +54,7 @@ async function updateNavUserDisplay() {
         // Check if master admin
         if (TierService.isMasterAdmin(user.email)) {
             navUserName.textContent = username;
-            navUserTier.innerHTML = '👑 Admin';
+            navUserTier.innerHTML = '👑 Owner';
             navUserTier.className = 'text-xs text-red-400';
         } else {
             const tier = data.tier || 'starter';
@@ -1507,7 +1507,7 @@ window.renderAdminUsersList = function(users) {
         
         // Use Admin tier display for master admin, otherwise use their actual tier
         const tierData = isUserMasterAdmin 
-            ? { icon: '👑', name: 'Admin', bgColor: 'bg-red-600', maxListings: Infinity }
+            ? { icon: '👑', name: 'Owner', bgColor: 'bg-red-600', maxListings: Infinity }
             : (TIERS[user.tier] || TIERS.starter);
         
         // ownerPropertyMap contains property IDs, need to look up actual property objects
@@ -1810,8 +1810,8 @@ window.orphanProperty = async function(propertyId) {
 window.reassignPropertyId = null;
 
 window.openReassignModal = async function(propertyId) {
-    if (!TierService.isMasterAdmin()) {
-        alert('Only admin can reassign properties');
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        alert('Only the owner can reassign properties');
         return;
     }
     

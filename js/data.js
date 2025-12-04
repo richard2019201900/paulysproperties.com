@@ -108,8 +108,8 @@ async function getPropertyOwnerWithTier(propertyId) {
             if (TierService.isMasterAdmin(email)) {
                 return {
                     username,
-                    tier: 'admin',
-                    tierData: { icon: '👑', name: 'Admin' },
+                    tier: 'owner',
+                    tierData: { icon: '👑', name: 'Owner' },
                     display: `👑 ${username}`
                 };
             }
@@ -150,6 +150,12 @@ function getOwnerProperties() {
 function ownsProperty(propertyId) {
     const user = auth.currentUser;
     if (!user) return false;
+    
+    // Master owner can access all properties
+    if (TierService.isMasterAdmin(user.email)) {
+        return true;
+    }
+    
     const email = user.email.toLowerCase();
     const propertyIds = ownerPropertyMap[email] || [];
     return propertyIds.includes(propertyId);

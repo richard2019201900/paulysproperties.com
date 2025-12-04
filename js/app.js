@@ -131,7 +131,7 @@ window.viewProperty = function(id) {
     getPropertyOwnerWithTier(id).then(ownerInfo => {
         const ownerEl = $('propertyOwnerDisplay');
         if (ownerEl) {
-            const isAdmin = TierService.isMasterAdmin();
+            const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
             if (isAdmin) {
                 ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display} <button onclick="openReassignModal(${id})" class="ml-2 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded transition">✏️ Change</button>`;
             } else {
