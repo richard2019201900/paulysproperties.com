@@ -2199,7 +2199,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             if (subLastPaid) {
                 const lastDate = new Date(subLastPaid);
                 const nextDate = new Date(lastDate);
-                nextDate.setMonth(nextDate.getMonth() + 1);
+                nextDate.setDate(nextDate.getDate() + 30); // 30 days from last payment
                 nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 
                 const today = new Date();
@@ -2245,17 +2245,17 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <span class="text-lg">${statusIcon}</span>
                             <span class="text-white font-bold text-sm">Subscription: ${tierPrice}/mo</span>
                         </div>
-                        <button onclick="copySubscriptionReminder('${escapedEmail}', '${displayName}', '${user.tier}', '${tierPrice}')" 
+                        <button onclick="openSubscriptionReminderModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${user.tier}', '${tierPrice}', ${daysUntilDue})" 
                             class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition">
-                            📋 Copy Reminder
+                            📋 Reminder Scripts
                         </button>
                     </div>
                     <div class="grid grid-cols-2 gap-3 text-xs">
                         <div>
                             <span class="text-gray-400">Last Paid:</span>
-                            <span class="text-white ml-1 cursor-pointer hover:text-cyan-400" 
+                            <span class="sub-last-paid text-white ml-1 cursor-pointer hover:text-cyan-400" 
                                   onclick="editSubscriptionDate('${escapedId}', '${escapedEmail}', '${subLastPaid}')"
-                                  title="Click to edit">
+                                  title="Click to select date">
                                 ${lastPaidDisplay} ✏️
                             </span>
                         </div>
@@ -2363,23 +2363,32 @@ window.filterAdminUsers = function() {
 
 // ==================== SUBSCRIPTION TRACKING ====================
 
-// Edit subscription last paid date
+// Edit subscription last paid date - opens inline date picker
 window.editSubscriptionDate = function(userId, email, currentDate) {
-    const newDate = prompt(
-        `Enter last subscription payment date for ${email}:\n\n` +
-        `Format: YYYY-MM-DD (e.g., 2025-12-04)\n` +
-        `Current value: ${currentDate || 'Not set'}`,
-        currentDate || new Date().toISOString().split('T')[0]
-    );
+    // Find the user card and subscription section
+    const userCard = document.querySelector(`[data-userid="${userId}"]`);
+    if (!userCard) return;
     
-    if (newDate !== null) {
-        // Validate date format
-        if (newDate && !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-            alert('Invalid date format. Please use YYYY-MM-DD');
-            return;
-        }
-        
-        saveSubscriptionDate(userId, email, newDate);
+    const lastPaidSpan = userCard.querySelector('.sub-last-paid');
+    if (!lastPaidSpan) return;
+    
+    // Create inline date picker
+    const today = new Date().toISOString().split('T')[0];
+    lastPaidSpan.innerHTML = `
+        <input type="date" 
+               id="subDatePicker_${userId}" 
+               value="${currentDate || today}"
+               max="${today}"
+               class="bg-gray-700 text-white px-2 py-1 rounded border border-cyan-500 text-xs"
+               onchange="saveSubscriptionDate('${userId}', '${email}', this.value)"
+               onblur="this.parentElement.innerHTML = this.value ? new Date(this.value).toLocaleDateString('en-US', {month:'short',day:'numeric'}) + ' ✏️' : 'Never ✏️'">
+    `;
+    
+    // Focus and open the date picker
+    const input = $(`subDatePicker_${userId}`);
+    if (input) {
+        input.focus();
+        input.showPicker?.(); // Opens the native date picker if supported
     }
 };
 
@@ -2410,27 +2419,145 @@ window.saveSubscriptionDate = async function(userId, email, date) {
     }
 };
 
-// Copy subscription reminder text
-window.copySubscriptionReminder = function(email, displayName, tier, price) {
+// Open subscription reminder modal with editable text
+window.openSubscriptionReminderModal = function(userId, email, displayName, tier, price, daysUntilDue) {
     const tierName = tier === 'pro' ? 'Pro ⭐' : 'Elite 👑';
+    const tierEmoji = tier === 'pro' ? '⭐' : '👑';
+    const benefits = tier === 'pro' ? '3 property listings' : 'Unlimited property listings';
     
-    const reminderText = `Hey ${displayName}! 👋
+    // Determine reminder type based on days until due
+    let reminderType, reminderTitle, reminderBg;
+    
+    if (daysUntilDue === null || daysUntilDue === undefined) {
+        reminderType = 'never_paid';
+        reminderTitle = '🚨 NEVER PAID - First Payment Needed';
+        reminderBg = 'bg-red-900/50 border-red-500';
+    } else if (daysUntilDue < 0) {
+        reminderType = 'overdue';
+        reminderTitle = `🚨 OVERDUE by ${Math.abs(daysUntilDue)} days`;
+        reminderBg = 'bg-red-900/50 border-red-500';
+    } else if (daysUntilDue === 0) {
+        reminderType = 'due_today';
+        reminderTitle = '⚠️ DUE TODAY';
+        reminderBg = 'bg-orange-900/50 border-orange-500';
+    } else if (daysUntilDue <= 3) {
+        reminderType = 'due_soon';
+        reminderTitle = `⚠️ Due in ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''}`;
+        reminderBg = 'bg-orange-900/50 border-orange-500';
+    } else if (daysUntilDue <= 7) {
+        reminderType = 'upcoming';
+        reminderTitle = `📆 Due in ${daysUntilDue} days`;
+        reminderBg = 'bg-yellow-900/30 border-yellow-600';
+    } else {
+        reminderType = 'normal';
+        reminderTitle = `✅ ${daysUntilDue} days until due`;
+        reminderBg = 'bg-green-900/30 border-green-600';
+    }
+    
+    // Generate different reminder scripts
+    const scripts = {
+        friendly: `Hey ${displayName}! 👋
 
-This is a friendly reminder that your PaulysProperties.com ${tierName} subscription payment is coming up!
+Just a friendly heads up - your PaulysProperties.com ${tierName} subscription payment is coming up!
+
+💰 Amount: ${price}
+${tierEmoji} Plan: ${tierName}
+🏠 Benefits: ${benefits}
+
+Let me know when you're free to meet up and handle the payment. No rush! 😊`,
+
+        urgent: `Hey ${displayName}! ⚠️
+
+Your PaulysProperties.com ${tierName} subscription is ${daysUntilDue !== null && daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} days OVERDUE` : daysUntilDue === 0 ? 'DUE TODAY' : `due in ${daysUntilDue} days`}!
 
 💰 Amount Due: ${price}
-📅 Subscription: ${tierName} Tier
-🏠 Benefits: ${tier === 'pro' ? '3 property listings' : 'Unlimited property listings'}
+${tierEmoji} Plan: ${tierName}
 
-Please meet up to make your monthly payment when you're available. Let me know what works for you!
+Please get in touch ASAP so we can sort out your payment and keep your listings active.
 
-Thanks for being a valued member! 🙏`;
+Thanks! 🙏`,
 
-    navigator.clipboard.writeText(reminderText).then(() => {
-        // Show success feedback
+        final_warning: `${displayName},
+
+URGENT: Your PaulysProperties.com ${tierName} subscription is seriously overdue.
+
+💰 Amount: ${price}
+⚠️ Status: ${daysUntilDue !== null && daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} DAYS OVERDUE` : 'PAYMENT REQUIRED'}
+
+Your property listings may be suspended if payment is not received soon.
+
+Please contact me immediately to resolve this.`
+    };
+    
+    // Create modal HTML
+    const modalHTML = `
+        <div id="subscriptionReminderModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeModal('subscriptionReminderModal')">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border ${reminderBg}">
+                <div class="p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 class="text-xl font-bold text-white">${tierEmoji} ${displayName}</h2>
+                            <p class="text-gray-400 text-sm">${email}</p>
+                            <p class="text-lg font-bold mt-2 ${daysUntilDue !== null && daysUntilDue < 0 ? 'text-red-400' : daysUntilDue <= 3 ? 'text-orange-400' : 'text-green-400'}">${reminderTitle}</p>
+                        </div>
+                        <button onclick="closeModal('subscriptionReminderModal')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <!-- Friendly Reminder -->
+                        <div class="bg-gray-700/50 rounded-xl p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-green-400 font-bold text-sm">😊 Friendly Reminder</span>
+                                <button onclick="copySubscriptionScript('friendly', '${displayName}')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-bold">📋 Copy</button>
+                            </div>
+                            <textarea id="subScript_friendly" class="w-full bg-gray-900 text-gray-300 text-xs p-3 rounded-lg border border-gray-600 resize-none" rows="6">${scripts.friendly}</textarea>
+                        </div>
+                        
+                        <!-- Urgent Reminder -->
+                        <div class="bg-gray-700/50 rounded-xl p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-orange-400 font-bold text-sm">⚠️ Urgent Reminder</span>
+                                <button onclick="copySubscriptionScript('urgent', '${displayName}')" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded text-xs font-bold">📋 Copy</button>
+                            </div>
+                            <textarea id="subScript_urgent" class="w-full bg-gray-900 text-gray-300 text-xs p-3 rounded-lg border border-gray-600 resize-none" rows="5">${scripts.urgent}</textarea>
+                        </div>
+                        
+                        <!-- Final Warning -->
+                        <div class="bg-gray-700/50 rounded-xl p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-red-400 font-bold text-sm">🚨 Final Warning</span>
+                                <button onclick="copySubscriptionScript('final_warning', '${displayName}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-bold">📋 Copy</button>
+                            </div>
+                            <textarea id="subScript_final_warning" class="w-full bg-gray-900 text-gray-300 text-xs p-3 rounded-lg border border-gray-600 resize-none" rows="4">${scripts.final_warning}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end">
+                        <button onclick="closeModal('subscriptionReminderModal')" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-xl font-bold">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = $('subscriptionReminderModal');
+    if (existingModal) existingModal.remove();
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+// Copy subscription script from modal
+window.copySubscriptionScript = function(scriptType, displayName) {
+    const textarea = $(`subScript_${scriptType}`);
+    if (!textarea) return;
+    
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        // Show success toast
         const toast = document.createElement('div');
-        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2';
-        toast.innerHTML = `<span class="text-lg">✅</span> Reminder copied for ${displayName}!`;
+        toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2';
+        toast.innerHTML = `<span class="text-lg">✅</span> ${scriptType === 'friendly' ? 'Friendly' : scriptType === 'urgent' ? 'Urgent' : 'Final warning'} reminder copied!`;
         document.body.appendChild(toast);
         
         setTimeout(() => {
@@ -2469,7 +2596,7 @@ window.checkSubscriptionAlerts = function() {
         
         const lastDate = new Date(subLastPaid);
         const nextDate = new Date(lastDate);
-        nextDate.setMonth(nextDate.getMonth() + 1);
+        nextDate.setDate(nextDate.getDate() + 30); // 30 days from last payment
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);
