@@ -1713,12 +1713,18 @@ window.adminDeleteUser = async function(userId, email) {
     }
     
     try {
-        // Delete properties if requested
         if (deleteProperties && propertyCount > 0) {
+            // Delete properties completely
             for (const prop of userProperties) {
                 await deletePropertyCompletely(prop.id, email);
             }
             console.log(`[Admin] Deleted ${propertyCount} properties for ${email}`);
+        } else if (propertyCount > 0) {
+            // Orphan properties - clear owner but keep property
+            for (const prop of userProperties) {
+                await orphanProperty(prop.id);
+            }
+            console.log(`[Admin] Orphaned ${propertyCount} properties for ${email}`);
         }
         
         // Delete user document from Firestore
@@ -1727,16 +1733,65 @@ window.adminDeleteUser = async function(userId, email) {
         // Remove from ownerPropertyMap
         delete ownerPropertyMap[email.toLowerCase()];
         
+        // Clear from username cache
+        if (window.ownerUsernameCache) {
+            delete window.ownerUsernameCache[email.toLowerCase()];
+        }
+        
         const resultMsg = deleteProperties && propertyCount > 0
-            ? `User ${email} and their ${propertyCount} properties deleted.`
-            : `User ${email} deleted.${propertyCount > 0 ? ` Their ${propertyCount} properties are now unassigned.` : ''}`;
+            ? `User ${email} and their ${propertyCount} properties deleted.\n\n⚠️ IMPORTANT: Also delete this user from Firebase Console → Authentication → Users`
+            : `User ${email} deleted.${propertyCount > 0 ? ` Their ${propertyCount} properties are now unassigned.` : ''}\n\n⚠️ IMPORTANT: Also delete this user from Firebase Console → Authentication → Users`;
         
         alert(resultMsg);
         loadAllUsers();
+        renderProperties(properties);
         
     } catch (error) {
         console.error('Error deleting user:', error);
         alert('Error deleting user: ' + error.message);
+    }
+};
+
+// Helper to orphan a property (clear owner but keep property)
+window.orphanProperty = async function(propertyId) {
+    try {
+        // Get the old owner email before clearing
+        const prop = properties.find(p => p.id === propertyId);
+        const oldOwnerEmail = prop?.ownerEmail;
+        
+        // Update property in memory
+        if (prop) {
+            prop.ownerEmail = null;
+        }
+        
+        // Update in Firestore
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        if (propsDoc.exists) {
+            const propsData = propsDoc.data();
+            if (propsData[propertyId]) {
+                propsData[propertyId].ownerEmail = null;
+                await db.collection('settings').doc('properties').set(propsData);
+            }
+        }
+        
+        // Clear from propertyOwnerEmail mapping if it exists
+        if (typeof propertyOwnerEmail !== 'undefined' && propertyOwnerEmail[propertyId]) {
+            delete propertyOwnerEmail[propertyId];
+        }
+        
+        // Remove from ownerPropertyMap for the old owner
+        if (oldOwnerEmail) {
+            const lowerEmail = oldOwnerEmail.toLowerCase();
+            if (ownerPropertyMap[lowerEmail]) {
+                ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== propertyId);
+            }
+        }
+        
+        console.log(`[Admin] Property ${propertyId} orphaned (owner cleared)`);
+        return true;
+    } catch (error) {
+        console.error(`Error orphaning property ${propertyId}:`, error);
+        throw error;
     }
 };
 

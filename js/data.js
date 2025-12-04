@@ -37,12 +37,23 @@ window.ownerUsernameCache = window.ownerUsernameCache || {};
 
 // Get owner email for a property
 function getPropertyOwnerEmail(propertyId) {
-    return propertyOwnerEmail[propertyId] || null;
+    // First check the static mapping
+    if (propertyOwnerEmail[propertyId]) {
+        return propertyOwnerEmail[propertyId];
+    }
+    
+    // Then check the property object itself (for user-created properties)
+    const prop = properties.find(p => p.id === propertyId);
+    if (prop && prop.ownerEmail) {
+        return prop.ownerEmail;
+    }
+    
+    return null;
 }
 
 // Fetch username by email from Firestore
 async function getUsernameByEmail(email) {
-    if (!email) return 'Property Owner';
+    if (!email) return 'Unassigned';
     
     // Check cache first
     if (window.ownerUsernameCache[email]) {
@@ -53,7 +64,7 @@ async function getUsernameByEmail(email) {
         const querySnapshot = await db.collection('users').where('email', '==', email).get();
         if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
-            const username = userData.username || 'Property Owner';
+            const username = userData.username || email.split('@')[0];
             window.ownerUsernameCache[email] = username; // Cache it
             return username;
         }
@@ -61,7 +72,8 @@ async function getUsernameByEmail(email) {
         console.error('Error fetching username:', error);
     }
     
-    return 'Property Owner';
+    // User not found - might be deleted, return Unassigned
+    return 'Unassigned';
 }
 
 // Get owner username for a property
