@@ -53,6 +53,18 @@ window.openModal = function(id) {
         hideElement($('loginError'));
         hideElement($('createAccountError'));
         
+        // Reset button states
+        const createBtn = $('createAccountBtn');
+        if (createBtn) {
+            createBtn.disabled = false;
+            createBtn.textContent = '🌱 Create Starter Account';
+        }
+        const loginBtn = $('loginSubmitBtn');
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
+        }
+        
         // Reset to show login options (not a specific form)
         showElement($('loginOptions'));
         hideElement($('ownerLoginForm'));
@@ -62,7 +74,7 @@ window.openModal = function(id) {
 window.closeModal = function(id) {
     hideElement($(id));
     
-    // If closing login modal, clear all forms
+    // If closing login modal, clear all forms and reset buttons
     if (id === 'loginModal') {
         const ownerEmail = $('ownerEmail');
         const ownerPassword = $('ownerPassword');
@@ -74,6 +86,18 @@ window.closeModal = function(id) {
         if (newAccountEmail) newAccountEmail.value = '';
         if (newAccountPassword) newAccountPassword.value = '';
         if (newAccountDisplayName) newAccountDisplayName.value = '';
+        
+        // Reset button states
+        const createBtn = $('createAccountBtn');
+        if (createBtn) {
+            createBtn.disabled = false;
+            createBtn.textContent = '🌱 Create Starter Account';
+        }
+        const loginBtn = $('loginSubmitBtn');
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Sign In';
+        }
     }
 };
 

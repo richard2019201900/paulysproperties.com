@@ -99,6 +99,13 @@ window.showCreateAccountForm = function() {
     if (emailField) emailField.value = '';
     if (passwordField) passwordField.value = '';
     if (displayNameField) displayNameField.value = '';
+    
+    // Reset button state
+    const btn = $('createAccountBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🌱 Create Starter Account';
+    }
 };
 
 window.showLoginForm = function() {
@@ -112,6 +119,13 @@ window.showLoginForm = function() {
     const passwordField = $('ownerPassword');
     if (emailField) emailField.value = '';
     if (passwordField) passwordField.value = '';
+    
+    // Reset login button state
+    const btn = $('loginSubmitBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+    }
 };
 
 window.hideCreateAccountForm = function() {
@@ -125,6 +139,13 @@ window.hideCreateAccountForm = function() {
     if (emailField) emailField.value = '';
     if (passwordField) passwordField.value = '';
     if (displayNameField) displayNameField.value = '';
+    
+    // Reset button state
+    const btn = $('createAccountBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🌱 Create Starter Account';
+    }
 };
 
 // Handle create account form submission
