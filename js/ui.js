@@ -1489,12 +1489,19 @@ window.renderAdminUsersList = function(users) {
     if (!container) return;
     
     container.innerHTML = users.map(user => {
-        const tierData = TIERS[user.tier] || TIERS.starter;
+        // Check if this user is the master admin
+        const isUserMasterAdmin = TierService.isMasterAdmin(user.email);
+        
+        // Use Admin tier display for master admin, otherwise use their actual tier
+        const tierData = isUserMasterAdmin 
+            ? { icon: '👑', name: 'Admin', bgColor: 'bg-red-600', maxListings: Infinity }
+            : (TIERS[user.tier] || TIERS.starter);
+        
         // ownerPropertyMap contains property IDs, need to look up actual property objects
         const userPropertyIds = ownerPropertyMap[user.email?.toLowerCase()] || [];
         const userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
         const listingCount = userProperties.length;
-        const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
+        const maxListings = (isUserMasterAdmin || tierData.maxListings === Infinity) ? '∞' : tierData.maxListings;
         const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
         const escapedEmail = user.email.replace(/'/g, "\\'");
         const escapedId = user.id;
@@ -1504,8 +1511,8 @@ window.renderAdminUsersList = function(users) {
         const propertiesHTML = userProperties.length > 0 
             ? userProperties.map((p, index) => {
                 const title = p.title || p.name || 'Unnamed Property';
-                // Check available status - PropertyDataService overrides take precedence
-                const isAvailable = PropertyDataService.getValue(p.id, 'available', p.available) !== false;
+                // Check available status - use state.availability which syncs with dashboard
+                const isAvailable = state.availability[p.id] !== false;
                 return `
                     <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0">
                         <span class="text-gray-300 text-xs">
@@ -1518,8 +1525,40 @@ window.renderAdminUsersList = function(users) {
             }).join('')
             : '<p class="text-gray-500 text-xs italic">No properties listed</p>';
         
+        // Don't show action buttons for master admin
+        const actionButtons = isUserMasterAdmin ? '' : `
+            <div class="flex flex-wrap gap-2">
+                ${user.tier !== 'pro' ? `
+                    <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
+                        class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                        title="Upgrade this user to Pro tier ($25k/mo)">
+                        ⭐ Upgrade to Pro
+                    </button>
+                ` : ''}
+                ${user.tier !== 'elite' ? `
+                    <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
+                        class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                        title="Upgrade this user to Elite tier ($50k/mo)">
+                        👑 Upgrade to Elite
+                    </button>
+                ` : ''}
+                ${user.tier !== 'starter' ? `
+                    <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" 
+                        class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                        title="Downgrade to free Starter tier">
+                        🌱 Downgrade
+                    </button>
+                ` : ''}
+                <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
+                    class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
+                    title="Delete this user account">
+                    🗑️ Delete
+                </button>
+            </div>
+        `;
+        
         return `
-            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
+            <div class="bg-gray-800 rounded-xl p-4 border ${isUserMasterAdmin ? 'border-red-600/50' : 'border-gray-700'} admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-3 mb-2">
@@ -1542,34 +1581,7 @@ window.renderAdminUsersList = function(users) {
                             ${propertiesHTML}
                         </div>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        ${user.tier !== 'pro' ? `
-                            <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
-                                class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                                title="Upgrade this user to Pro tier ($25k/mo)">
-                                ⭐ Upgrade to Pro
-                            </button>
-                        ` : ''}
-                        ${user.tier !== 'elite' ? `
-                            <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
-                                class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                                title="Upgrade this user to Elite tier ($50k/mo)">
-                                👑 Upgrade to Elite
-                            </button>
-                        ` : ''}
-                        ${user.tier !== 'starter' ? `
-                            <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" 
-                                class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                                title="Downgrade to free Starter tier">
-                                🌱 Downgrade
-                            </button>
-                        ` : ''}
-                        <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
-                            class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                            title="Delete this user account">
-                            🗑️ Delete
-                        </button>
-                    </div>
+                    ${actionButtons}
                 </div>
             </div>
         `;
