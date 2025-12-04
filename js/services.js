@@ -632,16 +632,20 @@ async function saveAvailability(id, isAvailable) {
 window.toggleAvailability = async function(id) {
     const currentlyRented = state.availability[id] === false;
     
-    // If trying to mark as Available, check if renter info exists
+    // If trying to mark as Available, check if renter info or payment date exists
     if (currentlyRented) {
         const renterName = PropertyDataService.getValue(id, 'renterName', '');
         const renterPhone = PropertyDataService.getValue(id, 'renterPhone', '');
+        const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', '');
         
-        if (renterName || renterPhone) {
-            alert('⚠️ Cannot mark as Available\n\nThis property has renter information set:\n' + 
-                  (renterName ? `• Renter Name: ${renterName}\n` : '') +
-                  (renterPhone ? `• Renter Phone: ${renterPhone}\n` : '') +
-                  '\nTo mark this property as Available, first clear the renter name and phone fields on the property stats page.');
+        if (renterName || renterPhone || lastPaymentDate) {
+            let message = '⚠️ Cannot mark as Available\n\nThis property has renter/payment information set:\n';
+            if (renterName) message += `• Renter Name: ${renterName}\n`;
+            if (renterPhone) message += `• Renter Phone: ${renterPhone}\n`;
+            if (lastPaymentDate) message += `• Last Payment Date: ${lastPaymentDate}\n`;
+            message += '\nTo mark this property as Available, first clear these fields by clicking on them and deleting the values.';
+            
+            alert(message);
             return;
         }
     }
