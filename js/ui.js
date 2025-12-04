@@ -218,6 +218,91 @@ window.goBack = function() {
     $('properties').scrollIntoView({ behavior: 'smooth' });
 };
 
+// ==================== PROPERTY NAVIGATION ====================
+// Navigate between properties (prev/next)
+window.navigateProperty = function(direction) {
+    const currentId = state.currentPropertyId;
+    if (!currentId) return;
+    
+    // Get the current list of visible/filtered properties
+    const visibleProperties = getVisibleProperties();
+    
+    if (visibleProperties.length === 0) return;
+    
+    // Find current property index
+    const currentIndex = visibleProperties.findIndex(p => p.id === currentId);
+    if (currentIndex === -1) return;
+    
+    let newIndex;
+    if (direction === 'prev') {
+        newIndex = currentIndex > 0 ? currentIndex - 1 : visibleProperties.length - 1;
+    } else {
+        newIndex = currentIndex < visibleProperties.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    const newProperty = visibleProperties[newIndex];
+    if (newProperty) {
+        // Navigate to the new property
+        viewProperty(newProperty.id);
+        // Scroll to top of page
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+
+// Get list of currently visible properties (respecting filters)
+window.getVisibleProperties = function() {
+    // If we have filtered properties, use those, otherwise use all
+    if (state.filteredProperties && state.filteredProperties.length > 0) {
+        return state.filteredProperties;
+    }
+    return properties;
+};
+
+// Update the property navigation counter
+window.updatePropertyNavCounter = function() {
+    const counter = $('propertyNavCounter');
+    const prevBtn = $('prevPropertyBtn');
+    const nextBtn = $('nextPropertyBtn');
+    
+    if (!counter) return;
+    
+    const currentId = state.currentPropertyId;
+    const visibleProperties = getVisibleProperties();
+    const currentIndex = visibleProperties.findIndex(p => p.id === currentId);
+    
+    if (currentIndex !== -1 && visibleProperties.length > 0) {
+        counter.textContent = `${currentIndex + 1} of ${visibleProperties.length}`;
+        
+        // Show/hide nav buttons based on property count
+        if (prevBtn) prevBtn.style.display = visibleProperties.length > 1 ? 'block' : 'none';
+        if (nextBtn) nextBtn.style.display = visibleProperties.length > 1 ? 'block' : 'none';
+    } else {
+        counter.textContent = '';
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
+    }
+};
+
+// Keyboard navigation for properties
+document.addEventListener('keydown', function(e) {
+    const detailPage = $('propertyDetailPage');
+    if (!detailPage || detailPage.classList.contains('hidden')) return;
+    
+    // Don't navigate if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    
+    if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateProperty('prev');
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateProperty('next');
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        goBack();
+    }
+});
+
 // ==================== USERNAME FUNCTIONS ====================
 window.loadUsername = async function() {
     const user = auth.currentUser;

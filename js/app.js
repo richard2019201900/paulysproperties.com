@@ -25,6 +25,11 @@ window.viewProperty = function(id) {
     hideElement($('propertyStatsPage'));
     showElement($('propertyDetailPage'));
     
+    // Update navigation counter
+    if (typeof updatePropertyNavCounter === 'function') {
+        updatePropertyNavCounter();
+    }
+    
     const luxuryFeatures = p.features ? `
         <div class="bg-gradient-to-br from-amber-900 via-orange-900 to-red-900 p-6 md:p-10 rounded-2xl md:rounded-3xl mb-8 border-2 md:border-4 border-amber-700 shadow-2xl">
             <h3 class="text-2xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-6 md:mb-8 flex items-center">

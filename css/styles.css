@@ -480,3 +480,27 @@ textarea.stat-input {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
+
+/* ==================== PROPERTY NAVIGATION CHEVRONS ==================== */
+#prevPropertyBtn,
+#nextPropertyBtn {
+    opacity: 0.7;
+    backdrop-filter: blur(4px);
+}
+
+#prevPropertyBtn:hover,
+#nextPropertyBtn:hover {
+    opacity: 1;
+}
+
+/* Hide nav buttons when on property detail but not on desktop */
+@media (max-width: 768px) {
+    #prevPropertyBtn {
+        left: 4px;
+        padding: 8px;
+    }
+    #nextPropertyBtn {
+        right: 4px;
+        padding: 8px;
+    }
+}
