@@ -70,6 +70,30 @@ window.handleAuthClick = function() {
     state.currentUser === 'owner' ? logout() : openModal('loginModal');
 };
 
+window.signInWithGoogle = async function() {
+    try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        const result = await auth.signInWithPopup(provider);
+        
+        console.log('[Auth] Google sign-in successful:', result.user.email);
+        closeModal('loginModal');
+        
+        // The onAuthStateChanged handler will handle the rest
+        // (creating user doc, setting tier, etc.)
+    } catch (error) {
+        console.error('[Auth] Google sign-in error:', error);
+        
+        // Show error to user
+        const loginError = $('loginError');
+        if (loginError) {
+            loginError.textContent = error.message || 'Sign-in failed. Please try again.';
+            showElement(loginError);
+        } else {
+            alert('Sign-in failed: ' + (error.message || 'Please try again.'));
+        }
+    }
+};
+
 window.goToDashboard = function() {
     hideElement($('mobileMenu'));
     if (state.currentUser === 'owner') {
