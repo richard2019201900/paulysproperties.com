@@ -330,8 +330,24 @@ window.saveUsername = async function() {
         status.className = 'text-green-400 text-sm mt-3';
         showElement(status);
         
+        // Update cache
+        window.ownerUsernameCache = window.ownerUsernameCache || {};
+        window.ownerUsernameCache[user.email.toLowerCase()] = username;
+        
         // Update nav bar display
         updateNavUserDisplay();
+        
+        // Sync everywhere
+        syncOwnerNameEverywhere(user.email, username);
+        
+        // Update admin user list if visible
+        const adminCard = document.querySelector(`[data-userid]`);
+        if (adminCard) {
+            const inputField = document.querySelector(`[id^="adminName_"]`);
+            if (inputField && inputField.closest('[data-email]')?.dataset.email === user.email) {
+                inputField.value = username;
+            }
+        }
         
         setTimeout(() => hideElement(status), 3000);
     } catch (error) {
@@ -1032,19 +1048,76 @@ window.switchAdminTab = function(tab) {
 
 window.updateAdminStats = function(users) {
     const totalUsers = users.length;
-    const proUsers = users.filter(u => u.tier === 'pro').length;
-    const eliteUsers = users.filter(u => u.tier === 'elite').length;
+    const proUsers = users.filter(u => u.tier === 'pro');
+    const eliteUsers = users.filter(u => u.tier === 'elite');
+    const starterUsers = users.filter(u => u.tier === 'starter' || !u.tier);
     const totalListings = Object.values(ownerPropertyMap).reduce((sum, props) => sum + props.length, 0);
+    const availableListings = properties.filter(p => p.available).length;
+    const rentedListings = properties.filter(p => !p.available).length;
     
+    // Front stats
     const statUsers = $('adminStatUsers');
     const statPro = $('adminStatPro');
     const statElite = $('adminStatElite');
     const statListings = $('adminStatListings');
     
     if (statUsers) statUsers.textContent = totalUsers;
-    if (statPro) statPro.textContent = proUsers;
-    if (statElite) statElite.textContent = eliteUsers;
+    if (statPro) statPro.textContent = proUsers.length;
+    if (statElite) statElite.textContent = eliteUsers.length;
     if (statListings) statListings.textContent = totalListings;
+    
+    // Back details - Users
+    const usersDetail = $('adminStatUsersDetail');
+    if (usersDetail) {
+        usersDetail.innerHTML = `
+            <div>🌱 Starter: ${starterUsers.length}</div>
+            <div>⭐ Pro: ${proUsers.length}</div>
+            <div>👑 Elite: ${eliteUsers.length}</div>
+        `;
+    }
+    
+    // Back details - Pro (with monthly revenue)
+    const proDetail = $('adminStatProDetail');
+    if (proDetail) {
+        const proRevenue = proUsers.length * 25000;
+        proDetail.innerHTML = `
+            <div>💰 Revenue: $${proRevenue.toLocaleString()}/mo</div>
+            <div>📊 3 listings each</div>
+            ${proUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
+            ${proUsers.length > 2 ? `<div class="text-gray-500">+${proUsers.length - 2} more</div>` : ''}
+        `;
+    }
+    
+    // Back details - Elite (with monthly revenue)
+    const eliteDetail = $('adminStatEliteDetail');
+    if (eliteDetail) {
+        const eliteRevenue = eliteUsers.length * 50000;
+        eliteDetail.innerHTML = `
+            <div>💰 Revenue: $${eliteRevenue.toLocaleString()}/mo</div>
+            <div>📊 Unlimited listings</div>
+            ${eliteUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
+            ${eliteUsers.length > 2 ? `<div class="text-gray-500">+${eliteUsers.length - 2} more</div>` : ''}
+        `;
+    }
+    
+    // Back details - Listings
+    const listingsDetail = $('adminStatListingsDetail');
+    if (listingsDetail) {
+        listingsDetail.innerHTML = `
+            <div>🟢 Available: ${availableListings}</div>
+            <div>🔴 Rented: ${rentedListings}</div>
+            <div>💵 Total Revenue: $${(proUsers.length * 25000 + eliteUsers.length * 50000).toLocaleString()}/mo</div>
+        `;
+    }
+};
+
+// Flippable tile function
+window.flipAdminTile = function(tileType) {
+    const tile = $('adminTile' + tileType.charAt(0).toUpperCase() + tileType.slice(1));
+    if (tile) {
+        const isFlipped = tile.style.transform === 'rotateY(180deg)';
+        tile.style.transform = isFlipped ? 'rotateY(0deg)' : 'rotateY(180deg)';
+    }
 };
 
 window.loadAllUsers = async function() {
@@ -1078,14 +1151,25 @@ window.renderAdminUsersList = function(users) {
     
     container.innerHTML = users.map(user => {
         const tierData = TIERS[user.tier] || TIERS.starter;
-        const listingCount = (ownerPropertyMap[user.email?.toLowerCase()] || []).length;
+        const userProperties = ownerPropertyMap[user.email?.toLowerCase()] || [];
+        const listingCount = userProperties.length;
         const maxListings = tierData.maxListings === Infinity ? '∞' : tierData.maxListings;
         const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
         const escapedEmail = user.email.replace(/'/g, "\\'");
         const escapedId = user.id;
         
+        // Build properties list HTML
+        const propertiesHTML = userProperties.length > 0 
+            ? userProperties.map(p => `
+                <div class="flex items-center justify-between py-1 border-b border-gray-700/50 last:border-0">
+                    <span class="text-gray-300 text-xs">${p.title}</span>
+                    <span class="text-gray-500 text-xs">${p.available ? '🟢' : '🔴'}</span>
+                </div>
+            `).join('')
+            : '<p class="text-gray-500 text-xs italic">No properties</p>';
+        
         return `
-            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 admin-user-card" data-email="${user.email}" data-name="${user.username || ''}">
+            <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 admin-user-card" data-email="${user.email}" data-name="${user.username || ''}" data-userid="${escapedId}">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div class="flex-1">
                         <div class="flex items-center gap-3 mb-2">
@@ -1108,7 +1192,13 @@ window.renderAdminUsersList = function(users) {
                             <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
                             <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
                             <span class="text-gray-500 text-xs">Updated: ${lastUpdated}</span>
-                            <button onclick="viewUserProperties('${escapedEmail}')" class="text-cyan-400 hover:underline text-xs">View Properties</button>
+                            <button onclick="toggleUserProperties('${escapedId}')" class="text-cyan-400 hover:underline text-xs flex items-center gap-1">
+                                <span id="propToggle_${escapedId}">▶</span> Properties
+                            </button>
+                        </div>
+                        <!-- Inline Properties List -->
+                        <div id="propList_${escapedId}" class="hidden mt-3 bg-gray-900/50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                            ${propertiesHTML}
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
@@ -1137,6 +1227,20 @@ window.renderAdminUsersList = function(users) {
     }).join('');
 };
 
+window.toggleUserProperties = function(userId) {
+    const list = $('propList_' + userId);
+    const toggle = $('propToggle_' + userId);
+    if (list && toggle) {
+        if (list.classList.contains('hidden')) {
+            list.classList.remove('hidden');
+            toggle.textContent = '▼';
+        } else {
+            list.classList.add('hidden');
+            toggle.textContent = '▶';
+        }
+    }
+};
+
 window.filterAdminUsers = function() {
     const searchTerm = ($('adminUserSearch')?.value || '').toLowerCase();
     const filtered = window.adminUsersData.filter(user => {
@@ -1152,12 +1256,27 @@ window.updateAdminUserField = async function(userId, email, field, value) {
             [field]: value,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        console.log(`[Admin] Updated ${field} for ${email}`);
+        console.log(`[Admin] Updated ${field} for ${email}: ${value}`);
         
-        // Update cache
+        // Update cache and sync everywhere
         if (field === 'username') {
             window.ownerUsernameCache = window.ownerUsernameCache || {};
             window.ownerUsernameCache[email.toLowerCase()] = value;
+            
+            // If this is the current user, update nav and profile
+            const currentUser = auth.currentUser;
+            if (currentUser && currentUser.email.toLowerCase() === email.toLowerCase()) {
+                // Update nav display
+                const navUserName = $('navUserName');
+                if (navUserName) navUserName.textContent = value;
+                
+                // Update profile input
+                const ownerUsername = $('ownerUsername');
+                if (ownerUsername) ownerUsername.value = value;
+            }
+            
+            // Update any property cards showing this owner
+            syncOwnerNameEverywhere(email, value);
         }
     } catch (error) {
         console.error('Error updating user field:', error);
@@ -1165,15 +1284,23 @@ window.updateAdminUserField = async function(userId, email, field, value) {
     }
 };
 
-window.viewUserProperties = function(email) {
-    const properties = ownerPropertyMap[email.toLowerCase()] || [];
-    if (properties.length === 0) {
-        alert(`${email} has no properties.`);
-        return;
-    }
+// Sync owner name across all visible elements
+window.syncOwnerNameEverywhere = function(email, newName) {
+    const normalizedEmail = email.toLowerCase();
     
-    const propList = properties.map(p => `• ${p.title}`).join('\n');
-    alert(`Properties for ${email}:\n\n${propList}`);
+    // Update property cards with this owner
+    document.querySelectorAll(`[data-owner-email="${normalizedEmail}"]`).forEach(el => {
+        el.textContent = newName;
+    });
+    
+    // Update any owner display elements
+    document.querySelectorAll('.owner-name').forEach(el => {
+        if (el.dataset.email?.toLowerCase() === normalizedEmail) {
+            el.textContent = newName;
+        }
+    });
+    
+    console.log(`[Sync] Updated owner name everywhere for ${email} to ${newName}`);
 };
 
 window.adminDeleteUser = async function(userId, email) {

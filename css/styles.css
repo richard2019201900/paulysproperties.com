@@ -465,3 +465,18 @@ textarea.stat-input {
 #dashboardTable tbody tr:last-child {
     border-bottom: none;
 }
+
+/* ==================== ADMIN STAT TILES - FLIP EFFECT ==================== */
+.admin-stat-tile {
+    perspective: 1000px;
+}
+
+.admin-stat-tile > div {
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+}
+
+.admin-stat-tile > div > div {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
