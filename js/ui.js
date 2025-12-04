@@ -165,7 +165,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.disabled = false;
                 btn.textContent = '🌱 Create Starter Account';
             }
-            }
         });
     }
 });
