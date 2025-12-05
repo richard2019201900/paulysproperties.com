@@ -51,6 +51,7 @@ async function updateNavUserDisplay() {
     
     const navUserName = $('navUserName');
     const navUserTier = $('navUserTier');
+    const navUpgradeOption = $('navUpgradeOption');
     
     if (!navUserName || !navUserTier) return;
     
@@ -64,6 +65,8 @@ async function updateNavUserDisplay() {
             navUserName.textContent = username;
             navUserTier.innerHTML = '👑 Owner';
             navUserTier.className = 'text-xs text-red-400';
+            // Hide upgrade option for Owner
+            if (navUpgradeOption) navUpgradeOption.classList.add('hidden');
         } else {
             const tier = data.tier || 'starter';
             const tierData = TIERS[tier] || TIERS.starter;
@@ -71,6 +74,15 @@ async function updateNavUserDisplay() {
             navUserName.textContent = username;
             navUserTier.innerHTML = `${tierData.icon} ${tierData.name}`;
             navUserTier.className = `text-xs ${tierData.color}`;
+            
+            // Hide upgrade option for Elite users
+            if (navUpgradeOption) {
+                if (tier === 'elite') {
+                    navUpgradeOption.classList.add('hidden');
+                } else {
+                    navUpgradeOption.classList.remove('hidden');
+                }
+            }
         }
     } catch (error) {
         console.error('Error updating nav user display:', error);
@@ -80,6 +92,48 @@ async function updateNavUserDisplay() {
 }
 
 window.updateNavUserDisplay = updateNavUserDisplay;
+
+// User dropdown menu functions
+window.toggleUserDropdown = function() {
+    const dropdown = $('userDropdownMenu');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+};
+
+window.closeUserDropdown = function() {
+    const dropdown = $('userDropdownMenu');
+    if (dropdown) {
+        dropdown.classList.add('hidden');
+    }
+};
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const dropdown = $('userDropdownMenu');
+    const navUserDisplay = $('navUserDisplay');
+    if (dropdown && navUserDisplay && !navUserDisplay.contains(e.target)) {
+        dropdown.classList.add('hidden');
+    }
+});
+
+// Navigate to profile settings section
+window.goToProfileSettings = function() {
+    goToDashboard();
+    // Scroll to profile settings after a short delay
+    setTimeout(() => {
+        const profileSection = document.querySelector('#ownerDashboard .glass-effect:has(#ownerUsername)');
+        if (profileSection) {
+            profileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Flash highlight effect
+            profileSection.style.transition = 'box-shadow 0.3s';
+            profileSection.style.boxShadow = '0 0 30px rgba(168, 85, 247, 0.5)';
+            setTimeout(() => {
+                profileSection.style.boxShadow = '';
+            }, 2000);
+        }
+    }, 300);
+};
 
 window.handleAuthClick = function() {
     hideElement($('mobileMenu'));
@@ -1057,7 +1111,8 @@ function renderOwnerDashboard() {
         const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
-        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
+        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
         
         // Calculate next due date
         let nextDueDate = '';
@@ -1070,6 +1125,8 @@ function renderOwnerDashboard() {
             const nextDate = new Date(lastDate);
             if (paymentFrequency === 'weekly') {
                 nextDate.setDate(nextDate.getDate() + 7);
+            } else if (paymentFrequency === 'biweekly') {
+                nextDate.setDate(nextDate.getDate() + 14);
             } else {
                 nextDate.setMonth(nextDate.getMonth() + 1);
             }
@@ -1092,8 +1149,20 @@ function renderOwnerDashboard() {
                 dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
             }
             
-            // Generate reminder script
-            const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
+            // Generate reminder script - determine amount based on frequency
+            let amountDue = weeklyPrice;
+            if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
+                amountDue = biweeklyPrice;
+            } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
+                amountDue = monthlyPrice;
+            } else if (paymentFrequency === 'biweekly') {
+                // If no biweekly price set, use weekly * 2
+                amountDue = weeklyPrice * 2;
+            } else if (paymentFrequency === 'monthly') {
+                // If no monthly price set, use weekly * 4
+                amountDue = weeklyPrice * 4;
+            }
+            
             if (renterName && daysUntilDue <= 1) {
                 const fullNextDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
                 if (daysUntilDue === 1) {
@@ -1129,7 +1198,9 @@ function renderOwnerDashboard() {
                 <td class="px-4 py-4">
                     <span class="property-name-link font-bold text-white text-base" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
                 </td>
-                <td class="px-4 py-4 text-gray-300 capitalize hidden md:table-cell">${p.type}</td>
+                <td class="px-4 py-4 text-gray-300 capitalize hidden md:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'type', this, 'propertyType')" title="Click to edit">
+                    <span class="cell-value">${p.type}</span>
+                </td>
                 <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
                     <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
                 </td>
@@ -1222,12 +1293,26 @@ window.startCellEdit = function(propertyId, field, cell, type) {
                 <option value="Walk-in" ${currentValue === 'Walk-in' ? 'selected' : ''}>Walk-in</option>
             </select>
         `;
+    } else if (type === 'propertyType') {
+        inputHTML = `
+            <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm w-full" 
+                    onchange="saveCellEdit(this, ${propertyId}, '${field}', '${type}')"
+                    onblur="setTimeout(() => cancelCellEdit(this), 150)">
+                <option value="apartment" ${currentValue === 'apartment' ? 'selected' : ''}>Apartment</option>
+                <option value="house" ${currentValue === 'house' ? 'selected' : ''}>House</option>
+                <option value="condo" ${currentValue === 'condo' ? 'selected' : ''}>Condo</option>
+                <option value="villa" ${currentValue === 'villa' ? 'selected' : ''}>Villa</option>
+                <option value="warehouse" ${currentValue === 'warehouse' ? 'selected' : ''}>Warehouse</option>
+                <option value="hideout" ${currentValue === 'hideout' ? 'selected' : ''}>Hideout</option>
+            </select>
+        `;
     } else if (type === 'frequency') {
         inputHTML = `
             <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm" 
                     onchange="saveCellEdit(this, ${propertyId}, '${field}', '${type}')"
                     onblur="setTimeout(() => cancelCellEdit(this), 150)">
                 <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
+                <option value="biweekly" ${currentValue === 'biweekly' ? 'selected' : ''}>Biweekly</option>
                 <option value="monthly" ${currentValue === 'monthly' ? 'selected' : ''}>Monthly</option>
             </select>
         `;
@@ -3773,13 +3858,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const storage = parseInt($('newListingStorage').value) || 600;
             const interiorType = $('newListingInterior').value;
             const weeklyPrice = parseInt($('newListingWeekly').value);
-            const monthlyPrice = parseInt($('newListingMonthly').value);
+            const biweeklyPrice = parseInt($('newListingBiweekly').value) || 0;
+            const monthlyPrice = parseInt($('newListingMonthly').value) || 0;
             const imagesText = $('newListingImages').value.trim();
             
             // Debug logging
             console.log('[CreateListing] Form values:', {
                 title, type, location, bedrooms, bathrooms, storage, 
-                interiorType, weeklyPrice, monthlyPrice
+                interiorType, weeklyPrice, biweeklyPrice, monthlyPrice
             });
             
             // Parse images
@@ -3787,9 +3873,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? imagesText.split('\n').map(url => url.trim()).filter(url => url)
                 : ['images/placeholder.jpg'];
             
-            // Validate
-            if (!title || !type || !location || !bedrooms || !bathrooms || !weeklyPrice || !monthlyPrice) {
-                errorDiv.textContent = 'Please fill in all required fields.';
+            // Validate - only weekly price is required
+            if (!title || !type || !location || !bedrooms || !bathrooms || !weeklyPrice) {
+                errorDiv.textContent = 'Please fill in all required fields (Weekly Price is required).';
                 showElement(errorDiv);
                 return;
             }
@@ -3820,6 +3906,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     storage: storage,
                     interiorType: interiorType,
                     weeklyPrice: weeklyPrice,
+                    biweeklyPrice: biweeklyPrice,
                     monthlyPrice: monthlyPrice,
                     images: images,
                     videoUrl: null,
@@ -3834,7 +3921,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 delete state.propertyOverrides[newId];
                 
                 // Get all fields that need to be deleted (all possible override fields)
-                const overrideFields = ['bedrooms', 'bathrooms', 'storage', 'weeklyPrice', 'monthlyPrice', 
+                const overrideFields = ['bedrooms', 'bathrooms', 'storage', 'weeklyPrice', 'biweeklyPrice', 'monthlyPrice', 
                                        'interiorType', 'renterName', 'renterPhone', 'renterNotes',
                                        'lastPaymentDate', 'paymentFrequency', 'title', 'location', 
                                        'type', 'customReminderScript', 'ownerName', 'ownerPhone',

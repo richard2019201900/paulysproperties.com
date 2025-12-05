@@ -211,6 +211,8 @@
                             <option value="house">House</option>
                             <option value="condo">Condo</option>
                             <option value="villa">Villa</option>
+                            <option value="warehouse">Warehouse</option>
+                            <option value="hideout">Hideout</option>
                         </select>
                     </div>
                 </div>
@@ -242,14 +244,18 @@
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Weekly Price *</label>
                         <input type="number" id="newListingWeekly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000">
                     </div>
                     <div>
-                        <label class="block text-gray-300 font-semibold mb-2">Monthly Price *</label>
-                        <input type="number" id="newListingMonthly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000">
+                        <label class="block text-gray-300 font-semibold mb-2">Biweekly Price</label>
+                        <input type="number" id="newListingBiweekly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="65000 (optional)">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Monthly Price</label>
+                        <input type="number" id="newListingMonthly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000 (optional)">
                     </div>
                 </div>
                 
@@ -543,11 +549,31 @@
                     <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden">+ New Listing</button>
                     <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base">Register / Sign In</button>
                     
-                    <!-- Logged-in user display -->
-                    <div id="navUserDisplay" class="hidden items-center gap-2">
-                        <div class="text-right">
+                    <!-- Logged-in user display with dropdown -->
+                    <div id="navUserDisplay" class="hidden items-center gap-2 relative">
+                        <div class="text-right cursor-pointer hover:bg-gray-700/50 px-3 py-2 rounded-xl transition" onclick="toggleUserDropdown()">
                             <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
                             <div id="navUserTier" class="text-xs text-gray-400"></div>
+                        </div>
+                        <!-- User dropdown menu -->
+                        <div id="userDropdownMenu" class="hidden absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                            <a onclick="goToDashboard(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                <span class="text-lg">🏠</span>
+                                <span class="font-medium">Dashboard</span>
+                            </a>
+                            <a onclick="goToProfileSettings(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                <span class="text-lg">⚙️</span>
+                                <span class="font-medium">Profile Settings</span>
+                            </a>
+                            <a id="navUpgradeOption" onclick="openUpgradeModal('Upgrade your account', state.userTier || 'starter'); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-purple-400 hover:bg-gray-700 cursor-pointer transition">
+                                <span class="text-lg">⭐</span>
+                                <span class="font-medium">Upgrade Plan</span>
+                            </a>
+                            <div class="border-t border-gray-700"></div>
+                            <a onclick="logout(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-gray-700 cursor-pointer transition">
+                                <span class="text-lg">🚪</span>
+                                <span class="font-medium">Logout</span>
+                            </a>
                         </div>
                     </div>
                     
@@ -1062,6 +1088,8 @@
                             <option value="apartment">Apartment</option>
                             <option value="condo">Condo</option>
                             <option value="villa">Villa</option>
+                            <option value="warehouse">Warehouse</option>
+                            <option value="hideout">Hideout</option>
                         </select>
                         <select id="searchInterior" class="px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 border-2 border-gray-600 rounded-lg md:rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 font-medium transition text-xs sm:text-sm md:text-base min-w-0">
                             <option value="" disabled selected class="text-purple-400">── Interior ──</option>
@@ -1090,6 +1118,8 @@
                     <button onclick="filterProperties('apartment', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Apartments</button>
                     <button onclick="filterProperties('condo', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Condos</button>
                     <button onclick="filterProperties('villa', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Villas</button>
+                    <button onclick="filterProperties('warehouse', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Warehouses</button>
+                    <button onclick="filterProperties('hideout', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hideouts</button>
                 </div>
                 <div class="flex flex-wrap gap-3 md:gap-4 items-center">
                     <label id="myPropertiesFilter" class="hidden items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition">
