@@ -2411,6 +2411,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         if (!isUserMasterAdmin && (user.tier === 'pro' || user.tier === 'elite')) {
             const subLastPaid = user.subscriptionLastPaid || '';
             const tierPrice = user.tier === 'pro' ? '$25,000' : '$50,000';
+            const tierName = user.tier === 'pro' ? 'Pro ⭐' : 'Elite 👑';
             const isFreeTrial = user.isFreeTrial === true;
             const trialEndDate = user.trialEndDate || '';
             
@@ -2492,27 +2493,40 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 ${trialDaysLeft !== null ? `<span class="text-cyan-400 text-xs ml-1">(${trialDaysLeft}d left)</span>` : ''}
             ` : '';
             
-            const convertTrialBtn = isFreeTrial ? `
+            // For trial users: show Convert to Paid
+            // For paid users: show Mark as Trial (to toggle back if needed)
+            const toggleTrialBtn = isFreeTrial ? `
                 <button onclick="convertTrialToPaid('${escapedId}', '${escapedEmail}')" 
                     class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition ml-2"
                     title="Convert to paid subscription">
                     💰 Convert to Paid
                 </button>
-            ` : '';
+            ` : `
+                <button onclick="markAsTrial('${escapedId}', '${escapedEmail}')" 
+                    class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition ml-2"
+                    title="Mark as trial (removes from revenue)">
+                    🎁 Mark as Trial
+                </button>
+            `;
+            
+            // For trial users, show tier name instead of price
+            const subscriptionLabel = isFreeTrial 
+                ? `${tierName} Trial` 
+                : `Subscription: ${tierPrice}/mo`;
             
             subscriptionHTML = `
                 <div class="mt-3 p-3 rounded-lg border ${statusBg}">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">${statusIcon}</span>
-                            <span class="text-white font-bold text-sm">${isFreeTrial ? 'Trial' : 'Subscription'}: ${tierPrice}/mo</span>
+                            <span class="text-white font-bold text-sm">${subscriptionLabel}</span>
                             ${trialBadge}
                         </div>
                         <div class="flex items-center">
-                            ${convertTrialBtn}
+                            ${toggleTrialBtn}
                             <button onclick="openSubscriptionReminderModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${user.tier}', '${tierPrice}', ${daysUntilDue})" 
-                                class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition">
-                                📋 Reminder Scripts
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-bold transition">
+                                📋 Scripts
                             </button>
                         </div>
                     </div>
@@ -3645,11 +3659,11 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
                 
                 <!-- Buttons -->
                 <div class="flex gap-3">
-                    <button onclick="confirmUpgrade('${email}', '${newTier}', '${currentTier}')" 
+                    <button id="upgradeConfirmBtn" onclick="confirmUpgrade('${email}', '${newTier}', '${currentTier}')" 
                             class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
                         ✓ Confirm Upgrade
                     </button>
-                    <button onclick="closeUpgradeModal()" 
+                    <button id="upgradeCancelBtn" onclick="closeUpgradeModal()" 
                             class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
                         Cancel
                     </button>
@@ -3672,7 +3686,17 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
     const notes = $('upgradeNotes')?.value || '';
     const tierData = TIERS[newTier];
     
-    closeUpgradeModal();
+    // Show loading state on button
+    const confirmBtn = $('upgradeConfirmBtn');
+    const cancelBtn = $('upgradeCancelBtn');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="animate-pulse">⏳ Upgrading...</span>';
+        confirmBtn.classList.add('opacity-70', 'cursor-not-allowed');
+    }
+    if (cancelBtn) {
+        cancelBtn.style.display = 'none';
+    }
     
     try {
         await TierService.setUserTier(email, newTier, currentTier, notes);
@@ -3698,11 +3722,30 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
             console.log(`[Subscription] Set for ${email}: trial=${isTrial}, date=${today}`);
         }
         
-        const trialMsg = isTrial ? '\n\n🎁 Marked as FREE TRIAL (not counted as revenue)' : '';
-        alert(`✓ ${email} upgraded to ${tierData.name}!${trialMsg}`);
-        loadAllUsers();
+        // Show success briefly then close
+        if (confirmBtn) {
+            confirmBtn.innerHTML = '✓ Success!';
+            confirmBtn.classList.remove('from-purple-600', 'to-pink-600');
+            confirmBtn.classList.add('from-green-600', 'to-emerald-600');
+        }
+        
+        setTimeout(() => {
+            closeUpgradeModal();
+            const trialMsg = isTrial ? '\n\n🎁 Marked as FREE TRIAL (not counted as revenue)' : '';
+            showToast(`${email} upgraded to ${tierData.name}!${isTrial ? ' (Trial)' : ''}`, 'success');
+            loadAllUsers();
+        }, 800);
+        
     } catch (error) {
         console.error('Error upgrading user:', error);
+        if (confirmBtn) {
+            confirmBtn.innerHTML = '❌ Error - Try Again';
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+        if (cancelBtn) {
+            cancelBtn.style.display = 'block';
+        }
         alert('Error upgrading user: ' + error.message);
     }
 };
@@ -3733,6 +3776,34 @@ window.convertTrialToPaid = async function(userId, email) {
         loadAllUsers();
     } catch (error) {
         console.error('Error converting trial:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
+// Mark a paid user as trial (for corrections/adjustments)
+window.markAsTrial = async function(userId, email) {
+    if (!confirm(`Mark ${email} as FREE TRIAL?\n\nThis will remove them from revenue calculations.`)) return;
+    
+    const reason = prompt('Reason for marking as trial (optional):');
+    if (reason === null) return;
+    
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 30);
+        
+        await db.collection('users').doc(userId).update({
+            isFreeTrial: true,
+            trialStartDate: today,
+            trialEndDate: trialEndDate.toISOString().split('T')[0],
+            trialNotes: reason || 'Marked as trial by admin',
+            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast(`${email} marked as FREE TRIAL`, 'success');
+        loadAllUsers();
+    } catch (error) {
+        console.error('Error marking as trial:', error);
         alert('Error: ' + error.message);
     }
 };
