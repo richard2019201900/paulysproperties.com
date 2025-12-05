@@ -40,7 +40,7 @@ function getPropertyOwnerEmail(propertyId) {
     // Ensure we're comparing with numeric ID
     const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
     
-    // First check the static mapping
+    // First check the direct property->email mapping
     if (propertyOwnerEmail[numericId]) {
         return propertyOwnerEmail[numericId];
     }
@@ -51,6 +51,15 @@ function getPropertyOwnerEmail(propertyId) {
         // Cache it for future lookups
         propertyOwnerEmail[numericId] = prop.ownerEmail.toLowerCase();
         return prop.ownerEmail.toLowerCase();
+    }
+    
+    // Also check ownerPropertyMap (reverse lookup)
+    for (const email in ownerPropertyMap) {
+        if (ownerPropertyMap[email] && ownerPropertyMap[email].includes(numericId)) {
+            // Cache it for future lookups
+            propertyOwnerEmail[numericId] = email.toLowerCase();
+            return email.toLowerCase();
+        }
     }
     
     return null;

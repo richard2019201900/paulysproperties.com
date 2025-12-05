@@ -697,6 +697,8 @@ async function initFirestore() {
                 const propId = parseInt(key);
                 const prop = propsData[key];
                 
+                console.log('[initFirestore] Processing property', propId, '- ownerEmail:', prop?.ownerEmail);
+                
                 // Ensure prop has the correct numeric ID
                 prop.id = propId;
                 
@@ -711,7 +713,7 @@ async function initFirestore() {
                 if (existingIndex === -1) {
                     // New user-created property - add to array
                     properties.push(prop);
-                    console.log('[initFirestore] Added user property:', prop.title, 'with id:', propId);
+                    console.log('[initFirestore] Added user property:', prop.title, 'with id:', propId, 'ownerEmail:', prop.ownerEmail);
                     
                     // Set availability from Firestore
                     if (data[propId] !== undefined) {
@@ -730,8 +732,12 @@ async function initFirestore() {
                             ownerPropertyMap[email].push(propId);
                         }
                         propertyOwnerEmail[propId] = email;
-                        console.log('[initFirestore] Set owner for property', propId, ':', email);
+                        console.log('[initFirestore] Set owner mapping:', propId, '->', email);
+                    } else {
+                        console.warn('[initFirestore] Property', propId, 'has no ownerEmail!');
                     }
+                } else {
+                    console.log('[initFirestore] Property', propId, 'already exists in static array');
                 }
             });
             // Update filtered properties
@@ -781,9 +787,38 @@ async function initFirestore() {
             console.log('[initFirestore] State after loading:', state.propertyOverrides);
         }
         
+        // Sync all property owner mappings to ensure consistency
+        syncPropertyOwnerMappings();
+        
         // Preload owner usernames in background for faster display
         preloadOwnerUsernames().catch(err => console.warn('[initFirestore] Username preload failed:', err));
     } catch (error) {
         console.error('Init error:', error);
     }
+}
+
+// Ensure all property owner mappings are synchronized
+function syncPropertyOwnerMappings() {
+    console.log('[Sync] Synchronizing property owner mappings...');
+    
+    // 1. Sync from ownerPropertyMap to propertyOwnerEmail
+    Object.keys(ownerPropertyMap).forEach(email => {
+        const lowerEmail = email.toLowerCase();
+        (ownerPropertyMap[email] || []).forEach(propId => {
+            if (!propertyOwnerEmail[propId]) {
+                propertyOwnerEmail[propId] = lowerEmail;
+                console.log('[Sync] Added mapping:', propId, '->', lowerEmail);
+            }
+        });
+    });
+    
+    // 2. Sync from property objects to propertyOwnerEmail
+    properties.forEach(prop => {
+        if (prop.ownerEmail && !propertyOwnerEmail[prop.id]) {
+            propertyOwnerEmail[prop.id] = prop.ownerEmail.toLowerCase();
+            console.log('[Sync] Added from property:', prop.id, '->', prop.ownerEmail);
+        }
+    });
+    
+    console.log('[Sync] Final propertyOwnerEmail:', propertyOwnerEmail);
 }
