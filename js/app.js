@@ -274,6 +274,8 @@ function renderPropertyStatsContent(id) {
         const nextDate = new Date(lastDate);
         if (paymentFrequency === 'weekly') {
             nextDate.setDate(nextDate.getDate() + 7);
+        } else if (paymentFrequency === 'biweekly') {
+            nextDate.setDate(nextDate.getDate() + 14);
         } else {
             nextDate.setMonth(nextDate.getMonth() + 1);
         }
@@ -285,7 +287,19 @@ function renderPropertyStatsContent(id) {
         daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
         
         // Generate reminder script if 1 day away or overdue
-        const amountDue = paymentFrequency === 'weekly' ? weeklyPrice : monthlyPrice;
+        // Determine amount based on frequency
+        const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
+        let amountDue = weeklyPrice;
+        if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
+            amountDue = biweeklyPrice;
+        } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
+            amountDue = monthlyPrice;
+        } else if (paymentFrequency === 'biweekly') {
+            amountDue = weeklyPrice * 2;
+        } else if (paymentFrequency === 'monthly') {
+            amountDue = weeklyPrice * 4;
+        }
+        
         if (renterName && daysUntilDue <= 1) {
             if (daysUntilDue === 1) {
                 reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
@@ -678,6 +692,7 @@ window.startEditTile = function(field, propertyId, type) {
         inputHtml = `
             <select id="input-${field}-${propertyId}" class="stat-input text-lg w-full">
                 <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
+                <option value="biweekly" ${currentValue === 'biweekly' ? 'selected' : ''}>Biweekly</option>
                 <option value="monthly" ${currentValue === 'monthly' ? 'selected' : ''}>Monthly</option>
             </select>
         `;

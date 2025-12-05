@@ -800,24 +800,36 @@ async function initFirestore() {
 // Ensure all property owner mappings are synchronized
 function syncPropertyOwnerMappings() {
     console.log('[Sync] Synchronizing property owner mappings...');
+    console.log('[Sync] Properties count:', properties.length);
+    console.log('[Sync] ownerPropertyMap:', ownerPropertyMap);
     
-    // 1. Sync from ownerPropertyMap to propertyOwnerEmail
+    // 1. First, sync from property objects (highest priority - these come from Firestore)
+    properties.forEach(prop => {
+        if (prop.ownerEmail) {
+            const lowerEmail = prop.ownerEmail.toLowerCase();
+            // Always set from property object if it has ownerEmail
+            propertyOwnerEmail[prop.id] = lowerEmail;
+            console.log('[Sync] Set from property object:', prop.id, '->', lowerEmail, '(title:', prop.title, ')');
+            
+            // Also ensure ownerPropertyMap is updated
+            if (!ownerPropertyMap[lowerEmail]) {
+                ownerPropertyMap[lowerEmail] = [];
+            }
+            if (!ownerPropertyMap[lowerEmail].includes(prop.id)) {
+                ownerPropertyMap[lowerEmail].push(prop.id);
+            }
+        }
+    });
+    
+    // 2. Then fill in any gaps from ownerPropertyMap
     Object.keys(ownerPropertyMap).forEach(email => {
         const lowerEmail = email.toLowerCase();
         (ownerPropertyMap[email] || []).forEach(propId => {
             if (!propertyOwnerEmail[propId]) {
                 propertyOwnerEmail[propId] = lowerEmail;
-                console.log('[Sync] Added mapping:', propId, '->', lowerEmail);
+                console.log('[Sync] Added from ownerPropertyMap:', propId, '->', lowerEmail);
             }
         });
-    });
-    
-    // 2. Sync from property objects to propertyOwnerEmail
-    properties.forEach(prop => {
-        if (prop.ownerEmail && !propertyOwnerEmail[prop.id]) {
-            propertyOwnerEmail[prop.id] = prop.ownerEmail.toLowerCase();
-            console.log('[Sync] Added from property:', prop.id, '->', prop.ownerEmail);
-        }
     });
     
     console.log('[Sync] Final propertyOwnerEmail:', propertyOwnerEmail);

@@ -2373,7 +2373,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                     <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0">
                         <span class="text-gray-300 text-xs">
                             <span class="text-gray-500 mr-2">${index + 1}.</span>
-                            ${title}
+                            <a onclick="viewPropertyStats(${p.id})" class="hover:text-cyan-400 cursor-pointer hover:underline transition">${title}</a>
                         </span>
                         <span class="text-xs ${isAvailable ? 'text-green-400' : 'text-red-400'}">${isAvailable ? '🟢 Available' : '🔴 Rented'}</span>
                     </div>

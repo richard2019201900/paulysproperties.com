@@ -40,17 +40,18 @@ function getPropertyOwnerEmail(propertyId) {
     // Ensure we're comparing with numeric ID
     const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
     
-    // First check the direct property->email mapping
-    if (propertyOwnerEmail[numericId]) {
-        return propertyOwnerEmail[numericId];
-    }
-    
-    // Then check the property object itself (for user-created properties)
+    // FIRST check the property object itself (most authoritative source from Firestore)
     const prop = properties.find(p => p.id === numericId);
     if (prop && prop.ownerEmail) {
+        const email = prop.ownerEmail.toLowerCase();
         // Cache it for future lookups
-        propertyOwnerEmail[numericId] = prop.ownerEmail.toLowerCase();
-        return prop.ownerEmail.toLowerCase();
+        propertyOwnerEmail[numericId] = email;
+        return email;
+    }
+    
+    // Then check the direct property->email mapping
+    if (propertyOwnerEmail[numericId]) {
+        return propertyOwnerEmail[numericId];
     }
     
     // Also check ownerPropertyMap (reverse lookup)
