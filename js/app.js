@@ -365,11 +365,14 @@ function renderPropertyStatsContent(id) {
                     </div>
                     <div class="flex flex-col items-end gap-2">
                         <span id="tile-type-${id}" 
-                              class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase cursor-pointer hover:ring-2 hover:ring-purple-400 transition"
+                              class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase cursor-pointer hover:ring-2 hover:ring-purple-400 transition flex items-center gap-2"
                               onclick="startEditPropertyType(${id})"
                               data-field="type"
                               data-original-value="${propertyType}"
-                              title="Click to change property type">${propertyType}</span>
+                              title="Click to change property type">
+                            ${propertyType}
+                            <svg class="w-3.5 h-3.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </span>
                         <span id="stats-owner-${id}" class="bg-blue-600/80 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             <span>Loading...</span>

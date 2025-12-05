@@ -2211,6 +2211,12 @@ window.updateAdminStats = async function(users) {
     const eliteUsers = users.filter(u => u.tier === 'elite');
     const starterUsers = users.filter(u => u.tier === 'starter' || !u.tier);
     
+    // Separate trial users from paid users
+    const proTrialUsers = proUsers.filter(u => u.isFreeTrial === true);
+    const proPaidUsers = proUsers.filter(u => u.isFreeTrial !== true);
+    const eliteTrialUsers = eliteUsers.filter(u => u.isFreeTrial === true);
+    const elitePaidUsers = eliteUsers.filter(u => u.isFreeTrial !== true);
+    
     // Refresh availability data from Firestore for accuracy
     try {
         const availDoc = await db.collection('settings').doc('propertyAvailability').get();
@@ -2247,42 +2253,51 @@ window.updateAdminStats = async function(users) {
     if (usersDetail) {
         usersDetail.innerHTML = `
             <div>🌱 Starter: ${starterUsers.length}</div>
-            <div>⭐ Pro: ${proUsers.length}</div>
-            <div>👑 Elite: ${eliteUsers.length}</div>
+            <div>⭐ Pro: ${proUsers.length} ${proTrialUsers.length > 0 ? `<span class="text-cyan-400">(${proTrialUsers.length} trial)</span>` : ''}</div>
+            <div>👑 Elite: ${eliteUsers.length} ${eliteTrialUsers.length > 0 ? `<span class="text-cyan-400">(${eliteTrialUsers.length} trial)</span>` : ''}</div>
         `;
     }
     
-    // Back details - Pro (with monthly revenue)
+    // Calculate PAID revenue only (excluding trials)
+    const proRevenue = proPaidUsers.length * 25000;
+    const eliteRevenue = elitePaidUsers.length * 50000;
+    const totalPaidRevenue = proRevenue + eliteRevenue;
+    
+    // Back details - Pro (with monthly revenue - PAID ONLY)
     const proDetail = $('adminStatProDetail');
     if (proDetail) {
-        const proRevenue = proUsers.length * 25000;
         proDetail.innerHTML = `
-            <div>💰 Revenue: $${proRevenue.toLocaleString()}/mo</div>
+            <div>💰 Paid Revenue: $${proRevenue.toLocaleString()}/mo</div>
+            ${proTrialUsers.length > 0 ? `<div class="text-cyan-400">🎁 Trials: ${proTrialUsers.length} ($0 revenue)</div>` : ''}
             <div>📊 3 listings each</div>
-            ${proUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
-            ${proUsers.length > 2 ? `<div class="text-gray-500">+${proUsers.length - 2} more</div>` : ''}
+            ${proPaidUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
+            ${proPaidUsers.length > 2 ? `<div class="text-gray-500">+${proPaidUsers.length - 2} more paid</div>` : ''}
         `;
     }
     
-    // Back details - Elite (with monthly revenue)
+    // Back details - Elite (with monthly revenue - PAID ONLY)
     const eliteDetail = $('adminStatEliteDetail');
     if (eliteDetail) {
-        const eliteRevenue = eliteUsers.length * 50000;
         eliteDetail.innerHTML = `
-            <div>💰 Revenue: $${eliteRevenue.toLocaleString()}/mo</div>
+            <div>💰 Paid Revenue: $${eliteRevenue.toLocaleString()}/mo</div>
+            ${eliteTrialUsers.length > 0 ? `<div class="text-cyan-400">🎁 Trials: ${eliteTrialUsers.length} ($0 revenue)</div>` : ''}
             <div>📊 Unlimited listings</div>
-            ${eliteUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
-            ${eliteUsers.length > 2 ? `<div class="text-gray-500">+${eliteUsers.length - 2} more</div>` : ''}
+            ${elitePaidUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
+            ${elitePaidUsers.length > 2 ? `<div class="text-gray-500">+${elitePaidUsers.length - 2} more paid</div>` : ''}
         `;
     }
     
-    // Back details - Listings
+    // Back details - Listings (with PAID ONLY revenue)
     const listingsDetail = $('adminStatListingsDetail');
     if (listingsDetail) {
+        const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
         listingsDetail.innerHTML = `
             <div>🟢 Available: ${availableListings}</div>
             <div>🔴 Rented: ${rentedListings}</div>
-            <div>💵 Total Revenue: $${(proUsers.length * 25000 + eliteUsers.length * 50000).toLocaleString()}/mo</div>
+            <div class="border-t border-gray-600 pt-2 mt-2">
+                <div class="text-green-400 font-bold">💵 Paid Revenue: $${totalPaidRevenue.toLocaleString()}/mo</div>
+                ${totalTrials > 0 ? `<div class="text-cyan-400 text-xs">🎁 ${totalTrials} trial user${totalTrials > 1 ? 's' : ''} (not counted)</div>` : ''}
+            </div>
         `;
     }
 };
@@ -2396,6 +2411,8 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         if (!isUserMasterAdmin && (user.tier === 'pro' || user.tier === 'elite')) {
             const subLastPaid = user.subscriptionLastPaid || '';
             const tierPrice = user.tier === 'pro' ? '$25,000' : '$50,000';
+            const isFreeTrial = user.isFreeTrial === true;
+            const trialEndDate = user.trialEndDate || '';
             
             // Calculate next due date (monthly)
             let nextDueDate = '';
@@ -2403,6 +2420,17 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             let statusColor = 'text-gray-400';
             let statusBg = 'bg-gray-700';
             let statusIcon = '📅';
+            
+            // Trial status calculations
+            let trialDaysLeft = null;
+            if (isFreeTrial && trialEndDate) {
+                const [tYear, tMonth, tDay] = trialEndDate.split('-').map(Number);
+                const endDate = new Date(tYear, tMonth - 1, tDay);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                endDate.setHours(0, 0, 0, 0);
+                trialDaysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+            }
             
             if (subLastPaid) {
                 // Parse date parts to avoid timezone shift
@@ -2417,7 +2445,12 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 nextDate.setHours(0, 0, 0, 0);
                 daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
                 
-                if (daysUntilDue < 0) {
+                if (isFreeTrial) {
+                    // Trial-specific styling
+                    statusColor = 'text-cyan-400';
+                    statusBg = 'bg-cyan-900/30 border-cyan-500';
+                    statusIcon = '🎁';
+                } else if (daysUntilDue < 0) {
                     statusColor = 'text-red-400';
                     statusBg = 'bg-red-900/50 border-red-500';
                     statusIcon = '🚨';
@@ -2453,21 +2486,39 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         : `<span class="${statusColor}">${daysUntilDue}d left</span>`)
                 : '<span class="text-gray-500">Not set</span>';
             
+            // Trial badge and convert button
+            const trialBadge = isFreeTrial ? `
+                <span class="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">🎁 FREE TRIAL</span>
+                ${trialDaysLeft !== null ? `<span class="text-cyan-400 text-xs ml-1">(${trialDaysLeft}d left)</span>` : ''}
+            ` : '';
+            
+            const convertTrialBtn = isFreeTrial ? `
+                <button onclick="convertTrialToPaid('${escapedId}', '${escapedEmail}')" 
+                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition ml-2"
+                    title="Convert to paid subscription">
+                    💰 Convert to Paid
+                </button>
+            ` : '';
+            
             subscriptionHTML = `
                 <div class="mt-3 p-3 rounded-lg border ${statusBg}">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">${statusIcon}</span>
-                            <span class="text-white font-bold text-sm">Subscription: ${tierPrice}/mo</span>
+                            <span class="text-white font-bold text-sm">${isFreeTrial ? 'Trial' : 'Subscription'}: ${tierPrice}/mo</span>
+                            ${trialBadge}
                         </div>
-                        <button onclick="openSubscriptionReminderModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${user.tier}', '${tierPrice}', ${daysUntilDue})" 
-                            class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition">
-                            📋 Reminder Scripts
-                        </button>
+                        <div class="flex items-center">
+                            ${convertTrialBtn}
+                            <button onclick="openSubscriptionReminderModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${user.tier}', '${tierPrice}', ${daysUntilDue})" 
+                                class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition">
+                                📋 Reminder Scripts
+                            </button>
+                        </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3 text-xs">
                         <div>
-                            <span class="text-gray-400">Last Paid:</span>
+                            <span class="text-gray-400">${isFreeTrial ? 'Trial Started:' : 'Last Paid:'}</span>
                             <span class="sub-last-paid text-white ml-1 cursor-pointer hover:text-cyan-400" 
                                   onclick="editSubscriptionDate('${escapedId}', '${escapedEmail}', '${subLastPaid}')"
                                   title="Click to select date">
@@ -2475,7 +2526,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             </span>
                         </div>
                         <div>
-                            <span class="text-gray-400">Next Due:</span>
+                            <span class="text-gray-400">${isFreeTrial ? 'Trial Ends:' : 'Next Due:'}</span>
                             <span class="ml-1">${nextDueDate || '-'}</span>
                             ${dueDisplay}
                         </div>
@@ -3649,25 +3700,100 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
     const tierData = TIERS[newTier];
     const price = newTier === 'pro' ? '$25,000' : '$50,000';
     
-    const paymentNote = prompt(`Upgrading ${email} to ${tierData.name} (${price}/month)\n\nEnter payment confirmation or notes:`);
-    if (paymentNote === null) return;
+    // Show upgrade modal with trial option
+    showUpgradeModal(email, newTier, currentTier, tierData, price);
+};
+
+// Show upgrade modal with trial checkbox
+function showUpgradeModal(email, newTier, currentTier, tierData, price) {
+    // Create modal overlay
+    const modalHTML = `
+        <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-700">
+                <h3 class="text-xl font-bold text-white mb-4">⬆️ Upgrade User</h3>
+                
+                <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 mb-2"><strong>User:</strong> ${email}</p>
+                    <p class="text-gray-300"><strong>New Tier:</strong> <span class="${newTier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tierData.icon} ${tierData.name}</span></p>
+                    <p class="text-gray-300"><strong>Price:</strong> ${price}/month</p>
+                </div>
+                
+                <!-- Free Trial Checkbox -->
+                <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="upgradeTrialCheckbox" class="w-5 h-5 rounded border-cyan-500 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
+                        <div>
+                            <span class="text-cyan-300 font-bold">🎁 Free 1-Month Trial</span>
+                            <p class="text-cyan-400/70 text-sm">Check this if this is a promotional trial upgrade (won't count as revenue)</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <!-- Notes Field -->
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm mb-2">Payment/Notes:</label>
+                    <input type="text" id="upgradeNotes" 
+                           class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                           placeholder="Payment confirmation or notes...">
+                </div>
+                
+                <!-- Buttons -->
+                <div class="flex gap-3">
+                    <button onclick="confirmUpgrade('${email}', '${newTier}', '${currentTier}')" 
+                            class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        ✓ Confirm Upgrade
+                    </button>
+                    <button onclick="closeUpgradeModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+window.closeUpgradeModal = function() {
+    const modal = $('upgradeModal');
+    if (modal) modal.remove();
+};
+
+window.confirmUpgrade = async function(email, newTier, currentTier) {
+    const isTrial = $('upgradeTrialCheckbox')?.checked || false;
+    const notes = $('upgradeNotes')?.value || '';
+    const tierData = TIERS[newTier];
+    
+    closeUpgradeModal();
     
     try {
-        await TierService.setUserTier(email, newTier, currentTier, paymentNote);
+        await TierService.setUserTier(email, newTier, currentTier, notes);
         
-        // Also set the subscription last paid date to today
+        // Set subscription data including trial status
         const snapshot = await db.collection('users').where('email', '==', email).get();
         if (!snapshot.empty) {
             const userId = snapshot.docs[0].id;
             const today = new Date().toISOString().split('T')[0];
+            
+            // Calculate trial end date (30 days from now)
+            const trialEndDate = new Date();
+            trialEndDate.setDate(trialEndDate.getDate() + 30);
+            
             await db.collection('users').doc(userId).update({
                 subscriptionLastPaid: today,
-                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                isFreeTrial: isTrial,
+                trialStartDate: isTrial ? today : null,
+                trialEndDate: isTrial ? trialEndDate.toISOString().split('T')[0] : null,
+                trialNotes: isTrial ? (notes || 'Free trial upgrade') : null
             });
-            console.log(`[Subscription] Set initial payment date for ${email}: ${today}`);
+            console.log(`[Subscription] Set for ${email}: trial=${isTrial}, date=${today}`);
         }
         
-        alert(`✓ ${email} upgraded to ${tierData.name}!\n\nSubscription payment date set to today.`);
+        const trialMsg = isTrial ? '\n\n🎁 Marked as FREE TRIAL (not counted as revenue)' : '';
+        alert(`✓ ${email} upgraded to ${tierData.name}!${trialMsg}`);
         loadAllUsers();
     } catch (error) {
         console.error('Error upgrading user:', error);
@@ -3675,8 +3801,38 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
     }
 };
 
+// Convert a trial user to paid subscription
+window.convertTrialToPaid = async function(userId, email) {
+    if (!confirm(`Convert ${email} from FREE TRIAL to PAID subscription?\n\nThis will mark them as a paying customer and reset their subscription date to today.`)) return;
+    
+    const paymentNote = prompt('Enter payment confirmation details:');
+    if (paymentNote === null) return;
+    
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        await db.collection('users').doc(userId).update({
+            isFreeTrial: false,
+            trialStartDate: null,
+            trialEndDate: null,
+            trialNotes: null,
+            subscriptionLastPaid: today,
+            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            convertedFromTrial: true,
+            trialConvertedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            trialConversionNotes: paymentNote || 'Converted to paid'
+        });
+        
+        alert(`✓ ${email} is now a PAID subscriber!\n\nSubscription date set to today.`);
+        loadAllUsers();
+    } catch (error) {
+        console.error('Error converting trial:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
 window.adminDowngradeUser = async function(email, currentTier) {
-    if (!confirm(`Are you sure you want to reset ${email} to Starter tier?\n\nThis will also clear their subscription payment history.`)) return;
+    if (!confirm(`Are you sure you want to reset ${email} to Starter tier?\n\nThis will also clear their subscription payment history and trial status.`)) return;
     
     const reason = prompt('Reason for downgrade (optional):');
     if (reason === null) return;
@@ -3684,13 +3840,17 @@ window.adminDowngradeUser = async function(email, currentTier) {
     try {
         await TierService.setUserTier(email, 'starter', currentTier, `Downgraded: ${reason || 'No reason given'}`);
         
-        // Clear subscription data when downgrading
+        // Clear subscription data AND trial data when downgrading
         const snapshot = await db.collection('users').where('email', '==', email).get();
         if (!snapshot.empty) {
             const userId = snapshot.docs[0].id;
             await db.collection('users').doc(userId).update({
                 subscriptionLastPaid: '',
-                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                isFreeTrial: false,
+                trialStartDate: null,
+                trialEndDate: null,
+                trialNotes: null
             });
         }
         
