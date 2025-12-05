@@ -92,7 +92,7 @@ window.viewProperty = function(id) {
                     <p class="text-lg md:text-xl text-gray-300 font-semibold">📍 Location: ${sanitize(p.location)}</p>
                     <p id="propertyOwnerDisplay" class="text-blue-400 font-semibold mt-1">👤 Owner: Loading...</p>
                 </div>
-                <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
+                <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${PropertyDataService.getValue(id, 'type', p.type)}</span>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
                 ${[
@@ -237,6 +237,7 @@ function renderPropertyStatsContent(id) {
     const bathrooms = PropertyDataService.getValue(id, 'bathrooms', p.bathrooms);
     const storage = PropertyDataService.getValue(id, 'storage', p.storage);
     const interiorType = PropertyDataService.getValue(id, 'interiorType', p.interiorType);
+    const propertyType = PropertyDataService.getValue(id, 'type', p.type);
     const weeklyPrice = PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice);
     const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice);
     
@@ -362,7 +363,7 @@ function renderPropertyStatsContent(id) {
                         </div>
                     </div>
                     <div class="flex flex-col items-end gap-2">
-                        <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${p.type}</span>
+                        <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${propertyType}</span>
                         <span id="stats-owner-${id}" class="bg-blue-600/80 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             <span>Loading...</span>
@@ -869,6 +870,9 @@ window.saveTileEdit = async function(field, propertyId, type) {
             // Refresh the entire stats page to show synced data
             renderPropertyStatsContent(propertyId);
         }, 1000);
+        
+        // Update filtered properties to reflect changes
+        state.filteredProperties = [...properties];
         
         // Also refresh properties grid and dashboard if they're using this data
         renderProperties(state.filteredProperties);

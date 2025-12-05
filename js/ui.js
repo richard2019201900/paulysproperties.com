@@ -1199,7 +1199,7 @@ function renderOwnerDashboard() {
                     <span class="property-name-link font-bold text-white text-base" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
                 </td>
                 <td class="px-4 py-4 text-gray-300 capitalize hidden md:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'type', this, 'propertyType')" title="Click to edit">
-                    <span class="cell-value">${p.type}</span>
+                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'type', p.type)}</span>
                 </td>
                 <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
                     <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
@@ -1372,7 +1372,7 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
             cell.innerHTML = originalHTML;
             return;
         }
-    } else if (type === 'text' || type === 'date' || type === 'frequency' || type === 'select') {
+    } else if (type === 'text' || type === 'date' || type === 'frequency' || type === 'select' || type === 'propertyType') {
         // Keep as string, allow empty for text and date fields (so they can be cleared)
         if (!newValue && type !== 'text' && type !== 'date') {
             cell.innerHTML = originalHTML;
@@ -1396,6 +1396,9 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
                 console.log(`Auto-flipped property ${propertyId} to rented (${field} set)`);
             }
         }
+        
+        // Update filtered properties to reflect changes
+        state.filteredProperties = [...properties];
         
         // Re-render dashboard to show updated values
         renderOwnerDashboard();
@@ -1433,7 +1436,7 @@ async function renderProperties(list) {
             <div class="p-5 md:p-6">
                 <div class="flex justify-between items-start gap-2 mb-3">
                     <h4 class="text-xl md:text-2xl font-bold text-white min-h-[3.5rem] md:min-h-[4rem] line-clamp-2">${sanitize(p.title)}</h4>
-                    <span class="badge text-white text-xs font-bold px-2 md:px-3 py-1 rounded-full uppercase shrink-0">${p.type}</span>
+                    <span class="badge text-white text-xs font-bold px-2 md:px-3 py-1 rounded-full uppercase shrink-0">${PropertyDataService.getValue(p.id, 'type', p.type)}</span>
                 </div>
                 <p class="text-gray-300 mb-2 font-medium text-sm md:text-base">Location: ${sanitize(p.location)}</p>
                 <p class="text-xs md:text-sm text-gray-400 mb-2 font-semibold">Interior: ${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</p>
