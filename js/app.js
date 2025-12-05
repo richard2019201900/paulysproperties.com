@@ -275,20 +275,30 @@ window.closePropertyDeletedModal = function() {
     const modal = $('propertyDeletedModal');
     if (modal) modal.remove();
     
-    // Cleanup listener
+    // Cleanup stats page listener
     if (window.propertyDeletionUnsubscribe) {
         window.propertyDeletionUnsubscribe();
         window.propertyDeletionUnsubscribe = null;
     }
     
-    // Redirect to dashboard
+    // Clear current property state
     state.currentPropertyId = null;
+    
+    // Hide all property-related pages
     hideElement($('propertyStatsPage'));
+    hideElement($('propertyDetailPage'));
+    
+    // Show dashboard
     showElement($('ownerDashboard'));
     
     // Refresh the dashboard
     if (typeof renderOwnerDashboard === 'function') {
         renderOwnerDashboard();
+    }
+    
+    // Also refresh property grid if it exists
+    if (typeof renderProperties === 'function') {
+        renderProperties(properties);
     }
 };
 
@@ -1495,19 +1505,59 @@ window.copyRenterPhone = function(phoneNumber, btn) {
 };
 
 // ==================== GLOBAL PROPERTIES SYNC LISTENER ====================
-// Simplified: Only used for tracking property changes, not automatic deletion detection
-// The stats page has its own dedicated listener for deletion detection
+// Listens for property deletion notifications and syncs to user's browser in real-time
 function setupGlobalPropertiesListener(userEmail) {
     // Cleanup existing listener
     if (window.globalPropertiesUnsubscribe) {
         window.globalPropertiesUnsubscribe();
     }
     
-    console.log('[GlobalSync] Properties listener setup for:', userEmail);
+    const lowerEmail = userEmail.toLowerCase();
+    console.log('[GlobalSync] Setting up deletion listener for:', lowerEmail);
     
-    // Note: We don't aggressively sync deletions globally anymore to prevent false positives
-    // The property stats page has its own dedicated listener that checks for deletion
-    // of the specific property being viewed
+    // Listen for deletion notifications for this user's properties
+    window.globalPropertiesUnsubscribe = db.collection('propertyDeletions')
+        .where('ownerEmail', '==', lowerEmail)
+        .where('acknowledged', '==', false)
+        .onSnapshot((snapshot) => {
+            snapshot.docChanges().forEach(async (change) => {
+                if (change.type === 'added') {
+                    const deletion = change.doc.data();
+                    const deletionId = change.doc.id;
+                    
+                    console.log('[GlobalSync] Property deletion detected:', deletion.propertyId, deletion.propertyTitle);
+                    
+                    // Remove from local properties array
+                    const index = properties.findIndex(p => p.id === deletion.propertyId || String(p.id) === String(deletion.propertyId));
+                    if (index !== -1) {
+                        properties.splice(index, 1);
+                        console.log('[GlobalSync] Removed property from local array');
+                    }
+                    
+                    // Remove from owner map
+                    if (ownerPropertyMap[lowerEmail]) {
+                        ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(
+                            id => id !== deletion.propertyId && String(id) !== String(deletion.propertyId)
+                        );
+                    }
+                    
+                    // Remove from state
+                    delete state.availability[deletion.propertyId];
+                    delete state.propertyOverrides[deletion.propertyId];
+                    
+                    // Show notification modal
+                    showPropertyDeletedNotification(deletion.propertyTitle || 'Your property');
+                    
+                    // Mark as acknowledged so it doesn't trigger again
+                    await db.collection('propertyDeletions').doc(deletionId).update({
+                        acknowledged: true,
+                        acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            });
+        }, (error) => {
+            console.error('[GlobalSync] Deletion listener error:', error);
+        });
 }
 
 // ==================== INITIALIZE ====================

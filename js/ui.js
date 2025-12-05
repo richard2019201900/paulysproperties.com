@@ -3497,6 +3497,10 @@ function getPropertyOwnerEmail(propertyId) {
 // Helper to completely delete a property
 window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
     try {
+        // Get property title before deletion for notification
+        const prop = properties.find(p => p.id === propertyId);
+        const propertyTitle = prop?.title || `Property ${propertyId}`;
+        
         // Remove from properties array
         const index = properties.findIndex(p => p.id === propertyId);
         if (index !== -1) {
@@ -3532,6 +3536,18 @@ window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
             if (ownerPropertyMap[lowerEmail]) {
                 ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== propertyId);
             }
+            
+            // CREATE DELETION NOTIFICATION for the property owner
+            // This allows real-time sync to their browser
+            await db.collection('propertyDeletions').add({
+                propertyId: propertyId,
+                propertyTitle: propertyTitle,
+                ownerEmail: lowerEmail,
+                deletedBy: auth.currentUser?.email || 'admin',
+                deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                acknowledged: false
+            });
+            console.log(`[Admin] Created deletion notification for ${lowerEmail}`);
         }
         
         console.log(`[Admin] Property ${propertyId} deleted completely`);
