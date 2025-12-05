@@ -1885,25 +1885,103 @@ window.updateRequestsBadge = function(count) {
     }
 };
 
-// Approve upgrade request
+// Approve upgrade request - show modal with trial option
 window.approveUpgradeRequest = async function(requestId, userEmail, newTier, currentTier) {
-    const paymentNote = prompt(`Approving upgrade to ${newTier.toUpperCase()} for ${userEmail}\n\nEnter payment confirmation:`);
-    if (paymentNote === null) return;
+    const tierData = TIERS[newTier];
+    const price = newTier === 'pro' ? '$25,000' : '$50,000';
+    
+    // Show approval modal with trial option
+    const modalHTML = `
+        <div id="approveModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-green-700">
+                <h3 class="text-xl font-bold text-white mb-4">✓ Approve Upgrade Request</h3>
+                
+                <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 mb-2"><strong>User:</strong> ${userEmail}</p>
+                    <p class="text-gray-300"><strong>Requested Tier:</strong> <span class="${newTier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tierData?.icon || '⭐'} ${tierData?.name || newTier}</span></p>
+                    <p class="text-gray-300"><strong>Price:</strong> ${price}/month</p>
+                </div>
+                
+                <!-- Free Trial Checkbox -->
+                <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="approveTrialCheckbox" class="w-5 h-5 rounded border-cyan-500 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
+                        <div>
+                            <span class="text-cyan-300 font-bold">🎁 Approve as Free Trial</span>
+                            <p class="text-cyan-400/70 text-sm">Check this if approving as a promotional trial (won't count as revenue)</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <!-- Notes Field -->
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm mb-2">Payment/Notes:</label>
+                    <input type="text" id="approveNotes" 
+                           class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                           placeholder="Payment confirmation or notes...">
+                </div>
+                
+                <!-- Buttons -->
+                <div class="flex gap-3">
+                    <button id="approveConfirmBtn" onclick="confirmApproveRequest('${requestId}', '${userEmail}', '${newTier}', '${currentTier}')" 
+                            class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        ✓ Approve
+                    </button>
+                    <button onclick="closeApproveModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = $('approveModal');
+    if (existingModal) existingModal.remove();
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeApproveModal = function() {
+    const modal = $('approveModal');
+    if (modal) modal.remove();
+};
+
+window.confirmApproveRequest = async function(requestId, userEmail, newTier, currentTier) {
+    const isTrial = $('approveTrialCheckbox')?.checked || false;
+    const paymentNote = $('approveNotes')?.value || '';
+    const tierData = TIERS[newTier];
+    
+    // Show loading state
+    const confirmBtn = $('approveConfirmBtn');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="animate-pulse">⏳ Approving...</span>';
+    }
     
     try {
-        // Update user tier
-        await TierService.setUserTier(userEmail, newTier, currentTier, paymentNote);
+        // Update user tier (with trial flag)
+        await TierService.setUserTier(userEmail, newTier, currentTier, paymentNote, isTrial);
         
-        // Set subscription payment date to today
+        // Set subscription payment date and trial status
         const snapshot = await db.collection('users').where('email', '==', userEmail).get();
         if (!snapshot.empty) {
             const userId = snapshot.docs[0].id;
             const today = new Date().toISOString().split('T')[0];
+            const trialEndDate = new Date();
+            trialEndDate.setDate(trialEndDate.getDate() + 30);
+            
             await db.collection('users').doc(userId).update({
                 subscriptionLastPaid: today,
-                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                isFreeTrial: isTrial,
+                trialStartDate: isTrial ? today : null,
+                trialEndDate: isTrial ? trialEndDate.toISOString().split('T')[0] : null,
+                trialNotes: isTrial ? (paymentNote || 'Free trial from upgrade request') : null
             });
-            console.log(`[Subscription] Set initial payment date for ${userEmail}: ${today}`);
+            console.log(`[Subscription] Set for ${userEmail}: trial=${isTrial}, date=${today}`);
         }
         
         // Mark request as approved
@@ -1911,26 +1989,42 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
             status: 'approved',
             approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
             approvedBy: auth.currentUser?.email,
-            paymentNote: paymentNote
+            paymentNote: paymentNote,
+            isFreeTrial: isTrial
         });
         
         // Create notification for user
+        const trialNote = isTrial ? ' (Free Trial)' : '';
         await db.collection('userNotifications').add({
             userEmail: userEmail.toLowerCase(),
             type: 'upgrade_approved',
             title: '🎉 Upgrade Approved!',
-            message: `Your upgrade to ${TIERS[newTier]?.name || newTier} has been approved! You now have access to ${TIERS[newTier]?.maxListings === Infinity ? 'unlimited' : TIERS[newTier]?.maxListings} listings.`,
+            message: `Your upgrade to ${tierData?.name || newTier}${trialNote} has been approved! You now have access to ${tierData?.maxListings === Infinity ? 'unlimited' : tierData?.maxListings} listings.`,
             newTier: newTier,
+            isFreeTrial: isTrial,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             read: false
         });
         
-        alert(`✓ ${userEmail} upgraded to ${newTier}!\n\nSubscription payment date set to today.\nUser will be notified.`);
-        loadUpgradeRequests();
-        loadAllUsers();
+        // Show success
+        if (confirmBtn) {
+            confirmBtn.innerHTML = '✓ Approved!';
+        }
+        
+        setTimeout(() => {
+            closeApproveModal();
+            const trialMsg = isTrial ? ' as FREE TRIAL' : '';
+            showToast(`${userEmail} upgraded to ${tierData?.name || newTier}${trialMsg}!`, 'success');
+            loadUpgradeRequests();
+            loadAllUsers();
+        }, 800);
         
     } catch (error) {
         console.error('Error approving request:', error);
+        if (confirmBtn) {
+            confirmBtn.innerHTML = '❌ Error - Try Again';
+            confirmBtn.disabled = false;
+        }
         alert('Error: ' + error.message);
     }
 };
