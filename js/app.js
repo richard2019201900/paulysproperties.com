@@ -189,6 +189,32 @@ window.viewPropertyStats = async function(id) {
         }
     });
     
+    // Set up real-time listener for property deletion
+    if (window.propertyDeletionUnsubscribe) {
+        window.propertyDeletionUnsubscribe();
+    }
+    window.propertyDeletionUnsubscribe = db.collection('settings').doc('properties')
+        .onSnapshot((doc) => {
+            if (doc.exists) {
+                const propsData = doc.data();
+                // Check if this property still exists
+                if (state.currentPropertyId === id && !propsData[id]) {
+                    console.log('[PropertyDeletion] Property was deleted by admin:', id);
+                    
+                    // Remove from local arrays
+                    const localIndex = properties.findIndex(prop => prop.id === id);
+                    if (localIndex !== -1) {
+                        properties.splice(localIndex, 1);
+                    }
+                    
+                    // Show notification and redirect
+                    showPropertyDeletedNotification(p.title || 'This property');
+                }
+            }
+        }, (error) => {
+            console.error('[PropertyDeletion] Listener error:', error);
+        });
+    
     renderPropertyStatsContent(id);
     loadStatsOwnerName(id);
     
@@ -197,6 +223,53 @@ window.viewPropertyStats = async function(id) {
     hideElement($('propertyDetailPage'));
     showElement($('propertyStatsPage'));
     window.scrollTo(0, 0);
+};
+
+// Show notification when property is deleted by admin
+window.showPropertyDeletedNotification = function(propertyTitle) {
+    // Create modal overlay
+    const modalHTML = `
+        <div id="propertyDeletedModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-red-700 text-center">
+                <div class="text-6xl mb-4">🗑️</div>
+                <h3 class="text-xl font-bold text-red-400 mb-4">Property Deleted</h3>
+                <p class="text-gray-300 mb-2">The property "<strong>${propertyTitle}</strong>" has been deleted by an administrator.</p>
+                <p class="text-gray-400 text-sm mb-6">You will be redirected to your dashboard.</p>
+                <button onclick="closePropertyDeletedModal()" 
+                        class="w-full bg-gradient-to-r from-red-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                    Go to Dashboard
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = $('propertyDeletedModal');
+    if (existingModal) existingModal.remove();
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closePropertyDeletedModal = function() {
+    const modal = $('propertyDeletedModal');
+    if (modal) modal.remove();
+    
+    // Cleanup listener
+    if (window.propertyDeletionUnsubscribe) {
+        window.propertyDeletionUnsubscribe();
+        window.propertyDeletionUnsubscribe = null;
+    }
+    
+    // Redirect to dashboard
+    state.currentPropertyId = null;
+    hideElement($('propertyStatsPage'));
+    showElement($('ownerDashboard'));
+    
+    // Refresh the dashboard
+    if (typeof renderOwnerDashboard === 'function') {
+        renderOwnerDashboard();
+    }
 };
 
 // Load owner name for stats page
@@ -1401,6 +1474,65 @@ window.copyRenterPhone = function(phoneNumber, btn) {
     });
 };
 
+// ==================== GLOBAL PROPERTIES SYNC LISTENER ====================
+// Listens for property changes (deletions, updates) and syncs local state
+function setupGlobalPropertiesListener(userEmail) {
+    // Cleanup existing listener
+    if (window.globalPropertiesUnsubscribe) {
+        window.globalPropertiesUnsubscribe();
+    }
+    
+    const lowerEmail = userEmail.toLowerCase();
+    console.log('[GlobalSync] Setting up properties listener for:', lowerEmail);
+    
+    window.globalPropertiesUnsubscribe = db.collection('settings').doc('properties')
+        .onSnapshot((doc) => {
+            if (!doc.exists) return;
+            
+            const firestoreProps = doc.data();
+            const firestoreIds = new Set(Object.keys(firestoreProps));
+            
+            // Check for deletions - properties that exist locally but not in Firestore
+            const deletedProps = properties.filter(p => !firestoreIds.has(String(p.id)));
+            
+            if (deletedProps.length > 0) {
+                console.log('[GlobalSync] Detected deleted properties:', deletedProps.map(p => p.id));
+                
+                // Remove deleted properties from local array
+                deletedProps.forEach(delProp => {
+                    const index = properties.findIndex(p => p.id === delProp.id);
+                    if (index !== -1) {
+                        properties.splice(index, 1);
+                    }
+                    
+                    // Remove from owner map
+                    if (ownerPropertyMap[lowerEmail]) {
+                        ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== delProp.id);
+                    }
+                    
+                    // Remove from state
+                    delete state.availability[delProp.id];
+                    delete state.propertyOverrides[delProp.id];
+                });
+                
+                // Refresh the dashboard if visible
+                if ($('ownerDashboard')?.style.display !== 'none') {
+                    console.log('[GlobalSync] Refreshing owner dashboard');
+                    renderOwnerDashboard();
+                }
+                
+                // Refresh property grid if visible
+                if ($('propertyGrid')?.style.display !== 'none') {
+                    console.log('[GlobalSync] Refreshing property grid');
+                    renderProperties(properties);
+                }
+            }
+            
+        }, (error) => {
+            console.error('[GlobalSync] Listener error:', error);
+        });
+}
+
 // ==================== INITIALIZE ====================
 async function init() {
     loadReviews();
@@ -1437,6 +1569,9 @@ async function init() {
                 state.userTier = 'starter';
             }
             
+            // Set up global properties sync listener
+            setupGlobalPropertiesListener(user.email);
+            
             renderOwnerDashboard();
             loadUsername();
             
@@ -1450,6 +1585,12 @@ async function init() {
             state.currentUser = null;
             state.userTier = null;
             updateAuthButton(false);
+            
+            // Cleanup global listener
+            if (window.globalPropertiesUnsubscribe) {
+                window.globalPropertiesUnsubscribe();
+                window.globalPropertiesUnsubscribe = null;
+            }
         }
     });
     
