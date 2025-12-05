@@ -88,6 +88,13 @@
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+        @keyframes premiumPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3), 0 0 40px rgba(245, 158, 11, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.5), 0 0 60px rgba(245, 158, 11, 0.2); }
+        }
+        .premium-glow {
+            animation: premiumPulse 2s ease-in-out infinite;
+        }
         #globalAlertBar {
             animation: slideDown 0.3s ease-out, gradientShift 2s ease infinite;
         }
@@ -247,16 +254,47 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Weekly Price *</label>
-                        <input type="number" id="newListingWeekly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000">
+                        <input type="number" id="newListingWeekly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000" oninput="checkPriceWarning()">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Biweekly Price</label>
-                        <input type="number" id="newListingBiweekly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="65000 (optional)">
+                        <input type="number" id="newListingBiweekly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="65000 (optional)" oninput="checkPriceWarning()">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Monthly Price</label>
-                        <input type="number" id="newListingMonthly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000 (optional)">
+                        <input type="number" id="newListingMonthly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000 (optional)" oninput="checkPriceWarning()">
                     </div>
+                </div>
+                
+                <!-- Price Warning -->
+                <div id="priceWarning" class="hidden bg-gradient-to-r from-orange-900/50 to-red-900/50 border border-orange-500 rounded-xl p-4">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">⚠️</span>
+                        <div>
+                            <p class="text-orange-300 font-bold">Pricing Warning</p>
+                            <p id="priceWarningText" class="text-orange-200 text-sm">Your biweekly/monthly price is lower than expected. Usually longer terms cost more, not less.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Premium Listing Option -->
+                <div class="bg-gradient-to-r from-amber-900/30 to-yellow-900/30 border-2 border-amber-500/50 rounded-xl p-4">
+                    <label class="flex items-start gap-4 cursor-pointer">
+                        <input type="checkbox" id="newListingPremium" class="w-6 h-6 mt-1 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">👑</span>
+                                <span class="text-amber-300 font-bold text-lg">Premium Listing</span>
+                                <span class="bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">$10,000</span>
+                            </div>
+                            <p class="text-amber-200/70 text-sm mt-1">Feature your property at the TOP of all listings with an eye-catching gold border. Stand out from the crowd and rent faster!</p>
+                            <div class="flex gap-4 mt-2 text-xs text-amber-300/60">
+                                <span>✓ Top placement</span>
+                                <span>✓ Gold border</span>
+                                <span>✓ Premium badge</span>
+                            </div>
+                        </div>
+                    </label>
                 </div>
                 
                 <div>

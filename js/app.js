@@ -236,6 +236,9 @@ function renderPropertyStatsContent(id) {
     const statusClass = isAvailable ? 'from-green-600 to-emerald-600' : 'from-red-600 to-pink-600';
     const statusText = isAvailable ? 'Available' : 'Rented';
     
+    // Get premium status
+    const isPremium = PropertyDataService.getValue(id, 'isPremium', p.isPremium || false);
+    
     // Get effective values (overrides or defaults)
     const bedrooms = PropertyDataService.getValue(id, 'bedrooms', p.bedrooms);
     const bathrooms = PropertyDataService.getValue(id, 'bathrooms', p.bathrooms);
@@ -321,7 +324,11 @@ function renderPropertyStatsContent(id) {
     const showReminderSection = renterName && (daysUntilDue !== null && daysUntilDue <= 1);
     
     $('propertyStatsContent').innerHTML = `
-        <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8">
+        ${isPremium ? `
+        <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-2 font-black text-sm tracking-wider flex items-center justify-center gap-2 rounded-t-2xl">
+            <span>👑</span> PREMIUM LISTING <span>👑</span>
+        </div>` : ''}
+        <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8 ${isPremium ? 'border-2 border-amber-500 ring-2 ring-amber-500/50 rounded-t-none' : ''}">
             <!-- View Toggle Tabs -->
             <div class="flex border-b border-gray-700">
                 <button onclick="viewProperty(${id})" class="flex-1 py-4 px-6 text-center font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
@@ -340,6 +347,7 @@ function renderPropertyStatsContent(id) {
                 <div class="absolute top-4 right-4 bg-gradient-to-r ${statusClass} text-white px-4 py-2 rounded-xl font-bold shadow-lg">
                     ${statusText}
                 </div>
+                ${isPremium ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' : ''}
             </div>
             
             <div class="p-6 md:p-8">
@@ -348,7 +356,7 @@ function renderPropertyStatsContent(id) {
                         <div class="flex items-center gap-2 mb-2">
                             <span class="text-2xl">✨</span>
                             <h2 id="editable-title-${id}" 
-                                class="text-3xl md:text-4xl font-black text-white cursor-pointer hover:text-purple-300 transition inline-block"
+                                class="text-3xl md:text-4xl font-black ${isPremium ? 'text-amber-300' : 'text-white'} cursor-pointer hover:text-purple-300 transition inline-block"
                                 onclick="startEditField('title', ${id}, this)"
                                 title="Click to edit address">
                                 ${sanitize(p.title)}
@@ -624,10 +632,14 @@ function renderPropertyStatsContent(id) {
         <!-- Actions -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
             <h3 class="text-2xl font-bold text-gray-200 mb-6">⚡ Quick Actions</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button onclick="toggleAvailability(${id}); setTimeout(() => renderPropertyStatsContent(${id}), 100);" class="flex items-center justify-center space-x-3 ${isAvailable ? 'bg-gradient-to-r from-red-500 to-pink-600' : 'bg-gradient-to-r from-green-500 to-emerald-600'} text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     <span>${isAvailable ? 'Mark as Rented' : 'Mark as Available'}</span>
+                </button>
+                <button onclick="togglePremiumStatus(${id})" class="flex items-center justify-center space-x-3 ${isPremium ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900' : 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-amber-600 hover:to-yellow-600 text-white'} px-6 py-4 rounded-xl font-bold transition shadow-lg">
+                    <span class="text-xl">👑</span>
+                    <span>${isPremium ? 'Premium Active ($10k)' : 'Enable Premium'}</span>
                 </button>
                 <button onclick="viewProperty(${id})" class="flex items-center justify-center space-x-3 gradient-bg text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
@@ -826,6 +838,49 @@ window.saveTileEdit = async function(field, propertyId, type) {
         }
     }
     
+    // PRICE VALIDATION - check if price values are logical
+    if (field === 'weeklyPrice' || field === 'biweeklyPrice' || field === 'monthlyPrice') {
+        const p = properties.find(prop => prop.id === propertyId);
+        if (p) {
+            const weekly = field === 'weeklyPrice' ? newValue : PropertyDataService.getValue(propertyId, 'weeklyPrice', p.weeklyPrice);
+            const biweekly = field === 'biweeklyPrice' ? newValue : PropertyDataService.getValue(propertyId, 'biweeklyPrice', p.biweeklyPrice || 0);
+            const monthly = field === 'monthlyPrice' ? newValue : PropertyDataService.getValue(propertyId, 'monthlyPrice', p.monthlyPrice);
+            
+            const warnings = validatePriceLogic(weekly, biweekly, monthly);
+            
+            if (warnings.length > 0) {
+                // Store the save parameters for after confirmation
+                const saveParams = { field, propertyId, type, newValue, tile, valueEl };
+                
+                showPriceWarningModal(warnings, 
+                    () => {
+                        // User confirmed - proceed with save
+                        executeTileSave(saveParams.field, saveParams.propertyId, saveParams.type, saveParams.newValue, saveParams.tile, saveParams.valueEl);
+                    },
+                    () => {
+                        // User cancelled - just cancel the edit
+                        cancelTileEdit(field, propertyId);
+                    }
+                );
+                return; // Don't save yet, wait for confirmation
+            }
+        }
+    }
+    
+    // Proceed with normal save
+    executeTileSave(field, propertyId, type, newValue, tile, valueEl);
+};
+
+/**
+ * Execute tile save - writes to Firestore with optimistic UI
+ * (Separated from saveTileEdit to allow price warning confirmation)
+ */
+window.executeTileSave = async function(field, propertyId, type, newValue, tile, valueEl) {
+    if (!tile || !valueEl) {
+        tile = $(`tile-${field}-${propertyId}`);
+        valueEl = $(`value-${field}-${propertyId}`);
+    }
+    
     const originalValue = tile.dataset.originalValue;
     
     // Optimistic UI update
@@ -995,6 +1050,51 @@ window.savePropertyType = async function(propertyId, newValue) {
 window.togglePropertyStatus = async function(propertyId) {
     await toggleAvailability(propertyId);
     setTimeout(() => renderPropertyStatsContent(propertyId), 100);
+};
+
+// Toggle Premium listing status
+window.togglePremiumStatus = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) return;
+    
+    const currentPremium = PropertyDataService.getValue(propertyId, 'isPremium', p.isPremium || false);
+    const newPremium = !currentPremium;
+    
+    if (newPremium) {
+        // Enabling premium - show confirmation
+        if (!confirm('Enable Premium Listing?\n\n👑 $10,000/month fee\n✓ Top placement on Properties page\n✓ Gold border and featured badge\n✓ Stand out from other listings\n\nProceed with enabling premium?')) {
+            return;
+        }
+    }
+    
+    try {
+        // Save to Firestore
+        await PropertyDataService.write(propertyId, 'isPremium', newPremium);
+        await PropertyDataService.write(propertyId, 'premiumUpdatedAt', new Date().toISOString());
+        
+        // Update local property object
+        p.isPremium = newPremium;
+        
+        // Refresh the stats page
+        renderPropertyStatsContent(propertyId);
+        
+        // Refresh property grid
+        if (typeof renderProperties === 'function') {
+            state.filteredProperties = [...properties];
+            renderProperties(state.filteredProperties);
+        }
+        
+        // Show toast
+        if (newPremium) {
+            showToast('👑 Premium Listing Activated!', 'success');
+        } else {
+            showToast('Premium Listing Deactivated', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Error toggling premium status:', error);
+        alert('Failed to update premium status. Please try again.');
+    }
 };
 
 // ==================== EVENT LISTENERS ====================

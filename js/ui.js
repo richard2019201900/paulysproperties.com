@@ -26,6 +26,130 @@ window.showToast = function(message, type = 'info') {
     }, 3000);
 };
 
+// ==================== PRICE WARNING SYSTEM ====================
+// Check if biweekly/monthly prices are suspiciously low
+window.checkPriceWarning = function(weeklyEl, biweeklyEl, monthlyEl, warningEl) {
+    // Handle both element IDs and elements directly
+    // If called without arguments (from create listing form oninput), use default form IDs
+    const weekly = weeklyEl ? (typeof weeklyEl === 'string' ? $(weeklyEl) : weeklyEl) : $('newListingWeekly');
+    const biweekly = biweeklyEl ? (typeof biweeklyEl === 'string' ? $(biweeklyEl) : biweeklyEl) : $('newListingBiweekly');
+    const monthly = monthlyEl ? (typeof monthlyEl === 'string' ? $(monthlyEl) : monthlyEl) : $('newListingMonthly');
+    const warning = warningEl ? (typeof warningEl === 'string' ? $(warningEl) : warningEl) : $('priceWarning');
+    
+    if (!weekly || !warning) return;
+    
+    const weeklyVal = parseInt(weekly.value) || 0;
+    const biweeklyVal = parseInt(biweekly?.value) || 0;
+    const monthlyVal = parseInt(monthly?.value) || 0;
+    
+    const warnings = [];
+    
+    // Check biweekly (should be >= weekly, ideally ~2x)
+    if (biweeklyVal > 0 && biweeklyVal < weeklyVal) {
+        warnings.push('Biweekly ($' + biweeklyVal.toLocaleString() + ') is less than Weekly ($' + weeklyVal.toLocaleString() + ')');
+    }
+    
+    // Check monthly (should be >= biweekly and >= weekly, ideally ~4x weekly)
+    if (monthlyVal > 0) {
+        if (monthlyVal < weeklyVal) {
+            warnings.push('Monthly ($' + monthlyVal.toLocaleString() + ') is less than Weekly ($' + weeklyVal.toLocaleString() + ')');
+        }
+        if (biweeklyVal > 0 && monthlyVal < biweeklyVal) {
+            warnings.push('Monthly ($' + monthlyVal.toLocaleString() + ') is less than Biweekly ($' + biweeklyVal.toLocaleString() + ')');
+        }
+    }
+    
+    const warningText = $('priceWarningText') || warning.querySelector('p:last-child');
+    
+    if (warnings.length > 0) {
+        if (warningText) {
+            warningText.textContent = warnings.join('. ') + '. Usually longer terms cost more.';
+        }
+        showElement(warning);
+    } else {
+        hideElement(warning);
+    }
+    
+    return warnings.length === 0;
+};
+
+// Generic price warning check for any set of inputs (used in stats page edits)
+window.validatePriceLogic = function(weekly, biweekly, monthly) {
+    const warnings = [];
+    
+    if (biweekly > 0 && biweekly < weekly) {
+        warnings.push(`Biweekly ($${biweekly.toLocaleString()}) < Weekly ($${weekly.toLocaleString()})`);
+    }
+    
+    if (monthly > 0) {
+        if (monthly < weekly) {
+            warnings.push(`Monthly ($${monthly.toLocaleString()}) < Weekly ($${weekly.toLocaleString()})`);
+        }
+        if (biweekly > 0 && monthly < biweekly) {
+            warnings.push(`Monthly ($${monthly.toLocaleString()}) < Biweekly ($${biweekly.toLocaleString()})`);
+        }
+    }
+    
+    return warnings;
+};
+
+// Show price warning modal (for stats page edits)
+window.showPriceWarningModal = function(warnings, onConfirm, onCancel) {
+    const modalHTML = `
+        <div id="priceWarningModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-orange-500">
+                <div class="text-center mb-4">
+                    <span class="text-5xl">⚠️</span>
+                    <h3 class="text-xl font-bold text-orange-400 mt-2">Unusual Pricing Detected</h3>
+                </div>
+                
+                <div class="bg-orange-900/30 border border-orange-600/50 rounded-xl p-4 mb-4">
+                    <p class="text-orange-200 text-sm mb-2">The following pricing seems unusual:</p>
+                    <ul class="text-orange-300 text-sm space-y-1">
+                        ${warnings.map(w => `<li>• ${w}</li>`).join('')}
+                    </ul>
+                    <p class="text-orange-200/70 text-xs mt-3">Usually, longer rental terms (biweekly, monthly) cost more, not less.</p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="closePriceWarningModal(true)" 
+                            class="flex-1 bg-orange-600 text-white py-3 rounded-xl font-bold hover:bg-orange-500 transition">
+                        Save Anyway
+                    </button>
+                    <button onclick="closePriceWarningModal(false)" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Store callbacks
+    window._priceWarningConfirm = onConfirm;
+    window._priceWarningCancel = onCancel;
+    
+    // Remove existing modal if any
+    const existing = $('priceWarningModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closePriceWarningModal = function(confirmed) {
+    const modal = $('priceWarningModal');
+    if (modal) modal.remove();
+    
+    if (confirmed && window._priceWarningConfirm) {
+        window._priceWarningConfirm();
+    } else if (!confirmed && window._priceWarningCancel) {
+        window._priceWarningCancel();
+    }
+    
+    window._priceWarningConfirm = null;
+    window._priceWarningCancel = null;
+};
+
 // ==================== NAVIGATION ====================
 function updateAuthButton(isLoggedIn) {
     const navBtn = $('navAuthBtn');
@@ -1451,19 +1575,47 @@ async function renderProperties(list) {
     // Update property count
     $('propertyCount').textContent = `(${list.length})`;
     
+    // Sort premium listings to the top
+    const sortedList = [...list].sort((a, b) => {
+        const aData = state.propertyOverrides[a.id] || {};
+        const bData = state.propertyOverrides[b.id] || {};
+        const aPremium = aData.isPremium || a.isPremium;
+        const bPremium = bData.isPremium || b.isPremium;
+        if (aPremium && !bPremium) return -1;
+        if (!aPremium && bPremium) return 1;
+        return 0;
+    });
+    
     // First render with placeholder owner
-    $('propertiesGrid').innerHTML = list.filter(p => p && p.images && p.images.length > 0).map(p => {
+    $('propertiesGrid').innerHTML = sortedList.filter(p => p && p.images && p.images.length > 0).map(p => {
         const available = state.availability[p.id] !== false;
+        const propData = state.propertyOverrides[p.id] || {};
+        const isPremium = propData.isPremium || p.isPremium;
+        
+        // Premium styling
+        const cardBorder = isPremium 
+            ? 'border-2 border-amber-500 ring-2 ring-amber-500/50 shadow-amber-500/20 shadow-2xl' 
+            : 'border border-gray-700';
+        const premiumBadge = isPremium 
+            ? `<div class="absolute top-0 left-0 right-0 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-1.5 font-black text-sm tracking-wider flex items-center justify-center gap-2">
+                <span>👑</span> PREMIUM LISTING <span>👑</span>
+               </div>` 
+            : '';
+        const premiumGlow = isPremium ? 'premium-glow' : '';
+        const imageMargin = isPremium ? 'mt-8' : '';
+        
         return `
-        <article class="property-card bg-gray-800 rounded-2xl shadow-xl overflow-hidden cursor-pointer border border-gray-700" onclick="viewProperty(${p.id})">
-            <div class="relative">
+        <article class="property-card bg-gray-800 rounded-2xl shadow-xl overflow-hidden cursor-pointer ${cardBorder} ${premiumGlow} relative" onclick="viewProperty(${p.id})">
+            ${premiumBadge}
+            <div class="relative ${imageMargin}">
                 ${!available ? '<div class="unavailable-overlay"><div class="unavailable-text">UNAVAILABLE</div></div>' : ''}
                 <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-72 object-cover" loading="lazy">
                 ${p.videoUrl ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-red-500 to-pink-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-full font-bold text-xs md:text-sm shadow-lg flex items-center space-x-1 md:space-x-2"><svg class="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path></svg><span>Video Tour</span></div>' : ''}
+                ${isPremium ? '<div class="absolute top-4 right-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-3 py-1 rounded-full font-bold text-xs shadow-lg">⭐ FEATURED</div>' : ''}
             </div>
             <div class="p-5 md:p-6">
                 <div class="flex justify-between items-start gap-2 mb-3">
-                    <h4 class="text-xl md:text-2xl font-bold text-white min-h-[3.5rem] md:min-h-[4rem] line-clamp-2">${sanitize(p.title)}</h4>
+                    <h4 class="text-xl md:text-2xl font-bold ${isPremium ? 'text-amber-300' : 'text-white'} min-h-[3.5rem] md:min-h-[4rem] line-clamp-2">${sanitize(p.title)}</h4>
                     <span class="badge text-white text-xs font-bold px-2 md:px-3 py-1 rounded-full uppercase shrink-0">${PropertyDataService.getValue(p.id, 'type', p.type)}</span>
                 </div>
                 <p class="text-gray-300 mb-2 font-medium text-sm md:text-base">Location: ${sanitize(p.location)}</p>
@@ -1476,16 +1628,16 @@ async function renderProperties(list) {
                 </div>
                 <div class="mb-4">
                     <div class="text-gray-400 font-semibold text-sm"><span class="font-bold text-gray-300">Weekly:</span> ${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
-                    <div class="text-purple-400 font-black text-xl md:text-2xl mt-1">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
+                    <div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
                 </div>
-                <button onclick="viewProperty(${p.id})" class="w-full gradient-bg text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
+                <button onclick="viewProperty(${p.id})" class="w-full ${isPremium ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900' : 'gradient-bg text-white'} px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
                 <button onclick="event.stopPropagation(); openContactModal('offer', '${sanitize(p.title)}', ${p.id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
             </div>
         </article>`;
     }).join('');
     
     // Then fetch and update owner names with tier icons asynchronously
-    for (const p of list) {
+    for (const p of sortedList) {
         const ownerInfo = await getPropertyOwnerWithTier(p.id);
         const ownerEl = $(`owner-${p.id}`);
         if (ownerEl) {
@@ -4186,11 +4338,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const biweeklyPrice = parseInt($('newListingBiweekly').value) || 0;
             const monthlyPrice = parseInt($('newListingMonthly').value) || 0;
             const imagesText = $('newListingImages').value.trim();
+            const isPremium = $('newListingPremium')?.checked || false;
             
             // Debug logging
             console.log('[CreateListing] Form values:', {
                 title, type, location, bedrooms, bathrooms, storage, 
-                interiorType, weeklyPrice, biweeklyPrice, monthlyPrice
+                interiorType, weeklyPrice, biweeklyPrice, monthlyPrice, isPremium
             });
             
             // Parse images
@@ -4236,7 +4389,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     images: images,
                     videoUrl: null,
                     features: false,
-                    ownerEmail: ownerEmail // Store owner email in property
+                    ownerEmail: ownerEmail,
+                    isPremium: isPremium,
+                    premiumRequestedAt: isPremium ? new Date().toISOString() : null
                 };
                 
                 // CRITICAL: Clear any stale property overrides for this ID FIRST
