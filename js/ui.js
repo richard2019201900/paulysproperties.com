@@ -2754,130 +2754,36 @@ window.openSubscriptionReminderModal = function(userId, email, displayName, tier
         reminderBg = 'bg-green-900/30 border-green-600';
     }
     
-    // Generate contextual payment reminder based on status
+    // Generate contextual payment reminder - TEXT MESSAGE FRIENDLY (no formatting)
     let paymentScript = '';
     if (daysUntilDue === null || daysUntilDue === undefined) {
         // Never paid
-        paymentScript = `Hey ${displayName}! 👋
-
-Welcome to PaulysProperties.com ${tierName}! We're excited to have you on board.
-
-Just a quick note - we haven't received your first subscription payment yet.
-
-💰 Amount Due: ${price}
-${tierEmoji} Your Plan: ${tierName}
-🏠 Benefits: ${benefits}
-
-Let's meet up whenever you're free to get this sorted out. Looking forward to helping you grow your rental business! 🏠✨`;
+        paymentScript = `Hey ${displayName}! 👋 Welcome to PaulysProperties.com ${tierName}! We're excited to have you on board. Just a quick note - we haven't received your first subscription payment yet. 💰 ${price} for the ${tierName} plan which gives you ${benefits}. Let's meet up whenever you're free to get this sorted out. Looking forward to helping you grow your rental business! 🏠✨`;
     } else if (daysUntilDue < 0) {
         // Overdue
-        paymentScript = `Hey ${displayName},
-
-Hope you're doing well! Just wanted to reach out - your PaulysProperties.com subscription is ${Math.abs(daysUntilDue)} days past due.
-
-💰 Amount Due: ${price}
-${tierEmoji} Plan: ${tierName}
-📅 Was Due: ${Math.abs(daysUntilDue)} days ago
-
-I want to make sure your listings stay active and visible to renters. Can we meet up soon to get this sorted?
-
-Let me know what works for you! 🙏`;
+        paymentScript = `Hey ${displayName}, hope you're doing well! Just wanted to reach out - your PaulysProperties.com subscription is ${Math.abs(daysUntilDue)} days past due. 💰 Amount: ${price} for your ${tierName} plan. I want to make sure your listings stay active and visible to renters. Can we meet up soon to get this sorted? Let me know what works for you! 🙏`;
     } else if (daysUntilDue === 0) {
         // Due today
-        paymentScript = `Hey ${displayName}! 👋
-
-Quick reminder - your PaulysProperties.com ${tierName} subscription is due today!
-
-💰 Amount: ${price}
-${tierEmoji} Plan: ${tierName}
-📅 Due: TODAY
-
-Are you free to meet up later? Let me know what time works and we can get this taken care of. 
-
-Thanks for being a valued member! 🙏`;
+        paymentScript = `Hey ${displayName}! 👋 Quick reminder - your PaulysProperties.com ${tierName} subscription is due today! 💰 ${price} for the month. Are you free to meet up later? Let me know what time works and we can get this taken care of. Thanks for being a valued member! 🙏`;
     } else if (daysUntilDue <= 7) {
         // Due soon (1-7 days)
-        paymentScript = `Hey ${displayName}! 👋
-
-Just a friendly heads up - your PaulysProperties.com ${tierName} subscription payment is coming up in ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''}!
-
-💰 Amount: ${price}
-${tierEmoji} Plan: ${tierName}
-📅 Due: ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''} from now
-
-No rush - just wanted to give you a heads up so we can plan to meet up. Let me know when you're available!
-
-Thanks! 😊`;
+        paymentScript = `Hey ${displayName}! 👋 Just a friendly heads up - your PaulysProperties.com ${tierName} subscription payment is coming up in ${daysUntilDue} day${daysUntilDue > 1 ? 's' : ''}! 💰 ${price} for the month. No rush - just wanted to give you a heads up so we can plan to meet up. Let me know when you're available! 😊`;
     } else {
         // Not due yet (8+ days)
-        paymentScript = `Hey ${displayName}! 👋
-
-Just checking in! Your PaulysProperties.com ${tierName} subscription is all good - next payment isn't due for another ${daysUntilDue} days.
-
-💰 Amount: ${price}
-${tierEmoji} Plan: ${tierName}
-📅 Next Due: ${daysUntilDue} days
-
-No action needed right now. Just wanted to say thanks for being part of the platform! 🏠✨
-
-Let me know if you need anything!`;
+        paymentScript = `Hey ${displayName}! 👋 Just checking in! Your PaulysProperties.com ${tierName} subscription is all good - next payment isn't due for another ${daysUntilDue} days. 💰 ${price} | ${tierEmoji} ${tierName} | 📅 ${daysUntilDue} days left. No action needed right now. Just wanted to say thanks for being part of the platform! 🏠✨`;
     }
     
-    // Generate upsell script (only if not already Elite)
+    // Generate upsell script - TEXT MESSAGE FRIENDLY
     let upsellScript = '';
     if (tier === 'pro') {
-        upsellScript = `Hey ${displayName}! 🌟
-
-I wanted to share something with you - I've noticed you're doing great with your ${benefits} on the Pro plan!
-
-Have you considered upgrading to Elite? Here's what you'd get:
-
-👑 ELITE TIER - $50,000/month
-✨ UNLIMITED property listings (no cap!)
-🎯 Priority placement in search results
-🏆 Elite badge on all your listings
-💼 Perfect for scaling your rental empire
-
-You're already at 2/3 listings on Pro. With Elite, you could list ALL your properties and really dominate the market here.
-
-The extra $25k/month pays for itself when you think about the additional rental income from more listings!
-
-Want to chat about upgrading? I can switch you over anytime. 🚀`;
+        upsellScript = `Hey ${displayName}! 🌟 I wanted to share something with you - I've noticed you're doing great with your ${benefits} on the Pro plan! Have you considered upgrading to Elite? Here's what you'd get: 👑 ELITE TIER - $50,000/month ✨ UNLIMITED property listings (no cap!) 🎯 Priority placement in search results 🏆 Elite badge on all your listings 💼 Perfect for scaling your rental empire. You're already at 2/3 listings on Pro. With Elite, you could list ALL your properties and really dominate the market here. The extra $25k/month pays for itself when you think about the additional rental income from more listings! Want to chat about upgrading? I can switch you over anytime. 🚀`;
     } else {
         // Already Elite - thank them instead
-        upsellScript = `Hey ${displayName}! 👑
-
-Just wanted to say THANK YOU for being an Elite member!
-
-You're one of our top property owners on PaulysProperties.com, and we really appreciate your business.
-
-🏆 Your Status: Elite Member
-✨ Your Benefits: Unlimited Listings
-🎯 Priority Placement: Active
-
-Your properties are getting maximum visibility, and renters love what you're offering.
-
-If there's anything we can do to help you succeed even more, just let me know. We're here for you!
-
-Keep crushing it! 💪🏠`;
+        upsellScript = `Hey ${displayName}! 👑 Just wanted to say THANK YOU for being an Elite member! You're one of our top property owners on PaulysProperties.com, and we really appreciate your business. 🏆 Elite Status with Unlimited Listings and Priority Placement - your properties are getting maximum visibility, and renters love what you're offering. If there's anything we can do to help you succeed even more, just let me know. We're here for you! Keep crushing it! 💪🏠`;
     }
     
-    // Generate referral/thank you script
-    const referralScript = `Hey ${displayName}! 🤝
-
-Quick question - do you know any other property owners who might benefit from PaulysProperties.com?
-
-Here's the deal:
-🎁 For every owner you refer who signs up for Pro or Elite, I'll give you a $5,000 credit toward your next subscription payment!
-
-It's a win-win:
-✅ Your friend gets a great platform for their rentals
-✅ You save money on your subscription
-✅ More properties means more options for renters
-
-Just have them mention your name when they sign up, and I'll apply the credit to your account.
-
-Know anyone who might be interested? 🏠💰`;
+    // Generate referral script - TEXT MESSAGE FRIENDLY
+    const referralScript = `Hey ${displayName}! 🤝 Quick question - do you know any other property owners who might benefit from PaulysProperties.com? Here's the deal: 🎁 For every owner you refer who signs up for Pro or Elite, I'll give you a $5,000 credit toward your next subscription payment! It's a win-win - your friend gets a great platform for their rentals, you save money on your subscription, and more properties means more options for renters. Just have them mention your name when they sign up, and I'll apply the credit to your account. Know anyone who might be interested? 🏠💰`;
     
     // Create modal HTML with larger text areas
     const modalHTML = `
@@ -2900,7 +2806,7 @@ Know anyone who might be interested? 🏠💰`;
                                 <span class="text-cyan-400 font-bold">💰 Payment Reminder</span>
                                 <button onclick="copySubscriptionScript('payment', '${displayName}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-1.5 rounded font-bold">📋 Copy</button>
                             </div>
-                            <textarea id="subScript_payment" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="10">${paymentScript}</textarea>
+                            <textarea id="subScript_payment" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="5">${paymentScript}</textarea>
                         </div>
                         
                         <!-- Upsell / Thank You -->
@@ -2909,7 +2815,7 @@ Know anyone who might be interested? 🏠💰`;
                                 <span class="${tier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tier === 'pro' ? '🚀 Upgrade to Elite' : '👑 VIP Thank You'}</span>
                                 <button onclick="copySubscriptionScript('upsell', '${displayName}')" class="${tier === 'pro' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-yellow-600 hover:bg-yellow-700'} text-white px-4 py-1.5 rounded font-bold">📋 Copy</button>
                             </div>
-                            <textarea id="subScript_upsell" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="10">${upsellScript}</textarea>
+                            <textarea id="subScript_upsell" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="5">${upsellScript}</textarea>
                         </div>
                         
                         <!-- Referral Program -->
@@ -2918,7 +2824,7 @@ Know anyone who might be interested? 🏠💰`;
                                 <span class="text-green-400 font-bold">🤝 Referral Bonus</span>
                                 <button onclick="copySubscriptionScript('referral', '${displayName}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded font-bold">📋 Copy</button>
                             </div>
-                            <textarea id="subScript_referral" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="10">${referralScript}</textarea>
+                            <textarea id="subScript_referral" class="w-full bg-gray-900 text-gray-300 text-sm p-4 rounded-lg border border-gray-600 resize-none" rows="5">${referralScript}</textarea>
                         </div>
                     </div>
                     
