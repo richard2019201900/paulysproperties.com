@@ -193,12 +193,32 @@ window.viewPropertyStats = async function(id) {
     if (window.propertyDeletionUnsubscribe) {
         window.propertyDeletionUnsubscribe();
     }
+    
+    // Track if property had an entry initially (to avoid false positives)
+    let propertyHadEntry = false;
+    let isFirstSnapshot = true;
+    
     window.propertyDeletionUnsubscribe = db.collection('settings').doc('properties')
         .onSnapshot((doc) => {
             if (doc.exists) {
                 const propsData = doc.data();
-                // Check if this property still exists
-                if (state.currentPropertyId === id && !propsData[id]) {
+                
+                if (isFirstSnapshot) {
+                    // On first load, just record if property has an entry
+                    propertyHadEntry = propsData[id] !== undefined;
+                    isFirstSnapshot = false;
+                    console.log('[PropertyDeletion] Initial check - property has entry:', propertyHadEntry);
+                    return;
+                }
+                
+                // Only trigger deletion notification if:
+                // 1. We're viewing this property
+                // 2. Property previously had an entry (was created via the system)
+                // 3. Entry is now gone OR explicitly marked deleted
+                const entryNowExists = propsData[id] !== undefined;
+                const isMarkedDeleted = propsData[id]?._deleted === true;
+                
+                if (state.currentPropertyId === id && propertyHadEntry && (!entryNowExists || isMarkedDeleted)) {
                     console.log('[PropertyDeletion] Property was deleted by admin:', id);
                     
                     // Remove from local arrays
@@ -1475,62 +1495,19 @@ window.copyRenterPhone = function(phoneNumber, btn) {
 };
 
 // ==================== GLOBAL PROPERTIES SYNC LISTENER ====================
-// Listens for property changes (deletions, updates) and syncs local state
+// Simplified: Only used for tracking property changes, not automatic deletion detection
+// The stats page has its own dedicated listener for deletion detection
 function setupGlobalPropertiesListener(userEmail) {
     // Cleanup existing listener
     if (window.globalPropertiesUnsubscribe) {
         window.globalPropertiesUnsubscribe();
     }
     
-    const lowerEmail = userEmail.toLowerCase();
-    console.log('[GlobalSync] Setting up properties listener for:', lowerEmail);
+    console.log('[GlobalSync] Properties listener setup for:', userEmail);
     
-    window.globalPropertiesUnsubscribe = db.collection('settings').doc('properties')
-        .onSnapshot((doc) => {
-            if (!doc.exists) return;
-            
-            const firestoreProps = doc.data();
-            const firestoreIds = new Set(Object.keys(firestoreProps));
-            
-            // Check for deletions - properties that exist locally but not in Firestore
-            const deletedProps = properties.filter(p => !firestoreIds.has(String(p.id)));
-            
-            if (deletedProps.length > 0) {
-                console.log('[GlobalSync] Detected deleted properties:', deletedProps.map(p => p.id));
-                
-                // Remove deleted properties from local array
-                deletedProps.forEach(delProp => {
-                    const index = properties.findIndex(p => p.id === delProp.id);
-                    if (index !== -1) {
-                        properties.splice(index, 1);
-                    }
-                    
-                    // Remove from owner map
-                    if (ownerPropertyMap[lowerEmail]) {
-                        ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== delProp.id);
-                    }
-                    
-                    // Remove from state
-                    delete state.availability[delProp.id];
-                    delete state.propertyOverrides[delProp.id];
-                });
-                
-                // Refresh the dashboard if visible
-                if ($('ownerDashboard')?.style.display !== 'none') {
-                    console.log('[GlobalSync] Refreshing owner dashboard');
-                    renderOwnerDashboard();
-                }
-                
-                // Refresh property grid if visible
-                if ($('propertyGrid')?.style.display !== 'none') {
-                    console.log('[GlobalSync] Refreshing property grid');
-                    renderProperties(properties);
-                }
-            }
-            
-        }, (error) => {
-            console.error('[GlobalSync] Listener error:', error);
-        });
+    // Note: We don't aggressively sync deletions globally anymore to prevent false positives
+    // The property stats page has its own dedicated listener that checks for deletion
+    // of the specific property being viewed
 }
 
 // ==================== INITIALIZE ====================
