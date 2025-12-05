@@ -189,51 +189,9 @@ window.viewPropertyStats = async function(id) {
         }
     });
     
-    // Set up real-time listener for property deletion
-    if (window.propertyDeletionUnsubscribe) {
-        window.propertyDeletionUnsubscribe();
-    }
-    
-    // Track if property had an entry initially (to avoid false positives)
-    let propertyHadEntry = false;
-    let isFirstSnapshot = true;
-    
-    window.propertyDeletionUnsubscribe = db.collection('settings').doc('properties')
-        .onSnapshot((doc) => {
-            if (doc.exists) {
-                const propsData = doc.data();
-                
-                if (isFirstSnapshot) {
-                    // On first load, just record if property has an entry
-                    propertyHadEntry = propsData[id] !== undefined;
-                    isFirstSnapshot = false;
-                    console.log('[PropertyDeletion] Initial check - property has entry:', propertyHadEntry);
-                    return;
-                }
-                
-                // Only trigger deletion notification if:
-                // 1. We're viewing this property
-                // 2. Property previously had an entry (was created via the system)
-                // 3. Entry is now gone OR explicitly marked deleted
-                const entryNowExists = propsData[id] !== undefined;
-                const isMarkedDeleted = propsData[id]?._deleted === true;
-                
-                if (state.currentPropertyId === id && propertyHadEntry && (!entryNowExists || isMarkedDeleted)) {
-                    console.log('[PropertyDeletion] Property was deleted by admin:', id);
-                    
-                    // Remove from local arrays
-                    const localIndex = properties.findIndex(prop => prop.id === id);
-                    if (localIndex !== -1) {
-                        properties.splice(localIndex, 1);
-                    }
-                    
-                    // Show notification and redirect
-                    showPropertyDeletedNotification(p.title || 'This property');
-                }
-            }
-        }, (error) => {
-            console.error('[PropertyDeletion] Listener error:', error);
-        });
+    // Note: Property deletion notifications are handled by the global listener
+    // in setupGlobalPropertiesListener() which watches the propertyDeletions collection
+    // filtered by the logged-in user's email - so only the OWNER sees the notification
     
     renderPropertyStatsContent(id);
     loadStatsOwnerName(id);
@@ -243,63 +201,6 @@ window.viewPropertyStats = async function(id) {
     hideElement($('propertyDetailPage'));
     showElement($('propertyStatsPage'));
     window.scrollTo(0, 0);
-};
-
-// Show notification when property is deleted by admin
-window.showPropertyDeletedNotification = function(propertyTitle) {
-    // Create modal overlay
-    const modalHTML = `
-        <div id="propertyDeletedModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-red-700 text-center">
-                <div class="text-6xl mb-4">🗑️</div>
-                <h3 class="text-xl font-bold text-red-400 mb-4">Property Deleted</h3>
-                <p class="text-gray-300 mb-2">The property "<strong>${propertyTitle}</strong>" has been deleted by an administrator.</p>
-                <p class="text-gray-400 text-sm mb-6">You will be redirected to your dashboard.</p>
-                <button onclick="closePropertyDeletedModal()" 
-                        class="w-full bg-gradient-to-r from-red-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
-                    Go to Dashboard
-                </button>
-            </div>
-        </div>
-    `;
-    
-    // Remove existing modal if any
-    const existingModal = $('propertyDeletedModal');
-    if (existingModal) existingModal.remove();
-    
-    // Add modal to body
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-};
-
-window.closePropertyDeletedModal = function() {
-    const modal = $('propertyDeletedModal');
-    if (modal) modal.remove();
-    
-    // Cleanup stats page listener
-    if (window.propertyDeletionUnsubscribe) {
-        window.propertyDeletionUnsubscribe();
-        window.propertyDeletionUnsubscribe = null;
-    }
-    
-    // Clear current property state
-    state.currentPropertyId = null;
-    
-    // Hide all property-related pages
-    hideElement($('propertyStatsPage'));
-    hideElement($('propertyDetailPage'));
-    
-    // Show dashboard
-    showElement($('ownerDashboard'));
-    
-    // Refresh the dashboard
-    if (typeof renderOwnerDashboard === 'function') {
-        renderOwnerDashboard();
-    }
-    
-    // Also refresh property grid if it exists
-    if (typeof renderProperties === 'function') {
-        renderProperties(properties);
-    }
 };
 
 // Load owner name for stats page
@@ -1504,62 +1405,6 @@ window.copyRenterPhone = function(phoneNumber, btn) {
     });
 };
 
-// ==================== GLOBAL PROPERTIES SYNC LISTENER ====================
-// Listens for property deletion notifications and syncs to user's browser in real-time
-function setupGlobalPropertiesListener(userEmail) {
-    // Cleanup existing listener
-    if (window.globalPropertiesUnsubscribe) {
-        window.globalPropertiesUnsubscribe();
-    }
-    
-    const lowerEmail = userEmail.toLowerCase();
-    console.log('[GlobalSync] Setting up deletion listener for:', lowerEmail);
-    
-    // Listen for deletion notifications for this user's properties
-    window.globalPropertiesUnsubscribe = db.collection('propertyDeletions')
-        .where('ownerEmail', '==', lowerEmail)
-        .where('acknowledged', '==', false)
-        .onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach(async (change) => {
-                if (change.type === 'added') {
-                    const deletion = change.doc.data();
-                    const deletionId = change.doc.id;
-                    
-                    console.log('[GlobalSync] Property deletion detected:', deletion.propertyId, deletion.propertyTitle);
-                    
-                    // Remove from local properties array
-                    const index = properties.findIndex(p => p.id === deletion.propertyId || String(p.id) === String(deletion.propertyId));
-                    if (index !== -1) {
-                        properties.splice(index, 1);
-                        console.log('[GlobalSync] Removed property from local array');
-                    }
-                    
-                    // Remove from owner map
-                    if (ownerPropertyMap[lowerEmail]) {
-                        ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(
-                            id => id !== deletion.propertyId && String(id) !== String(deletion.propertyId)
-                        );
-                    }
-                    
-                    // Remove from state
-                    delete state.availability[deletion.propertyId];
-                    delete state.propertyOverrides[deletion.propertyId];
-                    
-                    // Show notification modal
-                    showPropertyDeletedNotification(deletion.propertyTitle || 'Your property');
-                    
-                    // Mark as acknowledged so it doesn't trigger again
-                    await db.collection('propertyDeletions').doc(deletionId).update({
-                        acknowledged: true,
-                        acknowledgedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-            });
-        }, (error) => {
-            console.error('[GlobalSync] Deletion listener error:', error);
-        });
-}
-
 // ==================== INITIALIZE ====================
 async function init() {
     loadReviews();
@@ -1596,9 +1441,6 @@ async function init() {
                 state.userTier = 'starter';
             }
             
-            // Set up global properties sync listener
-            setupGlobalPropertiesListener(user.email);
-            
             renderOwnerDashboard();
             loadUsername();
             
@@ -1612,12 +1454,6 @@ async function init() {
             state.currentUser = null;
             state.userTier = null;
             updateAuthButton(false);
-            
-            // Cleanup global listener
-            if (window.globalPropertiesUnsubscribe) {
-                window.globalPropertiesUnsubscribe();
-                window.globalPropertiesUnsubscribe = null;
-            }
         }
     });
     

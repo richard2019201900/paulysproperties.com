@@ -3537,17 +3537,25 @@ window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
                 ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== propertyId);
             }
             
-            // CREATE DELETION NOTIFICATION for the property owner
-            // This allows real-time sync to their browser
-            await db.collection('propertyDeletions').add({
-                propertyId: propertyId,
-                propertyTitle: propertyTitle,
-                ownerEmail: lowerEmail,
-                deletedBy: auth.currentUser?.email || 'admin',
-                deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                acknowledged: false
-            });
-            console.log(`[Admin] Created deletion notification for ${lowerEmail}`);
+            // CREATE DELETION NOTIFICATION on owner's user document
+            // This triggers their existing user document listener for real-time sync
+            const ownerSnapshot = await db.collection('users')
+                .where('email', '==', lowerEmail)
+                .get();
+            
+            if (!ownerSnapshot.empty) {
+                const ownerDoc = ownerSnapshot.docs[0];
+                await db.collection('users').doc(ownerDoc.id).update({
+                    deletedProperty: {
+                        propertyId: propertyId,
+                        propertyTitle: propertyTitle,
+                        deletedBy: auth.currentUser?.email || 'admin',
+                        deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        acknowledged: false
+                    }
+                });
+                console.log(`[Admin] Set deletion notification on user document for ${lowerEmail}`);
+            }
         }
         
         console.log(`[Admin] Property ${propertyId} deleted completely`);
@@ -4344,24 +4352,32 @@ window.executeDeleteProperty = async function() {
     if (!window.pendingDeleteProperty) return;
     
     const propertyId = window.pendingDeleteProperty.id;
+    const propertyTitle = window.pendingDeleteProperty.title;
     const btn = $('confirmDeleteBtn');
     
     btn.disabled = true;
     btn.textContent = 'Deleting...';
     
     try {
+        // Get the ACTUAL property owner's email (not the current user - could be admin)
+        const actualOwnerEmail = (propertyOwnerEmail[propertyId] || '').toLowerCase();
+        const currentUserEmail = (auth.currentUser?.email || '').toLowerCase();
+        const isAdminDeleting = currentUserEmail !== actualOwnerEmail && actualOwnerEmail !== '';
+        
+        console.log('[Delete] Property:', propertyId, 'Owner:', actualOwnerEmail, 'Deleted by:', currentUserEmail, 'Admin?', isAdminDeleting);
+        
         // Remove from local properties array
         const propIndex = properties.findIndex(p => p.id === propertyId);
         if (propIndex !== -1) {
             properties.splice(propIndex, 1);
         }
         
-        // Remove from owner map
-        const ownerEmail = (auth.currentUser?.email || '').toLowerCase();
-        if (ownerPropertyMap[ownerEmail]) {
-            const idx = ownerPropertyMap[ownerEmail].indexOf(propertyId);
+        // Remove from owner map (use actual owner's email)
+        const ownerForMap = actualOwnerEmail || currentUserEmail;
+        if (ownerPropertyMap[ownerForMap]) {
+            const idx = ownerPropertyMap[ownerForMap].indexOf(propertyId);
             if (idx !== -1) {
-                ownerPropertyMap[ownerEmail].splice(idx, 1);
+                ownerPropertyMap[ownerForMap].splice(idx, 1);
             }
         }
         delete propertyOwnerEmail[propertyId];
@@ -4379,7 +4395,7 @@ window.executeDeleteProperty = async function() {
         
         // Update owner map in Firestore
         await db.collection('settings').doc('ownerPropertyMap').set({
-            [ownerEmail]: ownerPropertyMap[ownerEmail]
+            [ownerForMap]: ownerPropertyMap[ownerForMap] || []
         }, { merge: true });
         
         // Remove availability
@@ -4404,6 +4420,29 @@ window.executeDeleteProperty = async function() {
             console.log('[Delete] No overrides to clean up for property', propertyId);
         });
         
+        // CREATE DELETION NOTIFICATION for the property owner (if admin is deleting someone else's property)
+        if (isAdminDeleting && actualOwnerEmail) {
+            // Find the owner's user document and set deletedProperty field
+            // This triggers their existing user document listener
+            const ownerSnapshot = await db.collection('users')
+                .where('email', '==', actualOwnerEmail)
+                .get();
+            
+            if (!ownerSnapshot.empty) {
+                const ownerDoc = ownerSnapshot.docs[0];
+                await db.collection('users').doc(ownerDoc.id).update({
+                    deletedProperty: {
+                        propertyId: propertyId,
+                        propertyTitle: propertyTitle,
+                        deletedBy: currentUserEmail,
+                        deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        acknowledged: false
+                    }
+                });
+                console.log('[Delete] Set deletion notification on user document:', actualOwnerEmail);
+            }
+        }
+        
         // Update filtered properties
         state.filteredProperties = [...properties];
         
@@ -4412,8 +4451,7 @@ window.executeDeleteProperty = async function() {
         renderOwnerDashboard();
         
         // Update tier badge to reflect new listing count
-        const currentEmail = (auth.currentUser?.email || '').toLowerCase();
-        updateTierBadge(state.userTier || 'starter', currentEmail);
+        updateTierBadge(state.userTier || 'starter', currentUserEmail);
         
         // Close modal and go to dashboard
         closeModal('deleteConfirmModal');
@@ -4632,7 +4670,7 @@ window.startUserTierListener = function() {
     
     try {
         window.userTierUnsubscribe = db.collection('users').doc(user.uid)
-            .onSnapshot((doc) => {
+            .onSnapshot(async (doc) => {
                 if (!doc.exists) {
                     // Check if we're in the middle of creating an account
                     if (window.isCreatingAccount) {
@@ -4647,6 +4685,42 @@ window.startUserTierListener = function() {
                 
                 const data = doc.data();
                 const newTier = data.tier || 'starter';
+                
+                // CHECK FOR PROPERTY DELETION NOTIFICATION
+                if (data.deletedProperty && !data.deletedProperty.acknowledged) {
+                    console.log('[PropertySync] Property deletion detected:', data.deletedProperty);
+                    
+                    const deletedProp = data.deletedProperty;
+                    
+                    // Remove from local properties array
+                    const index = properties.findIndex(p => 
+                        p.id === deletedProp.propertyId || String(p.id) === String(deletedProp.propertyId)
+                    );
+                    if (index !== -1) {
+                        properties.splice(index, 1);
+                        console.log('[PropertySync] Removed property from local array');
+                    }
+                    
+                    // Remove from owner map
+                    const lowerEmail = user.email.toLowerCase();
+                    if (ownerPropertyMap[lowerEmail]) {
+                        ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(
+                            id => id !== deletedProp.propertyId && String(id) !== String(deletedProp.propertyId)
+                        );
+                    }
+                    
+                    // Remove from state
+                    delete state.availability[deletedProp.propertyId];
+                    delete state.propertyOverrides[deletedProp.propertyId];
+                    
+                    // Show notification modal
+                    showPropertyDeletedModal(deletedProp.propertyTitle || 'Your property');
+                    
+                    // Mark as acknowledged
+                    await db.collection('users').doc(user.uid).update({
+                        'deletedProperty.acknowledged': true
+                    });
+                }
                 
                 // Check if tier changed
                 if (state.userTier && state.userTier !== newTier) {
@@ -4676,6 +4750,53 @@ window.startUserTierListener = function() {
             });
     } catch (error) {
         console.error('Error setting up tier listener:', error);
+    }
+};
+
+// Show property deleted modal (called from tier listener)
+window.showPropertyDeletedModal = function(propertyTitle) {
+    const modalHTML = `
+        <div id="propertyDeletedModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-red-700 text-center">
+                <div class="text-6xl mb-4">🗑️</div>
+                <h3 class="text-xl font-bold text-red-400 mb-4">Property Deleted</h3>
+                <p class="text-gray-300 mb-2">The property "<strong>${propertyTitle}</strong>" has been deleted by an administrator.</p>
+                <p class="text-gray-400 text-sm mb-6">Your dashboard will be refreshed.</p>
+                <button onclick="closePropertyDeletedModal()" 
+                        class="w-full bg-gradient-to-r from-red-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                    OK
+                </button>
+            </div>
+        </div>
+    `;
+    
+    const existingModal = $('propertyDeletedModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+// Close property deleted modal and refresh UI
+window.closePropertyDeletedModal = function() {
+    const modal = $('propertyDeletedModal');
+    if (modal) modal.remove();
+    
+    // Clear current property state
+    state.currentPropertyId = null;
+    
+    // Hide property pages, show dashboard
+    hideElement($('propertyStatsPage'));
+    hideElement($('propertyDetailPage'));
+    showElement($('ownerDashboard'));
+    
+    // Refresh dashboard
+    if (typeof renderOwnerDashboard === 'function') {
+        renderOwnerDashboard();
+    }
+    
+    // Refresh property grid
+    if (typeof renderProperties === 'function') {
+        renderProperties(properties);
     }
 };
 
