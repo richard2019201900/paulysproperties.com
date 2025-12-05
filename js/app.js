@@ -96,10 +96,10 @@ window.viewProperty = function(id) {
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
                 ${[
-                    {icon:'Bed', val:PropertyDataService.getValue(id, 'bedrooms', p.bedrooms), label:'Bedrooms'},
-                    {icon:'Bath', val:PropertyDataService.getValue(id, 'bathrooms', p.bathrooms), label:'Bathrooms'},
-                    {icon:'Box', val:PropertyDataService.getValue(id, 'storage', p.storage).toLocaleString(), label:'Storage'},
-                    {icon:'Home', val:PropertyDataService.getValue(id, 'interiorType', p.interiorType), label:'Interior'}
+                    {icon:'🛏️', val:PropertyDataService.getValue(id, 'bedrooms', p.bedrooms), label:'Bedrooms'},
+                    {icon:'🛁', val:PropertyDataService.getValue(id, 'bathrooms', p.bathrooms), label:'Bathrooms'},
+                    {icon:'📦', val:PropertyDataService.getValue(id, 'storage', p.storage).toLocaleString(), label:'Storage Space'},
+                    {icon:'🏠', val:PropertyDataService.getValue(id, 'interiorType', p.interiorType), label:'Interior'}
                 ].map(s => `
                     <div class="text-center p-3 md:p-4 bg-gray-700 rounded-xl border border-gray-600">
                         <div class="text-2xl md:text-3xl mb-2">${s.icon}</div>
@@ -239,6 +239,7 @@ function renderPropertyStatsContent(id) {
     const interiorType = PropertyDataService.getValue(id, 'interiorType', p.interiorType);
     const propertyType = PropertyDataService.getValue(id, 'type', p.type);
     const weeklyPrice = PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice);
+    const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
     const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice);
     
     // Get reviews for this property
@@ -363,7 +364,12 @@ function renderPropertyStatsContent(id) {
                         </div>
                     </div>
                     <div class="flex flex-col items-end gap-2">
-                        <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${propertyType}</span>
+                        <span id="tile-type-${id}" 
+                              class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase cursor-pointer hover:ring-2 hover:ring-purple-400 transition"
+                              onclick="startEditPropertyType(${id})"
+                              data-field="type"
+                              data-original-value="${propertyType}"
+                              title="Click to change property type">${propertyType}</span>
                         <span id="stats-owner-${id}" class="bg-blue-600/80 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             <span>Loading...</span>
@@ -384,7 +390,7 @@ function renderPropertyStatsContent(id) {
                          onclick="startEditTile('bedrooms', ${id}, 'number')"
                          data-field="bedrooms"
                          data-original-value="${bedrooms}">
-                        <div class="text-2xl mb-2">Bed</div>
+                        <div class="text-2xl mb-2">🛏️</div>
                         <div id="value-bedrooms-${id}" class="text-xl font-bold text-white">${bedrooms}</div>
                         <div class="text-sm text-indigo-200">Bedrooms</div>
                         <div class="text-xs text-indigo-300 mt-1 opacity-70">Click to edit</div>
@@ -396,7 +402,7 @@ function renderPropertyStatsContent(id) {
                          onclick="startEditTile('bathrooms', ${id}, 'number')"
                          data-field="bathrooms"
                          data-original-value="${bathrooms}">
-                        <div class="text-2xl mb-2">Bath</div>
+                        <div class="text-2xl mb-2">🛁</div>
                         <div id="value-bathrooms-${id}" class="text-xl font-bold text-white">${bathrooms}</div>
                         <div class="text-sm text-cyan-200">Bathrooms</div>
                         <div class="text-xs text-cyan-300 mt-1 opacity-70">Click to edit</div>
@@ -408,9 +414,9 @@ function renderPropertyStatsContent(id) {
                          onclick="startEditTile('storage', ${id}, 'number')"
                          data-field="storage"
                          data-original-value="${storage}">
-                        <div class="text-2xl mb-2">Box</div>
+                        <div class="text-2xl mb-2">📦</div>
                         <div id="value-storage-${id}" class="text-xl font-bold text-white">${storage.toLocaleString()}</div>
-                        <div class="text-sm text-amber-200">Storage</div>
+                        <div class="text-sm text-amber-200">Storage Space</div>
                         <div class="text-xs text-amber-300 mt-1 opacity-70">Click to edit</div>
                     </div>
                     
@@ -420,7 +426,7 @@ function renderPropertyStatsContent(id) {
                          onclick="startEditTile('interiorType', ${id}, 'select')"
                          data-field="interiorType"
                          data-original-value="${interiorType}">
-                        <div class="text-2xl mb-2">Home</div>
+                        <div class="text-2xl mb-2">🏠</div>
                         <div id="value-interiorType-${id}" class="text-xl font-bold text-white">${interiorType}</div>
                         <div class="text-sm text-rose-200">Interior</div>
                         <div class="text-xs text-rose-300 mt-1 opacity-70">Click to edit</div>
@@ -566,6 +572,20 @@ function renderPropertyStatsContent(id) {
                 <div class="text-xs text-blue-200 mt-2 opacity-70">Click to edit</div>
             </div>
             
+            <!-- Biweekly Rate Tile -->
+            <div id="tile-biweeklyPrice-${id}" 
+                 class="stat-tile bg-gradient-to-br from-purple-600 to-violet-800 rounded-2xl shadow-xl p-6 text-white border border-purple-500 cursor-pointer"
+                 onclick="startEditTile('biweeklyPrice', ${id}, 'number')"
+                 data-field="biweeklyPrice"
+                 data-original-value="${biweeklyPrice}">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold opacity-90">Biweekly Rate</h3>
+                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <div id="value-biweeklyPrice-${id}" class="text-3xl font-black">${biweeklyPrice > 0 ? biweeklyPrice.toLocaleString() : 'Not set'}</div>
+                <div class="text-xs text-purple-200 mt-2 opacity-70">Click to edit</div>
+            </div>
+            
             <!-- Monthly Rate Tile -->
             <div id="tile-monthlyPrice-${id}" 
                  class="stat-tile bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-xl p-6 text-white border border-green-500 cursor-pointer"
@@ -591,16 +611,6 @@ function renderPropertyStatsContent(id) {
                 <div class="text-2xl font-black">${statusText}</div>
                 <div class="text-sm opacity-80 mt-1">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
                 <div class="text-xs mt-2 opacity-70">Click to toggle</div>
-            </div>
-            
-            <!-- Reviews Tile (read-only) -->
-            <div class="bg-gradient-to-br from-amber-600 to-orange-800 rounded-2xl shadow-xl p-6 text-white border border-amber-500">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-bold opacity-90">Reviews</h3>
-                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
-                </div>
-                <div class="text-2xl font-black">${avgRating} Star</div>
-                <div class="text-sm opacity-80 mt-1">${propertyReviews.length} review${propertyReviews.length !== 1 ? 's' : ''}</div>
             </div>
         </div>
         
@@ -817,7 +827,11 @@ window.saveTileEdit = async function(field, propertyId, type) {
     
     let displayValue;
     if (type === 'number') {
-        displayValue = field === 'weeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
+        if (field === 'biweeklyPrice' && (newValue === 0 || !newValue)) {
+            displayValue = 'Not set';
+        } else {
+            displayValue = field === 'weeklyPrice' || field === 'biweeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
+        }
     } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName' || field === 'renterPhone') && !newValue) {
         displayValue = '<span class="opacity-70">Not set</span>';
     } else if (field === 'renterNotes' && !newValue) {
@@ -886,7 +900,7 @@ window.saveTileEdit = async function(field, propertyId, type) {
         tile.classList.add('error');
         
         const rollbackValue = type === 'number'
-            ? (field === 'weeklyPrice' || field === 'monthlyPrice' ? `${parseInt(originalValue).toLocaleString()}` : parseInt(originalValue).toLocaleString())
+            ? (field === 'weeklyPrice' || field === 'biweeklyPrice' || field === 'monthlyPrice' ? `${parseInt(originalValue).toLocaleString()}` : parseInt(originalValue).toLocaleString())
             : originalValue;
         valueEl.innerHTML = `${rollbackValue}<div class="text-xs mt-1 text-red-300">Error! Try again</div>`;
         
@@ -910,6 +924,62 @@ window.cancelTileEdit = function(field, propertyId) {
     
     // Re-render to restore original display
     renderPropertyStatsContent(propertyId);
+};
+
+/**
+ * Edit property type on stats page
+ */
+window.startEditPropertyType = function(propertyId) {
+    const tile = $(`tile-type-${propertyId}`);
+    if (!tile) return;
+    
+    const currentValue = tile.dataset.originalValue || tile.textContent.trim().toLowerCase();
+    
+    // Create dropdown in place
+    tile.outerHTML = `
+        <div id="type-edit-container-${propertyId}" class="flex flex-col items-end gap-2">
+            <select id="type-select-${propertyId}" 
+                    class="bg-gray-800 border-2 border-purple-500 rounded-full px-4 py-2 text-white text-sm font-bold uppercase cursor-pointer focus:ring-2 focus:ring-purple-400"
+                    onchange="savePropertyType(${propertyId}, this.value)">
+                <option value="apartment" ${currentValue === 'apartment' ? 'selected' : ''}>Apartment</option>
+                <option value="house" ${currentValue === 'house' ? 'selected' : ''}>House</option>
+                <option value="condo" ${currentValue === 'condo' ? 'selected' : ''}>Condo</option>
+                <option value="villa" ${currentValue === 'villa' ? 'selected' : ''}>Villa</option>
+                <option value="warehouse" ${currentValue === 'warehouse' ? 'selected' : ''}>Warehouse</option>
+                <option value="hideout" ${currentValue === 'hideout' ? 'selected' : ''}>Hideout</option>
+            </select>
+            <button onclick="renderPropertyStatsContent(${propertyId})" class="text-xs text-gray-400 hover:text-white">Cancel</button>
+        </div>
+    `;
+    
+    // Focus the select
+    setTimeout(() => {
+        const select = $(`type-select-${propertyId}`);
+        if (select) select.focus();
+    }, 50);
+};
+
+/**
+ * Save property type change
+ */
+window.savePropertyType = async function(propertyId, newValue) {
+    try {
+        await PropertyDataService.write(propertyId, 'type', newValue);
+        
+        // Update filtered properties
+        state.filteredProperties = [...properties];
+        
+        // Refresh all views
+        renderPropertyStatsContent(propertyId);
+        renderProperties(state.filteredProperties);
+        if (state.currentUser === 'owner') renderOwnerDashboard();
+        
+        showToast('Property type updated!', 'success');
+    } catch (error) {
+        console.error('Failed to save property type:', error);
+        showToast('Failed to update property type', 'error');
+        renderPropertyStatsContent(propertyId);
+    }
 };
 
 /**
