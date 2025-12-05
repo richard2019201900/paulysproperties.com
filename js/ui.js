@@ -1,3 +1,31 @@
+// ==================== TOAST NOTIFICATIONS ====================
+window.showToast = function(message, type = 'info') {
+    const bgColors = {
+        success: 'from-green-600 to-emerald-600',
+        error: 'from-red-600 to-pink-600',
+        info: 'from-blue-600 to-cyan-600',
+        warning: 'from-yellow-600 to-orange-600'
+    };
+    
+    const icons = {
+        success: '✓',
+        error: '✕',
+        info: 'ℹ',
+        warning: '⚠'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 z-50 bg-gradient-to-r ${bgColors[type] || bgColors.info} text-white px-6 py-3 rounded-xl shadow-2xl font-bold flex items-center gap-2 animate-pulse`;
+    toast.innerHTML = `<span class="text-lg">${icons[type] || icons.info}</span> ${message}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.transition = 'opacity 0.3s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+};
+
 // ==================== NAVIGATION ====================
 function updateAuthButton(isLoggedIn) {
     const navBtn = $('navAuthBtn');
@@ -2237,15 +2265,32 @@ window.updateAdminStats = async function(users) {
     const availableListings = properties.filter(p => state.availability[p.id] !== false).length;
     const rentedListings = properties.filter(p => state.availability[p.id] === false).length;
     
-    // Front stats
+    // Front stats - with paid/trial breakdown
     const statUsers = $('adminStatUsers');
     const statPro = $('adminStatPro');
     const statElite = $('adminStatElite');
     const statListings = $('adminStatListings');
     
     if (statUsers) statUsers.textContent = totalUsers;
-    if (statPro) statPro.textContent = proUsers.length;
-    if (statElite) statElite.textContent = eliteUsers.length;
+    
+    // Pro tile - show paid/trial split
+    if (statPro) {
+        if (proTrialUsers.length > 0) {
+            statPro.innerHTML = `${proUsers.length} <span class="text-sm font-normal text-gray-400">(${proPaidUsers.length} paid, ${proTrialUsers.length} trial)</span>`;
+        } else {
+            statPro.textContent = proUsers.length;
+        }
+    }
+    
+    // Elite tile - show paid/trial split
+    if (statElite) {
+        if (eliteTrialUsers.length > 0) {
+            statElite.innerHTML = `${eliteUsers.length} <span class="text-sm font-normal text-gray-400">(${elitePaidUsers.length} paid, ${eliteTrialUsers.length} trial)</span>`;
+        } else {
+            statElite.textContent = eliteUsers.length;
+        }
+    }
+    
     if (statListings) statListings.textContent = totalListings;
     
     // Back details - Users
@@ -2263,27 +2308,42 @@ window.updateAdminStats = async function(users) {
     const eliteRevenue = elitePaidUsers.length * 50000;
     const totalPaidRevenue = proRevenue + eliteRevenue;
     
-    // Back details - Pro (with monthly revenue - PAID ONLY)
+    // Helper function to get user listing count
+    const getUserListings = (user) => {
+        const userEmail = user.email?.toLowerCase();
+        const userProps = ownerPropertyMap[userEmail] || [];
+        return userProps.length;
+    };
+    
+    // Back details - Pro (show users with listings)
     const proDetail = $('adminStatProDetail');
     if (proDetail) {
+        const allProUsersList = proUsers.map(u => {
+            const listings = getUserListings(u);
+            const isTrial = u.isFreeTrial === true;
+            const trialTag = isTrial ? '<span class="text-cyan-400">🎁</span>' : '<span class="text-green-400">💰</span>';
+            return `<div class="truncate">${trialTag} ${u.username || u.email.split('@')[0]} <span class="text-gray-500">${listings}/3</span></div>`;
+        }).join('');
+        
         proDetail.innerHTML = `
-            <div>💰 Paid Revenue: $${proRevenue.toLocaleString()}/mo</div>
-            ${proTrialUsers.length > 0 ? `<div class="text-cyan-400">🎁 Trials: ${proTrialUsers.length} ($0 revenue)</div>` : ''}
-            <div>📊 3 listings each</div>
-            ${proPaidUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
-            ${proPaidUsers.length > 2 ? `<div class="text-gray-500">+${proPaidUsers.length - 2} more paid</div>` : ''}
+            <div class="mb-1">💵 Revenue: <span class="text-green-400">$${proRevenue.toLocaleString()}/mo</span></div>
+            ${allProUsersList || '<div class="text-gray-500">No Pro users</div>'}
         `;
     }
     
-    // Back details - Elite (with monthly revenue - PAID ONLY)
+    // Back details - Elite (show users with listings)
     const eliteDetail = $('adminStatEliteDetail');
     if (eliteDetail) {
+        const allEliteUsersList = eliteUsers.map(u => {
+            const listings = getUserListings(u);
+            const isTrial = u.isFreeTrial === true;
+            const trialTag = isTrial ? '<span class="text-cyan-400">🎁</span>' : '<span class="text-green-400">💰</span>';
+            return `<div class="truncate">${trialTag} ${u.username || u.email.split('@')[0]} <span class="text-gray-500">${listings}/∞</span></div>`;
+        }).join('');
+        
         eliteDetail.innerHTML = `
-            <div>💰 Paid Revenue: $${eliteRevenue.toLocaleString()}/mo</div>
-            ${eliteTrialUsers.length > 0 ? `<div class="text-cyan-400">🎁 Trials: ${eliteTrialUsers.length} ($0 revenue)</div>` : ''}
-            <div>📊 Unlimited listings</div>
-            ${elitePaidUsers.slice(0, 2).map(u => `<div class="truncate">• ${u.username || u.email.split('@')[0]}</div>`).join('')}
-            ${elitePaidUsers.length > 2 ? `<div class="text-gray-500">+${elitePaidUsers.length - 2} more paid</div>` : ''}
+            <div class="mb-1">💵 Revenue: <span class="text-green-400">$${eliteRevenue.toLocaleString()}/mo</span></div>
+            ${allEliteUsersList || '<div class="text-gray-500">No Elite users</div>'}
         `;
     }
     
@@ -2497,13 +2557,13 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             // For paid users: show Mark as Trial (to toggle back if needed)
             const toggleTrialBtn = isFreeTrial ? `
                 <button onclick="convertTrialToPaid('${escapedId}', '${escapedEmail}')" 
-                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition ml-2"
+                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition"
                     title="Convert to paid subscription">
                     💰 Convert to Paid
                 </button>
             ` : `
                 <button onclick="markAsTrial('${escapedId}', '${escapedEmail}')" 
-                    class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition ml-2"
+                    class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition"
                     title="Mark as trial (removes from revenue)">
                     🎁 Mark as Trial
                 </button>
@@ -2522,7 +2582,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <span class="text-white font-bold text-sm">${subscriptionLabel}</span>
                             ${trialBadge}
                         </div>
-                        <div class="flex items-center">
+                        <div class="flex items-center gap-2">
                             ${toggleTrialBtn}
                             <button onclick="openSubscriptionReminderModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${user.tier}', '${tierPrice}', ${daysUntilDue})" 
                                 class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-bold transition">
@@ -3539,8 +3599,15 @@ window.loadUpgradeHistory = async function() {
                 borderColor = 'border-red-700/50';
             } else {
                 const newTierData = TIERS[entry.newTier] || TIERS.starter;
-                newTierDisplay = `<span class="px-2 py-1 rounded bg-gray-700 ${newTierData.color}">${newTierData.icon} ${newTierData.name}</span>`;
-                priceDisplay = entry.price ? `<span class="text-green-400 font-bold">$${entry.price.toLocaleString()}</span>` : '<span class="text-gray-500">-</span>';
+                const isTrialEntry = entry.isFreeTrial === true;
+                const trialBadge = isTrialEntry ? '<span class="px-2 py-0.5 rounded bg-cyan-600 text-white text-xs font-bold">🎁 TRIAL</span>' : '';
+                newTierDisplay = `<span class="px-2 py-1 rounded bg-gray-700 ${newTierData.color}">${newTierData.icon} ${newTierData.name}</span> ${trialBadge}`;
+                priceDisplay = isTrialEntry 
+                    ? '<span class="text-cyan-400 font-bold">$0 <span class="text-xs">(trial)</span></span>' 
+                    : (entry.price ? `<span class="text-green-400 font-bold">$${entry.price.toLocaleString()}</span>` : '<span class="text-gray-500">-</span>');
+                
+                // Different border for trials
+                if (isTrialEntry) borderColor = 'border-cyan-700/50';
             }
             
             // Only master owner can delete history entries
@@ -3699,7 +3766,7 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
     }
     
     try {
-        await TierService.setUserTier(email, newTier, currentTier, notes);
+        await TierService.setUserTier(email, newTier, currentTier, notes, isTrial);
         
         // Set subscription data including trial status
         const snapshot = await db.collection('users').where('email', '==', email).get();

@@ -100,7 +100,7 @@ const TierService = {
      * @param {string} previousTier - Previous tier for history
      * @param {string} paymentNote - Optional payment/note info
      */
-    async setUserTier(userEmail, newTier, previousTier = null, paymentNote = '') {
+    async setUserTier(userEmail, newTier, previousTier = null, paymentNote = '', isFreeTrial = false) {
         if (!TIERS[newTier]) {
             throw new Error('Invalid tier');
         }
@@ -131,10 +131,11 @@ const TierService = {
             upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
             upgradedBy: auth.currentUser?.email || 'system',
             paymentNote: paymentNote,
-            price: newTier === 'pro' ? 25000 : (newTier === 'elite' ? 50000 : 0)
+            price: isFreeTrial ? 0 : (newTier === 'pro' ? 25000 : (newTier === 'elite' ? 50000 : 0)),
+            isFreeTrial: isFreeTrial
         });
         
-        console.log(`[TierService] Updated ${userEmail} from ${oldTier} to ${newTier} tier`);
+        console.log(`[TierService] Updated ${userEmail} from ${oldTier} to ${newTier} tier${isFreeTrial ? ' (FREE TRIAL)' : ''}`);
     },
     
     /**
@@ -153,7 +154,11 @@ const TierService = {
                 tierUpdatedAt: data.tierUpdatedAt,
                 tierUpdatedBy: data.tierUpdatedBy,
                 createdAt: data.createdAt,
-                subscriptionLastPaid: data.subscriptionLastPaid || ''
+                subscriptionLastPaid: data.subscriptionLastPaid || '',
+                isFreeTrial: data.isFreeTrial === true,
+                trialStartDate: data.trialStartDate || '',
+                trialEndDate: data.trialEndDate || '',
+                trialNotes: data.trialNotes || ''
             };
         });
     },
