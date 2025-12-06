@@ -460,6 +460,28 @@ function renderPropertyStatsContent(id) {
                     </div>
                 </div>
                 
+                <!-- Property Images Gallery -->
+                <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
+                        <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Add Image
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="images-grid-${id}">
+                        ${p.images.map((img, i) => `
+                            <div class="relative group">
+                                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
+                                <button onclick="deletePropertyImage(${id}, ${i}, '${img.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg" title="Delete image">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${p.images.length === 0 ? '<p class="text-gray-500 text-center py-8">No images yet. Add some images to showcase your property!</p>' : ''}
+                </div>
+                
                 <!-- Renter & Payment Info -->
                 <h3 class="text-xl font-bold text-gray-200 mb-4">Renter & Payment Info <span class="text-sm text-purple-400">(Click to edit)</span></h3>
                 
@@ -682,28 +704,6 @@ function renderPropertyStatsContent(id) {
                     <p class="text-gray-400">Loading analytics...</p>
                 </div>
             </div>
-        </div>
-        
-        <!-- Property Images Gallery -->
-        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
-                <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    Add Image
-                </button>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="images-grid-${id}">
-                ${p.images.map((img, i) => `
-                    <div class="relative group">
-                        <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
-                        <button onclick="deletePropertyImage(${id}, ${i}, '${img.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg" title="Delete image">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
-                    </div>
-                `).join('')}
-            </div>
-            ${p.images.length === 0 ? '<p class="text-gray-500 text-center py-8">No images yet. Add some images to showcase your property!</p>' : ''}
         </div>
         
         <!-- Reviews Section -->
