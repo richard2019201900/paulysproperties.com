@@ -3136,34 +3136,64 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
     const pending = pendingRequests || window.adminPendingRequests || [];
     const pendingEmails = pending.map(r => r.userEmail?.toLowerCase());
     
-    container.innerHTML = users.map(user => {
-        // Check if this user is the master admin
-        const isUserMasterAdmin = TierService.isMasterAdmin(user.email);
+    // Sort users into tier groups
+    const tierOrder = { 'owner': 0, 'elite': 1, 'pro': 2, 'starter': 3 };
+    const sortedUsers = [...users].sort((a, b) => {
+        const aIsAdmin = TierService.isMasterAdmin(a.email);
+        const bIsAdmin = TierService.isMasterAdmin(b.email);
+        const aTier = aIsAdmin ? 'owner' : (a.tier || 'starter');
+        const bTier = bIsAdmin ? 'owner' : (b.tier || 'starter');
         
-        // Check if user has pending upgrade request
+        // First sort by tier
+        if (tierOrder[aTier] !== tierOrder[bTier]) {
+            return tierOrder[aTier] - tierOrder[bTier];
+        }
+        // Then by name
+        return (a.username || a.email).localeCompare(b.username || b.email);
+    });
+    
+    // Group users by tier
+    const groups = {
+        owner: sortedUsers.filter(u => TierService.isMasterAdmin(u.email)),
+        elite: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && u.tier === 'elite'),
+        pro: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && u.tier === 'pro'),
+        starter: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && (!u.tier || u.tier === 'starter'))
+    };
+    
+    // Render function for individual user card
+    const renderUserCard = (user) => {
+        const isUserMasterAdmin = TierService.isMasterAdmin(user.email);
         const hasPendingRequest = pendingEmails.includes(user.email?.toLowerCase());
         const pendingRequest = pending.find(r => r.userEmail?.toLowerCase() === user.email?.toLowerCase());
         
-        // Use Admin tier display for master admin, otherwise use their actual tier
         const tierData = isUserMasterAdmin 
             ? { icon: '👑', name: 'Owner', bgColor: 'bg-red-600', maxListings: Infinity }
             : (TIERS[user.tier] || TIERS.starter);
         
-        // ownerPropertyMap contains property IDs, need to look up actual property objects
         const userPropertyIds = ownerPropertyMap[user.email?.toLowerCase()] || [];
         const userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
         const listingCount = userProperties.length;
         const maxListings = (isUserMasterAdmin || tierData.maxListings === Infinity) ? '∞' : tierData.maxListings;
-        const lastUpdated = user.tierUpdatedAt?.toDate ? user.tierUpdatedAt.toDate().toLocaleDateString() : 'Never';
         const escapedEmail = user.email.replace(/'/g, "\\'");
         const escapedId = user.id;
         const displayName = user.username || user.email.split('@')[0];
         
-        // Build properties list HTML with numbering and proper data
+        // Format activity times
+        const lastLogin = user.lastLogin?.toDate 
+            ? user.lastLogin.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+            : (user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Never');
+        
+        const lastPropertyPost = user.lastPropertyPosted?.toDate 
+            ? user.lastPropertyPosted.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : (user.lastPropertyPostedAt ? new Date(user.lastPropertyPostedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never');
+        
+        const createdAt = user.createdAt?.toDate 
+            ? user.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Unknown';
+        
         const propertiesHTML = userProperties.length > 0 
             ? userProperties.map((p, index) => {
                 const title = p.title || p.name || 'Unnamed Property';
-                // Check available status - use state.availability which syncs with dashboard
                 const isAvailable = state.availability[p.id] !== false;
                 return `
                     <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0">
@@ -3171,20 +3201,19 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <span class="text-gray-500 mr-2">${index + 1}.</span>
                             <a onclick="viewPropertyStats(${p.id})" class="hover:text-cyan-400 cursor-pointer hover:underline transition">${title}</a>
                         </span>
-                        <span class="text-xs ${isAvailable ? 'text-green-400' : 'text-red-400'}">${isAvailable ? '🟢 Available' : '🔴 Rented'}</span>
+                        <span class="text-xs ${isAvailable ? 'text-green-400' : 'text-red-400'}">${isAvailable ? '🟢' : '🔴'}</span>
                     </div>
                 `;
             }).join('')
             : '<p class="text-gray-500 text-xs italic">No properties listed</p>';
         
-        // Pending upgrade badge
         const pendingBadge = hasPendingRequest ? `
             <span class="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse ml-2">
                 💰 WANTS ${(TIERS[pendingRequest?.requestedTier]?.name || 'Upgrade').toUpperCase()}
             </span>
         ` : '';
         
-        // === SUBSCRIPTION TRACKING FOR PRO/ELITE USERS ===
+        // Subscription tracking HTML for Pro/Elite
         let subscriptionHTML = '';
         if (!isUserMasterAdmin && (user.tier === 'pro' || user.tier === 'elite')) {
             const subLastPaid = user.subscriptionLastPaid || '';
@@ -3193,14 +3222,12 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             const isFreeTrial = user.isFreeTrial === true;
             const trialEndDate = user.trialEndDate || '';
             
-            // Calculate next due date (monthly)
             let nextDueDate = '';
             let daysUntilDue = null;
             let statusColor = 'text-gray-400';
             let statusBg = 'bg-gray-700';
             let statusIcon = '📅';
             
-            // Trial status calculations
             let trialDaysLeft = null;
             if (isFreeTrial && trialEndDate) {
                 const [tYear, tMonth, tDay] = trialEndDate.split('-').map(Number);
@@ -3212,11 +3239,10 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             }
             
             if (subLastPaid) {
-                // Parse date parts to avoid timezone shift
                 const [year, month, day] = subLastPaid.split('-').map(Number);
                 const lastDate = new Date(year, month - 1, day);
                 const nextDate = new Date(lastDate);
-                nextDate.setDate(nextDate.getDate() + 30); // 30 days from last payment
+                nextDate.setDate(nextDate.getDate() + 30);
                 nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 
                 const today = new Date();
@@ -3225,7 +3251,6 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
                 
                 if (isFreeTrial) {
-                    // Trial-specific styling
                     statusColor = 'text-cyan-400';
                     statusBg = 'bg-cyan-900/30 border-cyan-500';
                     statusIcon = '🎁';
@@ -3250,7 +3275,6 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             
             const lastPaidDisplay = subLastPaid 
                 ? (() => {
-                    // Parse date parts to avoid timezone shift
                     const [year, month, day] = subLastPaid.split('-').map(Number);
                     const localDate = new Date(year, month - 1, day);
                     return localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -3265,29 +3289,23 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         : `<span class="${statusColor}">${daysUntilDue}d left</span>`)
                 : '<span class="text-gray-500">Not set</span>';
             
-            // Trial badge and convert button
             const trialBadge = isFreeTrial ? `
                 <span class="bg-cyan-600 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">🎁 FREE TRIAL</span>
                 ${trialDaysLeft !== null ? `<span class="text-cyan-400 text-xs ml-1">(${trialDaysLeft}d left)</span>` : ''}
             ` : '';
             
-            // For trial users: show Convert to Paid
-            // For paid users: show Mark as Trial (to toggle back if needed)
             const toggleTrialBtn = isFreeTrial ? `
                 <button onclick="convertTrialToPaid('${escapedId}', '${escapedEmail}')" 
-                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition"
-                    title="Convert to paid subscription">
+                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition">
                     💰 Convert to Paid
                 </button>
             ` : `
                 <button onclick="markAsTrial('${escapedId}', '${escapedEmail}')" 
-                    class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition"
-                    title="Mark as trial (removes from revenue)">
+                    class="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs font-bold transition">
                     🎁 Mark as Trial
                 </button>
             `;
             
-            // For trial users, show tier name instead of price
             const subscriptionLabel = isFreeTrial 
                 ? `${tierName} Trial` 
                 : `Subscription: ${tierPrice}/mo`;
@@ -3312,8 +3330,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         <div>
                             <span class="text-gray-400">${isFreeTrial ? 'Trial Started:' : 'Last Paid:'}</span>
                             <span class="sub-last-paid text-white ml-1 cursor-pointer hover:text-cyan-400" 
-                                  onclick="editSubscriptionDate('${escapedId}', '${escapedEmail}', '${subLastPaid}')"
-                                  title="Click to select date">
+                                  onclick="editSubscriptionDate('${escapedId}', '${escapedEmail}', '${subLastPaid}')">
                                 ${lastPaidDisplay} ✏️
                             </span>
                         </div>
@@ -3327,39 +3344,33 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             `;
         }
         
-        // Don't show action buttons for master admin
         const actionButtons = isUserMasterAdmin ? '' : `
             <div class="flex flex-wrap gap-2">
                 ${user.tier !== 'pro' ? `
                     <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
-                        class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                        title="Upgrade this user to Pro tier ($25k/mo)">
+                        class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
                         ⭐ Upgrade to Pro
                     </button>
                 ` : ''}
                 ${user.tier !== 'elite' ? `
                     <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
-                        class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                        title="Upgrade this user to Elite tier ($50k/mo)">
+                        class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
                         👑 Upgrade to Elite
                     </button>
                 ` : ''}
                 ${user.tier !== 'starter' ? `
                     <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" 
-                        class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                        title="Downgrade to free Starter tier">
+                        class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
                         🌱 Downgrade
                     </button>
                 ` : ''}
                 <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
-                    class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition"
-                    title="Delete this user account">
+                    class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
                     🗑️ Delete
                 </button>
             </div>
         `;
         
-        // Card border styling - highlight users with pending requests
         const cardBorder = hasPendingRequest 
             ? 'border-orange-500 ring-2 ring-orange-500/50 animate-pulse'
             : (isUserMasterAdmin ? 'border-red-600/50' : 'border-gray-700');
@@ -3375,15 +3386,29 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                                 <div class="text-gray-500 text-xs">${user.email}</div>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-3 text-sm">
+                        <div class="flex flex-wrap items-center gap-3 text-sm mb-2">
                             <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold text-xs">${tierData.name}</span>
                             <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
-                            <span class="text-gray-500 text-xs">Updated: ${lastUpdated}</span>
                             <button onclick="toggleUserProperties('${escapedId}')" class="text-cyan-400 hover:underline text-xs flex items-center gap-1">
                                 <span id="propToggle_${escapedId}">▶</span> Properties (${listingCount})
                             </button>
                         </div>
-                        <!-- Inline Properties List -->
+                        <!-- Activity Info -->
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-400 bg-gray-900/30 rounded-lg p-2 mb-2">
+                            <div title="Account created">
+                                <span class="text-gray-500">📅 Joined:</span> 
+                                <span class="text-gray-300">${createdAt}</span>
+                            </div>
+                            <div title="Last login time">
+                                <span class="text-gray-500">🕐 Last Login:</span> 
+                                <span class="text-gray-300">${lastLogin}</span>
+                            </div>
+                            <div title="Last property posted">
+                                <span class="text-gray-500">🏠 Last Post:</span> 
+                                <span class="text-gray-300">${lastPropertyPost}</span>
+                            </div>
+                        </div>
+                        <!-- Properties List -->
                         <div id="propList_${escapedId}" class="hidden mt-3 bg-gray-900/50 rounded-lg p-3 max-h-32 overflow-y-auto">
                             ${propertiesHTML}
                         </div>
@@ -3393,7 +3418,76 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 </div>
             </div>
         `;
-    }).join('');
+    };
+    
+    // Render grouped sections
+    let html = '';
+    
+    // Owner/Admin section
+    if (groups.owner.length > 0) {
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-red-600/50">
+                    <span class="text-xl">👑</span>
+                    <h5 class="text-red-400 font-bold">Owner / Admin</h5>
+                    <span class="text-gray-500 text-sm">(${groups.owner.length})</span>
+                </div>
+                <div class="space-y-3">
+                    ${groups.owner.map(renderUserCard).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Elite section
+    if (groups.elite.length > 0) {
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-600/50">
+                    <span class="text-xl">👑</span>
+                    <h5 class="text-yellow-400 font-bold">Elite Members</h5>
+                    <span class="text-gray-500 text-sm">(${groups.elite.length}) • $50k/mo each</span>
+                </div>
+                <div class="space-y-3">
+                    ${groups.elite.map(renderUserCard).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Pro section
+    if (groups.pro.length > 0) {
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-600/50">
+                    <span class="text-xl">⭐</span>
+                    <h5 class="text-purple-400 font-bold">Pro Members</h5>
+                    <span class="text-gray-500 text-sm">(${groups.pro.length}) • $25k/mo each</span>
+                </div>
+                <div class="space-y-3">
+                    ${groups.pro.map(renderUserCard).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Starter section
+    if (groups.starter.length > 0) {
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-green-600/50">
+                    <span class="text-xl">🌱</span>
+                    <h5 class="text-green-400 font-bold">Starter Members</h5>
+                    <span class="text-gray-500 text-sm">(${groups.starter.length}) • Free tier</span>
+                </div>
+                <div class="space-y-3">
+                    ${groups.starter.map(renderUserCard).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html || '<p class="text-gray-500 italic">No users found.</p>';
 };
 
 window.toggleUserProperties = function(userId) {
@@ -4913,6 +5007,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 await db.collection('settings').doc('ownerPropertyMap').set({
                     [ownerEmail]: ownerPropertyMap[ownerEmail]
                 }, { merge: true });
+                
+                // Track last property posted time for this user
+                try {
+                    const user = auth.currentUser;
+                    if (user) {
+                        await db.collection('users').doc(user.uid).update({
+                            lastPropertyPostedAt: new Date().toISOString(),
+                            lastPropertyPosted: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log('[CreateListing] Updated lastPropertyPosted time');
+                    }
+                } catch (e) {
+                    console.warn('[CreateListing] Could not update lastPropertyPosted:', e);
+                }
                 
                 // Update filtered properties
                 state.filteredProperties = [...properties];

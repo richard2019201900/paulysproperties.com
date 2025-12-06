@@ -1998,6 +1998,17 @@ async function init() {
                 state.userTier = 'starter';
             }
             
+            // Track last login time
+            try {
+                await db.collection('users').doc(user.uid).update({
+                    lastLoginAt: new Date().toISOString(),
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('[Auth] Updated last login time');
+            } catch (e) {
+                console.warn('[Auth] Could not update last login:', e);
+            }
+            
             renderOwnerDashboard();
             loadUsername();
             
