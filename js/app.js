@@ -509,11 +509,12 @@ function renderPropertyStatsContent(id) {
                          onclick="startEditTile('renterNotes', ${id}, 'textarea')"
                          data-field="renterNotes"
                          data-original-value="${sanitize(renterNotes)}">
-                        <div class="flex items-center gap-3 mb-2">
+                        <div class="flex items-center gap-3 mb-1">
                             <svg class="w-6 h-6 text-violet-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                            <span class="text-violet-200 font-semibold">Notes</span>
+                            <span class="text-violet-200 font-semibold">Private Renter Notes</span>
                         </div>
-                        <div id="value-renterNotes-${id}" class="text-sm font-medium text-white" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${renterNotes || '<span class="text-violet-300 opacity-70">Add notes...</span>'}</div>
+                        <div class="text-xs text-violet-300 mb-2 opacity-80">🔒 Only you can see this</div>
+                        <div id="value-renterNotes-${id}" class="text-sm font-medium text-white" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${renterNotes || '<span class="text-violet-300 opacity-70">e.g. Prefers upfront monthly discounts</span>'}</div>
                         <div class="text-xs text-violet-300 mt-2 opacity-70">Click to edit</div>
                     </div>
                 </div>
