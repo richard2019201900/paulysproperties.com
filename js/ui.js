@@ -3282,6 +3282,36 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             ? user.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
             : 'Unknown';
         
+        // Calculate property type breakdown
+        const propTypeBreakdown = {};
+        const interiorBreakdown = { 'Walk-in': 0, 'Instance': 0 };
+        userProperties.forEach(p => {
+            const pType = p.type || 'unknown';
+            propTypeBreakdown[pType] = (propTypeBreakdown[pType] || 0) + 1;
+            if (p.interiorType === 'Walk-in') interiorBreakdown['Walk-in']++;
+            else if (p.interiorType === 'Instance') interiorBreakdown['Instance']++;
+        });
+        
+        // Format property type breakdown for display
+        let propBreakdownHTML = '';
+        if (userProperties.length > 0) {
+            const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', warehouse: '🏭', hideout: '🏚️' };
+            const typeEntries = Object.entries(propTypeBreakdown)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3) // Show top 3
+                .map(([type, count]) => `${typeIcons[type] || '🏠'} ${type.charAt(0).toUpperCase() + type.slice(1)}: ${count}`)
+                .join(' • ');
+            
+            const walkinPct = userProperties.length > 0 ? Math.round((interiorBreakdown['Walk-in'] / userProperties.length) * 100) : 0;
+            
+            propBreakdownHTML = `
+                <div class="flex flex-wrap gap-2 text-xs mt-1">
+                    <span class="text-gray-500">${typeEntries}</span>
+                    <span class="text-cyan-400/70">| ${walkinPct}% Walk-in</span>
+                </div>
+            `;
+        }
+        
         const propertiesHTML = userProperties.length > 0 
             ? userProperties.map((p, index) => {
                 const title = p.title || p.name || 'Unnamed Property';
@@ -3499,6 +3529,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                                 <span class="text-gray-300">${lastPropertyPost}</span>
                             </div>
                         </div>
+                        ${propBreakdownHTML}
                         <!-- Properties List -->
                         <div id="propList_${escapedId}" class="hidden mt-3 bg-gray-900/50 rounded-lg p-3 max-h-32 overflow-y-auto">
                             ${propertiesHTML}
@@ -3514,64 +3545,68 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
     // Render grouped sections
     let html = '';
     
-    // Owner/Admin section
+    // Owner/Admin section (collapsed by default)
     if (groups.owner.length > 0) {
         html += `
             <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-red-600/50">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-red-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('ownerGroup')">
+                    <span id="ownerGroupToggle" class="text-gray-400 transition">▶</span>
                     <span class="text-xl">👑</span>
                     <h5 class="text-red-400 font-bold">Owner / Admin</h5>
                     <span class="text-gray-500 text-sm">(${groups.owner.length})</span>
                 </div>
-                <div class="space-y-3">
+                <div id="ownerGroup" class="space-y-3 hidden">
                     ${groups.owner.map(renderUserCard).join('')}
                 </div>
             </div>
         `;
     }
     
-    // Elite section
+    // Elite section (expanded by default)
     if (groups.elite.length > 0) {
         html += `
             <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-600/50">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('eliteGroup')">
+                    <span id="eliteGroupToggle" class="text-gray-400 transition">▼</span>
                     <span class="text-xl">👑</span>
                     <h5 class="text-yellow-400 font-bold">Elite Members</h5>
                     <span class="text-gray-500 text-sm">(${groups.elite.length}) • $50k/mo each</span>
                 </div>
-                <div class="space-y-3">
+                <div id="eliteGroup" class="space-y-3">
                     ${groups.elite.map(renderUserCard).join('')}
                 </div>
             </div>
         `;
     }
     
-    // Pro section
+    // Pro section (expanded by default)
     if (groups.pro.length > 0) {
         html += `
             <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-600/50">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('proGroup')">
+                    <span id="proGroupToggle" class="text-gray-400 transition">▼</span>
                     <span class="text-xl">⭐</span>
                     <h5 class="text-purple-400 font-bold">Pro Members</h5>
                     <span class="text-gray-500 text-sm">(${groups.pro.length}) • $25k/mo each</span>
                 </div>
-                <div class="space-y-3">
+                <div id="proGroup" class="space-y-3">
                     ${groups.pro.map(renderUserCard).join('')}
                 </div>
             </div>
         `;
     }
     
-    // Starter section
+    // Starter section (expanded by default)
     if (groups.starter.length > 0) {
         html += `
             <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-green-600/50">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-green-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('starterGroup')">
+                    <span id="starterGroupToggle" class="text-gray-400 transition">▼</span>
                     <span class="text-xl">🌱</span>
                     <h5 class="text-green-400 font-bold">Starter Members</h5>
                     <span class="text-gray-500 text-sm">(${groups.starter.length}) • Free tier</span>
                 </div>
-                <div class="space-y-3">
+                <div id="starterGroup" class="space-y-3">
                     ${groups.starter.map(renderUserCard).join('')}
                 </div>
             </div>
@@ -3590,6 +3625,21 @@ window.toggleUserProperties = function(userId) {
             toggle.textContent = '▼';
         } else {
             list.classList.add('hidden');
+            toggle.textContent = '▶';
+        }
+    }
+};
+
+// Toggle user group visibility (collapsible sections)
+window.toggleUserGroup = function(groupId) {
+    const group = $(groupId);
+    const toggle = $(groupId + 'Toggle');
+    if (group && toggle) {
+        if (group.classList.contains('hidden')) {
+            group.classList.remove('hidden');
+            toggle.textContent = '▼';
+        } else {
+            group.classList.add('hidden');
             toggle.textContent = '▶';
         }
     }

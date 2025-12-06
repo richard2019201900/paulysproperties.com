@@ -963,7 +963,7 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             }
             
             // Log payment to Firestore
-            await logPayment(propertyId, {
+            const logSuccess = await logPayment(propertyId, {
                 paymentDate: newValue,
                 recordedAt: new Date().toISOString(),
                 renterName: renterName,
@@ -972,6 +972,11 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 recordedBy: auth.currentUser?.email || 'owner'
             });
             console.log(`[PaymentLog] Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
+            
+            // Show toast notification for payment logged
+            if (logSuccess && typeof showToast === 'function') {
+                showToast(`💰 Payment logged: $${paymentAmount.toLocaleString()} from ${renterName}`, 'success');
+            }
         }
         
         // Auto-flip to "rented" when setting renter name or phone

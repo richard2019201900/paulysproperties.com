@@ -1174,8 +1174,14 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                 <h2 class="text-4xl md:text-6xl font-black mb-6">Live Like You Mean It.</h2>
                 <p class="text-xl md:text-2xl mb-12 font-light max-w-4xl mx-auto">Pauly's exclusive collection. Premium rentals. Professionally managed. Scroll down and find your next home — or make an offer to own it.</p>
-                <div class="max-w-5xl mx-auto glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
-                    <div class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-2 md:gap-4">
+                <div class="max-w-6xl mx-auto glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
+                    <!-- Row 1: Listing Type, Property Type, Interior -->
+                    <div class="grid grid-cols-3 gap-2 md:gap-4 mb-3">
+                        <select id="searchListingType" onchange="updatePriceOptions()" class="px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 border-2 border-gray-600 rounded-lg md:rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 font-medium transition text-xs sm:text-sm md:text-base min-w-0">
+                            <option value="" disabled selected class="text-purple-400">── Rental/Purchase ──</option>
+                            <option value="rental">🏠 For Rent</option>
+                            <option value="purchase">💰 For Purchase</option>
+                        </select>
                         <select id="searchType" class="px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 border-2 border-gray-600 rounded-lg md:rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 font-medium transition text-xs sm:text-sm md:text-base min-w-0">
                             <option value="" disabled selected class="text-purple-400">── Type ──</option>
                             <option value="house">House</option>
@@ -1190,12 +1196,21 @@
                             <option value="Walk-in">Walk-in</option>
                             <option value="Instance">Instance</option>
                         </select>
+                    </div>
+                    <!-- Row 2: Frequency (rental only), Price, Search/Clear -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+                        <select id="searchFrequency" class="hidden px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 border-2 border-cyan-500 rounded-lg md:rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 font-medium transition text-xs sm:text-sm md:text-base min-w-0" onchange="updatePriceOptions()">
+                            <option value="" disabled selected class="text-cyan-400">── Frequency ──</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
                         <select id="searchPrice" class="px-2 py-2 sm:px-3 sm:py-3 md:px-5 md:py-4 border-2 border-gray-600 rounded-lg md:rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 font-medium transition text-xs sm:text-sm md:text-base min-w-0">
                             <option value="" disabled selected class="text-purple-400">── Price ──</option>
-                            <option value="0-200000">$0 - $200k</option>
-                            <option value="200000-400000">$200k - $400k</option>
-                            <option value="400000-600000">$400k - $600k</option>
-                            <option value="600000+">$600k+</option>
+                            <option value="0-50000">$0 - $50k</option>
+                            <option value="50000-100000">$50k - $100k</option>
+                            <option value="100000-200000">$100k - $200k</option>
+                            <option value="200000+">$200k+</option>
                         </select>
                         <button onclick="searchProperties()" class="gradient-bg text-white px-3 py-2 sm:px-4 sm:py-3 md:px-8 md:py-4 rounded-lg md:rounded-xl font-bold hover:opacity-90 transition shadow-lg text-xs sm:text-sm md:text-base">Search</button>
                         <button onclick="clearFilters()" class="bg-gray-600 text-white px-3 py-2 sm:px-4 sm:py-3 md:px-8 md:py-4 rounded-lg md:rounded-xl font-bold hover:bg-gray-500 transition shadow-lg text-xs sm:text-sm md:text-base">Clear</button>
