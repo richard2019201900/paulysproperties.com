@@ -154,6 +154,12 @@ const TierService = {
                 tierUpdatedAt: data.tierUpdatedAt,
                 tierUpdatedBy: data.tierUpdatedBy,
                 createdAt: data.createdAt,
+                // Activity tracking fields
+                lastLogin: data.lastLogin,           // Firestore Timestamp
+                lastLoginAt: data.lastLoginAt || '', // ISO string fallback
+                lastPropertyPosted: data.lastPropertyPosted,    // Firestore Timestamp
+                lastPropertyPostedAt: data.lastPropertyPostedAt || '', // ISO string fallback
+                // Subscription fields
                 subscriptionLastPaid: data.subscriptionLastPaid || '',
                 isFreeTrial: data.isFreeTrial === true,
                 trialStartDate: data.trialStartDate || '',

@@ -3348,7 +3348,8 @@ window.updateAdminStats = async function(users) {
     const totalUsers = users.length;
     const proUsers = users.filter(u => u.tier === 'pro');
     const eliteUsers = users.filter(u => u.tier === 'elite');
-    const starterUsers = users.filter(u => u.tier === 'starter' || !u.tier);
+    // Exclude master admin from starter count
+    const starterUsers = users.filter(u => !TierService.isMasterAdmin(u.email) && (u.tier === 'starter' || !u.tier));
     
     // Separate trial users from paid users
     const proTrialUsers = proUsers.filter(u => u.isFreeTrial === true);
