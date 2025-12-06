@@ -4726,8 +4726,8 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
 function showUpgradeModal(email, newTier, currentTier, tierData, price) {
     // Create modal overlay
     const modalHTML = `
-        <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-700">
+        <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'upgradeModal') closeUpgradeModal()">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-700" onclick="event.stopPropagation()">
                 <h3 class="text-xl font-bold text-white mb-4">⬆️ Upgrade User</h3>
                 
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
@@ -4827,12 +4827,24 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
             confirmBtn.classList.add('from-green-600', 'to-emerald-600');
         }
         
-        setTimeout(() => {
-            closeUpgradeModal();
-            const trialMsg = isTrial ? '\n\n🎁 Marked as FREE TRIAL (not counted as revenue)' : '';
-            showToast(`${email} upgraded to ${tierData.name}!${isTrial ? ' (Trial)' : ''}`, 'success');
+        // Close modal and refresh after brief delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Force close modal
+        const modal = $('upgradeModal');
+        if (modal) {
+            modal.remove();
+            console.log('[Upgrade] Modal closed');
+        }
+        
+        // Show toast and refresh users
+        const trialMsg = isTrial ? ' (Trial)' : '';
+        showToast(`${email} upgraded to ${tierData.name}!${trialMsg}`, 'success');
+        
+        // Refresh users list
+        if (typeof loadAllUsers === 'function') {
             loadAllUsers();
-        }, 800);
+        }
         
     } catch (error) {
         console.error('Error upgrading user:', error);
