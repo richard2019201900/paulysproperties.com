@@ -2807,7 +2807,7 @@ window.startAdminUsersListener = function() {
         });
 };
 
-// Real-time listener for properties - detects new listings
+// Real-time listener for properties - detects new listings AND updates admin panel data
 window.startAdminPropertiesListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
@@ -2816,6 +2816,9 @@ window.startAdminPropertiesListener = function() {
     if (window.adminPropertiesUnsubscribe) {
         window.adminPropertiesUnsubscribe();
     }
+    
+    // Also start listener for settings/properties document (user-created properties)
+    startSettingsPropertiesListener();
     
     // Get admin's last visit time from localStorage
     let lastAdminVisit = null;
@@ -2919,6 +2922,150 @@ window.startAdminPropertiesListener = function() {
             
         }, (error) => {
             console.error('[AdminProperties] Properties listener error:', error);
+        });
+};
+
+// Real-time listener for settings/properties document - this is where user-created properties are stored
+window.startSettingsPropertiesListener = function() {
+    if (window.settingsPropertiesUnsubscribe) {
+        window.settingsPropertiesUnsubscribe();
+    }
+    
+    console.log('[SettingsProperties] Starting real-time listener for settings/properties');
+    
+    let isFirstSnapshot = true;
+    
+    window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
+        .onSnapshot((doc) => {
+            if (!doc.exists) {
+                console.log('[SettingsProperties] No properties document yet');
+                return;
+            }
+            
+            const propsData = doc.data();
+            let hasChanges = false;
+            const newListings = [];
+            
+            console.log('[SettingsProperties] Snapshot received, processing properties...');
+            
+            Object.keys(propsData).forEach(key => {
+                const propId = parseInt(key);
+                const prop = propsData[key];
+                
+                if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
+                    return; // Skip invalid properties
+                }
+                
+                // Ensure prop has the correct numeric ID
+                prop.id = propId;
+                
+                // Check if this property already exists in the local array
+                const existingIndex = properties.findIndex(p => p.id === propId);
+                
+                if (existingIndex === -1) {
+                    // New property - add to array
+                    properties.push(prop);
+                    hasChanges = true;
+                    
+                    // Set up owner mapping
+                    if (prop.ownerEmail) {
+                        const email = prop.ownerEmail.toLowerCase();
+                        if (!ownerPropertyMap[email]) {
+                            ownerPropertyMap[email] = [];
+                        }
+                        if (!ownerPropertyMap[email].includes(propId)) {
+                            ownerPropertyMap[email].push(propId);
+                        }
+                        propertyOwnerEmail[propId] = email;
+                    }
+                    
+                    // Set default availability
+                    if (state.availability[propId] === undefined) {
+                        state.availability[propId] = true;
+                    }
+                    
+                    // Track as new listing for notification (if not first snapshot)
+                    if (!isFirstSnapshot) {
+                        newListings.push(prop);
+                        console.log('[SettingsProperties] New property detected:', prop.title);
+                    }
+                    
+                    console.log('[SettingsProperties] Added property:', prop.title, 'owner:', prop.ownerEmail);
+                } else {
+                    // Existing property - check for updates
+                    const existing = properties[existingIndex];
+                    
+                    // Update if owner changed
+                    if (prop.ownerEmail && prop.ownerEmail !== existing.ownerEmail) {
+                        // Remove from old owner's map
+                        if (existing.ownerEmail) {
+                            const oldEmail = existing.ownerEmail.toLowerCase();
+                            if (ownerPropertyMap[oldEmail]) {
+                                ownerPropertyMap[oldEmail] = ownerPropertyMap[oldEmail].filter(id => id !== propId);
+                            }
+                        }
+                        
+                        // Add to new owner's map
+                        const newEmail = prop.ownerEmail.toLowerCase();
+                        if (!ownerPropertyMap[newEmail]) {
+                            ownerPropertyMap[newEmail] = [];
+                        }
+                        if (!ownerPropertyMap[newEmail].includes(propId)) {
+                            ownerPropertyMap[newEmail].push(propId);
+                        }
+                        propertyOwnerEmail[propId] = newEmail;
+                        hasChanges = true;
+                    }
+                    
+                    // Update the property data
+                    properties[existingIndex] = { ...existing, ...prop };
+                }
+            });
+            
+            // Update filtered properties
+            state.filteredProperties = [...properties];
+            
+            // If there were changes and we're past first load, refresh the admin panel
+            if (hasChanges && !isFirstSnapshot) {
+                console.log('[SettingsProperties] Changes detected, refreshing admin panel...');
+                
+                // Refresh admin stats and user list if we're in admin panel
+                if (window.adminUsersData && window.adminUsersData.length > 0) {
+                    updateAdminStats(window.adminUsersData);
+                    renderAdminUsersList(window.adminUsersData);
+                }
+                
+                // Refresh property grid
+                if (typeof renderProperties === 'function') {
+                    renderProperties(state.filteredProperties);
+                }
+                
+                // Refresh owner dashboard if visible
+                if (typeof renderOwnerDashboard === 'function' && $('ownerDashboard')?.style.display !== 'none') {
+                    renderOwnerDashboard();
+                }
+            }
+            
+            // Show notifications for new listings
+            if (newListings.length > 0 && !isFirstSnapshot) {
+                flashScreen('green');
+                newListings.forEach(listing => {
+                    const notificationId = 'new-listing-' + listing.id;
+                    if (!window.dismissedAdminNotifications.has(notificationId)) {
+                        window.pendingAdminNotifications.add(notificationId);
+                        showNewListingNotification(listing, false);
+                    }
+                });
+                updateNotificationBadge();
+            }
+            
+            if (isFirstSnapshot) {
+                isFirstSnapshot = false;
+                console.log('[SettingsProperties] Initial load complete, now listening for changes');
+            }
+            
+        }, (error) => {
+            console.error('[SettingsProperties] Listener error:', error);
         });
 };
 

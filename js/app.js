@@ -2023,6 +2023,11 @@ async function init() {
             renderOwnerDashboard();
             loadUsername();
             
+            // Start real-time property sync listener (all users)
+            if (typeof startPropertySyncListener === 'function') {
+                startPropertySyncListener();
+            }
+            
             // Start real-time listener for upgrade requests (admin only)
             if (typeof loadPendingUpgradeRequests === 'function') {
                 loadPendingUpgradeRequests();
@@ -2033,6 +2038,11 @@ async function init() {
             state.currentUser = null;
             state.userTier = null;
             updateAuthButton(false);
+            
+            // Stop property sync listener
+            if (typeof stopPropertySyncListener === 'function') {
+                stopPropertySyncListener();
+            }
         }
     });
     

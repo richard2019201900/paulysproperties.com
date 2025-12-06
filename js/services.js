@@ -845,3 +845,176 @@ function syncPropertyOwnerMappings() {
     
     console.log('[Sync] Final propertyOwnerEmail:', propertyOwnerEmail);
 }
+
+// ==================== REAL-TIME PROPERTY SYNC (ALL USERS) ====================
+// This listener keeps the properties array in sync for ALL logged-in users (not just admin)
+window.propertySyncUnsubscribe = null;
+
+window.startPropertySyncListener = function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    // Clean up existing listener
+    if (window.propertySyncUnsubscribe) {
+        window.propertySyncUnsubscribe();
+        window.propertySyncUnsubscribe = null;
+    }
+    
+    console.log('[PropertySync] Starting real-time property sync for:', user.email);
+    
+    let isFirstSnapshot = true;
+    
+    window.propertySyncUnsubscribe = db.collection('settings').doc('properties')
+        .onSnapshot((doc) => {
+            if (!doc.exists) {
+                console.log('[PropertySync] No properties document yet');
+                return;
+            }
+            
+            const propsData = doc.data();
+            let hasChanges = false;
+            
+            console.log('[PropertySync] Snapshot received');
+            
+            Object.keys(propsData).forEach(key => {
+                const propId = parseInt(key);
+                const prop = propsData[key];
+                
+                if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
+                    return; // Skip invalid properties
+                }
+                
+                // Ensure prop has the correct numeric ID
+                prop.id = propId;
+                
+                // Check if this property already exists in the local array
+                const existingIndex = properties.findIndex(p => p.id === propId);
+                
+                if (existingIndex === -1) {
+                    // New property - add to array
+                    properties.push(prop);
+                    hasChanges = true;
+                    
+                    // Set up owner mapping
+                    if (prop.ownerEmail) {
+                        const email = prop.ownerEmail.toLowerCase();
+                        if (!ownerPropertyMap[email]) {
+                            ownerPropertyMap[email] = [];
+                        }
+                        if (!ownerPropertyMap[email].includes(propId)) {
+                            ownerPropertyMap[email].push(propId);
+                        }
+                        propertyOwnerEmail[propId] = email;
+                    }
+                    
+                    // Set default availability
+                    if (state.availability[propId] === undefined) {
+                        state.availability[propId] = true;
+                    }
+                    
+                    console.log('[PropertySync] Added new property:', prop.title, 'owner:', prop.ownerEmail);
+                } else {
+                    // Existing property - check for updates
+                    const existing = properties[existingIndex];
+                    
+                    // Check if anything meaningful changed
+                    const hasUpdates = JSON.stringify(existing) !== JSON.stringify({ ...existing, ...prop });
+                    
+                    if (hasUpdates) {
+                        // Update owner mapping if owner changed
+                        if (prop.ownerEmail && prop.ownerEmail.toLowerCase() !== existing.ownerEmail?.toLowerCase()) {
+                            // Remove from old owner's map
+                            if (existing.ownerEmail) {
+                                const oldEmail = existing.ownerEmail.toLowerCase();
+                                if (ownerPropertyMap[oldEmail]) {
+                                    ownerPropertyMap[oldEmail] = ownerPropertyMap[oldEmail].filter(id => id !== propId);
+                                }
+                            }
+                            
+                            // Add to new owner's map
+                            const newEmail = prop.ownerEmail.toLowerCase();
+                            if (!ownerPropertyMap[newEmail]) {
+                                ownerPropertyMap[newEmail] = [];
+                            }
+                            if (!ownerPropertyMap[newEmail].includes(propId)) {
+                                ownerPropertyMap[newEmail].push(propId);
+                            }
+                            propertyOwnerEmail[propId] = newEmail;
+                        }
+                        
+                        // Update the property data
+                        properties[existingIndex] = { ...existing, ...prop };
+                        hasChanges = true;
+                        console.log('[PropertySync] Updated property:', prop.title);
+                    }
+                }
+            });
+            
+            // Check for deleted properties (in local array but not in Firestore)
+            const firestoreIds = new Set(Object.keys(propsData).map(k => parseInt(k)));
+            const localUserCreatedProps = properties.filter(p => p.id >= 1000); // User-created properties have high IDs
+            
+            localUserCreatedProps.forEach(prop => {
+                if (!firestoreIds.has(prop.id)) {
+                    // Property was deleted from Firestore
+                    const index = properties.findIndex(p => p.id === prop.id);
+                    if (index !== -1) {
+                        properties.splice(index, 1);
+                        hasChanges = true;
+                        console.log('[PropertySync] Removed deleted property:', prop.id);
+                        
+                        // Clean up owner mapping
+                        if (prop.ownerEmail) {
+                            const email = prop.ownerEmail.toLowerCase();
+                            if (ownerPropertyMap[email]) {
+                                ownerPropertyMap[email] = ownerPropertyMap[email].filter(id => id !== prop.id);
+                            }
+                            delete propertyOwnerEmail[prop.id];
+                        }
+                    }
+                }
+            });
+            
+            // Update filtered properties
+            state.filteredProperties = [...properties];
+            
+            // If there were changes and we're past first load, refresh the UI
+            if (hasChanges && !isFirstSnapshot) {
+                console.log('[PropertySync] Changes detected, refreshing UI...');
+                
+                // Refresh property grid
+                if (typeof renderProperties === 'function') {
+                    renderProperties(state.filteredProperties);
+                }
+                
+                // Refresh owner dashboard if the user is viewing it
+                const dashboardEl = $('ownerDashboard');
+                if (dashboardEl && !dashboardEl.classList.contains('hidden') && typeof renderOwnerDashboard === 'function') {
+                    renderOwnerDashboard();
+                }
+                
+                // Refresh admin panel if admin and viewing it
+                if (TierService.isMasterAdmin(user.email) && window.adminUsersData && window.adminUsersData.length > 0) {
+                    updateAdminStats(window.adminUsersData);
+                    renderAdminUsersList(window.adminUsersData);
+                }
+            }
+            
+            if (isFirstSnapshot) {
+                isFirstSnapshot = false;
+                console.log('[PropertySync] Initial sync complete, now listening for changes');
+            }
+            
+        }, (error) => {
+            console.error('[PropertySync] Listener error:', error);
+        });
+};
+
+// Stop property sync listener (call on logout)
+window.stopPropertySyncListener = function() {
+    if (window.propertySyncUnsubscribe) {
+        window.propertySyncUnsubscribe();
+        window.propertySyncUnsubscribe = null;
+        console.log('[PropertySync] Listener stopped');
+    }
+};
