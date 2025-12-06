@@ -2649,7 +2649,7 @@ window.startAdminNotificationsListener = function() {
     }
 };
 
-// Real-time listener for users - detects new signups immediately
+// Real-time listener for users - detects new signups immediately AND shows missed signups
 window.startAdminUsersListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
@@ -2659,10 +2659,27 @@ window.startAdminUsersListener = function() {
         window.adminUsersUnsubscribe();
     }
     
-    // Record session start time - only notify for users created AFTER this
-    if (!window.adminSessionStartTime) {
-        window.adminSessionStartTime = new Date();
-        console.log('[AdminUsers] Session started at:', window.adminSessionStartTime);
+    // Get admin's last visit time from localStorage
+    let lastAdminVisit = null;
+    try {
+        const lastVisitStr = localStorage.getItem('adminLastVisit');
+        if (lastVisitStr) {
+            lastAdminVisit = new Date(lastVisitStr);
+            console.log('[AdminUsers] Last admin visit:', lastAdminVisit);
+        }
+    } catch (e) {
+        console.warn('[AdminUsers] Could not load last visit time');
+    }
+    
+    // Record current session start time
+    window.adminSessionStartTime = new Date();
+    console.log('[AdminUsers] Session started at:', window.adminSessionStartTime);
+    
+    // Save current time as last visit for next session
+    try {
+        localStorage.setItem('adminLastVisit', window.adminSessionStartTime.toISOString());
+    } catch (e) {
+        console.warn('[AdminUsers] Could not save visit time');
     }
     
     // Load dismissed notifications from localStorage
@@ -2675,7 +2692,7 @@ window.startAdminUsersListener = function() {
         console.warn('[AdminUsers] Could not load dismissed notifications');
     }
     
-    // First snapshot flag - skip initial load
+    // First snapshot flag - used for catching "missed" users
     let isFirstSnapshot = true;
     
     // Simple listener - no orderBy to avoid index requirement
@@ -2683,23 +2700,32 @@ window.startAdminUsersListener = function() {
         .onSnapshot((snapshot) => {
             const users = [];
             const newUsers = [];
+            const missedUsers = []; // Users created while admin was away
             
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const user = { id: doc.id, ...data };
                 users.push(user);
                 
-                // Only detect as "new" if:
-                // 1. This is NOT the first snapshot (page just loaded)
-                // 2. User was created AFTER our session started
-                // 3. We haven't already notified about this user
-                if (!isFirstSnapshot && !window.knownUserIds.has(doc.id)) {
-                    const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
-                    if (createdAt && createdAt > window.adminSessionStartTime) {
-                        newUsers.push(user);
-                        
-                        // Log to activity log
-                        logAdminActivity('new_user', user);
+                const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+                const notificationId = 'new-user-' + doc.id;
+                
+                if (isFirstSnapshot) {
+                    // On first load, check for users created since last visit
+                    // but NOT already dismissed
+                    if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
+                        if (!window.dismissedAdminNotifications.has(notificationId)) {
+                            missedUsers.push(user);
+                            console.log('[AdminUsers] Missed user found:', user.email, 'created:', createdAt);
+                        }
+                    }
+                } else {
+                    // Real-time: detect users created AFTER session started
+                    if (!window.knownUserIds.has(doc.id)) {
+                        if (createdAt && createdAt > window.adminSessionStartTime) {
+                            newUsers.push(user);
+                            logAdminActivity('new_user', user);
+                        }
                     }
                 }
                 
@@ -2709,16 +2735,26 @@ window.startAdminUsersListener = function() {
             // Update admin data
             window.adminUsersData = users;
             
-            // If we have truly NEW users (created after session start), show notification
+            // Show notifications for MISSED users (created while away)
+            if (isFirstSnapshot && missedUsers.length > 0) {
+                console.log('[AdminUsers] Showing notifications for', missedUsers.length, 'missed user(s)');
+                
+                // Show notification for each missed user (no flash for these)
+                missedUsers.forEach(user => {
+                    showNewUserNotification(user, true); // true = missed (not real-time)
+                });
+            }
+            
+            // Show notifications for REAL-TIME new users
             if (newUsers.length > 0) {
                 console.log('[AdminUsers] New user(s) detected:', newUsers.map(u => u.email));
                 
-                // Flash screen
+                // Flash screen for real-time only
                 flashScreen();
                 
                 // Show notification for each new user
                 newUsers.forEach(user => {
-                    showNewUserNotification(user);
+                    showNewUserNotification(user, false); // false = real-time
                 });
                 
                 // Refresh the user list and stats
@@ -2849,7 +2885,7 @@ window.clearActivityLog = function() {
 };
 
 // Show a notification for a new user
-window.showNewUserNotification = function(user) {
+window.showNewUserNotification = function(user, isMissed = false) {
     const stack = $('adminNotificationsStack');
     if (!stack) return;
     
@@ -2861,23 +2897,41 @@ window.showNewUserNotification = function(user) {
     if (window.dismissedAdminNotifications.has(notificationId)) return;
     if ($('notification-' + notificationId)) return;
     
-    const time = new Date().toLocaleString('en-US', { 
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-    });
+    // For missed users, show actual creation time; for real-time, show now
+    let timeDisplay;
+    if (isMissed && user.createdAt?.toDate) {
+        const createdDate = user.createdAt.toDate();
+        timeDisplay = createdDate.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
+    } else {
+        timeDisplay = new Date().toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
+    }
+    
+    // Different styling for missed vs real-time notifications
+    const gradientClass = isMissed 
+        ? 'from-orange-600 to-amber-600 border-orange-500' 
+        : 'from-cyan-600 to-blue-600 border-cyan-500';
+    
+    const titleText = isMissed 
+        ? '📬 While You Were Away...' 
+        : '👤 New User Registered!';
     
     const notificationHTML = `
-        <div id="notification-${notificationId}" class="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-4 border-2 border-cyan-500 shadow-lg relative admin-notification-new" 
+        <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new" 
              onclick="handleNewUserNotificationClick('${user.id}')">
             <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
                     class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
                 ✕
             </button>
             <div class="flex items-center gap-4 pr-8 cursor-pointer">
-                <span class="text-3xl">👤</span>
+                <span class="text-3xl">${isMissed ? '📬' : '👤'}</span>
                 <div class="flex-1">
-                    <div class="text-white font-bold text-lg">New User Registered!</div>
-                    <div class="text-white/80">${user.username || user.email?.split('@')[0] || 'Unknown'} created a Starter account</div>
-                    <div class="text-white/50 text-xs mt-1">${time}</div>
+                    <div class="text-white font-bold text-lg">${titleText}</div>
+                    <div class="text-white/90">${user.username || user.email?.split('@')[0] || 'Unknown'} created a Starter account</div>
+                    <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
                 </div>
             </div>
         </div>
