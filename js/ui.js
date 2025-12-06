@@ -417,16 +417,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('[Auth] User document created with starter tier');
                 
-                // CREATE ADMIN NOTIFICATION for new user signup
-                await db.collection('adminNotifications').add({
-                    type: 'new_user',
-                    userEmail: user.email.toLowerCase(),
-                    displayName: displayName,
-                    tier: 'starter',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    dismissed: false
-                });
-                console.log('[Auth] Admin notification created for new user');
+                // CREATE ADMIN NOTIFICATION for new user signup (wrapped in try-catch to not break flow)
+                try {
+                    await db.collection('adminNotifications').add({
+                        type: 'new_user',
+                        userEmail: user.email.toLowerCase(),
+                        displayName: displayName,
+                        tier: 'starter',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        dismissed: false
+                    });
+                    console.log('[Auth] Admin notification created for new user');
+                } catch (notifyError) {
+                    console.warn('[Auth] Could not create admin notification (non-critical):', notifyError);
+                    // Don't break the flow - account creation succeeded
+                }
                 
                 // Clear the flag after document is created
                 window.isCreatingAccount = false;
