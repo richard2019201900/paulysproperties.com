@@ -812,6 +812,12 @@ window.updateTierBadge = function(tier, email) {
             resetAdminTiles(); // Reset tiles to front view
             loadPendingUpgradeRequests();
             loadAllUsers(); // Load users immediately when dashboard loads
+            
+            // Start real-time users listener for new user notifications
+            if (typeof startAdminUsersListener === 'function') {
+                startAdminUsersListener();
+            }
+            
             // Also check for subscription alerts after a delay (to allow user list to load)
             setTimeout(() => {
                 if (window.adminUsersData) {
@@ -2499,6 +2505,7 @@ window.dismissGlobalAlert = function() {
 // Track dismissed notifications in this session
 window.dismissedAdminNotifications = new Set();
 window.adminNotificationsData = [];
+window.knownUserIds = new Set();
 
 // Start listening for admin notifications (new users, etc.)
 window.startAdminNotificationsListener = function() {
@@ -2506,38 +2513,174 @@ window.startAdminNotificationsListener = function() {
     
     console.log('[AdminNotify] Starting admin notifications listener');
     
-    // Unsubscribe from existing listener
-    if (window.adminNotifyUnsubscribe) {
-        window.adminNotifyUnsubscribe();
+    // Start listening for new users directly (more reliable than adminNotifications collection)
+    startAdminUsersListener();
+    
+    // Also try the adminNotifications collection (may fail due to rules, but that's ok)
+    try {
+        if (window.adminNotifyUnsubscribe) {
+            window.adminNotifyUnsubscribe();
+        }
+        
+        window.adminNotifyUnsubscribe = db.collection('adminNotifications')
+            .where('dismissed', '==', false)
+            .orderBy('createdAt', 'desc')
+            .limit(20)
+            .onSnapshot((snapshot) => {
+                console.log('[AdminNotify] Snapshot received, count:', snapshot.size);
+                
+                const notifications = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    notifications.push({ id: doc.id, ...data });
+                });
+                
+                // Check for NEW notifications (for flash effect)
+                const newNotifications = notifications.filter(n => 
+                    !window.adminNotificationsData.some(old => old.id === n.id) &&
+                    !window.dismissedAdminNotifications.has(n.id)
+                );
+                
+                window.adminNotificationsData = notifications;
+                
+                // Render the notification stack
+                renderAdminNotificationStack(notifications, newNotifications.length > 0);
+                
+            }, (error) => {
+                console.warn('[AdminNotify] adminNotifications listener error (non-critical):', error.message);
+                // This is ok - we have the users listener as backup
+            });
+    } catch (e) {
+        console.warn('[AdminNotify] Could not set up adminNotifications listener:', e);
+    }
+};
+
+// Real-time listener for users - detects new signups immediately
+window.startAdminUsersListener = function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    
+    console.log('[AdminUsers] Starting real-time users listener');
+    
+    if (window.adminUsersUnsubscribe) {
+        window.adminUsersUnsubscribe();
     }
     
-    window.adminNotifyUnsubscribe = db.collection('adminNotifications')
-        .where('dismissed', '==', false)
-        .orderBy('createdAt', 'desc')
-        .limit(20)
+    // Initialize known users from current data
+    if (window.adminUsersData) {
+        window.adminUsersData.forEach(u => window.knownUserIds.add(u.id));
+    }
+    
+    // Simple listener - no orderBy to avoid index requirement
+    window.adminUsersUnsubscribe = db.collection('users')
         .onSnapshot((snapshot) => {
-            console.log('[AdminNotify] Snapshot received, count:', snapshot.size);
+            const users = [];
+            const newUsers = [];
             
-            const notifications = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
-                notifications.push({ id: doc.id, ...data });
+                const user = { id: doc.id, ...data };
+                users.push(user);
+                
+                // Detect NEW users (not in our known set)
+                if (!window.knownUserIds.has(doc.id) && window.knownUserIds.size > 0) {
+                    newUsers.push(user);
+                    window.knownUserIds.add(doc.id);
+                }
             });
             
-            // Check for NEW notifications (for flash effect)
-            const newNotifications = notifications.filter(n => 
-                !window.adminNotificationsData.some(old => old.id === n.id) &&
-                !window.dismissedAdminNotifications.has(n.id)
-            );
+            // Update known users
+            users.forEach(u => window.knownUserIds.add(u.id));
             
-            window.adminNotificationsData = notifications;
+            // Update admin data
+            window.adminUsersData = users;
             
-            // Render the notification stack
-            renderAdminNotificationStack(notifications, newNotifications.length > 0);
+            // If we have new users, show notification and refresh
+            if (newUsers.length > 0) {
+                console.log('[AdminUsers] New user(s) detected:', newUsers.map(u => u.email));
+                
+                // Flash screen
+                flashScreen();
+                
+                // Show notification for each new user
+                newUsers.forEach(user => {
+                    showNewUserNotification(user);
+                });
+                
+                // Always refresh the user list and stats when new users are detected
+                const container = $('allUsersList');
+                if (container) {
+                    renderAdminUsersList(users);
+                }
+                updateAdminStats(users);
+            }
             
         }, (error) => {
-            console.error('[AdminNotify] Listener error:', error);
+            console.error('[AdminUsers] Users listener error:', error);
         });
+};
+
+// Show a notification for a new user
+window.showNewUserNotification = function(user) {
+    const stack = $('adminNotificationsStack');
+    if (!stack) return;
+    
+    stack.classList.remove('hidden');
+    
+    const notificationId = 'new-user-' + user.id;
+    
+    // Don't add if already dismissed or already showing
+    if (window.dismissedAdminNotifications.has(notificationId)) return;
+    if ($('notification-' + notificationId)) return;
+    
+    const time = new Date().toLocaleString('en-US', { 
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+    });
+    
+    const notificationHTML = `
+        <div id="notification-${notificationId}" class="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-4 border-2 border-cyan-500 shadow-lg relative admin-notification-new" 
+             onclick="handleNewUserNotificationClick('${user.id}')">
+            <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
+                    class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
+                ✕
+            </button>
+            <div class="flex items-center gap-4 pr-8 cursor-pointer">
+                <span class="text-3xl">👤</span>
+                <div class="flex-1">
+                    <div class="text-white font-bold text-lg">New User Registered!</div>
+                    <div class="text-white/80">${user.username || user.email?.split('@')[0] || 'Unknown'} created a Starter account</div>
+                    <div class="text-white/50 text-xs mt-1">${time}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    stack.insertAdjacentHTML('afterbegin', notificationHTML);
+};
+
+// Handle click on new user notification
+window.handleNewUserNotificationClick = function(userId) {
+    switchAdminTab('users');
+};
+
+// Dismiss new user notification
+window.dismissNewUserNotification = function(notificationId) {
+    window.dismissedAdminNotifications.add(notificationId);
+    
+    const notification = $('notification-' + notificationId);
+    if (notification) {
+        notification.style.animation = 'slideUp 0.3s ease-out forwards';
+        setTimeout(() => notification.remove(), 300);
+    }
+    
+    // Hide stack if empty
+    const stack = $('adminNotificationsStack');
+    if (stack && stack.children.length <= 1) {
+        setTimeout(() => {
+            if (stack.children.length === 0) {
+                stack.classList.add('hidden');
+            }
+        }, 350);
+    }
 };
 
 // Render the persistent admin notification stack
@@ -2816,6 +2959,10 @@ window.loadAllUsers = async function() {
     try {
         const users = await TierService.getAllUsers();
         window.adminUsersData = users;
+        
+        // Initialize known users set (for new user detection)
+        if (!window.knownUserIds) window.knownUserIds = new Set();
+        users.forEach(u => window.knownUserIds.add(u.id));
         
         await updateAdminStats(users);
         
