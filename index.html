@@ -600,6 +600,8 @@
                     
                     <!-- Logged-in user display with dropdown -->
                     <div id="navUserDisplay" class="hidden items-center gap-2 relative">
+                        <!-- Notification badge -->
+                        <span id="adminNotificationBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-[20px] flex items-center justify-center shadow-lg z-10 animate-pulse" style="display: none;"></span>
                         <div class="text-right cursor-pointer hover:bg-gray-700/50 px-3 py-2 rounded-xl transition" onclick="toggleUserDropdown()">
                             <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
                             <div id="navUserTier" class="text-xs text-gray-400"></div>

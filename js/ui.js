@@ -2598,6 +2598,7 @@ window.dismissGlobalAlert = function() {
 // ==================== ADMIN PERSISTENT NOTIFICATIONS ====================
 // Track dismissed notifications in this session
 window.dismissedAdminNotifications = new Set();
+window.pendingAdminNotifications = new Set();
 window.adminNotificationsData = [];
 window.knownUserIds = new Set();
 
@@ -2671,15 +2672,21 @@ window.startAdminUsersListener = function() {
         console.warn('[AdminUsers] Could not load last visit time');
     }
     
-    // Record current session start time
+    // Record current session start time (but don't save to localStorage yet!)
     window.adminSessionStartTime = new Date();
     console.log('[AdminUsers] Session started at:', window.adminSessionStartTime);
     
-    // Save current time as last visit for next session
+    // Load pending notifications from localStorage (these need to be shown again)
     try {
-        localStorage.setItem('adminLastVisit', window.adminSessionStartTime.toISOString());
+        const pending = localStorage.getItem('pendingUserNotifications');
+        if (pending) {
+            window.pendingAdminNotifications = new Set(JSON.parse(pending));
+            console.log('[AdminUsers] Loaded pending notifications:', window.pendingAdminNotifications.size);
+        } else {
+            window.pendingAdminNotifications = new Set();
+        }
     } catch (e) {
-        console.warn('[AdminUsers] Could not save visit time');
+        window.pendingAdminNotifications = new Set();
     }
     
     // Load dismissed notifications from localStorage
@@ -2711,11 +2718,19 @@ window.startAdminUsersListener = function() {
                 const notificationId = 'new-user-' + doc.id;
                 
                 if (isFirstSnapshot) {
-                    // On first load, check for users created since last visit
-                    // but NOT already dismissed
-                    if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
+                    // Check if this user has a pending (unacknowledged) notification
+                    if (window.pendingAdminNotifications.has(notificationId)) {
                         if (!window.dismissedAdminNotifications.has(notificationId)) {
                             missedUsers.push(user);
+                            console.log('[AdminUsers] Pending notification found:', user.email);
+                        }
+                    }
+                    // Also check for users created since last visit (new missed users)
+                    else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
+                        if (!window.dismissedAdminNotifications.has(notificationId)) {
+                            missedUsers.push(user);
+                            // Add to pending so it persists across refreshes
+                            window.pendingAdminNotifications.add(notificationId);
                             console.log('[AdminUsers] Missed user found:', user.email, 'created:', createdAt);
                         }
                     }
@@ -2724,6 +2739,8 @@ window.startAdminUsersListener = function() {
                     if (!window.knownUserIds.has(doc.id)) {
                         if (createdAt && createdAt > window.adminSessionStartTime) {
                             newUsers.push(user);
+                            // Add to pending notifications
+                            window.pendingAdminNotifications.add(notificationId);
                             logAdminActivity('new_user', user);
                         }
                     }
@@ -2732,10 +2749,17 @@ window.startAdminUsersListener = function() {
                 window.knownUserIds.add(doc.id);
             });
             
+            // Save pending notifications to localStorage
+            try {
+                localStorage.setItem('pendingUserNotifications', JSON.stringify(Array.from(window.pendingAdminNotifications)));
+            } catch (e) {
+                console.warn('[AdminUsers] Could not save pending notifications');
+            }
+            
             // Update admin data
             window.adminUsersData = users;
             
-            // Show notifications for MISSED users (created while away)
+            // Show notifications for MISSED users (created while away or pending from last session)
             if (isFirstSnapshot && missedUsers.length > 0) {
                 console.log('[AdminUsers] Showing notifications for', missedUsers.length, 'missed user(s)');
                 
@@ -2764,6 +2788,9 @@ window.startAdminUsersListener = function() {
                 }
                 updateAdminStats(users);
             }
+            
+            // Update notification badge
+            updateNotificationBadge();
             
             // After first snapshot, mark as no longer first
             if (isFirstSnapshot) {
@@ -2949,10 +2976,22 @@ window.handleNewUserNotificationClick = function(userId) {
 window.dismissNewUserNotification = function(notificationId) {
     window.dismissedAdminNotifications.add(notificationId);
     
+    // Remove from pending notifications
+    window.pendingAdminNotifications.delete(notificationId);
+    
     // Save to localStorage for persistence across sessions
     try {
         const dismissed = Array.from(window.dismissedAdminNotifications);
         localStorage.setItem('dismissedUserNotifications', JSON.stringify(dismissed));
+        
+        const pending = Array.from(window.pendingAdminNotifications);
+        localStorage.setItem('pendingUserNotifications', JSON.stringify(pending));
+        
+        // If all notifications are dismissed, update lastVisit time
+        if (window.pendingAdminNotifications.size === 0) {
+            localStorage.setItem('adminLastVisit', new Date().toISOString());
+            console.log('[AdminNotify] All notifications dismissed, updated lastVisit');
+        }
     } catch (e) {
         console.warn('[AdminNotify] Could not save dismissed state');
     }
@@ -2963,6 +3002,9 @@ window.dismissNewUserNotification = function(notificationId) {
         setTimeout(() => notification.remove(), 300);
     }
     
+    // Update the notification badge
+    updateNotificationBadge();
+    
     // Hide stack if empty
     const stack = $('adminNotificationsStack');
     if (stack && stack.children.length <= 1) {
@@ -2971,6 +3013,21 @@ window.dismissNewUserNotification = function(notificationId) {
                 stack.classList.add('hidden');
             }
         }, 350);
+    }
+};
+
+// Update notification badge in header
+window.updateNotificationBadge = function() {
+    const pendingCount = window.pendingAdminNotifications?.size || 0;
+    const badge = $('adminNotificationBadge');
+    
+    if (badge) {
+        if (pendingCount > 0) {
+            badge.textContent = pendingCount > 9 ? '9+' : pendingCount;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
     }
 };
 
