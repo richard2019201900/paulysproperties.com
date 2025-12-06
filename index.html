@@ -92,8 +92,19 @@
             0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3), 0 0 40px rgba(245, 158, 11, 0.1); }
             50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.5), 0 0 60px rgba(245, 158, 11, 0.2); }
         }
+        @keyframes flashFade {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes notificationPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
         .premium-glow {
             animation: premiumPulse 2s ease-in-out infinite;
+        }
+        .admin-notification-new {
+            animation: notificationPulse 0.5s ease-out;
         }
         #globalAlertBar {
             animation: slideDown 0.3s ease-out, gradientShift 2s ease infinite;
@@ -647,6 +658,11 @@
                 <div id="userNotificationsContainer" class="space-y-3">
                     <!-- Notifications will be inserted here -->
                 </div>
+            </div>
+
+            <!-- Admin Persistent Notifications Stack -->
+            <div id="adminNotificationsStack" class="hidden mb-6 space-y-3">
+                <!-- Persistent notifications will be inserted here by JS -->
             </div>
 
             <!-- Admin Section (Only visible to master admin) -->

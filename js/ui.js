@@ -417,6 +417,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log('[Auth] User document created with starter tier');
                 
+                // CREATE ADMIN NOTIFICATION for new user signup
+                await db.collection('adminNotifications').add({
+                    type: 'new_user',
+                    userEmail: user.email.toLowerCase(),
+                    displayName: displayName,
+                    tier: 'starter',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    dismissed: false
+                });
+                console.log('[Auth] Admin notification created for new user');
+                
                 // Clear the flag after document is created
                 window.isCreatingAccount = false;
                 
@@ -2477,6 +2488,169 @@ window.dismissGlobalAlert = function() {
             }
         }, 250);
     }
+};
+
+// ==================== ADMIN PERSISTENT NOTIFICATIONS ====================
+// Track dismissed notifications in this session
+window.dismissedAdminNotifications = new Set();
+window.adminNotificationsData = [];
+
+// Start listening for admin notifications (new users, etc.)
+window.startAdminNotificationsListener = function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    
+    console.log('[AdminNotify] Starting admin notifications listener');
+    
+    // Unsubscribe from existing listener
+    if (window.adminNotifyUnsubscribe) {
+        window.adminNotifyUnsubscribe();
+    }
+    
+    window.adminNotifyUnsubscribe = db.collection('adminNotifications')
+        .where('dismissed', '==', false)
+        .orderBy('createdAt', 'desc')
+        .limit(20)
+        .onSnapshot((snapshot) => {
+            console.log('[AdminNotify] Snapshot received, count:', snapshot.size);
+            
+            const notifications = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                notifications.push({ id: doc.id, ...data });
+            });
+            
+            // Check for NEW notifications (for flash effect)
+            const newNotifications = notifications.filter(n => 
+                !window.adminNotificationsData.some(old => old.id === n.id) &&
+                !window.dismissedAdminNotifications.has(n.id)
+            );
+            
+            window.adminNotificationsData = notifications;
+            
+            // Render the notification stack
+            renderAdminNotificationStack(notifications, newNotifications.length > 0);
+            
+        }, (error) => {
+            console.error('[AdminNotify] Listener error:', error);
+        });
+};
+
+// Render the persistent admin notification stack
+window.renderAdminNotificationStack = function(notifications, hasNew = false) {
+    const stack = $('adminNotificationsStack');
+    if (!stack) return;
+    
+    // Filter out dismissed ones
+    const activeNotifications = notifications.filter(n => 
+        !window.dismissedAdminNotifications.has(n.id)
+    );
+    
+    if (activeNotifications.length === 0) {
+        stack.classList.add('hidden');
+        stack.innerHTML = '';
+        return;
+    }
+    
+    stack.classList.remove('hidden');
+    
+    // Flash the entire screen if there are new notifications
+    if (hasNew) {
+        flashScreen();
+    }
+    
+    stack.innerHTML = activeNotifications.map(n => {
+        const time = n.createdAt?.toDate ? n.createdAt.toDate() : new Date();
+        const timeStr = time.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
+        
+        let icon, bgGradient, borderColor, title, message;
+        
+        switch(n.type) {
+            case 'new_user':
+                icon = '👤';
+                bgGradient = 'from-cyan-600 to-blue-600';
+                borderColor = 'border-cyan-500';
+                title = 'New User Registered!';
+                message = `${n.displayName || n.userEmail?.split('@')[0]} created a Starter account`;
+                break;
+            case 'upgrade_request':
+                icon = '💰';
+                bgGradient = 'from-amber-600 to-orange-600';
+                borderColor = 'border-amber-500';
+                title = 'Upgrade Request';
+                message = `${n.displayName || n.userEmail} wants ${TIERS[n.requestedTier]?.name || 'upgrade'}`;
+                break;
+            default:
+                icon = '🔔';
+                bgGradient = 'from-purple-600 to-pink-600';
+                borderColor = 'border-purple-500';
+                title = 'Notification';
+                message = n.message || 'New notification';
+        }
+        
+        return `
+            <div class="bg-gradient-to-r ${bgGradient} rounded-xl p-4 border-2 ${borderColor} shadow-lg relative admin-notification-new" 
+                 onclick="handleAdminNotificationClick('${n.id}', '${n.type}')">
+                <button onclick="event.stopPropagation(); dismissAdminNotification('${n.id}')" 
+                        class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
+                    ✕
+                </button>
+                <div class="flex items-center gap-4 pr-8 cursor-pointer">
+                    <span class="text-3xl">${icon}</span>
+                    <div class="flex-1">
+                        <div class="text-white font-bold text-lg">${title}</div>
+                        <div class="text-white/80">${message}</div>
+                        <div class="text-white/50 text-xs mt-1">${timeStr}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+// Flash the screen for new notifications
+window.flashScreen = function() {
+    const flash = document.createElement('div');
+    flash.className = 'fixed inset-0 pointer-events-none z-[100]';
+    flash.style.cssText = 'background: linear-gradient(to bottom, rgba(34, 211, 238, 0.3), transparent); animation: flashFade 1s ease-out forwards;';
+    document.body.appendChild(flash);
+    
+    setTimeout(() => flash.remove(), 1000);
+};
+
+// Handle click on admin notification
+window.handleAdminNotificationClick = function(notificationId, type) {
+    if (type === 'new_user') {
+        switchAdminTab('users');
+    } else if (type === 'upgrade_request') {
+        switchAdminTab('requests');
+    }
+};
+
+// Dismiss admin notification
+window.dismissAdminNotification = async function(notificationId) {
+    console.log('[AdminNotify] Dismissing notification:', notificationId);
+    
+    // Add to dismissed set (session-based - won't come back until page refresh)
+    window.dismissedAdminNotifications.add(notificationId);
+    
+    // Mark as dismissed in Firestore
+    try {
+        await db.collection('adminNotifications').doc(notificationId).update({
+            dismissed: true,
+            dismissedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            dismissedBy: auth.currentUser?.email
+        });
+    } catch (error) {
+        console.error('[AdminNotify] Error dismissing:', error);
+    }
+    
+    // Re-render
+    renderAdminNotificationStack(
+        window.adminNotificationsData.filter(n => n.id !== notificationId),
+        false
+    );
 };
 
 window.updateAdminStats = async function(users) {
@@ -4689,6 +4863,11 @@ window.loadUserNotifications = async function() {
     
     // Start tier listener for real-time tier updates
     startUserTierListener();
+    
+    // Start admin notifications listener (only works for master admin)
+    if (typeof startAdminNotificationsListener === 'function') {
+        startAdminNotificationsListener();
+    }
     
     const banner = $('userNotificationsBanner');
     const container = $('userNotificationsContainer');
