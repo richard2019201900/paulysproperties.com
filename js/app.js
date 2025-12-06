@@ -89,7 +89,7 @@ window.viewProperty = function(id) {
             <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
                 <div>
                     <h2 class="text-2xl md:text-4xl font-black text-white mb-2">✨ ${sanitize(p.title)}</h2>
-                    <p class="text-lg md:text-xl text-gray-300 font-semibold">📍 Location: ${sanitize(p.location)}</p>
+                    <p class="text-lg md:text-xl text-gray-300 font-semibold">📝 Description: ${sanitize(p.location)}</p>
                     <p id="propertyOwnerDisplay" class="text-blue-400 font-semibold mt-1">👤 Owner: Loading...</p>
                 </div>
                 <span class="badge text-white text-sm font-bold px-4 py-2 rounded-full uppercase">${PropertyDataService.getValue(id, 'type', p.type)}</span>
@@ -376,12 +376,12 @@ function renderPropertyStatsContent(id) {
                             <span class="text-purple-400 text-sm">✏️</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span>📍</span>
-                            <span class="text-lg text-gray-300 font-semibold">Location:</span>
+                            <span>📝</span>
+                            <span class="text-lg text-gray-300 font-semibold">Description:</span>
                             <span id="editable-location-${id}" 
                                   class="text-lg text-gray-300 font-semibold cursor-pointer hover:text-purple-300 transition"
                                   onclick="startEditField('location', ${id}, this)"
-                                  title="Click to edit location">
+                                  title="Click to edit description">
                                 ${sanitize(p.location)}
                             </span>
                             <span class="text-purple-400 text-sm">✏️</span>
