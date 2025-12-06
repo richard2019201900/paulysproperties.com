@@ -2601,8 +2601,9 @@ window.dismissedAdminNotifications = new Set();
 window.pendingAdminNotifications = new Set();
 window.adminNotificationsData = [];
 window.knownUserIds = new Set();
+window.knownPropertyIds = new Set();
 
-// Start listening for admin notifications (new users, etc.)
+// Start listening for admin notifications (new users, new listings, etc.)
 window.startAdminNotificationsListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
@@ -2610,6 +2611,9 @@ window.startAdminNotificationsListener = function() {
     
     // Start listening for new users directly (more reliable than adminNotifications collection)
     startAdminUsersListener();
+    
+    // Start listening for new properties
+    startAdminPropertiesListener();
     
     // Also try the adminNotifications collection (may fail due to rules, but that's ok)
     try {
@@ -2803,6 +2807,182 @@ window.startAdminUsersListener = function() {
         });
 };
 
+// Real-time listener for properties - detects new listings
+window.startAdminPropertiesListener = function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    
+    console.log('[AdminProperties] Starting real-time properties listener');
+    
+    if (window.adminPropertiesUnsubscribe) {
+        window.adminPropertiesUnsubscribe();
+    }
+    
+    // Get admin's last visit time from localStorage
+    let lastAdminVisit = null;
+    try {
+        const lastVisitStr = localStorage.getItem('adminLastVisit');
+        if (lastVisitStr) {
+            lastAdminVisit = new Date(lastVisitStr);
+        }
+    } catch (e) {
+        console.warn('[AdminProperties] Could not load last visit time');
+    }
+    
+    // Load pending property notifications from localStorage
+    try {
+        const pending = localStorage.getItem('pendingPropertyNotifications');
+        if (pending) {
+            JSON.parse(pending).forEach(id => window.pendingAdminNotifications.add(id));
+        }
+    } catch (e) {
+        console.warn('[AdminProperties] Could not load pending notifications');
+    }
+    
+    // First snapshot flag
+    let isFirstSnapshot = true;
+    
+    // Listen to properties collection
+    window.adminPropertiesUnsubscribe = db.collection('properties')
+        .onSnapshot((snapshot) => {
+            const newListings = [];
+            const missedListings = [];
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const notificationId = 'new-listing-' + doc.id;
+                const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+                
+                if (isFirstSnapshot) {
+                    // Check if this property has a pending notification
+                    if (window.pendingAdminNotifications.has(notificationId)) {
+                        if (!window.dismissedAdminNotifications.has(notificationId)) {
+                            missedListings.push({ id: doc.id, ...data });
+                        }
+                    }
+                    // Also check for properties created since last visit
+                    else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
+                        if (!window.dismissedAdminNotifications.has(notificationId)) {
+                            missedListings.push({ id: doc.id, ...data });
+                            window.pendingAdminNotifications.add(notificationId);
+                        }
+                    }
+                } else {
+                    // Real-time: detect new listings
+                    if (!window.knownPropertyIds.has(doc.id)) {
+                        if (createdAt && createdAt > window.adminSessionStartTime) {
+                            newListings.push({ id: doc.id, ...data });
+                            window.pendingAdminNotifications.add(notificationId);
+                            logAdminActivity('new_listing', { id: doc.id, ...data });
+                        }
+                    }
+                }
+                
+                window.knownPropertyIds.add(doc.id);
+            });
+            
+            // Save pending notifications
+            try {
+                const allPending = Array.from(window.pendingAdminNotifications);
+                localStorage.setItem('pendingUserNotifications', JSON.stringify(allPending.filter(id => id.startsWith('new-user-'))));
+                localStorage.setItem('pendingPropertyNotifications', JSON.stringify(allPending.filter(id => id.startsWith('new-listing-'))));
+            } catch (e) {
+                console.warn('[AdminProperties] Could not save pending notifications');
+            }
+            
+            // Show notifications for missed listings (on page load)
+            if (isFirstSnapshot && missedListings.length > 0) {
+                console.log('[AdminProperties] Showing notifications for', missedListings.length, 'missed listing(s)');
+                missedListings.forEach(listing => {
+                    showNewListingNotification(listing, true);
+                });
+            }
+            
+            // Show notifications for real-time new listings
+            if (newListings.length > 0) {
+                console.log('[AdminProperties] New listing(s) detected:', newListings.map(l => l.title));
+                
+                // Flash screen
+                flashScreen('green');
+                
+                newListings.forEach(listing => {
+                    showNewListingNotification(listing, false);
+                });
+            }
+            
+            // Update notification badge
+            updateNotificationBadge();
+            
+            if (isFirstSnapshot) {
+                isFirstSnapshot = false;
+                console.log('[AdminProperties] Initial load complete, now listening for new listings');
+            }
+            
+        }, (error) => {
+            console.error('[AdminProperties] Properties listener error:', error);
+        });
+};
+
+// Show a notification for a new listing
+window.showNewListingNotification = function(listing, isMissed = false) {
+    const stack = $('adminNotificationsStack');
+    if (!stack) return;
+    
+    stack.classList.remove('hidden');
+    
+    const notificationId = 'new-listing-' + listing.id;
+    
+    // Don't add if already dismissed or already showing
+    if (window.dismissedAdminNotifications.has(notificationId)) return;
+    if ($('notification-' + notificationId)) return;
+    
+    // Get owner name
+    const ownerEmail = listing.ownerEmail || 'Unknown';
+    const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
+    
+    // Time display
+    let timeDisplay;
+    if (isMissed && listing.createdAt?.toDate) {
+        const createdDate = listing.createdAt.toDate();
+        timeDisplay = createdDate.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
+    } else {
+        timeDisplay = new Date().toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
+    }
+    
+    // Different styling for missed vs real-time
+    const gradientClass = isMissed 
+        ? 'from-emerald-700 to-green-600 border-emerald-500' 
+        : 'from-green-600 to-teal-600 border-green-500';
+    
+    const titleText = isMissed 
+        ? '🏠 Listing While You Were Away...' 
+        : '🏠 New Listing Posted!';
+    
+    const notificationHTML = `
+        <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new" 
+             onclick="viewProperty(${listing.id})">
+            <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
+                    class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
+                ✕
+            </button>
+            <div class="flex items-center gap-4 pr-8 cursor-pointer">
+                <span class="text-3xl">${isMissed ? '📬' : '🏠'}</span>
+                <div class="flex-1">
+                    <div class="text-white font-bold text-lg">${titleText}</div>
+                    <div class="text-white/90">${listing.title || 'New Property'}</div>
+                    <div class="text-white/70 text-sm">by ${ownerName}</div>
+                    <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    stack.insertAdjacentHTML('afterbegin', notificationHTML);
+};
+
 // Log admin activity for history
 window.adminActivityLog = [];
 
@@ -2869,6 +3049,12 @@ window.loadActivityLog = function() {
                 bgColor = 'from-cyan-900/50 to-blue-900/50 border-cyan-600/30';
                 title = 'New User Registered';
                 description = `${entry.data.username || entry.data.email?.split('@')[0] || 'Unknown'} created a ${entry.data.tier || 'Starter'} account`;
+                break;
+            case 'new_listing':
+                icon = '🏠';
+                bgColor = 'from-green-900/50 to-emerald-900/50 border-green-600/30';
+                title = 'New Listing Posted';
+                description = `${entry.data.title || 'New Property'} listed by ${entry.data.ownerEmail?.split('@')[0] || 'Unknown'}`;
                 break;
             case 'upgrade':
                 icon = '⬆️';
@@ -3106,10 +3292,19 @@ window.renderAdminNotificationStack = function(notifications, hasNew = false) {
 };
 
 // Flash the screen for new notifications
-window.flashScreen = function() {
+window.flashScreen = function(color = 'cyan') {
     const flash = document.createElement('div');
     flash.className = 'fixed inset-0 pointer-events-none z-[100]';
-    flash.style.cssText = 'background: linear-gradient(to bottom, rgba(34, 211, 238, 0.3), transparent); animation: flashFade 1s ease-out forwards;';
+    
+    const colorMap = {
+        cyan: 'rgba(34, 211, 238, 0.3)',
+        green: 'rgba(34, 197, 94, 0.3)',
+        orange: 'rgba(251, 146, 60, 0.3)',
+        purple: 'rgba(168, 85, 247, 0.3)'
+    };
+    
+    const bgColor = colorMap[color] || colorMap.cyan;
+    flash.style.cssText = `background: linear-gradient(to bottom, ${bgColor}, transparent); animation: flashFade 1s ease-out forwards;`;
     document.body.appendChild(flash);
     
     setTimeout(() => flash.remove(), 1000);
@@ -5391,10 +5586,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     const user = auth.currentUser;
                     if (user) {
-                        await db.collection('users').doc(user.uid).update({
+                        await db.collection('users').doc(user.uid).set({
                             lastPropertyPostedAt: new Date().toISOString(),
                             lastPropertyPosted: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        }, { merge: true });
                         console.log('[CreateListing] Updated lastPropertyPosted time');
                     }
                 } catch (e) {
