@@ -1132,7 +1132,7 @@ window.togglePremiumStatus = async function(propertyId) {
     
     if (newPremium) {
         // Enabling premium - show confirmation
-        if (!confirm('Enable Premium Listing?\n\n👑 $10,000/month fee\n✓ Top placement on Properties page\n✓ Gold border and featured badge\n✓ Stand out from other listings\n\nProceed with enabling premium?')) {
+        if (!confirm('Enable Premium Listing?\n\n👑 $10,000/week fee\n✓ Top placement on Properties page\n✓ Gold border and featured badge\n✓ Stand out from other listings\n\nProceed with enabling premium?')) {
             return;
         }
     }
