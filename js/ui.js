@@ -604,22 +604,113 @@ window.updatePropertyNavCounter = function() {
 // Keyboard navigation for properties
 document.addEventListener('keydown', function(e) {
     const detailPage = $('propertyDetailPage');
-    if (!detailPage || detailPage.classList.contains('hidden')) return;
+    const statsPage = $('propertyStatsPage');
     
     // Don't navigate if user is typing in an input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     
-    if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        navigateProperty('prev');
-    } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        navigateProperty('next');
-    } else if (e.key === 'Escape') {
-        e.preventDefault();
-        goBack();
+    // Handle property detail page navigation
+    if (detailPage && !detailPage.classList.contains('hidden')) {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            navigateProperty('prev');
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            navigateProperty('next');
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            goBack();
+        }
+    }
+    
+    // Handle stats page navigation
+    if (statsPage && !statsPage.classList.contains('hidden')) {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            navigateStats('prev');
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            navigateStats('next');
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            backToDashboard();
+        }
     }
 });
+
+// Navigate between properties on stats page
+window.navigateStats = function(direction) {
+    const currentId = state.currentPropertyId;
+    if (!currentId) return;
+    
+    // Get owner's properties (or all if admin)
+    const userEmail = auth.currentUser?.email?.toLowerCase();
+    const isMasterAdmin = TierService.isMasterAdmin(userEmail);
+    
+    let userProperties;
+    if (isMasterAdmin) {
+        // Admin can navigate all properties
+        userProperties = properties;
+    } else {
+        // Regular user can only navigate their own properties
+        const userPropertyIds = ownerPropertyMap[userEmail] || [];
+        userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+    }
+    
+    if (userProperties.length === 0) return;
+    
+    // Find current property index
+    const currentIndex = userProperties.findIndex(p => p.id === currentId);
+    if (currentIndex === -1) return;
+    
+    let newIndex;
+    if (direction === 'prev') {
+        newIndex = currentIndex > 0 ? currentIndex - 1 : userProperties.length - 1;
+    } else {
+        newIndex = currentIndex < userProperties.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    const newProperty = userProperties[newIndex];
+    if (newProperty) {
+        viewPropertyStats(newProperty.id);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+
+// Update the stats navigation counter
+window.updateStatsNavCounter = function() {
+    const counter = $('statsNavCounter');
+    const prevBtn = $('prevStatsBtn');
+    const nextBtn = $('nextStatsBtn');
+    
+    if (!counter) return;
+    
+    const currentId = state.currentPropertyId;
+    const userEmail = auth.currentUser?.email?.toLowerCase();
+    const isMasterAdmin = TierService.isMasterAdmin(userEmail);
+    
+    let userProperties;
+    if (isMasterAdmin) {
+        userProperties = properties;
+    } else {
+        const userPropertyIds = ownerPropertyMap[userEmail] || [];
+        userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+    }
+    
+    const currentIndex = userProperties.findIndex(p => p.id === currentId);
+    
+    if (currentIndex !== -1 && userProperties.length > 0) {
+        counter.textContent = `${currentIndex + 1} of ${userProperties.length}`;
+        
+        // Show/hide nav buttons based on property count
+        if (prevBtn) prevBtn.style.display = userProperties.length > 1 ? 'block' : 'none';
+        if (nextBtn) nextBtn.style.display = userProperties.length > 1 ? 'block' : 'none';
+    } else {
+        counter.textContent = '';
+        if (prevBtn) prevBtn.style.display = 'none';
+        if (nextBtn) nextBtn.style.display = 'none';
+    }
+};
 
 // ==================== USERNAME FUNCTIONS ====================
 window.loadUsername = async function() {

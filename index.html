@@ -1075,11 +1075,33 @@
 
     <!-- Property Stats Page (Owner View) -->
     <section id="propertyStatsPage" class="hidden min-h-screen py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <button onclick="backToDashboard()" class="mb-6 flex items-center space-x-2 text-purple-400 hover:text-purple-300 font-semibold transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                <span>Back to Dashboard</span>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <!-- Navigation Header -->
+            <div class="flex items-center justify-between mb-6">
+                <button onclick="backToDashboard()" class="flex items-center space-x-2 text-purple-400 hover:text-purple-300 font-semibold transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    <span>Back to Dashboard</span>
+                </button>
+                <!-- Property Navigation Counter -->
+                <div id="statsNavCounter" class="text-gray-400 text-sm font-medium"></div>
+            </div>
+            
+            <!-- Left/Right Navigation Chevrons -->
+            <button id="prevStatsBtn" onclick="navigateStats('prev')" 
+                class="fixed left-2 md:left-8 top-1/2 -translate-y-1/2 z-30 bg-gray-900/80 hover:bg-purple-600 text-white p-3 md:p-4 rounded-full shadow-xl transition-all duration-300 hover:scale-110 border border-gray-700 hover:border-purple-500"
+                title="Previous Property (←)">
+                <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
             </button>
+            <button id="nextStatsBtn" onclick="navigateStats('next')" 
+                class="fixed right-2 md:right-8 top-1/2 -translate-y-1/2 z-30 bg-gray-900/80 hover:bg-purple-600 text-white p-3 md:p-4 rounded-full shadow-xl transition-all duration-300 hover:scale-110 border border-gray-700 hover:border-purple-500"
+                title="Next Property (→)">
+                <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </button>
+            
             <div id="propertyStatsContent"></div>
         </div>
     </section>

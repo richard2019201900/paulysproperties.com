@@ -208,6 +208,11 @@ window.viewPropertyStats = async function(id) {
     hideElement($('propertyDetailPage'));
     showElement($('propertyStatsPage'));
     window.scrollTo(0, 0);
+    
+    // Update stats navigation counter
+    if (typeof updateStatsNavCounter === 'function') {
+        updateStatsNavCounter();
+    }
 };
 
 // Load owner name for stats page
