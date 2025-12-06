@@ -1871,20 +1871,22 @@ window.checkPendingUpgradeRequest = async function(email) {
 window.adminUsersData = [];
 
 window.switchAdminTab = function(tab) {
-    const tabs = ['users', 'requests', 'create', 'history', 'tools'];
+    const tabs = ['users', 'requests', 'create', 'history', 'tools', 'log'];
     const tabElements = {
         users: $('adminUsersTab'),
         requests: $('adminRequestsTab'),
         create: $('adminCreateTab'),
         history: $('adminHistoryTab'),
-        tools: $('adminToolsTab')
+        tools: $('adminToolsTab'),
+        log: $('adminLogTab')
     };
     const tabButtons = {
         users: $('adminTabUsers'),
         requests: $('adminTabRequests'),
         create: $('adminTabCreate'),
         history: $('adminTabHistory'),
-        tools: $('adminTabTools')
+        tools: $('adminTabTools'),
+        log: $('adminTabLog')
     };
     
     tabs.forEach(t => {
@@ -1907,6 +1909,7 @@ window.switchAdminTab = function(tab) {
     if (tab === 'users') loadAllUsers();
     else if (tab === 'requests') loadUpgradeRequests();
     else if (tab === 'history') loadUpgradeHistory();
+    else if (tab === 'log') loadActivityLog();
 };
 
 // Load and display pending upgrade requests
@@ -2565,10 +2568,24 @@ window.startAdminUsersListener = function() {
         window.adminUsersUnsubscribe();
     }
     
-    // Initialize known users from current data
-    if (window.adminUsersData) {
-        window.adminUsersData.forEach(u => window.knownUserIds.add(u.id));
+    // Record session start time - only notify for users created AFTER this
+    if (!window.adminSessionStartTime) {
+        window.adminSessionStartTime = new Date();
+        console.log('[AdminUsers] Session started at:', window.adminSessionStartTime);
     }
+    
+    // Load dismissed notifications from localStorage
+    try {
+        const dismissed = localStorage.getItem('dismissedUserNotifications');
+        if (dismissed) {
+            JSON.parse(dismissed).forEach(id => window.dismissedAdminNotifications.add(id));
+        }
+    } catch (e) {
+        console.warn('[AdminUsers] Could not load dismissed notifications');
+    }
+    
+    // First snapshot flag - skip initial load
+    let isFirstSnapshot = true;
     
     // Simple listener - no orderBy to avoid index requirement
     window.adminUsersUnsubscribe = db.collection('users')
@@ -2581,20 +2598,27 @@ window.startAdminUsersListener = function() {
                 const user = { id: doc.id, ...data };
                 users.push(user);
                 
-                // Detect NEW users (not in our known set)
-                if (!window.knownUserIds.has(doc.id) && window.knownUserIds.size > 0) {
-                    newUsers.push(user);
-                    window.knownUserIds.add(doc.id);
+                // Only detect as "new" if:
+                // 1. This is NOT the first snapshot (page just loaded)
+                // 2. User was created AFTER our session started
+                // 3. We haven't already notified about this user
+                if (!isFirstSnapshot && !window.knownUserIds.has(doc.id)) {
+                    const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+                    if (createdAt && createdAt > window.adminSessionStartTime) {
+                        newUsers.push(user);
+                        
+                        // Log to activity log
+                        logAdminActivity('new_user', user);
+                    }
                 }
+                
+                window.knownUserIds.add(doc.id);
             });
-            
-            // Update known users
-            users.forEach(u => window.knownUserIds.add(u.id));
             
             // Update admin data
             window.adminUsersData = users;
             
-            // If we have new users, show notification and refresh
+            // If we have truly NEW users (created after session start), show notification
             if (newUsers.length > 0) {
                 console.log('[AdminUsers] New user(s) detected:', newUsers.map(u => u.email));
                 
@@ -2606,7 +2630,7 @@ window.startAdminUsersListener = function() {
                     showNewUserNotification(user);
                 });
                 
-                // Always refresh the user list and stats when new users are detected
+                // Refresh the user list and stats
                 const container = $('allUsersList');
                 if (container) {
                     renderAdminUsersList(users);
@@ -2614,9 +2638,123 @@ window.startAdminUsersListener = function() {
                 updateAdminStats(users);
             }
             
+            // After first snapshot, mark as no longer first
+            if (isFirstSnapshot) {
+                isFirstSnapshot = false;
+                console.log('[AdminUsers] Initial load complete, now listening for new users');
+            }
+            
         }, (error) => {
             console.error('[AdminUsers] Users listener error:', error);
         });
+};
+
+// Log admin activity for history
+window.adminActivityLog = [];
+
+window.logAdminActivity = function(type, data) {
+    const entry = {
+        id: Date.now().toString(),
+        type: type,
+        data: data,
+        timestamp: new Date().toISOString()
+    };
+    
+    window.adminActivityLog.unshift(entry); // Add to front
+    
+    // Keep only last 100 entries in memory
+    if (window.adminActivityLog.length > 100) {
+        window.adminActivityLog = window.adminActivityLog.slice(0, 100);
+    }
+    
+    // Also save to localStorage for persistence
+    try {
+        const existing = JSON.parse(localStorage.getItem('adminActivityLog') || '[]');
+        existing.unshift(entry);
+        localStorage.setItem('adminActivityLog', JSON.stringify(existing.slice(0, 100)));
+    } catch (e) {
+        console.warn('[AdminActivity] Could not save to localStorage');
+    }
+};
+
+// Load and display activity log
+window.loadActivityLog = function() {
+    const container = $('activityLogList');
+    if (!container) return;
+    
+    // Load from localStorage
+    let entries = [];
+    try {
+        entries = JSON.parse(localStorage.getItem('adminActivityLog') || '[]');
+    } catch (e) {
+        console.warn('[AdminActivity] Could not load from localStorage');
+    }
+    
+    if (entries.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4">📭</div>
+                <p class="text-gray-500">No activity recorded yet</p>
+                <p class="text-gray-600 text-sm mt-2">New user signups and other events will appear here</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = entries.map(entry => {
+        const time = new Date(entry.timestamp).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit'
+        });
+        
+        let icon, bgColor, title, description;
+        
+        switch(entry.type) {
+            case 'new_user':
+                icon = '👤';
+                bgColor = 'from-cyan-900/50 to-blue-900/50 border-cyan-600/30';
+                title = 'New User Registered';
+                description = `${entry.data.username || entry.data.email?.split('@')[0] || 'Unknown'} created a ${entry.data.tier || 'Starter'} account`;
+                break;
+            case 'upgrade':
+                icon = '⬆️';
+                bgColor = 'from-purple-900/50 to-pink-900/50 border-purple-600/30';
+                title = 'User Upgraded';
+                description = `${entry.data.email} upgraded to ${entry.data.newTier}`;
+                break;
+            case 'payment':
+                icon = '💰';
+                bgColor = 'from-green-900/50 to-emerald-900/50 border-green-600/30';
+                title = 'Payment Received';
+                description = entry.data.description || 'Payment recorded';
+                break;
+            default:
+                icon = '📋';
+                bgColor = 'from-gray-800 to-gray-900 border-gray-600/30';
+                title = 'Activity';
+                description = JSON.stringify(entry.data);
+        }
+        
+        return `
+            <div class="bg-gradient-to-r ${bgColor} rounded-xl p-4 border flex items-start gap-4">
+                <span class="text-2xl">${icon}</span>
+                <div class="flex-1 min-w-0">
+                    <div class="text-white font-semibold">${title}</div>
+                    <div class="text-gray-300 text-sm">${description}</div>
+                    <div class="text-gray-500 text-xs mt-1">${time}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+};
+
+// Clear activity log
+window.clearActivityLog = function() {
+    if (!confirm('Clear all activity log entries? This cannot be undone.')) return;
+    
+    window.adminActivityLog = [];
+    localStorage.removeItem('adminActivityLog');
+    loadActivityLog();
 };
 
 // Show a notification for a new user
@@ -2665,6 +2803,14 @@ window.handleNewUserNotificationClick = function(userId) {
 // Dismiss new user notification
 window.dismissNewUserNotification = function(notificationId) {
     window.dismissedAdminNotifications.add(notificationId);
+    
+    // Save to localStorage for persistence across sessions
+    try {
+        const dismissed = Array.from(window.dismissedAdminNotifications);
+        localStorage.setItem('dismissedUserNotifications', JSON.stringify(dismissed));
+    } catch (e) {
+        console.warn('[AdminNotify] Could not save dismissed state');
+    }
     
     const notification = $('notification-' + notificationId);
     if (notification) {

@@ -788,6 +788,9 @@
                     <button id="adminTabTools" onclick="switchAdminTab('tools')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">
                         🛠️ Tools
                     </button>
+                    <button id="adminTabLog" onclick="switchAdminTab('log')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600">
+                        📋 Activity Log
+                    </button>
                 </div>
                 
                 <!-- Upgrade Requests Tab -->
@@ -890,6 +893,21 @@
                             <p class="text-gray-400 text-sm mb-3">Careful - these actions are permanent</p>
                             <button onclick="cleanupOrphanedListings()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 mr-2 mb-2">🧹 Cleanup Orphaned Listings</button>
                         </div>
+                    </div>
+                </div>
+                
+                <!-- Activity Log Tab -->
+                <div id="adminLogTab" class="hidden space-y-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-bold text-gray-200">📋 Activity Log</h4>
+                        <div class="flex gap-2">
+                            <button onclick="loadActivityLog()" class="text-purple-400 hover:text-purple-300 text-sm font-bold px-3 py-2 bg-gray-700 rounded-lg">🔄 Refresh</button>
+                            <button onclick="clearActivityLog()" class="text-red-400 hover:text-red-300 text-sm font-bold px-3 py-2 bg-gray-700 rounded-lg">🗑️ Clear</button>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 text-sm mb-4">Real-time events like new user signups are logged here. View history even after dismissing notifications.</p>
+                    <div id="activityLogList" class="space-y-3 max-h-96 overflow-y-auto">
+                        <p class="text-gray-500 italic">Loading activity log...</p>
                     </div>
                 </div>
             </div>
