@@ -196,6 +196,13 @@ window.viewPropertyStats = async function(id) {
     renderPropertyStatsContent(id);
     loadStatsOwnerName(id);
     
+    // Load property analytics (async - will populate the analytics section)
+    setTimeout(() => {
+        if (typeof renderPropertyAnalytics === 'function') {
+            renderPropertyAnalytics(id);
+        }
+    }, 100);
+    
     hideElement($('ownerDashboard'));
     hideElement($('renterSection'));
     hideElement($('propertyDetailPage'));
@@ -652,6 +659,25 @@ function renderPropertyStatsContent(id) {
             </div>
         </div>
         
+        <!-- Property Analytics & Payment Ledger -->
+        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-200 flex items-center gap-3">
+                    <span>📊</span> Property Analytics & Ledger
+                </h3>
+                <button onclick="renderPropertyAnalytics(${id})" class="text-purple-400 hover:text-purple-300 text-sm font-semibold flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Refresh
+                </button>
+            </div>
+            <div id="propertyAnalyticsSection">
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-4 animate-pulse">📊</div>
+                    <p class="text-gray-400">Loading analytics...</p>
+                </div>
+            </div>
+        </div>
+        
         <!-- Property Images Gallery -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
             <div class="flex justify-between items-center mb-6">
@@ -914,6 +940,35 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
         // CRITICAL: Write to Firestore (includes fresh read before write)
         await PropertyDataService.write(propertyId, field, newValue);
         
+        // LOG PAYMENT when lastPaymentDate is updated
+        if (field === 'lastPaymentDate' && newValue) {
+            const p = properties.find(prop => prop.id === propertyId);
+            const renterName = PropertyDataService.getValue(propertyId, 'renterName', p?.renterName || 'Unknown');
+            const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || 'weekly');
+            const weeklyPrice = PropertyDataService.getValue(propertyId, 'weeklyPrice', p?.weeklyPrice || 0);
+            const biweeklyPrice = PropertyDataService.getValue(propertyId, 'biweeklyPrice', p?.biweeklyPrice || 0);
+            const monthlyPrice = PropertyDataService.getValue(propertyId, 'monthlyPrice', p?.monthlyPrice || 0);
+            
+            // Calculate payment amount based on frequency
+            let paymentAmount = weeklyPrice;
+            if (paymentFrequency === 'biweekly') {
+                paymentAmount = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
+            } else if (paymentFrequency === 'monthly') {
+                paymentAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
+            }
+            
+            // Log payment to Firestore
+            await logPayment(propertyId, {
+                paymentDate: newValue,
+                recordedAt: new Date().toISOString(),
+                renterName: renterName,
+                frequency: paymentFrequency,
+                amount: paymentAmount,
+                recordedBy: auth.currentUser?.email || 'owner'
+            });
+            console.log(`[PaymentLog] Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
+        }
+        
         // Auto-flip to "rented" when setting renter name or phone
         if ((field === 'renterName' || field === 'renterPhone') && newValue) {
             if (state.availability[propertyId] !== false) {
@@ -945,6 +1000,11 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             tile.classList.remove('success');
             // Refresh the entire stats page to show synced data
             renderPropertyStatsContent(propertyId);
+            
+            // Refresh analytics if payment was logged
+            if (field === 'lastPaymentDate' && typeof renderPropertyAnalytics === 'function') {
+                setTimeout(() => renderPropertyAnalytics(propertyId), 200);
+            }
         }, 1000);
         
         // Update filtered properties to reflect changes
@@ -1095,6 +1155,403 @@ window.togglePremiumStatus = async function(propertyId) {
         console.error('Error toggling premium status:', error);
         alert('Failed to update premium status. Please try again.');
     }
+};
+
+// ==================== PAYMENT LEDGER SYSTEM ====================
+
+// Log a payment to the property's payment history
+window.logPayment = async function(propertyId, paymentData) {
+    try {
+        // Get existing payment history
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        let payments = [];
+        
+        if (historyDoc.exists) {
+            payments = historyDoc.data().payments || [];
+        }
+        
+        // Add new payment
+        payments.push({
+            ...paymentData,
+            id: Date.now().toString() // Unique ID for this payment
+        });
+        
+        // Save back to Firestore
+        await db.collection('paymentHistory').doc(String(propertyId)).set({
+            propertyId: propertyId,
+            payments: payments,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('[PaymentLog] Payment logged successfully');
+        return true;
+    } catch (error) {
+        console.error('[PaymentLog] Error logging payment:', error);
+        return false;
+    }
+};
+
+// Get payment history for a property
+window.getPaymentHistory = async function(propertyId) {
+    try {
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        if (historyDoc.exists) {
+            return historyDoc.data().payments || [];
+        }
+        return [];
+    } catch (error) {
+        console.error('[PaymentLog] Error fetching history:', error);
+        return [];
+    }
+};
+
+// Calculate property analytics from payment history
+window.calculatePropertyAnalytics = function(payments, property) {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    
+    // Sort payments by date
+    const sortedPayments = [...payments].sort((a, b) => 
+        new Date(a.paymentDate) - new Date(b.paymentDate)
+    );
+    
+    // YTD calculations
+    const ytdPayments = sortedPayments.filter(p => new Date(p.paymentDate) >= yearStart);
+    const totalEarnings = sortedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const ytdEarnings = ytdPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    
+    // Payment counts
+    const totalPayments = sortedPayments.length;
+    const ytdPaymentCount = ytdPayments.length;
+    
+    // Average rent calculation
+    const avgRent = totalPayments > 0 ? Math.round(totalEarnings / totalPayments) : 0;
+    
+    // Renter breakdown
+    const renterStats = {};
+    sortedPayments.forEach(p => {
+        const name = p.renterName || 'Unknown';
+        if (!renterStats[name]) {
+            renterStats[name] = { count: 0, total: 0, payments: [] };
+        }
+        renterStats[name].count++;
+        renterStats[name].total += (p.amount || 0);
+        renterStats[name].payments.push(p);
+    });
+    
+    // Monthly breakdown for charting
+    const monthlyData = {};
+    sortedPayments.forEach(p => {
+        const date = new Date(p.paymentDate);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyData[monthKey]) {
+            monthlyData[monthKey] = { earnings: 0, payments: 0 };
+        }
+        monthlyData[monthKey].earnings += (p.amount || 0);
+        monthlyData[monthKey].payments++;
+    });
+    
+    // Calculate rental period (time since first payment or first renter set)
+    let firstPaymentDate = null;
+    if (sortedPayments.length > 0) {
+        firstPaymentDate = new Date(sortedPayments[0].paymentDate);
+    }
+    
+    const daysSinceFirstPayment = firstPaymentDate 
+        ? Math.floor((now - firstPaymentDate) / (1000 * 60 * 60 * 24))
+        : 0;
+    
+    // Calculate occupancy rate (payments / expected payments based on frequency)
+    let expectedPayments = 0;
+    if (firstPaymentDate && daysSinceFirstPayment > 0) {
+        const weeklyPrice = property?.weeklyPrice || 0;
+        const frequency = PropertyDataService.getValue(property?.id, 'paymentFrequency', 'weekly');
+        if (frequency === 'weekly') {
+            expectedPayments = Math.floor(daysSinceFirstPayment / 7);
+        } else if (frequency === 'biweekly') {
+            expectedPayments = Math.floor(daysSinceFirstPayment / 14);
+        } else {
+            expectedPayments = Math.floor(daysSinceFirstPayment / 30);
+        }
+    }
+    const occupancyRate = expectedPayments > 0 
+        ? Math.min(100, Math.round((totalPayments / expectedPayments) * 100))
+        : 0;
+    
+    return {
+        totalEarnings,
+        ytdEarnings,
+        totalPayments,
+        ytdPaymentCount,
+        avgRent,
+        renterStats,
+        monthlyData,
+        firstPaymentDate,
+        daysSinceFirstPayment,
+        occupancyRate,
+        sortedPayments
+    };
+};
+
+// Render analytics section on property stats page
+window.renderPropertyAnalytics = async function(propertyId) {
+    const container = $('propertyAnalyticsSection');
+    if (!container) return;
+    
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) return;
+    
+    // Show loading
+    container.innerHTML = `
+        <div class="text-center py-8">
+            <div class="text-4xl mb-4 animate-pulse">📊</div>
+            <p class="text-gray-400">Loading analytics...</p>
+        </div>
+    `;
+    
+    // Fetch payment history
+    const payments = await getPaymentHistory(propertyId);
+    const analytics = calculatePropertyAnalytics(payments, p);
+    
+    // Generate monthly chart data
+    const months = Object.keys(analytics.monthlyData).sort();
+    const lastSixMonths = months.slice(-6);
+    
+    container.innerHTML = `
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-600/30">
+                <div class="text-green-400 text-sm font-semibold">💰 Total Earnings</div>
+                <div class="text-2xl font-black text-white">$${analytics.totalEarnings.toLocaleString()}</div>
+                <div class="text-green-300/70 text-xs">${analytics.totalPayments} payments</div>
+            </div>
+            <div class="bg-gradient-to-br from-blue-900/50 to-cyan-900/50 rounded-xl p-4 border border-blue-600/30">
+                <div class="text-blue-400 text-sm font-semibold">📅 YTD Earnings</div>
+                <div class="text-2xl font-black text-white">$${analytics.ytdEarnings.toLocaleString()}</div>
+                <div class="text-blue-300/70 text-xs">${analytics.ytdPaymentCount} payments this year</div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-900/50 to-pink-900/50 rounded-xl p-4 border border-purple-600/30">
+                <div class="text-purple-400 text-sm font-semibold">💵 Avg Payment</div>
+                <div class="text-2xl font-black text-white">$${analytics.avgRent.toLocaleString()}</div>
+                <div class="text-purple-300/70 text-xs">per payment cycle</div>
+            </div>
+            <div class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-xl p-4 border border-amber-600/30">
+                <div class="text-amber-400 text-sm font-semibold">📈 Occupancy</div>
+                <div class="text-2xl font-black text-white">${analytics.occupancyRate}%</div>
+                <div class="text-amber-300/70 text-xs">${analytics.daysSinceFirstPayment} days tracked</div>
+            </div>
+        </div>
+        
+        <!-- Monthly Earnings Chart -->
+        <div class="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
+            <h4 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span>📊</span> Monthly Earnings Trend
+            </h4>
+            <div id="earningsChart-${propertyId}" class="h-48">
+                ${renderEarningsChart(lastSixMonths, analytics.monthlyData)}
+            </div>
+        </div>
+        
+        <!-- Renter Breakdown -->
+        <div class="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700">
+            <h4 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span>👥</span> Renter History
+            </h4>
+            <div class="space-y-3">
+                ${Object.entries(analytics.renterStats).length > 0 
+                    ? Object.entries(analytics.renterStats).map(([name, stats]) => `
+                        <div class="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
+                                    ${name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div class="text-white font-semibold">${name}</div>
+                                    <div class="text-gray-400 text-sm">${stats.count} payment${stats.count > 1 ? 's' : ''}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-green-400 font-bold">$${stats.total.toLocaleString()}</div>
+                                <div class="text-gray-500 text-xs">total paid</div>
+                            </div>
+                        </div>
+                    `).join('')
+                    : '<p class="text-gray-500 text-center py-4">No renter history yet</p>'
+                }
+            </div>
+        </div>
+        
+        <!-- Payment Ledger -->
+        <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-bold text-white flex items-center gap-2">
+                    <span>📒</span> Payment Ledger
+                </h4>
+                <button onclick="toggleLedgerExpand(${propertyId})" class="text-purple-400 hover:text-purple-300 text-sm font-semibold">
+                    ${payments.length > 5 ? 'View All (' + payments.length + ')' : ''}
+                </button>
+            </div>
+            <div id="paymentLedger-${propertyId}" class="space-y-2 max-h-80 overflow-y-auto">
+                ${payments.length > 0 
+                    ? analytics.sortedPayments.slice().reverse().slice(0, 10).map((p, i) => `
+                        <div class="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between text-sm ${i === 0 ? 'ring-2 ring-green-500/50' : ''}">
+                            <div class="flex items-center gap-3">
+                                <div class="text-2xl">${i === 0 ? '✅' : '💵'}</div>
+                                <div>
+                                    <div class="text-white font-medium">${p.renterName || 'Unknown'}</div>
+                                    <div class="text-gray-400 text-xs">
+                                        Paid for: ${formatDate(p.paymentDate)} 
+                                        <span class="text-gray-600">•</span> 
+                                        ${p.frequency || 'weekly'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-green-400 font-bold">$${(p.amount || 0).toLocaleString()}</div>
+                                <div class="text-gray-500 text-xs">
+                                    ${new Date(p.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')
+                    : `
+                        <div class="text-center py-8">
+                            <div class="text-4xl mb-2">📭</div>
+                            <p class="text-gray-500">No payments recorded yet</p>
+                            <p class="text-gray-600 text-sm mt-1">Payments are logged when you update the "Last Payment" date</p>
+                        </div>
+                    `
+                }
+            </div>
+            ${payments.length > 10 ? `
+                <button onclick="showFullLedger(${propertyId})" class="w-full mt-4 py-2 text-center text-purple-400 hover:text-purple-300 font-semibold border border-purple-500/30 rounded-lg hover:bg-purple-500/10 transition">
+                    View Full Ledger (${payments.length} entries)
+                </button>
+            ` : ''}
+        </div>
+    `;
+};
+
+// Render simple bar chart for earnings
+window.renderEarningsChart = function(months, monthlyData) {
+    if (months.length === 0) {
+        return `
+            <div class="flex items-center justify-center h-full text-gray-500">
+                <div class="text-center">
+                    <div class="text-3xl mb-2">📊</div>
+                    <p>No earnings data yet</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    const maxEarnings = Math.max(...months.map(m => monthlyData[m]?.earnings || 0), 1);
+    
+    return `
+        <div class="flex items-end justify-around h-full gap-2 px-4">
+            ${months.map(month => {
+                const data = monthlyData[month] || { earnings: 0, payments: 0 };
+                const heightPercent = (data.earnings / maxEarnings) * 100;
+                const monthLabel = new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' });
+                return `
+                    <div class="flex-1 flex flex-col items-center gap-2">
+                        <div class="text-xs text-green-400 font-bold">$${(data.earnings / 1000).toFixed(0)}k</div>
+                        <div class="w-full bg-gray-700 rounded-t-lg relative" style="height: 120px;">
+                            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-green-600 to-emerald-500 rounded-t-lg transition-all duration-500" 
+                                 style="height: ${Math.max(heightPercent, 5)}%;">
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400">${monthLabel}</div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+};
+
+// Show full ledger modal
+window.showFullLedger = async function(propertyId) {
+    const payments = await getPaymentHistory(propertyId);
+    const p = properties.find(prop => prop.id === propertyId);
+    
+    const sortedPayments = [...payments].sort((a, b) => 
+        new Date(b.paymentDate) - new Date(a.paymentDate)
+    );
+    
+    const totalEarnings = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    
+    const modalHTML = `
+        <div id="fullLedgerModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-purple-700">
+                <div class="bg-gradient-to-r from-purple-900 to-pink-900 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                                <span>📒</span> Complete Payment Ledger
+                            </h3>
+                            <p class="text-purple-200 text-sm mt-1">${p?.title || 'Property'}</p>
+                        </div>
+                        <button onclick="closeFullLedger()" class="text-white/70 hover:text-white text-2xl">&times;</button>
+                    </div>
+                    <div class="mt-4 flex gap-4 text-sm">
+                        <div class="bg-white/10 rounded-lg px-4 py-2">
+                            <span class="text-purple-200">Total Payments:</span>
+                            <span class="text-white font-bold ml-2">${payments.length}</span>
+                        </div>
+                        <div class="bg-white/10 rounded-lg px-4 py-2">
+                            <span class="text-purple-200">Total Earned:</span>
+                            <span class="text-green-400 font-bold ml-2">$${totalEarnings.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[60vh]">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-gray-400 text-sm border-b border-gray-700">
+                                <th class="pb-3">Date</th>
+                                <th class="pb-3">Renter</th>
+                                <th class="pb-3">Frequency</th>
+                                <th class="pb-3 text-right">Amount</th>
+                                <th class="pb-3 text-right">Recorded</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm">
+                            ${sortedPayments.map((payment, i) => `
+                                <tr class="border-b border-gray-700/50 hover:bg-gray-700/30">
+                                    <td class="py-3 text-white font-medium">${formatDate(payment.paymentDate)}</td>
+                                    <td class="py-3 text-gray-300">${payment.renterName || 'Unknown'}</td>
+                                    <td class="py-3">
+                                        <span class="px-2 py-1 rounded-full text-xs font-semibold ${
+                                            payment.frequency === 'monthly' ? 'bg-purple-500/20 text-purple-300' :
+                                            payment.frequency === 'biweekly' ? 'bg-blue-500/20 text-blue-300' :
+                                            'bg-green-500/20 text-green-300'
+                                        }">
+                                            ${payment.frequency || 'weekly'}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 text-right text-green-400 font-bold">$${(payment.amount || 0).toLocaleString()}</td>
+                                    <td class="py-3 text-right text-gray-500 text-xs">
+                                        ${new Date(payment.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existing = $('fullLedgerModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeFullLedger = function() {
+    const modal = $('fullLedgerModal');
+    if (modal) modal.remove();
 };
 
 // ==================== EVENT LISTENERS ====================
