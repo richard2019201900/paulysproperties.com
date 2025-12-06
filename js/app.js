@@ -18,7 +18,23 @@ window.viewProperty = function(id) {
     if (!p) return;
     
     state.currentPropertyId = id;
-    state.currentImages = p.images;
+    state.currentImages = p.images || [];
+    
+    // Check if property has valid images
+    const hasImages = p.images && Array.isArray(p.images) && p.images.length > 0;
+    const firstImage = hasImages ? p.images[0] : '';
+    
+    // Image placeholder HTML
+    const imagePlaceholder = `
+        <div class="w-full h-60 md:h-80 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center rounded-xl shadow-lg border border-gray-600">
+            <span class="text-7xl mb-4">🏠</span>
+            <span class="text-gray-400 font-semibold text-lg">Photos Coming Soon</span>
+            <span class="text-gray-500 text-sm mt-1">Check back later for property images</span>
+        </div>
+    `;
+    
+    // Image error handler
+    const imgErrorHandler = "this.onerror=null; this.style.display='none'; this.insertAdjacentHTML('afterend', `<div class='w-full h-60 md:h-80 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center rounded-xl shadow-lg border border-gray-600'><span class='text-7xl mb-4'>🏠</span><span class='text-gray-400 font-semibold text-lg'>Photo Unavailable</span></div>`);";
     
     hideElement($('renterSection'));
     hideElement($('ownerDashboard'));
@@ -68,6 +84,24 @@ window.viewProperty = function(id) {
             </button>
         </div>` : '';
 
+    // Build images section - show placeholder if no images
+    const imagesSection = hasImages 
+        ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 p-4 md:p-6">
+            ${p.images.map((img, i) => `
+                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-60 md:h-80 object-cover rounded-xl shadow-lg border border-gray-600 ${i === 0 ? 'md:col-span-2' : ''}" loading="lazy" onerror="${imgErrorHandler}">
+            `).join('')}
+           </div>`
+        : `<div class="p-4 md:p-6">
+            <div class="md:col-span-2 w-full h-72 md:h-96 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center rounded-xl shadow-lg border border-gray-600">
+                <span class="text-8xl mb-4">🏠</span>
+                <span class="text-gray-400 font-semibold text-xl">Photos Coming Soon</span>
+                <span class="text-gray-500 text-sm mt-2">Check back later for property images</span>
+            </div>
+           </div>`;
+    
+    // Video poster - use first image or empty
+    const videoPoster = firstImage || '';
+
     $('propertyDetailContent').innerHTML = `
         ${ownerTabs}
         ${p.videoUrl ? `
@@ -76,15 +110,11 @@ window.viewProperty = function(id) {
                 <svg class="w-6 h-6 md:w-8 md:h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path></svg>
                 <h3 class="text-xl md:text-2xl font-black text-white">Virtual Video Tour</h3>
             </div>
-            <video controls autoplay muted playsinline class="w-full rounded-xl shadow-2xl border border-gray-600" poster="${p.images[0]}">
+            <video controls autoplay muted playsinline class="w-full rounded-xl shadow-2xl border border-gray-600" ${videoPoster ? `poster="${videoPoster}"` : ''}>
                 <source src="${p.videoUrl}" type="video/mp4">
             </video>
         </div>` : ''}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 p-4 md:p-6">
-            ${p.images.map((img, i) => `
-                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-60 md:h-80 object-cover rounded-xl shadow-lg border border-gray-600 ${i === 0 ? 'md:col-span-2' : ''}" loading="lazy">
-            `).join('')}
-        </div>
+        ${imagesSection}
         <div class="p-5 md:p-8">
             <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
                 <div>

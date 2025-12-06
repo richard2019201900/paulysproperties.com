@@ -1699,11 +1699,23 @@ async function renderProperties(list) {
         return 0;
     });
     
-    // First render with placeholder owner
-    $('propertiesGrid').innerHTML = sortedList.filter(p => p && p.images && p.images.length > 0).map(p => {
+    // Placeholder for properties with no/broken images
+    const imagePlaceholder = `
+        <div class="w-full h-64 md:h-72 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center">
+            <span class="text-6xl mb-3">🏠</span>
+            <span class="text-gray-400 font-semibold text-sm">Photos Coming Soon</span>
+        </div>
+    `;
+    
+    // Image error handler function name
+    const imgErrorHandler = "this.onerror=null; this.parentElement.innerHTML=`<div class='w-full h-64 md:h-72 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center'><span class='text-6xl mb-3'>🏠</span><span class='text-gray-400 font-semibold text-sm'>Photos Coming Soon</span></div>`;";
+    
+    // First render with placeholder owner - include ALL properties, even those without images
+    $('propertiesGrid').innerHTML = sortedList.filter(p => p).map(p => {
         const available = state.availability[p.id] !== false;
         const propData = state.propertyOverrides[p.id] || {};
         const isPremium = propData.isPremium || p.isPremium;
+        const hasImages = p.images && Array.isArray(p.images) && p.images.length > 0 && p.images[0];
         
         // Premium styling
         const cardBorder = isPremium 
@@ -1717,12 +1729,17 @@ async function renderProperties(list) {
         const premiumGlow = isPremium ? 'premium-glow' : '';
         const imageMargin = isPremium ? 'mt-8' : '';
         
+        // Image element - use placeholder if no images, add error handler for broken images
+        const imageElement = hasImages 
+            ? `<img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-72 object-cover" loading="lazy" onerror="${imgErrorHandler}">`
+            : imagePlaceholder;
+        
         return `
         <article class="property-card bg-gray-800 rounded-2xl shadow-xl overflow-hidden cursor-pointer ${cardBorder} ${premiumGlow} relative" onclick="viewProperty(${p.id})">
             ${premiumBadge}
             <div class="relative ${imageMargin}">
                 ${!available ? '<div class="unavailable-overlay"><div class="unavailable-text">UNAVAILABLE</div></div>' : ''}
-                <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-72 object-cover" loading="lazy">
+                ${imageElement}
                 ${p.videoUrl ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-red-500 to-pink-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-full font-bold text-xs md:text-sm shadow-lg flex items-center space-x-1 md:space-x-2"><svg class="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path></svg><span>Video Tour</span></div>' : ''}
                 ${isPremium ? '<div class="absolute top-4 right-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-3 py-1 rounded-full font-bold text-xs shadow-lg">⭐ FEATURED</div>' : ''}
             </div>
