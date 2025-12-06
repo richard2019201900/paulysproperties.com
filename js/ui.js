@@ -3127,26 +3127,34 @@ window.updateAdminStats = async function(users) {
     // Front stats - with paid/trial breakdown
     const statUsers = $('adminStatUsers');
     const statPro = $('adminStatPro');
+    const statProBreakdown = $('adminStatProBreakdown');
     const statElite = $('adminStatElite');
+    const statEliteBreakdown = $('adminStatEliteBreakdown');
     const statListings = $('adminStatListings');
     
     if (statUsers) statUsers.textContent = totalUsers;
     
-    // Pro tile - show paid/trial split
+    // Pro tile - show count and paid/trial split separately
     if (statPro) {
-        if (proTrialUsers.length > 0) {
-            statPro.innerHTML = `${proUsers.length} <span class="text-sm font-normal text-gray-400">(${proPaidUsers.length} paid, ${proTrialUsers.length} trial)</span>`;
+        statPro.textContent = proUsers.length;
+    }
+    if (statProBreakdown) {
+        if (proTrialUsers.length > 0 || proPaidUsers.length > 0) {
+            statProBreakdown.textContent = `(${proPaidUsers.length} paid, ${proTrialUsers.length} trial)`;
         } else {
-            statPro.textContent = proUsers.length;
+            statProBreakdown.textContent = '';
         }
     }
     
-    // Elite tile - show paid/trial split
+    // Elite tile - show count and paid/trial split separately
     if (statElite) {
-        if (eliteTrialUsers.length > 0) {
-            statElite.innerHTML = `${eliteUsers.length} <span class="text-sm font-normal text-gray-400">(${elitePaidUsers.length} paid, ${eliteTrialUsers.length} trial)</span>`;
+        statElite.textContent = eliteUsers.length;
+    }
+    if (statEliteBreakdown) {
+        if (eliteTrialUsers.length > 0 || elitePaidUsers.length > 0) {
+            statEliteBreakdown.textContent = `(${elitePaidUsers.length} paid, ${eliteTrialUsers.length} trial)`;
         } else {
-            statElite.textContent = eliteUsers.length;
+            statEliteBreakdown.textContent = '';
         }
     }
     
@@ -3346,22 +3354,30 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             else if (p.interiorType === 'Instance') interiorBreakdown['Instance']++;
         });
         
-        // Format property type breakdown for display
+        // Format property type breakdown for display (clickable)
         let propBreakdownHTML = '';
+        const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', warehouse: '🏭', hideout: '🏚️' };
+        
         if (userProperties.length > 0) {
-            const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', warehouse: '🏭', hideout: '🏚️' };
             const typeEntries = Object.entries(propTypeBreakdown)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 3) // Show top 3
-                .map(([type, count]) => `${typeIcons[type] || '🏠'} ${type.charAt(0).toUpperCase() + type.slice(1)}: ${count}`)
-                .join(' • ');
+                .map(([type, count]) => {
+                    const icon = typeIcons[type] || '🏠';
+                    const typeName = type.charAt(0).toUpperCase() + type.slice(1);
+                    return `<span onclick="filterUserPropertiesByType('${escapedId}', '${type}')" class="cursor-pointer hover:text-cyan-300 hover:underline transition">${icon} ${typeName}: ${count}</span>`;
+                })
+                .join(' <span class="text-gray-600">•</span> ');
             
-            const walkinPct = userProperties.length > 0 ? Math.round((interiorBreakdown['Walk-in'] / userProperties.length) * 100) : 0;
+            const walkinPct = Math.round((interiorBreakdown['Walk-in'] / userProperties.length) * 100);
+            const instancePct = 100 - walkinPct;
             
             propBreakdownHTML = `
                 <div class="flex flex-wrap gap-2 text-xs mt-1">
-                    <span class="text-gray-500">${typeEntries}</span>
-                    <span class="text-cyan-400/70">| ${walkinPct}% Walk-in</span>
+                    <span class="text-gray-400">${typeEntries}</span>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-cyan-400/70 cursor-pointer hover:text-cyan-300" onclick="filterUserPropertiesByInterior('${escapedId}', 'Walk-in')">${walkinPct}% Walk-in</span>
+                    <span class="text-purple-400/70 cursor-pointer hover:text-purple-300" onclick="filterUserPropertiesByInterior('${escapedId}', 'Instance')">${instancePct}% Instance</span>
                 </div>
             `;
         }
@@ -3370,10 +3386,14 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             ? userProperties.map((p, index) => {
                 const title = p.title || p.name || 'Unnamed Property';
                 const isAvailable = state.availability[p.id] !== false;
+                const typeIcon = typeIcons[p.type] || '🏠';
+                const interiorIcon = p.interiorType === 'Walk-in' ? '🚶' : '🌀';
                 return `
-                    <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0">
-                        <span class="text-gray-300 text-xs">
-                            <span class="text-gray-500 mr-2">${index + 1}.</span>
+                    <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0 user-property-item" data-type="${p.type || ''}" data-interior="${p.interiorType || ''}">
+                        <span class="text-gray-300 text-xs flex items-center gap-1">
+                            <span class="text-gray-500">${index + 1}.</span>
+                            <span title="${(p.type || 'unknown').charAt(0).toUpperCase() + (p.type || 'unknown').slice(1)}">${typeIcon}</span>
+                            <span title="${p.interiorType || 'Unknown'}" class="text-gray-600">${interiorIcon}</span>
                             <a onclick="viewPropertyStats(${p.id})" class="hover:text-cyan-400 cursor-pointer hover:underline transition">${title}</a>
                         </span>
                         <span class="text-xs ${isAvailable ? 'text-green-400' : 'text-red-400'}">${isAvailable ? '🟢' : '🔴'}</span>
@@ -3697,6 +3717,101 @@ window.toggleUserGroup = function(groupId) {
             toggle.textContent = '▶';
         }
     }
+};
+
+// Filter user properties by type (House, Apartment, etc.)
+window.filterUserPropertiesByType = function(userId, type) {
+    const list = $('propList_' + userId);
+    if (!list) return;
+    
+    // Make sure the list is visible
+    list.classList.remove('hidden');
+    const toggle = $('propToggle_' + userId);
+    if (toggle) toggle.textContent = '▼';
+    
+    // Get all property items
+    const items = list.querySelectorAll('.user-property-item');
+    let visibleCount = 0;
+    
+    items.forEach(item => {
+        const itemType = item.dataset.type;
+        if (itemType === type) {
+            item.style.display = '';
+            item.style.background = 'rgba(34, 211, 238, 0.1)'; // cyan highlight
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    // Show toast with filter info
+    const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', warehouse: '🏭', hideout: '🏚️' };
+    showToast(`${typeIcons[type] || '🏠'} Showing ${visibleCount} ${type}${visibleCount !== 1 ? 's' : ''} - Click "Show All" to reset`, 'info');
+    
+    // Add a "Show All" button if not already present
+    if (!list.querySelector('.show-all-btn')) {
+        const showAllBtn = document.createElement('button');
+        showAllBtn.className = 'show-all-btn mt-2 text-xs text-cyan-400 hover:text-cyan-300 underline cursor-pointer';
+        showAllBtn.textContent = '↩ Show All Properties';
+        showAllBtn.onclick = () => resetUserPropertiesFilter(userId);
+        list.appendChild(showAllBtn);
+    }
+};
+
+// Filter user properties by interior type (Walk-in, Instance)
+window.filterUserPropertiesByInterior = function(userId, interiorType) {
+    const list = $('propList_' + userId);
+    if (!list) return;
+    
+    // Make sure the list is visible
+    list.classList.remove('hidden');
+    const toggle = $('propToggle_' + userId);
+    if (toggle) toggle.textContent = '▼';
+    
+    // Get all property items
+    const items = list.querySelectorAll('.user-property-item');
+    let visibleCount = 0;
+    
+    items.forEach(item => {
+        const itemInterior = item.dataset.interior;
+        if (itemInterior === interiorType) {
+            item.style.display = '';
+            item.style.background = interiorType === 'Walk-in' ? 'rgba(34, 211, 238, 0.1)' : 'rgba(168, 85, 247, 0.1)';
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    const icon = interiorType === 'Walk-in' ? '🚶' : '🌀';
+    showToast(`${icon} Showing ${visibleCount} ${interiorType} properties - Click "Show All" to reset`, 'info');
+    
+    // Add a "Show All" button if not already present
+    if (!list.querySelector('.show-all-btn')) {
+        const showAllBtn = document.createElement('button');
+        showAllBtn.className = 'show-all-btn mt-2 text-xs text-cyan-400 hover:text-cyan-300 underline cursor-pointer';
+        showAllBtn.textContent = '↩ Show All Properties';
+        showAllBtn.onclick = () => resetUserPropertiesFilter(userId);
+        list.appendChild(showAllBtn);
+    }
+};
+
+// Reset user properties filter
+window.resetUserPropertiesFilter = function(userId) {
+    const list = $('propList_' + userId);
+    if (!list) return;
+    
+    const items = list.querySelectorAll('.user-property-item');
+    items.forEach(item => {
+        item.style.display = '';
+        item.style.background = '';
+    });
+    
+    // Remove the "Show All" button
+    const showAllBtn = list.querySelector('.show-all-btn');
+    if (showAllBtn) showAllBtn.remove();
+    
+    showToast('Showing all properties', 'info');
 };
 
 window.filterAdminUsers = function() {
