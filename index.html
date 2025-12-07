@@ -229,6 +229,7 @@
                             <option value="house">House</option>
                             <option value="condo">Condo</option>
                             <option value="villa">Villa</option>
+                            <option value="hotel">Hotel</option>
                             <option value="warehouse">Warehouse</option>
                             <option value="hideout">Hideout</option>
                         </select>
@@ -293,10 +294,10 @@
                     <label class="flex items-start gap-4 cursor-pointer">
                         <input type="checkbox" id="newListingPremium" class="w-6 h-6 mt-1 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
                         <div class="flex-1">
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-2xl">👑</span>
                                 <span class="text-amber-300 font-bold text-lg">Premium Listing</span>
-                                <span class="bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">$10,000</span>
+                                <span class="bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">$10,000/week</span>
                             </div>
                             <p class="text-amber-200/70 text-sm mt-1">Feature your property at the TOP of all listings with an eye-catching gold border. Stand out from the crowd and rent faster!</p>
                             <div class="flex gap-4 mt-2 text-xs text-amber-300/60">
@@ -304,6 +305,7 @@
                                 <span>✓ Gold border</span>
                                 <span>✓ Premium badge</span>
                             </div>
+                            <p class="text-orange-400 text-xs mt-2 font-semibold">⚠️ Weekly payment required - Pauly will contact you in-city to collect $10k payment</p>
                         </div>
                     </label>
                 </div>
@@ -1192,6 +1194,7 @@
                             <option value="apartment">Apartment</option>
                             <option value="condo">Condo</option>
                             <option value="villa">Villa</option>
+                            <option value="hotel">Hotel</option>
                             <option value="warehouse">Warehouse</option>
                             <option value="hideout">Hideout</option>
                         </select>
@@ -1231,6 +1234,7 @@
                     <button onclick="filterProperties('apartment', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Apartments</button>
                     <button onclick="filterProperties('condo', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Condos</button>
                     <button onclick="filterProperties('villa', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Villas</button>
+                    <button onclick="filterProperties('hotel', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hotels</button>
                     <button onclick="filterProperties('warehouse', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Warehouses</button>
                     <button onclick="filterProperties('hideout', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hideouts</button>
                 </div>

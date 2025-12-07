@@ -1567,6 +1567,7 @@ window.startCellEdit = function(propertyId, field, cell, type) {
                 <option value="house" ${currentValue === 'house' ? 'selected' : ''}>House</option>
                 <option value="condo" ${currentValue === 'condo' ? 'selected' : ''}>Condo</option>
                 <option value="villa" ${currentValue === 'villa' ? 'selected' : ''}>Villa</option>
+                <option value="hotel" ${currentValue === 'hotel' ? 'selected' : ''}>Hotel</option>
                 <option value="warehouse" ${currentValue === 'warehouse' ? 'selected' : ''}>Warehouse</option>
                 <option value="hideout" ${currentValue === 'hideout' ? 'selected' : ''}>Hideout</option>
             </select>
@@ -3063,17 +3064,24 @@ window.startSettingsPropertiesListener = function() {
                 }
             }
             
-            // Show notifications for new listings
+            // Show notifications for new listings (skip if created by current user)
             if (newListings.length > 0 && !isFirstSnapshot) {
-                flashScreen('green');
-                newListings.forEach(listing => {
-                    const notificationId = 'new-listing-' + listing.id;
-                    if (!window.dismissedAdminNotifications.has(notificationId)) {
-                        window.pendingAdminNotifications.add(notificationId);
-                        showNewListingNotification(listing, false);
-                    }
-                });
-                updateNotificationBadge();
+                const currentUserEmail = auth.currentUser?.email?.toLowerCase();
+                const otherUsersListings = newListings.filter(listing => 
+                    listing.ownerEmail?.toLowerCase() !== currentUserEmail
+                );
+                
+                if (otherUsersListings.length > 0) {
+                    flashScreen('green');
+                    otherUsersListings.forEach(listing => {
+                        const notificationId = 'new-listing-' + listing.id;
+                        if (!window.dismissedAdminNotifications.has(notificationId)) {
+                            window.pendingAdminNotifications.add(notificationId);
+                            showNewListingNotification(listing, false);
+                        }
+                    });
+                    updateNotificationBadge();
+                }
             }
             
             if (isFirstSnapshot) {
@@ -3773,7 +3781,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         
         // Format property type breakdown for display (clickable)
         let propBreakdownHTML = '';
-        const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', warehouse: '🏭', hideout: '🏚️' };
+        const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', hotel: '🏩', warehouse: '🏭', hideout: '🏚️' };
         
         if (userProperties.length > 0) {
             const typeEntries = Object.entries(propTypeBreakdown)
@@ -4162,7 +4170,7 @@ window.filterUserPropertiesByType = function(userId, type) {
     });
     
     // Show toast with filter info
-    const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', warehouse: '🏭', hideout: '🏚️' };
+    const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', hotel: '🏩', warehouse: '🏭', hideout: '🏚️' };
     showToast(`${typeIcons[type] || '🏠'} Showing ${visibleCount} ${type}${visibleCount !== 1 ? 's' : ''} - Click "Show All" to reset`, 'info');
     
     // Add a "Show All" button if not already present
@@ -5759,6 +5767,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } catch (e) {
                     console.warn('[CreateListing] Could not update lastPropertyPosted:', e);
+                }
+                
+                // Log premium listing fee if premium was selected
+                if (isPremium && typeof logPayment === 'function') {
+                    try {
+                        await logPayment(newId, {
+                            paymentDate: new Date().toISOString().split('T')[0],
+                            amount: 10000,
+                            frequency: 'premium',
+                            renterName: '👑 Premium Listing Fee',
+                            type: 'premium_fee',
+                            notes: 'Premium listing activation - weekly fee',
+                            recordedAt: new Date().toISOString()
+                        });
+                        console.log('[CreateListing] Premium listing fee logged: $10,000');
+                    } catch (e) {
+                        console.warn('[CreateListing] Could not log premium fee:', e);
+                    }
                 }
                 
                 // Update filtered properties
