@@ -42,35 +42,38 @@ window.checkPriceWarning = function(weeklyEl, biweeklyEl, monthlyEl, warningEl) 
     const biweeklyVal = parseInt(biweekly?.value) || 0;
     const monthlyVal = parseInt(monthly?.value) || 0;
     
-    const warnings = [];
+    let hasIssue = false;
+    let suggestions = [];
     
-    // Check biweekly (should be >= weekly, ideally ~2x)
+    // Check if there are pricing issues
     if (biweeklyVal > 0 && biweeklyVal < weeklyVal) {
-        warnings.push('Biweekly ($' + biweeklyVal.toLocaleString() + ') is less than Weekly ($' + weeklyVal.toLocaleString() + ')');
+        hasIssue = true;
+    }
+    if (monthlyVal > 0 && (monthlyVal < weeklyVal || (biweeklyVal > 0 && monthlyVal < biweeklyVal))) {
+        hasIssue = true;
     }
     
-    // Check monthly (should be >= biweekly and >= weekly, ideally ~4x weekly)
-    if (monthlyVal > 0) {
-        if (monthlyVal < weeklyVal) {
-            warnings.push('Monthly ($' + monthlyVal.toLocaleString() + ') is less than Weekly ($' + weeklyVal.toLocaleString() + ')');
-        }
-        if (biweeklyVal > 0 && monthlyVal < biweeklyVal) {
-            warnings.push('Monthly ($' + monthlyVal.toLocaleString() + ') is less than Biweekly ($' + biweeklyVal.toLocaleString() + ')');
-        }
+    // Generate suggested prices (longer terms = slight discount)
+    if (hasIssue && weeklyVal > 0) {
+        const suggestedBiweekly = Math.round(weeklyVal * 1.8 / 1000) * 1000; // ~10% discount vs 2x weekly
+        const suggestedMonthly = Math.round(weeklyVal * 3.5 / 1000) * 1000;  // ~12% discount vs 4x weekly
+        suggestions.push(`Weekly: $${weeklyVal.toLocaleString()}`);
+        if (biweeklyVal > 0) suggestions.push(`Biweekly: $${suggestedBiweekly.toLocaleString()}`);
+        if (monthlyVal > 0) suggestions.push(`Monthly: $${suggestedMonthly.toLocaleString()}`);
     }
     
     const warningText = $('priceWarningText') || warning.querySelector('p:last-child');
     
-    if (warnings.length > 0) {
+    if (hasIssue) {
         if (warningText) {
-            warningText.textContent = warnings.join('. ') + '. Usually longer terms cost more.';
+            warningText.textContent = 'Longer terms should cost more. Try: ' + suggestions.join(', ');
         }
         showElement(warning);
     } else {
         hideElement(warning);
     }
     
-    return warnings.length === 0;
+    return !hasIssue;
 };
 
 // Generic price warning check for any set of inputs (used in stats page edits)
@@ -2589,6 +2592,7 @@ window.pendingAdminNotifications = new Set();
 window.adminNotificationsData = [];
 window.knownUserIds = new Set();
 window.knownPropertyIds = new Set();
+window.knownSettingsPropertyIds = new Set();
 
 // Start listening for admin notifications (new users, new listings, etc.)
 window.startAdminNotificationsListener = function() {
@@ -2910,20 +2914,36 @@ window.startSettingsPropertiesListener = function() {
     
     console.log('[SettingsProperties] Starting real-time listener for settings/properties');
     
+    // Initialize known settings property IDs if not exists
+    if (!window.knownSettingsPropertyIds) {
+        window.knownSettingsPropertyIds = new Set();
+    }
+    
+    // Get admin's last visit time from localStorage for missed listings detection
+    let lastAdminVisit = null;
+    try {
+        const lastVisitStr = localStorage.getItem('adminLastVisit');
+        if (lastVisitStr) {
+            lastAdminVisit = new Date(lastVisitStr);
+        }
+    } catch (e) {}
+    
     let isFirstSnapshot = true;
     
     window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
         .onSnapshot((doc) => {
             if (!doc.exists) {
                 console.log('[SettingsProperties] No properties document yet');
+                isFirstSnapshot = false;
                 return;
             }
             
             const propsData = doc.data();
             let hasChanges = false;
             const newListings = [];
+            const missedListings = [];
             
-            console.log('[SettingsProperties] Snapshot received, processing properties...');
+            console.log('[SettingsProperties] Snapshot received, isFirstSnapshot:', isFirstSnapshot);
             
             Object.keys(propsData).forEach(key => {
                 const propId = parseInt(key);
@@ -2935,6 +2955,18 @@ window.startSettingsPropertiesListener = function() {
                 
                 // Ensure prop has the correct numeric ID
                 prop.id = propId;
+                
+                const notificationId = 'new-listing-settings-' + propId;
+                
+                // Parse createdAt - handle both string and Firestore timestamp
+                let createdAt = null;
+                if (prop.createdAt) {
+                    if (typeof prop.createdAt === 'string') {
+                        createdAt = new Date(prop.createdAt);
+                    } else if (prop.createdAt.toDate) {
+                        createdAt = prop.createdAt.toDate();
+                    }
+                }
                 
                 // Check if this property already exists in the local array
                 const existingIndex = properties.findIndex(p => p.id === propId);
@@ -2961,10 +2993,29 @@ window.startSettingsPropertiesListener = function() {
                         state.availability[propId] = true;
                     }
                     
-                    // Track as new listing for notification (if not first snapshot)
-                    if (!isFirstSnapshot) {
-                        newListings.push(prop);
-                        console.log('[SettingsProperties] New property detected:', prop.title);
+                    // Determine if this is a new or missed listing
+                    if (isFirstSnapshot) {
+                        // First snapshot - check if this was created while admin was away
+                        if (window.pendingAdminNotifications.has(notificationId)) {
+                            if (!window.dismissedAdminNotifications.has(notificationId)) {
+                                missedListings.push(prop);
+                            }
+                        } else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
+                            if (!window.dismissedAdminNotifications.has(notificationId)) {
+                                missedListings.push(prop);
+                                window.pendingAdminNotifications.add(notificationId);
+                            }
+                        }
+                    } else {
+                        // Real-time detection - this is a new listing
+                        if (!window.knownSettingsPropertyIds.has(propId)) {
+                            // Double-check it was created after session started
+                            if (!createdAt || createdAt > window.adminSessionStartTime) {
+                                newListings.push(prop);
+                                window.pendingAdminNotifications.add(notificationId);
+                                console.log('[SettingsProperties] New property detected:', prop.title, 'by', prop.ownerEmail);
+                            }
+                        }
                     }
                     
                     console.log('[SettingsProperties] Added property:', prop.title, 'owner:', prop.ownerEmail);
@@ -2997,6 +3048,9 @@ window.startSettingsPropertiesListener = function() {
                     // Update the property data
                     properties[existingIndex] = { ...existing, ...prop };
                 }
+                
+                // Track this property ID as known
+                window.knownSettingsPropertyIds.add(propId);
             });
             
             // Update filtered properties
@@ -3023,7 +3077,22 @@ window.startSettingsPropertiesListener = function() {
                 }
             }
             
-            // Show notifications for new listings (skip if created by current user)
+            // Save pending notifications to localStorage
+            try {
+                const allPending = Array.from(window.pendingAdminNotifications);
+                localStorage.setItem('pendingPropertyNotifications', JSON.stringify(allPending.filter(id => id.includes('listing'))));
+            } catch (e) {}
+            
+            // Show notifications for MISSED listings (on first load)
+            if (isFirstSnapshot && missedListings.length > 0) {
+                console.log('[SettingsProperties] Showing notifications for', missedListings.length, 'missed listing(s)');
+                missedListings.forEach(listing => {
+                    showNewListingNotification(listing, true); // true = missed
+                });
+                updateNotificationBadge();
+            }
+            
+            // Show notifications for REAL-TIME new listings (skip if created by current admin)
             if (newListings.length > 0 && !isFirstSnapshot) {
                 const currentUserEmail = auth.currentUser?.email?.toLowerCase();
                 const otherUsersListings = newListings.filter(listing => 
@@ -3031,21 +3100,23 @@ window.startSettingsPropertiesListener = function() {
                 );
                 
                 if (otherUsersListings.length > 0) {
+                    console.log('[SettingsProperties] Showing real-time notifications for', otherUsersListings.length, 'new listing(s)');
+                    
+                    // Flash screen for real-time notifications
                     flashScreen('green');
+                    
                     otherUsersListings.forEach(listing => {
-                        const notificationId = 'new-listing-' + listing.id;
-                        if (!window.dismissedAdminNotifications.has(notificationId)) {
-                            window.pendingAdminNotifications.add(notificationId);
-                            showNewListingNotification(listing, false);
-                        }
+                        showNewListingNotification(listing, false); // false = real-time
+                        logAdminActivity('new_listing', listing);
                     });
+                    
                     updateNotificationBadge();
                 }
             }
             
             if (isFirstSnapshot) {
                 isFirstSnapshot = false;
-                console.log('[SettingsProperties] Initial load complete, now listening for changes');
+                console.log('[SettingsProperties] Initial load complete, now listening for new listings');
             }
             
         }, (error) => {
@@ -3060,7 +3131,7 @@ window.showNewListingNotification = function(listing, isMissed = false) {
     
     stack.classList.remove('hidden');
     
-    const notificationId = 'new-listing-' + listing.id;
+    const notificationId = 'new-listing-settings-' + listing.id;
     
     // Don't add if already dismissed or already showing
     if (window.dismissedAdminNotifications.has(notificationId)) return;
@@ -3070,13 +3141,24 @@ window.showNewListingNotification = function(listing, isMissed = false) {
     const ownerEmail = listing.ownerEmail || 'Unknown';
     const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
     
-    // Time display
+    // Time display - handle various timestamp formats
     let timeDisplay;
-    if (isMissed && listing.createdAt?.toDate) {
-        const createdDate = listing.createdAt.toDate();
-        timeDisplay = createdDate.toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
+    if (isMissed) {
+        let createdDate = null;
+        if (listing.createdAt) {
+            if (typeof listing.createdAt === 'string') {
+                createdDate = new Date(listing.createdAt);
+            } else if (listing.createdAt.toDate) {
+                createdDate = listing.createdAt.toDate();
+            }
+        }
+        if (createdDate) {
+            timeDisplay = createdDate.toLocaleString('en-US', { 
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+            });
+        } else {
+            timeDisplay = 'Recently';
+        }
     } else {
         timeDisplay = new Date().toLocaleString('en-US', { 
             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
@@ -5783,7 +5865,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     features: false,
                     ownerEmail: ownerEmail,
                     isPremium: isPremium,
-                    premiumRequestedAt: isPremium ? new Date().toISOString() : null
+                    premiumRequestedAt: isPremium ? new Date().toISOString() : null,
+                    createdAt: new Date().toISOString(),
+                    createdAtTimestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
                 // CRITICAL: Clear any stale property overrides for this ID FIRST
