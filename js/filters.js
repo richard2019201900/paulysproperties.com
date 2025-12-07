@@ -50,7 +50,11 @@ window.toggleHideUnavailable = async function() {
         if (availDoc.exists) {
             const availData = availDoc.data();
             Object.keys(availData).forEach(key => {
-                state.availability[key] = availData[key];
+                // Convert string key to number to match property IDs
+                const numKey = parseInt(key);
+                if (!isNaN(numKey)) {
+                    state.availability[numKey] = availData[key];
+                }
             });
         }
     } catch (err) {

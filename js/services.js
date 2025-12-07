@@ -496,9 +496,11 @@ function setupRealtimeListener() {
         .onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
-                properties.forEach(p => {
-                    if (data[p.id] !== undefined) {
-                        state.availability[p.id] = data[p.id];
+                // Convert all keys to numbers for consistency
+                Object.keys(data).forEach(key => {
+                    const numKey = parseInt(key);
+                    if (!isNaN(numKey)) {
+                        state.availability[numKey] = data[key];
                     }
                 });
             }
@@ -508,7 +510,14 @@ function setupRealtimeListener() {
             console.error('Firestore error:', error);
             const stored = localStorage.getItem('propertyAvailability');
             if (stored) {
-                state.availability = JSON.parse(stored);
+                const parsed = JSON.parse(stored);
+                // Convert all keys to numbers for consistency
+                Object.keys(parsed).forEach(key => {
+                    const numKey = parseInt(key);
+                    if (!isNaN(numKey)) {
+                        state.availability[numKey] = parsed[key];
+                    }
+                });
                 renderProperties(state.filteredProperties);
             }
         });
