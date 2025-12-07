@@ -3394,17 +3394,80 @@ window.dismissNewUserNotification = function(notificationId) {
 
 // Update notification badge in header
 window.updateNotificationBadge = function() {
-    const pendingCount = window.pendingAdminNotifications?.size || 0;
-    const badge = $('adminNotificationBadge');
+    // Count user vs listing notifications separately
+    let userCount = 0;
+    let listingCount = 0;
     
-    if (badge) {
-        if (pendingCount > 0) {
-            badge.textContent = pendingCount > 9 ? '9+' : pendingCount;
-            badge.style.display = 'flex';
+    if (window.pendingAdminNotifications) {
+        window.pendingAdminNotifications.forEach(id => {
+            if (id.startsWith('new-user-')) {
+                userCount++;
+            } else if (id.startsWith('new-listing-')) {
+                listingCount++;
+            }
+        });
+    }
+    
+    // Update badges container visibility
+    const badgesContainer = $('adminNotificationBadges');
+    const userBadge = $('adminNewUserBadge');
+    const userCountEl = $('adminNewUserCount');
+    const listingBadge = $('adminNewListingBadge');
+    const listingCountEl = $('adminNewListingCount');
+    
+    // Only show for admins
+    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
+    
+    if (!isAdmin) {
+        if (badgesContainer) badgesContainer.style.display = 'none';
+        return;
+    }
+    
+    // Show/hide individual badges based on counts
+    if (userBadge && userCountEl) {
+        if (userCount > 0) {
+            userCountEl.textContent = userCount > 9 ? '9+' : userCount;
+            userBadge.style.display = 'flex';
         } else {
-            badge.style.display = 'none';
+            userBadge.style.display = 'none';
         }
     }
+    
+    if (listingBadge && listingCountEl) {
+        if (listingCount > 0) {
+            listingCountEl.textContent = listingCount > 9 ? '9+' : listingCount;
+            listingBadge.style.display = 'flex';
+        } else {
+            listingBadge.style.display = 'none';
+        }
+    }
+    
+    // Show container if either badge is visible
+    if (badgesContainer) {
+        if (userCount > 0 || listingCount > 0) {
+            badgesContainer.style.display = 'flex';
+            badgesContainer.classList.remove('hidden');
+        } else {
+            badgesContainer.style.display = 'none';
+        }
+    }
+};
+
+// Show new user notifications popup
+window.showNewUserNotifications = function(event) {
+    event.stopPropagation();
+    // Navigate to dashboard and switch to users tab
+    goToDashboard();
+    setTimeout(() => {
+        switchAdminTab('users');
+    }, 100);
+};
+
+// Show new listing notifications popup
+window.showNewListingNotifications = function(event) {
+    event.stopPropagation();
+    // Navigate to dashboard - listings are shown in the notifications stack
+    goToDashboard();
 };
 
 // Render the persistent admin notification stack
