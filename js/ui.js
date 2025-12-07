@@ -1766,7 +1766,7 @@ async function renderProperties(list) {
                     <div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
                 </div>
                 <button onclick="viewProperty(${p.id})" class="w-full ${isPremium ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900' : 'gradient-bg text-white'} px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
-                <button onclick="event.stopPropagation(); openContactModal('offer', '${sanitize(p.title)}', ${p.id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
+                <button onclick="event.stopPropagation(); viewPropertyAndHighlightOffers(${p.id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
             </div>
         </article>`;
     }).join('');

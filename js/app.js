@@ -151,8 +151,8 @@ window.viewProperty = function(id) {
                     </div>
                 </div>
             </div>
-            <button onclick="openContactModal('rent', '${sanitize(p.title)}', ${id})" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
-            <button onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
+            <button id="offerRentBtn" onclick="openContactModal('rent', '${sanitize(p.title)}', ${id})" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
+            <button id="offerPurchaseBtn" onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
         </div>`;
     
     displayReviews(id);
@@ -171,6 +171,44 @@ window.viewProperty = function(id) {
     });
     
     window.scrollTo(0, 0);
+};
+
+// Navigate to property page and highlight the offer buttons
+window.viewPropertyAndHighlightOffers = function(id) {
+    viewProperty(id);
+    
+    // Wait for DOM to update, then highlight the offer buttons
+    setTimeout(() => {
+        const rentBtn = $('offerRentBtn');
+        const purchaseBtn = $('offerPurchaseBtn');
+        
+        if (rentBtn && purchaseBtn) {
+            // Add highlight animation class
+            const highlightClass = 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-gray-900 animate-pulse';
+            
+            rentBtn.className += ' ' + highlightClass;
+            purchaseBtn.className += ' ' + highlightClass;
+            
+            // Scroll to buttons
+            rentBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Add a tooltip/label
+            const tipHtml = `
+                <div id="offerTip" class="bg-yellow-500 text-gray-900 font-bold px-4 py-2 rounded-lg mb-4 text-center animate-bounce shadow-lg">
+                    👇 Choose your offer type below 👇
+                </div>
+            `;
+            rentBtn.insertAdjacentHTML('beforebegin', tipHtml);
+            
+            // Remove highlight after 5 seconds
+            setTimeout(() => {
+                rentBtn.className = rentBtn.className.replace(/ ring-4 ring-yellow-400 ring-offset-2 ring-offset-gray-900 animate-pulse/g, '');
+                purchaseBtn.className = purchaseBtn.className.replace(/ ring-4 ring-yellow-400 ring-offset-2 ring-offset-gray-900 animate-pulse/g, '');
+                const tip = $('offerTip');
+                if (tip) tip.remove();
+            }, 5000);
+        }
+    }, 100);
 };
 
 // ==================== PROPERTY STATS PAGE ====================
