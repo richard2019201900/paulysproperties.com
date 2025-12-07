@@ -146,8 +146,8 @@ window.viewProperty = function(id) {
                         <div class="text-2xl md:text-3xl font-black text-green-400">$${PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
                     </div>
                     <div>
-                        <div class="text-gray-400 font-bold mb-2">Monthly Price (Discounted)</div>
-                        <div class="text-3xl md:text-4xl font-black text-purple-400">$${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}</div>
+                        <div class="text-gray-400 font-bold mb-2">${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0) > 0 ? 'Monthly Price (Discounted)' : (PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0) > 0 ? 'Biweekly Price' : 'Monthly Price')}</div>
+                        <div class="text-3xl md:text-4xl font-black ${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0) > 0 || PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0) > 0 ? 'text-purple-400' : 'text-gray-500'}">$${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0) > 0 ? PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice).toLocaleString() : (PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0) > 0 ? PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice).toLocaleString() : 'Contact for pricing')}</div>
                     </div>
                 </div>
             </div>

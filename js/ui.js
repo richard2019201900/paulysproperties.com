@@ -1763,7 +1763,23 @@ async function renderProperties(list) {
                 </div>
                 <div class="mb-4">
                     <div class="text-gray-400 font-semibold text-sm"><span class="font-bold text-gray-300">Weekly:</span> ${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
-                    <div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice).toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>
+                    ${(() => {
+                        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+                        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+                        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+                        
+                        if (monthlyPrice > 0) {
+                            return `<div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${monthlyPrice.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>`;
+                        } else if (biweeklyPrice > 0) {
+                            return `<div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${biweeklyPrice.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/biweekly</span></div>`;
+                        } else if (weeklyPrice > 0) {
+                            // Calculate a reasonable monthly estimate (weekly * 3.5)
+                            const estimatedMonthly = Math.round(weeklyPrice * 3.5);
+                            return `<div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">~${estimatedMonthly.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>`;
+                        } else {
+                            return `<div class="text-gray-500 font-bold text-xl mt-1">Contact for pricing</div>`;
+                        }
+                    })()}
                 </div>
                 <button onclick="viewProperty(${p.id})" class="w-full ${isPremium ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900' : 'gradient-bg text-white'} px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
                 <button onclick="event.stopPropagation(); viewPropertyAndHighlightOffers(${p.id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
