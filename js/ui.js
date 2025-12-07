@@ -2912,11 +2912,12 @@ window.startSettingsPropertiesListener = function() {
         window.settingsPropertiesUnsubscribe();
     }
     
-    console.log('[SettingsProperties] Starting real-time listener for settings/properties');
+    console.log('[SettingsProperties] Starting real-time listener');
     
-    // Initialize known settings property IDs if not exists
-    if (!window.knownSettingsPropertyIds) {
-        window.knownSettingsPropertyIds = new Set();
+    // Ensure adminSessionStartTime is set (backup if users listener hasn't set it yet)
+    if (!window.adminSessionStartTime) {
+        window.adminSessionStartTime = new Date();
+        console.log('[SettingsProperties] Set adminSessionStartTime:', window.adminSessionStartTime);
     }
     
     // Get admin's last visit time from localStorage for missed listings detection
@@ -2928,6 +2929,16 @@ window.startSettingsPropertiesListener = function() {
         }
     } catch (e) {}
     
+    // Load pending listing notifications from localStorage
+    try {
+        const pending = localStorage.getItem('pendingListingNotifications');
+        if (pending) {
+            JSON.parse(pending).forEach(id => window.pendingAdminNotifications.add(id));
+        }
+    } catch (e) {}
+    
+    // Track which property IDs we've SEEN in snapshots (not just locally)
+    let seenPropertyIds = new Set();
     let isFirstSnapshot = true;
     
     window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
@@ -2939,11 +2950,10 @@ window.startSettingsPropertiesListener = function() {
             }
             
             const propsData = doc.data();
-            let hasChanges = false;
             const newListings = [];
             const missedListings = [];
             
-            console.log('[SettingsProperties] Snapshot received, isFirstSnapshot:', isFirstSnapshot);
+            console.log('[SettingsProperties] Snapshot received, isFirst:', isFirstSnapshot, 'properties count:', Object.keys(propsData).length);
             
             Object.keys(propsData).forEach(key => {
                 const propId = parseInt(key);
@@ -2953,10 +2963,8 @@ window.startSettingsPropertiesListener = function() {
                     return; // Skip invalid properties
                 }
                 
-                // Ensure prop has the correct numeric ID
                 prop.id = propId;
-                
-                const notificationId = 'new-listing-settings-' + propId;
+                const notificationId = 'new-listing-' + propId;
                 
                 // Parse createdAt - handle both string and Firestore timestamp
                 let createdAt = null;
@@ -2968,155 +2976,113 @@ window.startSettingsPropertiesListener = function() {
                     }
                 }
                 
-                // Check if this property already exists in the local array
-                const existingIndex = properties.findIndex(p => p.id === propId);
+                // Check if this is a NEW property (not seen in any previous snapshot)
+                const isNewToUs = !seenPropertyIds.has(propId);
                 
-                if (existingIndex === -1) {
-                    // New property - add to array
-                    properties.push(prop);
-                    hasChanges = true;
+                if (isNewToUs) {
+                    console.log('[SettingsProperties] New property ID detected:', propId, prop.title, 'isFirst:', isFirstSnapshot);
                     
-                    // Set up owner mapping
-                    if (prop.ownerEmail) {
-                        const email = prop.ownerEmail.toLowerCase();
-                        if (!ownerPropertyMap[email]) {
-                            ownerPropertyMap[email] = [];
+                    // Add to local properties array if not already there
+                    const existingIndex = properties.findIndex(p => p.id === propId);
+                    if (existingIndex === -1) {
+                        properties.push(prop);
+                        
+                        // Set up owner mapping
+                        if (prop.ownerEmail) {
+                            const email = prop.ownerEmail.toLowerCase();
+                            if (!ownerPropertyMap[email]) ownerPropertyMap[email] = [];
+                            if (!ownerPropertyMap[email].includes(propId)) ownerPropertyMap[email].push(propId);
+                            propertyOwnerEmail[propId] = email;
                         }
-                        if (!ownerPropertyMap[email].includes(propId)) {
-                            ownerPropertyMap[email].push(propId);
+                        
+                        // Set default availability
+                        if (state.availability[propId] === undefined) {
+                            state.availability[propId] = true;
                         }
-                        propertyOwnerEmail[propId] = email;
                     }
                     
-                    // Set default availability
-                    if (state.availability[propId] === undefined) {
-                        state.availability[propId] = true;
-                    }
-                    
-                    // Determine if this is a new or missed listing
+                    // Determine if this is a MISSED listing (first snapshot) or REAL-TIME (subsequent)
                     if (isFirstSnapshot) {
-                        // First snapshot - check if this was created while admin was away
+                        // First snapshot - check if created while admin was away
                         if (window.pendingAdminNotifications.has(notificationId)) {
                             if (!window.dismissedAdminNotifications.has(notificationId)) {
                                 missedListings.push(prop);
+                                console.log('[SettingsProperties] Pending missed listing:', prop.title);
                             }
                         } else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
                             if (!window.dismissedAdminNotifications.has(notificationId)) {
                                 missedListings.push(prop);
                                 window.pendingAdminNotifications.add(notificationId);
+                                console.log('[SettingsProperties] Missed listing (created while away):', prop.title);
                             }
                         }
                     } else {
-                        // Real-time detection - this is a new listing
-                        if (!window.knownSettingsPropertyIds.has(propId)) {
-                            // Double-check it was created after session started
-                            if (!createdAt || createdAt > window.adminSessionStartTime) {
-                                newListings.push(prop);
-                                window.pendingAdminNotifications.add(notificationId);
-                                console.log('[SettingsProperties] New property detected:', prop.title, 'by', prop.ownerEmail);
-                            }
+                        // REAL-TIME - this is a new listing created while we're watching!
+                        // Only notify if created after we started listening
+                        if (!createdAt || createdAt > window.adminSessionStartTime) {
+                            newListings.push(prop);
+                            window.pendingAdminNotifications.add(notificationId);
+                            console.log('[SettingsProperties] REAL-TIME new listing:', prop.title, 'by', prop.ownerEmail);
                         }
                     }
-                    
-                    console.log('[SettingsProperties] Added property:', prop.title, 'owner:', prop.ownerEmail);
-                } else {
-                    // Existing property - check for updates
-                    const existing = properties[existingIndex];
-                    
-                    // Update if owner changed
-                    if (prop.ownerEmail && prop.ownerEmail !== existing.ownerEmail) {
-                        // Remove from old owner's map
-                        if (existing.ownerEmail) {
-                            const oldEmail = existing.ownerEmail.toLowerCase();
-                            if (ownerPropertyMap[oldEmail]) {
-                                ownerPropertyMap[oldEmail] = ownerPropertyMap[oldEmail].filter(id => id !== propId);
-                            }
-                        }
-                        
-                        // Add to new owner's map
-                        const newEmail = prop.ownerEmail.toLowerCase();
-                        if (!ownerPropertyMap[newEmail]) {
-                            ownerPropertyMap[newEmail] = [];
-                        }
-                        if (!ownerPropertyMap[newEmail].includes(propId)) {
-                            ownerPropertyMap[newEmail].push(propId);
-                        }
-                        propertyOwnerEmail[propId] = newEmail;
-                        hasChanges = true;
-                    }
-                    
-                    // Update the property data
-                    properties[existingIndex] = { ...existing, ...prop };
                 }
                 
-                // Track this property ID as known
-                window.knownSettingsPropertyIds.add(propId);
+                // Mark this property ID as seen
+                seenPropertyIds.add(propId);
             });
             
             // Update filtered properties
             state.filteredProperties = [...properties];
             
-            // If there were changes and we're past first load, refresh the admin panel
-            if (hasChanges && !isFirstSnapshot) {
-                console.log('[SettingsProperties] Changes detected, refreshing admin panel...');
-                
-                // Refresh admin stats and user list if we're in admin panel
-                if (window.adminUsersData && window.adminUsersData.length > 0) {
-                    updateAdminStats(window.adminUsersData);
-                    renderAdminUsersList(window.adminUsersData);
-                }
-                
-                // Refresh property grid
-                if (typeof renderProperties === 'function') {
-                    renderProperties(state.filteredProperties);
-                }
-                
-                // Refresh owner dashboard if visible
-                if (typeof renderOwnerDashboard === 'function' && $('ownerDashboard')?.style.display !== 'none') {
-                    renderOwnerDashboard();
-                }
-            }
-            
             // Save pending notifications to localStorage
             try {
-                const allPending = Array.from(window.pendingAdminNotifications);
-                localStorage.setItem('pendingPropertyNotifications', JSON.stringify(allPending.filter(id => id.includes('listing'))));
+                const listingNotifs = Array.from(window.pendingAdminNotifications).filter(id => id.startsWith('new-listing-'));
+                localStorage.setItem('pendingListingNotifications', JSON.stringify(listingNotifs));
             } catch (e) {}
             
-            // Show notifications for MISSED listings (on first load)
+            // Show notifications for MISSED listings (on first load only)
             if (isFirstSnapshot && missedListings.length > 0) {
-                console.log('[SettingsProperties] Showing notifications for', missedListings.length, 'missed listing(s)');
+                console.log('[SettingsProperties] Showing', missedListings.length, 'missed listing notification(s)');
                 missedListings.forEach(listing => {
-                    showNewListingNotification(listing, true); // true = missed
+                    showNewListingNotification(listing, true);
                 });
                 updateNotificationBadge();
             }
             
-            // Show notifications for REAL-TIME new listings (skip if created by current admin)
-            if (newListings.length > 0 && !isFirstSnapshot) {
+            // Show notifications for REAL-TIME new listings
+            if (!isFirstSnapshot && newListings.length > 0) {
+                // Filter out listings created by the current admin
                 const currentUserEmail = auth.currentUser?.email?.toLowerCase();
                 const otherUsersListings = newListings.filter(listing => 
                     listing.ownerEmail?.toLowerCase() !== currentUserEmail
                 );
                 
                 if (otherUsersListings.length > 0) {
-                    console.log('[SettingsProperties] Showing real-time notifications for', otherUsersListings.length, 'new listing(s)');
+                    console.log('[SettingsProperties] FLASHING SCREEN for', otherUsersListings.length, 'new listing(s)');
                     
-                    // Flash screen for real-time notifications
+                    // Flash screen green!
                     flashScreen('green');
                     
+                    // Show notification for each
                     otherUsersListings.forEach(listing => {
-                        showNewListingNotification(listing, false); // false = real-time
+                        showNewListingNotification(listing, false);
                         logAdminActivity('new_listing', listing);
                     });
+                    
+                    // Refresh admin panel
+                    if (window.adminUsersData && window.adminUsersData.length > 0) {
+                        updateAdminStats(window.adminUsersData);
+                        renderAdminUsersList(window.adminUsersData);
+                    }
                     
                     updateNotificationBadge();
                 }
             }
             
+            // Mark first snapshot as complete
             if (isFirstSnapshot) {
                 isFirstSnapshot = false;
-                console.log('[SettingsProperties] Initial load complete, now listening for new listings');
+                console.log('[SettingsProperties] Initial load complete. Seen', seenPropertyIds.size, 'properties. Now listening for new listings...');
             }
             
         }, (error) => {
@@ -3127,15 +3093,26 @@ window.startSettingsPropertiesListener = function() {
 // Show a notification for a new listing
 window.showNewListingNotification = function(listing, isMissed = false) {
     const stack = $('adminNotificationsStack');
-    if (!stack) return;
+    if (!stack) {
+        console.log('[showNewListingNotification] No notification stack found!');
+        return;
+    }
     
     stack.classList.remove('hidden');
     
-    const notificationId = 'new-listing-settings-' + listing.id;
+    const notificationId = 'new-listing-' + listing.id;
     
     // Don't add if already dismissed or already showing
-    if (window.dismissedAdminNotifications.has(notificationId)) return;
-    if ($('notification-' + notificationId)) return;
+    if (window.dismissedAdminNotifications.has(notificationId)) {
+        console.log('[showNewListingNotification] Already dismissed:', notificationId);
+        return;
+    }
+    if ($('notification-' + notificationId)) {
+        console.log('[showNewListingNotification] Already showing:', notificationId);
+        return;
+    }
+    
+    console.log('[showNewListingNotification] Creating notification for:', listing.title, 'isMissed:', isMissed);
     
     // Get owner name
     const ownerEmail = listing.ownerEmail || 'Unknown';
