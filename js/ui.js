@@ -2627,10 +2627,21 @@ window.startAdminNotificationsListener = function() {
                     !window.dismissedAdminNotifications.has(n.id)
                 );
                 
+                // Check if any new notification is a premium request
+                const hasPremiumNotification = newNotifications.some(n => n.type === 'premium_request');
+                
                 window.adminNotificationsData = notifications;
                 
                 // Render the notification stack
                 renderAdminNotificationStack(notifications, newNotifications.length > 0);
+                
+                // Flash amber for premium notifications
+                if (hasPremiumNotification) {
+                    flashScreen('orange');
+                }
+                
+                // Update the notification badges
+                updateNotificationBadge();
                 
             }, (error) => {
                 // This is ok - we have the users listener as backup
@@ -3394,9 +3405,10 @@ window.dismissNewUserNotification = function(notificationId) {
 
 // Update notification badge in header
 window.updateNotificationBadge = function() {
-    // Count user vs listing notifications separately
+    // Count user vs listing vs premium notifications separately
     let userCount = 0;
     let listingCount = 0;
+    let premiumCount = 0;
     
     if (window.pendingAdminNotifications) {
         window.pendingAdminNotifications.forEach(id => {
@@ -3404,6 +3416,8 @@ window.updateNotificationBadge = function() {
                 userCount++;
             } else if (id.startsWith('new-listing-')) {
                 listingCount++;
+            } else if (id.startsWith('new-premium-')) {
+                premiumCount++;
             }
         });
     }
@@ -3414,6 +3428,8 @@ window.updateNotificationBadge = function() {
     const userCountEl = $('adminNewUserCount');
     const listingBadge = $('adminNewListingBadge');
     const listingCountEl = $('adminNewListingCount');
+    const premiumBadge = $('adminNewPremiumBadge');
+    const premiumCountEl = $('adminNewPremiumCount');
     
     // Only show for admins
     const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
@@ -3442,9 +3458,18 @@ window.updateNotificationBadge = function() {
         }
     }
     
-    // Show container if either badge is visible
+    if (premiumBadge && premiumCountEl) {
+        if (premiumCount > 0) {
+            premiumCountEl.textContent = premiumCount > 9 ? '9+' : premiumCount;
+            premiumBadge.style.display = 'flex';
+        } else {
+            premiumBadge.style.display = 'none';
+        }
+    }
+    
+    // Show container if any badge is visible
     if (badgesContainer) {
-        if (userCount > 0 || listingCount > 0) {
+        if (userCount > 0 || listingCount > 0 || premiumCount > 0) {
             badgesContainer.style.display = 'flex';
             badgesContainer.classList.remove('hidden');
         } else {
@@ -3468,6 +3493,70 @@ window.showNewListingNotifications = function(event) {
     event.stopPropagation();
     // Navigate to dashboard - listings are shown in the notifications stack
     goToDashboard();
+};
+
+// Show new premium notifications popup
+window.showNewPremiumNotifications = function(event) {
+    event.stopPropagation();
+    // Navigate to dashboard - premium notifications are shown in the stack
+    goToDashboard();
+};
+
+// Show a notification for a new premium activation
+window.showNewPremiumNotification = function(property, ownerEmail, isMissed = false) {
+    const stack = $('adminNotificationsStack');
+    if (!stack) {
+        console.log('[showNewPremiumNotification] No notification stack found!');
+        return;
+    }
+    
+    stack.classList.remove('hidden');
+    
+    const notificationId = 'new-premium-' + property.id + '-' + Date.now();
+    
+    // Don't add if already dismissed
+    if (window.dismissedAdminNotifications.has(notificationId)) return;
+    
+    console.log('[showNewPremiumNotification] Creating notification for:', property.title);
+    
+    // Get owner name
+    const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
+    
+    const timeDisplay = new Date().toLocaleString('en-US', { 
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+    });
+    
+    const gradientClass = isMissed 
+        ? 'from-amber-700 to-orange-600 border-amber-500' 
+        : 'from-amber-600 to-yellow-500 border-amber-400';
+    
+    const titleText = isMissed 
+        ? '👑 Premium Request While Away...' 
+        : '👑 New Premium Activation!';
+    
+    const notificationHTML = `
+        <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new">
+            <button onclick="event.stopPropagation(); dismissAdminNotification('${notificationId}')" 
+                    class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
+                ✕
+            </button>
+            <div class="flex items-center gap-4 pr-8">
+                <span class="text-3xl">👑</span>
+                <div class="flex-1">
+                    <div class="text-white font-bold text-lg">${titleText}</div>
+                    <div class="text-white/90 font-semibold">${property.title || 'Property'}</div>
+                    <div class="text-white/70 text-sm">by ${ownerName} • $10k/week fee</div>
+                    <div class="text-white/50 text-xs mt-1">${timeDisplay}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    stack.insertAdjacentHTML('afterbegin', notificationHTML);
+    
+    // Add to pending
+    window.pendingAdminNotifications.add(notificationId);
+    updateNotificationBadge();
 };
 
 // Render the persistent admin notification stack
@@ -3511,10 +3600,21 @@ window.renderAdminNotificationStack = function(notifications, hasNew = false) {
                 break;
             case 'upgrade_request':
                 icon = '💰';
-                bgGradient = 'from-amber-600 to-orange-600';
-                borderColor = 'border-amber-500';
+                bgGradient = 'from-purple-600 to-pink-600';
+                borderColor = 'border-purple-500';
                 title = 'Upgrade Request';
                 message = `${n.displayName || n.userEmail} wants ${TIERS[n.requestedTier]?.name || 'upgrade'}`;
+                break;
+            case 'premium_request':
+                icon = '👑';
+                bgGradient = 'from-amber-600 to-yellow-500';
+                borderColor = 'border-amber-400';
+                title = 'Premium Listing Activated!';
+                message = n.message || `${n.propertyTitle || 'Property'} enabled premium - collect $10k/week`;
+                // Add to pending premium notifications for badge count
+                if (!window.pendingAdminNotifications.has('new-premium-' + n.id)) {
+                    window.pendingAdminNotifications.add('new-premium-' + n.id);
+                }
                 break;
             default:
                 icon = '🔔';

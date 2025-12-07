@@ -1315,6 +1315,32 @@ window.togglePremiumStatus = async function(propertyId) {
 
 // Show modal to enable premium with trial option
 window.showPremiumEnableModal = function(propertyId, propertyTitle) {
+    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
+    
+    // Free Trial section - only visible to admin
+    const freeTrialSection = isAdmin ? `
+                <!-- Free Trial Checkbox - Admin Only -->
+                <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="premiumTrialCheckbox" class="w-5 h-5 rounded border-cyan-500 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
+                        <div>
+                            <span class="text-cyan-300 font-bold">🎁 Free Trial</span>
+                            <p class="text-cyan-400/70 text-sm">Grant free premium trial (won't count as revenue)</p>
+                        </div>
+                    </label>
+                </div>
+    ` : '';
+    
+    // Payment notice for non-admin users
+    const paymentNotice = !isAdmin ? `
+                <div class="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
+                    <div class="flex items-center gap-2 text-red-300">
+                        <span class="text-xl">⚠️</span>
+                        <p class="text-sm"><strong>Weekly payment required</strong> - Pauly will contact you in-city to collect $10k payment</p>
+                    </div>
+                </div>
+    ` : '';
+    
     const modalHTML = `
         <div id="premiumEnableModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'premiumEnableModal') closePremiumEnableModal()">
             <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-amber-700/50" onclick="event.stopPropagation()">
@@ -1334,16 +1360,8 @@ window.showPremiumEnableModal = function(propertyId, propertyTitle) {
                     </ul>
                 </div>
                 
-                <!-- Free Trial Checkbox -->
-                <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
-                    <label class="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" id="premiumTrialCheckbox" class="w-5 h-5 rounded border-cyan-500 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
-                        <div>
-                            <span class="text-cyan-300 font-bold">🎁 Free Trial</span>
-                            <p class="text-cyan-400/70 text-sm">Grant free premium trial (won't count as revenue)</p>
-                        </div>
-                    </label>
-                </div>
+                ${freeTrialSection}
+                ${paymentNotice}
                 
                 <!-- Buttons -->
                 <div class="flex gap-3">
