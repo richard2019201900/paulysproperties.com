@@ -280,6 +280,24 @@ function renderPropertyStatsContent(id) {
     
     // Get premium status
     const isPremium = PropertyDataService.getValue(id, 'isPremium', p.isPremium || false);
+    const isPremiumTrial = PropertyDataService.getValue(id, 'isPremiumTrial', p.isPremiumTrial || false);
+    const premiumStartDate = PropertyDataService.getValue(id, 'premiumStartDate', p.premiumStartDate || '');
+    const premiumLastPayment = PropertyDataService.getValue(id, 'premiumLastPayment', p.premiumLastPayment || '');
+    
+    // Calculate premium next due date (weekly)
+    let premiumNextDue = '';
+    let premiumDaysUntilDue = null;
+    if (isPremium && !isPremiumTrial && premiumLastPayment) {
+        const lastDate = parseLocalDate(premiumLastPayment);
+        const nextDate = new Date(lastDate);
+        nextDate.setDate(nextDate.getDate() + 7); // Weekly premium fee
+        premiumNextDue = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        nextDate.setHours(0, 0, 0, 0);
+        premiumDaysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+    }
     
     // Get effective values (overrides or defaults)
     const bedrooms = PropertyDataService.getValue(id, 'bedrooms', p.bedrooms);
@@ -692,6 +710,73 @@ function renderPropertyStatsContent(id) {
                 <div class="text-xs mt-2 opacity-70">Click to toggle</div>
             </div>
         </div>
+        
+        <!-- Premium Advertising Info (only shows if premium is enabled) -->
+        ${isPremium ? `
+        <h3 class="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">👑 Premium Advertising <span class="text-sm text-amber-300/70">(Click to edit)</span></h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <!-- Premium Status -->
+            <div class="stat-tile p-4 bg-gradient-to-br from-amber-600 to-yellow-700 rounded-xl border border-amber-500">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">👑</span>
+                    <span class="text-amber-100 font-semibold">Premium Status</span>
+                </div>
+                <div class="text-lg font-bold text-white">${isPremiumTrial ? '🎁 Free Trial' : '💰 Paid'}</div>
+                <div class="text-xs text-amber-200 mt-2">${isPremiumTrial ? 'No charge' : '$10,000/week'}</div>
+                ${TierService.isMasterAdmin(auth.currentUser?.email) ? `
+                <button onclick="togglePremiumTrialStatus(${id})" class="mt-2 text-xs bg-amber-800 hover:bg-amber-700 px-2 py-1 rounded text-amber-100">
+                    ${isPremiumTrial ? 'Convert to Paid' : 'Convert to Trial'}
+                </button>
+                ` : ''}
+            </div>
+            
+            <!-- Premium Start Date -->
+            <div id="tile-premiumStartDate-${id}"
+                 class="stat-tile p-4 bg-gradient-to-br from-amber-700 to-orange-800 rounded-xl border border-amber-600 cursor-pointer"
+                 onclick="startEditTile('premiumStartDate', ${id}, 'date')"
+                 data-field="premiumStartDate"
+                 data-original-value="${premiumStartDate}">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">📅</span>
+                    <span class="text-amber-100 font-semibold">Start Date</span>
+                </div>
+                <div id="value-premiumStartDate-${id}" class="text-lg font-bold text-white">${premiumStartDate ? formatDate(premiumStartDate) : '<span class="opacity-70">Not set</span>'}</div>
+                <div class="text-xs text-amber-200 mt-2 opacity-70">Click to edit</div>
+            </div>
+            
+            <!-- Premium Last Payment (only for paid) -->
+            <div id="tile-premiumLastPayment-${id}"
+                 class="stat-tile p-4 bg-gradient-to-br ${isPremiumTrial ? 'from-gray-600 to-gray-700 border-gray-500' : 'from-green-600 to-emerald-700 border-green-500'} rounded-xl border cursor-pointer"
+                 onclick="${isPremiumTrial ? '' : `startEditTile('premiumLastPayment', ${id}, 'date')`}"
+                 data-field="premiumLastPayment"
+                 data-original-value="${premiumLastPayment}">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">💵</span>
+                    <span class="${isPremiumTrial ? 'text-gray-300' : 'text-green-100'} font-semibold">Last Payment</span>
+                </div>
+                <div id="value-premiumLastPayment-${id}" class="text-lg font-bold text-white">
+                    ${isPremiumTrial ? '<span class="opacity-50">N/A (Trial)</span>' : (premiumLastPayment ? formatDate(premiumLastPayment) : '<span class="opacity-70">Not set</span>')}
+                </div>
+                <div class="text-xs ${isPremiumTrial ? 'text-gray-400' : 'text-green-200'} mt-2 opacity-70">${isPremiumTrial ? 'Free trial active' : 'Click to edit'}</div>
+            </div>
+            
+            <!-- Premium Next Due (calculated) -->
+            <div class="stat-tile p-4 bg-gradient-to-br ${isPremiumTrial ? 'from-gray-600 to-gray-700 border-gray-500' : (premiumDaysUntilDue !== null && premiumDaysUntilDue <= 1 ? 'from-red-600 to-red-800 border-red-500' : 'from-orange-600 to-orange-800 border-orange-500')} rounded-xl border">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xl">⏰</span>
+                    <span class="${isPremiumTrial ? 'text-gray-300' : (premiumDaysUntilDue !== null && premiumDaysUntilDue <= 1 ? 'text-red-100' : 'text-orange-100')} font-semibold">Next Due</span>
+                </div>
+                <div class="text-lg font-bold text-white">
+                    ${isPremiumTrial ? '<span class="opacity-50">N/A (Trial)</span>' : (premiumNextDue || '<span class="opacity-70">Set last payment</span>')}
+                </div>
+                ${!isPremiumTrial && premiumDaysUntilDue !== null ? `
+                <div class="text-xs ${premiumDaysUntilDue <= 1 ? 'text-red-200 font-bold' : 'text-orange-200'} mt-2">
+                    ${premiumDaysUntilDue === 0 ? '⚠️ Due today!' : premiumDaysUntilDue === 1 ? '⚠️ Due tomorrow!' : premiumDaysUntilDue < 0 ? '🚨 ' + Math.abs(premiumDaysUntilDue) + ' day(s) overdue!' : premiumDaysUntilDue + ' days remaining'}
+                </div>
+                ` : '<div class="text-xs text-gray-400 mt-2">Auto-calculated weekly</div>'}
+            </div>
+        </div>
+        ` : ''}
         
         <!-- Actions -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
@@ -1160,39 +1245,190 @@ window.togglePremiumStatus = async function(propertyId) {
     const newPremium = !currentPremium;
     
     if (newPremium) {
-        // Enabling premium - show confirmation
-        if (!confirm('Enable Premium Listing?\n\n👑 $10,000/week fee\n✓ Top placement on Properties page\n✓ Gold border and featured badge\n✓ Stand out from other listings\n\nProceed with enabling premium?')) {
-            return;
-        }
+        // Show premium enable modal instead of simple confirm
+        showPremiumEnableModal(propertyId, p.title);
+        return;
+    }
+    
+    // Disabling premium - simple confirm
+    if (!confirm('Disable Premium Listing?\n\nThis will remove the premium status and featured placement.')) {
+        return;
     }
     
     try {
-        // Save to Firestore
-        await PropertyDataService.write(propertyId, 'isPremium', newPremium);
+        await PropertyDataService.write(propertyId, 'isPremium', false);
         await PropertyDataService.write(propertyId, 'premiumUpdatedAt', new Date().toISOString());
         
-        // Update local property object
-        p.isPremium = newPremium;
-        
-        // Refresh the stats page
+        p.isPremium = false;
         renderPropertyStatsContent(propertyId);
         
-        // Refresh property grid
         if (typeof renderProperties === 'function') {
             state.filteredProperties = [...properties];
             renderProperties(state.filteredProperties);
         }
         
-        // Show toast
-        if (newPremium) {
-            showToast('👑 Premium Listing Activated!', 'success');
-        } else {
-            showToast('Premium Listing Deactivated', 'info');
-        }
+        showToast('Premium Listing Deactivated', 'info');
         
     } catch (error) {
         console.error('Error toggling premium status:', error);
         alert('Failed to update premium status. Please try again.');
+    }
+};
+
+// Show modal to enable premium with trial option
+window.showPremiumEnableModal = function(propertyId, propertyTitle) {
+    const modalHTML = `
+        <div id="premiumEnableModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'premiumEnableModal') closePremiumEnableModal()">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-amber-700/50" onclick="event.stopPropagation()">
+                <h3 class="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">👑 Enable Premium Listing</h3>
+                
+                <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 mb-2"><strong>Property:</strong> ${propertyTitle}</p>
+                    <p class="text-gray-300"><strong>Fee:</strong> <span class="text-amber-400 font-bold">$10,000/week</span></p>
+                </div>
+                
+                <div class="bg-amber-900/20 border border-amber-600/30 rounded-xl p-4 mb-4">
+                    <div class="text-amber-300 font-bold mb-2">✨ Premium Benefits:</div>
+                    <ul class="text-amber-200/80 text-sm space-y-1">
+                        <li>✓ Top placement on Properties page</li>
+                        <li>✓ Gold border and FEATURED badge</li>
+                        <li>✓ Stand out from other listings</li>
+                    </ul>
+                </div>
+                
+                <!-- Free Trial Checkbox -->
+                <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="premiumTrialCheckbox" class="w-5 h-5 rounded border-cyan-500 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
+                        <div>
+                            <span class="text-cyan-300 font-bold">🎁 Free Trial</span>
+                            <p class="text-cyan-400/70 text-sm">Grant free premium trial (won't count as revenue)</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <!-- Buttons -->
+                <div class="flex gap-3">
+                    <button onclick="confirmPremiumEnable(${propertyId})" 
+                            class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        ✓ Enable Premium
+                    </button>
+                    <button onclick="closePremiumEnableModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closePremiumEnableModal = function() {
+    const modal = $('premiumEnableModal');
+    if (modal) modal.remove();
+};
+
+window.confirmPremiumEnable = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) return;
+    
+    const isTrial = $('premiumTrialCheckbox')?.checked || false;
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+        // Save premium status
+        await PropertyDataService.write(propertyId, 'isPremium', true);
+        await PropertyDataService.write(propertyId, 'isPremiumTrial', isTrial);
+        await PropertyDataService.write(propertyId, 'premiumUpdatedAt', new Date().toISOString());
+        await PropertyDataService.write(propertyId, 'premiumStartDate', today);
+        
+        // If not trial, set last payment date to today
+        if (!isTrial) {
+            await PropertyDataService.write(propertyId, 'premiumLastPayment', today);
+        }
+        
+        // Update local property
+        p.isPremium = true;
+        p.isPremiumTrial = isTrial;
+        
+        // Create admin notification if NOT admin enabling it
+        const currentUserEmail = auth.currentUser?.email?.toLowerCase();
+        const ownerEmail = (p.ownerEmail || propertyOwnerEmail[propertyId] || '').toLowerCase();
+        
+        if (!TierService.isMasterAdmin(currentUserEmail)) {
+            // Property owner enabled premium - notify admin
+            try {
+                await db.collection('adminNotifications').add({
+                    type: 'premium_request',
+                    propertyId: propertyId,
+                    propertyTitle: p.title,
+                    ownerEmail: ownerEmail,
+                    isTrial: isTrial,
+                    requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    dismissed: false,
+                    message: `${p.title} enabled premium${isTrial ? ' (trial)' : ' - collect $10k/week'}`
+                });
+            } catch (e) {
+                // Non-critical error
+            }
+        }
+        
+        closePremiumEnableModal();
+        renderPropertyStatsContent(propertyId);
+        
+        if (typeof renderProperties === 'function') {
+            state.filteredProperties = [...properties];
+            renderProperties(state.filteredProperties);
+        }
+        
+        if (isTrial) {
+            showToast('🎁 Premium Trial Activated!', 'success');
+        } else {
+            showToast('👑 Premium Listing Activated!', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Error enabling premium:', error);
+        alert('Failed to enable premium. Please try again.');
+    }
+};
+
+// Toggle premium between trial and paid
+window.togglePremiumTrialStatus = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) return;
+    
+    const currentTrial = PropertyDataService.getValue(propertyId, 'isPremiumTrial', p.isPremiumTrial || false);
+    const newTrial = !currentTrial;
+    
+    const action = newTrial ? 'Convert to Free Trial?' : 'Convert to Paid ($10k/week)?';
+    if (!confirm(action + '\n\nThis will update the premium status.')) {
+        return;
+    }
+    
+    try {
+        await PropertyDataService.write(propertyId, 'isPremiumTrial', newTrial);
+        
+        // If converting to paid, set last payment to today
+        if (!newTrial) {
+            const today = new Date().toISOString().split('T')[0];
+            await PropertyDataService.write(propertyId, 'premiumLastPayment', today);
+        }
+        
+        p.isPremiumTrial = newTrial;
+        renderPropertyStatsContent(propertyId);
+        
+        if (newTrial) {
+            showToast('🎁 Converted to Free Trial', 'info');
+        } else {
+            showToast('💰 Converted to Paid Premium', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Error toggling premium trial:', error);
+        alert('Failed to update. Please try again.');
     }
 };
 

@@ -711,7 +711,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <!-- Starter Users Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('starter')">
-                        <div id="adminTileStarter" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTileStarter" class="relative min-h-[7rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gray-800/50 rounded-xl p-4 text-center border border-gray-700 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatStarter" class="text-2xl font-bold text-gray-400">-</div>
@@ -719,7 +719,7 @@
                                 <div class="text-gray-600 text-xs mt-1">Free tier</div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-gray-700/50 rounded-xl p-3 border border-gray-600 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-gray-700/50 rounded-xl p-3 border border-gray-600 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatStarterDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -727,7 +727,7 @@
                     
                     <!-- Pro Users Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('pro')">
-                        <div id="adminTilePro" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTilePro" class="relative min-h-[7rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gray-800/50 rounded-xl p-4 text-center border border-yellow-700/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatPro" class="text-2xl font-bold text-yellow-400">-</div>
@@ -735,7 +735,7 @@
                                 <div id="adminStatProBreakdown" class="text-cyan-400 text-xs mt-0.5"></div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-yellow-900/30 rounded-xl p-3 border border-yellow-700 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-yellow-900/30 rounded-xl p-3 border border-yellow-700 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatProDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -743,7 +743,7 @@
                     
                     <!-- Elite Users Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('elite')">
-                        <div id="adminTileElite" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTileElite" class="relative min-h-[7rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gray-800/50 rounded-xl p-4 text-center border border-purple-700/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatElite" class="text-2xl font-bold text-purple-400">-</div>
@@ -751,7 +751,7 @@
                                 <div id="adminStatEliteBreakdown" class="text-cyan-400 text-xs mt-0.5"></div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-purple-900/30 rounded-xl p-3 border border-purple-600 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-purple-900/30 rounded-xl p-3 border border-purple-600 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatEliteDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -759,7 +759,7 @@
                     
                     <!-- Total Users Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('users')">
-                        <div id="adminTileUsers" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTileUsers" class="relative min-h-[7rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gray-800/50 rounded-xl p-4 text-center border border-blue-700/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatUsers" class="text-2xl font-bold text-blue-400">-</div>
@@ -767,7 +767,7 @@
                                 <div class="text-gray-600 text-xs mt-1">Click for details</div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-blue-900/30 rounded-xl p-3 border border-blue-700 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-blue-900/30 rounded-xl p-3 border border-blue-700 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatUsersDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -778,7 +778,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <!-- Pro Revenue Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('proRevenue')">
-                        <div id="adminTileProRevenue" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTileProRevenue" class="relative min-h-[9rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gradient-to-br from-yellow-900/30 to-orange-900/30 rounded-xl p-4 text-center border border-yellow-600/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatProRevenue" class="text-2xl font-bold text-yellow-400">-</div>
@@ -786,7 +786,7 @@
                                 <div id="adminStatProRevenueSub" class="text-gray-500 text-xs mt-0.5">$25k/mo each</div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-yellow-900/40 rounded-xl p-3 border border-yellow-600 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-yellow-900/40 rounded-xl p-3 border border-yellow-600 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatProRevenueDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -794,7 +794,7 @@
                     
                     <!-- Elite Revenue Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('eliteRevenue')">
-                        <div id="adminTileEliteRevenue" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTileEliteRevenue" class="relative min-h-[9rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gradient-to-br from-purple-900/30 to-pink-900/30 rounded-xl p-4 text-center border border-purple-600/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatEliteRevenue" class="text-2xl font-bold text-purple-400">-</div>
@@ -802,7 +802,7 @@
                                 <div id="adminStatEliteRevenueSub" class="text-gray-500 text-xs mt-0.5">$50k/mo each</div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-purple-900/40 rounded-xl p-3 border border-purple-600 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-purple-900/40 rounded-xl p-3 border border-purple-600 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatEliteRevenueDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -810,15 +810,15 @@
                     
                     <!-- Premium Fees Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('premium')">
-                        <div id="adminTilePremium" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTilePremium" class="relative min-h-[9rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gradient-to-br from-amber-900/30 to-yellow-900/30 rounded-xl p-4 text-center border border-amber-600/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatPremium" class="text-2xl font-bold text-amber-400">-</div>
                                 <div class="text-gray-400 text-sm">Premium Fees</div>
-                                <div id="adminStatPremiumSub" class="text-gray-500 text-xs mt-0.5">Weekly ad fees</div>
+                                <div id="adminStatPremiumSub" class="text-gray-500 text-xs mt-0.5">$10k/wk each</div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-amber-900/40 rounded-xl p-3 border border-amber-600 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-amber-900/40 rounded-xl p-3 border border-amber-600 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatPremiumDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>
@@ -826,7 +826,7 @@
                     
                     <!-- Total Revenue Tile -->
                     <div class="admin-stat-tile cursor-pointer" onclick="flipAdminTile('totalRevenue')">
-                        <div id="adminTileTotalRevenue" class="relative h-24 transition-transform duration-500" style="transform-style: preserve-3d;">
+                        <div id="adminTileTotalRevenue" class="relative min-h-[9rem] transition-transform duration-500" style="transform-style: preserve-3d;">
                             <!-- Front -->
                             <div class="absolute inset-0 bg-gradient-to-br from-green-900/30 to-emerald-900/30 rounded-xl p-4 text-center border border-green-600/50 flex flex-col justify-center" style="backface-visibility: hidden;">
                                 <div id="adminStatTotalRevenue" class="text-2xl font-bold text-green-400">-</div>
@@ -834,7 +834,7 @@
                                 <div id="adminStatTotalRevenueSub" class="text-gray-500 text-xs mt-0.5">Monthly income</div>
                             </div>
                             <!-- Back -->
-                            <div class="absolute inset-0 bg-green-900/40 rounded-xl p-3 border border-green-600 flex flex-col justify-center text-xs" style="backface-visibility: hidden; transform: rotateY(180deg);">
+                            <div class="absolute inset-0 bg-green-900/40 rounded-xl p-3 border border-green-600 flex flex-col justify-start text-xs overflow-y-auto" style="backface-visibility: hidden; transform: rotateY(180deg);">
                                 <div id="adminStatTotalRevenueDetail" class="text-gray-300 space-y-1"></div>
                             </div>
                         </div>

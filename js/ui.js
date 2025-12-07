@@ -3512,14 +3512,22 @@ window.updateAdminStats = async function(users) {
     // Calculate Premium Ad Fees (weekly fees from premium listings)
     let premiumFeeTotal = 0;
     let premiumListingsCount = 0;
-    const premiumFeePerWeek = 5000; // $5k/week per premium listing
+    let premiumPaidCount = 0;
+    let premiumTrialCount = 0;
+    const premiumFeePerWeek = 10000; // $10k/week per premium listing
     
     // Check each property for premium status
     properties.forEach(p => {
         const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
         if (isPremium) {
             premiumListingsCount++;
-            premiumFeeTotal += premiumFeePerWeek;
+            const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
+            if (isPremiumTrial) {
+                premiumTrialCount++;
+            } else {
+                premiumPaidCount++;
+                premiumFeeTotal += premiumFeePerWeek;
+            }
         }
     });
     
@@ -3656,7 +3664,13 @@ window.updateAdminStats = async function(users) {
     const statPremium = $('adminStatPremium');
     const statPremiumSub = $('adminStatPremiumSub');
     if (statPremium) statPremium.textContent = `$${(premiumMonthlyRevenue / 1000).toFixed(0)}k`;
-    if (statPremiumSub) statPremiumSub.textContent = `${premiumListingsCount} listings × $5k/wk`;
+    if (statPremiumSub) {
+        if (premiumListingsCount > 0) {
+            statPremiumSub.textContent = `${premiumPaidCount} paid, ${premiumTrialCount} trial`;
+        } else {
+            statPremiumSub.textContent = 'No premium listings';
+        }
+    }
     
     const premiumDetail = $('adminStatPremiumDetail');
     if (premiumDetail) {
@@ -3664,14 +3678,17 @@ window.updateAdminStats = async function(users) {
         const premiumListings = properties.filter(p => 
             PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false)
         );
-        const premiumList = premiumListings.slice(0, 4).map(p => 
-            `<div class="truncate">👑 ${p.title}</div>`
-        ).join('');
+        const premiumList = premiumListings.slice(0, 4).map(p => {
+            const isTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
+            const icon = isTrial ? '🎁' : '💰';
+            return `<div class="truncate">${icon} ${p.title}</div>`;
+        }).join('');
         premiumDetail.innerHTML = `
             <div class="mb-1 text-amber-400 font-bold">$${premiumMonthlyRevenue.toLocaleString()}/mo</div>
-            <div class="text-gray-400 text-xs mb-1">($${premiumFeeTotal.toLocaleString()}/wk × 4)</div>
+            <div class="text-gray-400 text-xs mb-1">${premiumPaidCount} × $10k/wk × 4</div>
             ${premiumList || '<div class="text-gray-500">No premium listings</div>'}
             ${premiumListings.length > 4 ? `<div class="text-gray-500">+${premiumListings.length - 4} more...</div>` : ''}
+            ${premiumTrialCount > 0 ? `<div class="text-cyan-400 mt-1">🎁 ${premiumTrialCount} on free trial</div>` : ''}
         `;
     }
     
