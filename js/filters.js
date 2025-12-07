@@ -2,8 +2,6 @@
 
 // Central function to apply all active filters
 window.applyAllFilters = function() {
-    console.log('[applyAllFilters] Called. Current state.availability:', JSON.stringify(state.availability));
-    
     // Start with all properties
     let filtered = [...properties];
     

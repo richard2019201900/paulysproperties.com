@@ -1686,13 +1686,6 @@ window.cancelCellEdit = function(input) {
 };
 
 async function renderProperties(list) {
-    // Debug: Log availability state for all properties in the list
-    console.log('[renderProperties] Availability state for rendered properties:');
-    list.forEach(p => {
-        const propId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-        console.log(`  Property ${propId} (${p.title}): state.availability[${propId}] = ${state.availability[propId]}`);
-    });
-    
     // Update property count
     $('propertyCount').textContent = `(${list.length})`;
     
@@ -2134,31 +2127,19 @@ window.loadUpgradeRequests = async function() {
 
 // Update request badge counts
 window.updateRequestsBadge = function(count) {
-    console.log('[AdminAlert] updateRequestsBadge called with count:', count);
-    
     const badge = $('requestsTabBadge');
     const notificationBadge = $('upgradeNotificationBadge');
     const notificationCount = $('upgradeNotificationCount');
     const alertBox = $('pendingUpgradesAlert');
     const alertCount = $('pendingUpgradesCount');
     
-    console.log('[AdminAlert] Badge elements found:', {
-        badge: !!badge,
-        notificationBadge: !!notificationBadge,
-        alertBox: !!alertBox
-    });
-    
     if (badge) {
         if (count > 0) {
             badge.textContent = count;
             badge.classList.remove('hidden');
-            console.log('[AdminAlert] Badge shown with count:', count);
         } else {
             badge.classList.add('hidden');
-            console.log('[AdminAlert] Badge hidden');
         }
-    } else {
-        console.log('[AdminAlert] WARNING: requestsTabBadge element not found!');
     }
     
     if (notificationBadge) {
@@ -2386,17 +2367,11 @@ window.adminPollInterval = null;
 
 // Load pending requests with real-time listener AND polling backup (for admin)
 window.loadPendingUpgradeRequests = function() {
-    console.log('[AdminAlert] loadPendingUpgradeRequests called');
-    
     const currentEmail = auth.currentUser?.email;
-    console.log('[AdminAlert] Current user:', currentEmail);
     
     if (!TierService.isMasterAdmin(currentEmail)) {
-        console.log('[AdminAlert] Not master admin, skipping');
         return;
     }
-    
-    console.log('[AdminAlert] IS MASTER ADMIN - Setting up notifications');
     
     // Clear any existing poll interval
     if (window.adminPollInterval) {
@@ -2413,12 +2388,10 @@ window.loadPendingUpgradeRequests = function() {
     // Function to check for pending requests
     const checkPendingRequests = async () => {
         try {
-            console.log('[AdminAlert] Checking for pending requests...');
             const snapshot = await db.collection('upgradeNotifications')
                 .where('status', '==', 'pending')
                 .get();
             
-            console.log('[AdminAlert] Found', snapshot.size, 'pending requests');
             processRequestSnapshot(snapshot);
             
         } catch (error) {
@@ -2431,23 +2404,18 @@ window.loadPendingUpgradeRequests = function() {
         window.upgradeRequestUnsubscribe = db.collection('upgradeNotifications')
             .where('status', '==', 'pending')
             .onSnapshot((snapshot) => {
-                console.log('[AdminAlert] Real-time snapshot received, count:', snapshot.size);
                 processRequestSnapshot(snapshot);
             }, (error) => {
                 console.error('[AdminAlert] Listener error:', error);
-                console.log('[AdminAlert] Falling back to polling only');
             });
-        
-        console.log('[AdminAlert] Real-time listener setup complete');
             
     } catch (error) {
         console.error('[AdminAlert] Error setting up listener:', error);
     }
     
     // ALSO set up polling as backup (every 5 seconds)
-    checkPendingRequests(); // Check immediately
+    checkPendingRequests();
     window.adminPollInterval = setInterval(checkPendingRequests, 5000);
-    console.log('[AdminAlert] Polling backup started (every 5 seconds)');
 };
 
 // Process request snapshot (used by both listener and polling)
@@ -2476,7 +2444,6 @@ window.processRequestSnapshot = function(snapshot) {
     // Only refresh user list if pending requests have actually changed
     // This prevents collapsing open property lists during polling
     if (hasChanged && window.adminUsersData && window.adminUsersData.length > 0) {
-        console.log('[AdminAlert] Pending requests changed - refreshing user list');
         const searchTerm = ($('adminUserSearch')?.value || '').toLowerCase();
         const filtered = searchTerm 
             ? window.adminUsersData.filter(user => 
@@ -2489,7 +2456,6 @@ window.processRequestSnapshot = function(snapshot) {
     // Check for NEW requests we haven't alerted about
     pendingRequests.forEach(req => {
         if (!window.adminAlertShownForRequests.has(req.id)) {
-            console.log('[AdminAlert] NEW REQUEST DETECTED:', req.id, req.userEmail);
             window.adminAlertShownForRequests.add(req.id);
             
             // Show alert for new request (skip first load)
@@ -2526,10 +2492,7 @@ window.showPersistentAdminAlert = function(count, newestRequest) {
     const alertTitle = $('globalAlertTitle');
     const alertMessage = $('globalAlertMessage');
     
-    if (!alertBar) {
-        console.log('[AdminAlert] Alert bar element not found!');
-        return;
-    }
+    if (!alertBar) return;
     
     const title = count === 1 
         ? '💰 Upgrade Request Pending!' 
@@ -2544,8 +2507,6 @@ window.showPersistentAdminAlert = function(count, newestRequest) {
     alertBar.dataset.navigateTo = 'requests';
     alertBar.classList.remove('hidden');
     alertBar.classList.add('animate-pulse');
-    
-    console.log('[AdminAlert] Persistent alert shown');
 };
 
 // Show global alert bar
@@ -2634,8 +2595,6 @@ window.knownPropertyIds = new Set();
 window.startAdminNotificationsListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
-    console.log('[AdminNotify] Starting admin notifications listener');
-    
     // Start listening for new users directly (more reliable than adminNotifications collection)
     startAdminUsersListener();
     
@@ -2653,8 +2612,6 @@ window.startAdminNotificationsListener = function() {
             .orderBy('createdAt', 'desc')
             .limit(20)
             .onSnapshot((snapshot) => {
-                console.log('[AdminNotify] Snapshot received, count:', snapshot.size);
-                
                 const notifications = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
@@ -2673,19 +2630,16 @@ window.startAdminNotificationsListener = function() {
                 renderAdminNotificationStack(notifications, newNotifications.length > 0);
                 
             }, (error) => {
-                console.warn('[AdminNotify] adminNotifications listener error (non-critical):', error.message);
                 // This is ok - we have the users listener as backup
             });
     } catch (e) {
-        console.warn('[AdminNotify] Could not set up adminNotifications listener:', e);
+        // Non-critical error
     }
 };
 
 // Real-time listener for users - detects new signups immediately AND shows missed signups
 window.startAdminUsersListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
-    
-    console.log('[AdminUsers] Starting real-time users listener');
     
     if (window.adminUsersUnsubscribe) {
         window.adminUsersUnsubscribe();
@@ -2697,22 +2651,19 @@ window.startAdminUsersListener = function() {
         const lastVisitStr = localStorage.getItem('adminLastVisit');
         if (lastVisitStr) {
             lastAdminVisit = new Date(lastVisitStr);
-            console.log('[AdminUsers] Last admin visit:', lastAdminVisit);
         }
     } catch (e) {
-        console.warn('[AdminUsers] Could not load last visit time');
+        // Ignore
     }
     
     // Record current session start time (but don't save to localStorage yet!)
     window.adminSessionStartTime = new Date();
-    console.log('[AdminUsers] Session started at:', window.adminSessionStartTime);
     
     // Load pending notifications from localStorage (these need to be shown again)
     try {
         const pending = localStorage.getItem('pendingUserNotifications');
         if (pending) {
             window.pendingAdminNotifications = new Set(JSON.parse(pending));
-            console.log('[AdminUsers] Loaded pending notifications:', window.pendingAdminNotifications.size);
         } else {
             window.pendingAdminNotifications = new Set();
         }
@@ -2727,7 +2678,7 @@ window.startAdminUsersListener = function() {
             JSON.parse(dismissed).forEach(id => window.dismissedAdminNotifications.add(id));
         }
     } catch (e) {
-        console.warn('[AdminUsers] Could not load dismissed notifications');
+        // Ignore
     }
     
     // First snapshot flag - used for catching "missed" users
