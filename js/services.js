@@ -696,24 +696,37 @@ window.toggleAvailability = async function(id) {
 
 async function initFirestore() {
     try {
+        console.log('[initFirestore] Starting...');
         const doc = await db.collection('settings').doc('propertyAvailability').get();
         const data = doc.exists ? doc.data() : {};
+        console.log('[initFirestore] Raw Firestore propertyAvailability data:', JSON.stringify(data));
+        
         const updates = {};
         let needsUpdate = false;
         
         // IMPORTANT: Firestore returns string keys, so we must use String(p.id) to access
         properties.forEach(p => {
             const keyStr = String(p.id);
-            if (data[keyStr] === undefined) {
-                updates[p.id] = true;
+            const firestoreValue = data[keyStr];
+            console.log(`[initFirestore] Property ${p.id} (${p.title}): Firestore key "${keyStr}" = ${firestoreValue}`);
+            
+            if (firestoreValue === undefined) {
+                // Property not in Firestore - DON'T set to true, leave at current value
+                // But DO add to updates so it gets saved
+                updates[p.id] = state.availability[p.id] !== false; // Use current state or default to true
                 needsUpdate = true;
+                console.log(`[initFirestore] Property ${p.id}: NOT in Firestore, will save as ${updates[p.id]}`);
             } else {
                 // Store with numeric key for consistency in state
-                state.availability[p.id] = data[keyStr];
+                state.availability[p.id] = firestoreValue;
+                console.log(`[initFirestore] Property ${p.id}: Set state.availability[${p.id}] = ${firestoreValue}`);
             }
         });
         
+        console.log('[initFirestore] State after loading:', JSON.stringify(state.availability));
+        
         if (needsUpdate || !doc.exists) {
+            console.log('[initFirestore] Writing updates to Firestore:', JSON.stringify(updates));
             await db.collection('settings').doc('propertyAvailability').set(updates, { merge: true });
         }
         
