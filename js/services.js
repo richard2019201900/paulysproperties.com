@@ -694,12 +694,15 @@ async function initFirestore() {
         const updates = {};
         let needsUpdate = false;
         
+        // IMPORTANT: Firestore returns string keys, so we must use String(p.id) to access
         properties.forEach(p => {
-            if (data[p.id] === undefined) {
+            const keyStr = String(p.id);
+            if (data[keyStr] === undefined) {
                 updates[p.id] = true;
                 needsUpdate = true;
             } else {
-                state.availability[p.id] = data[p.id];
+                // Store with numeric key for consistency in state
+                state.availability[p.id] = data[keyStr];
             }
         });
         
@@ -735,9 +738,10 @@ async function initFirestore() {
                     properties.push(prop);
                     console.log('[initFirestore] Added user property:', prop.title, 'with id:', propId, 'ownerEmail:', prop.ownerEmail);
                     
-                    // Set availability from Firestore
-                    if (data[propId] !== undefined) {
-                        state.availability[propId] = data[propId];
+                    // Set availability from Firestore (use string key to access data)
+                    const propKeyStr = String(propId);
+                    if (data[propKeyStr] !== undefined) {
+                        state.availability[propId] = data[propKeyStr];
                     } else {
                         state.availability[propId] = true;
                     }

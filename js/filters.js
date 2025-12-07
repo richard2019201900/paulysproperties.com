@@ -1,7 +1,24 @@
 // ==================== FILTER & SORT ====================
 
 // Central function to apply all active filters
-window.applyAllFilters = function() {
+window.applyAllFilters = async function() {
+    // Always refresh availability from Firestore first to ensure accurate data
+    try {
+        const availDoc = await db.collection('settings').doc('propertyAvailability').get();
+        if (availDoc.exists) {
+            const availData = availDoc.data();
+            Object.keys(availData).forEach(key => {
+                // Convert string key to number to match property IDs
+                const numKey = parseInt(key);
+                if (!isNaN(numKey)) {
+                    state.availability[numKey] = availData[key];
+                }
+            });
+        }
+    } catch (err) {
+        console.warn('[applyAllFilters] Could not refresh availability:', err);
+    }
+    
     // Start with all properties
     let filtered = [...properties];
     
@@ -43,23 +60,7 @@ window.applyAllFilters = function() {
     renderProperties(state.filteredProperties);
 };
 
-window.toggleHideUnavailable = async function() {
-    // Refresh availability from Firestore first to ensure accurate data
-    try {
-        const availDoc = await db.collection('settings').doc('propertyAvailability').get();
-        if (availDoc.exists) {
-            const availData = availDoc.data();
-            Object.keys(availData).forEach(key => {
-                // Convert string key to number to match property IDs
-                const numKey = parseInt(key);
-                if (!isNaN(numKey)) {
-                    state.availability[numKey] = availData[key];
-                }
-            });
-        }
-    } catch (err) {
-        console.warn('[toggleHideUnavailable] Could not refresh availability:', err);
-    }
+window.toggleHideUnavailable = function() {
     applyAllFilters();
 };
 
@@ -78,7 +79,23 @@ window.filterProperties = function(type, btn) {
     applyAllFilters();
 };
 
-window.sortProperties = function() {
+window.sortProperties = async function() {
+    // Refresh availability from Firestore first
+    try {
+        const availDoc = await db.collection('settings').doc('propertyAvailability').get();
+        if (availDoc.exists) {
+            const availData = availDoc.data();
+            Object.keys(availData).forEach(key => {
+                const numKey = parseInt(key);
+                if (!isNaN(numKey)) {
+                    state.availability[numKey] = availData[key];
+                }
+            });
+        }
+    } catch (err) {
+        console.warn('[sortProperties] Could not refresh availability:', err);
+    }
+    
     const sortBy = $('sortBy').value;
     const sorters = {
         'price-low': (a, b) => a.monthlyPrice - b.monthlyPrice,
@@ -116,8 +133,9 @@ window.clearFilters = function() {
         toggleClass(btn, 'bg-gray-700', i !== 0);
         toggleClass(btn, 'text-gray-200', i !== 0);
     });
-    state.filteredProperties = [...properties];
-    renderProperties(state.filteredProperties);
+    
+    // Use applyAllFilters to ensure availability is refreshed from Firestore
+    applyAllFilters();
 };
 
 // Update price options based on rental vs purchase selection
