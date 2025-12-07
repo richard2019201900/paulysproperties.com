@@ -3481,6 +3481,7 @@ window.updateAdminStats = async function(users) {
     const eliteUsers = users.filter(u => u.tier === 'elite');
     // Exclude master admin from starter count
     const starterUsers = users.filter(u => !TierService.isMasterAdmin(u.email) && (u.tier === 'starter' || !u.tier));
+    const adminUsers = users.filter(u => TierService.isMasterAdmin(u.email));
     
     // Separate trial users from paid users
     const proTrialUsers = proUsers.filter(u => u.isFreeTrial === true);
@@ -3494,7 +3495,6 @@ window.updateAdminStats = async function(users) {
         if (availDoc.exists) {
             const availData = availDoc.data();
             Object.keys(availData).forEach(key => {
-                // Convert string key to number to match property IDs
                 const numKey = parseInt(key);
                 if (!isNaN(numKey)) {
                     state.availability[numKey] = availData[key];
@@ -3502,68 +3502,32 @@ window.updateAdminStats = async function(users) {
             });
         }
     } catch (err) {
-        console.warn('[AdminStats] Could not refresh availability:', err);
-    }
-    
-    // Get accurate listing count from properties array
-    const totalListings = properties.length;
-    
-    // Use state.availability for accurate available/rented counts
-    const availableListings = properties.filter(p => state.availability[p.id] !== false).length;
-    const rentedListings = properties.filter(p => state.availability[p.id] === false).length;
-    
-    // Front stats - with paid/trial breakdown
-    const statUsers = $('adminStatUsers');
-    const statPro = $('adminStatPro');
-    const statProBreakdown = $('adminStatProBreakdown');
-    const statElite = $('adminStatElite');
-    const statEliteBreakdown = $('adminStatEliteBreakdown');
-    const statListings = $('adminStatListings');
-    
-    if (statUsers) statUsers.textContent = totalUsers;
-    
-    // Pro tile - show count and paid/trial split separately
-    if (statPro) {
-        statPro.textContent = proUsers.length;
-    }
-    if (statProBreakdown) {
-        if (proTrialUsers.length > 0 || proPaidUsers.length > 0) {
-            statProBreakdown.textContent = `(${proPaidUsers.length} paid, ${proTrialUsers.length} trial)`;
-        } else {
-            statProBreakdown.textContent = '';
-        }
-    }
-    
-    // Elite tile - show count and paid/trial split separately
-    if (statElite) {
-        statElite.textContent = eliteUsers.length;
-    }
-    if (statEliteBreakdown) {
-        if (eliteTrialUsers.length > 0 || elitePaidUsers.length > 0) {
-            statEliteBreakdown.textContent = `(${elitePaidUsers.length} paid, ${eliteTrialUsers.length} trial)`;
-        } else {
-            statEliteBreakdown.textContent = '';
-        }
-    }
-    
-    if (statListings) statListings.textContent = totalListings;
-    
-    // Back details - Users
-    const usersDetail = $('adminStatUsersDetail');
-    if (usersDetail) {
-        const adminUsers = users.filter(u => TierService.isMasterAdmin(u.email));
-        usersDetail.innerHTML = `
-            <div>👑 Owner/Admin: ${adminUsers.length}</div>
-            <div>🌱 Starter: ${starterUsers.length}</div>
-            <div>⭐ Pro: ${proUsers.length} ${proTrialUsers.length > 0 ? `<span class="text-cyan-400">(${proTrialUsers.length} trial)</span>` : ''}</div>
-            <div>👑 Elite: ${eliteUsers.length} ${eliteTrialUsers.length > 0 ? `<span class="text-cyan-400">(${eliteTrialUsers.length} trial)</span>` : ''}</div>
-        `;
+        // Silently handle error
     }
     
     // Calculate PAID revenue only (excluding trials)
     const proRevenue = proPaidUsers.length * 25000;
     const eliteRevenue = elitePaidUsers.length * 50000;
-    const totalPaidRevenue = proRevenue + eliteRevenue;
+    
+    // Calculate Premium Ad Fees (weekly fees from premium listings)
+    let premiumFeeTotal = 0;
+    let premiumListingsCount = 0;
+    const premiumFeePerWeek = 5000; // $5k/week per premium listing
+    
+    // Check each property for premium status
+    properties.forEach(p => {
+        const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+        if (isPremium) {
+            premiumListingsCount++;
+            premiumFeeTotal += premiumFeePerWeek;
+        }
+    });
+    
+    // Calculate monthly premium revenue (weekly * 4)
+    const premiumMonthlyRevenue = premiumFeeTotal * 4;
+    
+    // Total revenue
+    const totalRevenue = proRevenue + eliteRevenue + premiumMonthlyRevenue;
     
     // Helper function to get user listing count
     const getUserListings = (user) => {
@@ -3572,7 +3536,36 @@ window.updateAdminStats = async function(users) {
         return userProps.length;
     };
     
-    // Back details - Pro (show users with listings)
+    // ==================== ROW 1: USER TYPES ====================
+    
+    // Starter Users Tile
+    const statStarter = $('adminStatStarter');
+    if (statStarter) statStarter.textContent = starterUsers.length;
+    
+    const starterDetail = $('adminStatStarterDetail');
+    if (starterDetail) {
+        const recentStarters = starterUsers.slice(0, 5).map(u => 
+            `<div class="truncate">🌱 ${u.username || u.email.split('@')[0]}</div>`
+        ).join('');
+        starterDetail.innerHTML = `
+            <div class="mb-1 text-gray-400">Free tier (1 listing max)</div>
+            ${recentStarters || '<div class="text-gray-500">No starter users</div>'}
+            ${starterUsers.length > 5 ? `<div class="text-gray-500">+${starterUsers.length - 5} more...</div>` : ''}
+        `;
+    }
+    
+    // Pro Users Tile
+    const statPro = $('adminStatPro');
+    const statProBreakdown = $('adminStatProBreakdown');
+    if (statPro) statPro.textContent = proUsers.length;
+    if (statProBreakdown) {
+        if (proUsers.length > 0) {
+            statProBreakdown.textContent = `(${proPaidUsers.length} paid, ${proTrialUsers.length} trial)`;
+        } else {
+            statProBreakdown.textContent = '';
+        }
+    }
+    
     const proDetail = $('adminStatProDetail');
     if (proDetail) {
         const allProUsersList = proUsers.map(u => {
@@ -3581,14 +3574,21 @@ window.updateAdminStats = async function(users) {
             const trialTag = isTrial ? '<span class="text-cyan-400">🎁</span>' : '<span class="text-green-400">💰</span>';
             return `<div class="truncate">${trialTag} ${u.username || u.email.split('@')[0]} <span class="text-gray-500">${listings}/3</span></div>`;
         }).join('');
-        
-        proDetail.innerHTML = `
-            <div class="mb-1">💵 Revenue: <span class="text-green-400">$${proRevenue.toLocaleString()}/mo</span></div>
-            ${allProUsersList || '<div class="text-gray-500">No Pro users</div>'}
-        `;
+        proDetail.innerHTML = allProUsersList || '<div class="text-gray-500">No Pro users</div>';
     }
     
-    // Back details - Elite (show users with listings)
+    // Elite Users Tile
+    const statElite = $('adminStatElite');
+    const statEliteBreakdown = $('adminStatEliteBreakdown');
+    if (statElite) statElite.textContent = eliteUsers.length;
+    if (statEliteBreakdown) {
+        if (eliteUsers.length > 0) {
+            statEliteBreakdown.textContent = `(${elitePaidUsers.length} paid, ${eliteTrialUsers.length} trial)`;
+        } else {
+            statEliteBreakdown.textContent = '';
+        }
+    }
+    
     const eliteDetail = $('adminStatEliteDetail');
     if (eliteDetail) {
         const allEliteUsersList = eliteUsers.map(u => {
@@ -3597,24 +3597,104 @@ window.updateAdminStats = async function(users) {
             const trialTag = isTrial ? '<span class="text-cyan-400">🎁</span>' : '<span class="text-green-400">💰</span>';
             return `<div class="truncate">${trialTag} ${u.username || u.email.split('@')[0]} <span class="text-gray-500">${listings}/∞</span></div>`;
         }).join('');
-        
-        eliteDetail.innerHTML = `
-            <div class="mb-1">💵 Revenue: <span class="text-green-400">$${eliteRevenue.toLocaleString()}/mo</span></div>
-            ${allEliteUsersList || '<div class="text-gray-500">No Elite users</div>'}
+        eliteDetail.innerHTML = allEliteUsersList || '<div class="text-gray-500">No Elite users</div>';
+    }
+    
+    // Total Users Tile
+    const statUsers = $('adminStatUsers');
+    if (statUsers) statUsers.textContent = totalUsers;
+    
+    const usersDetail = $('adminStatUsersDetail');
+    if (usersDetail) {
+        usersDetail.innerHTML = `
+            <div>👑 Owner/Admin: ${adminUsers.length}</div>
+            <div>🌱 Starter: ${starterUsers.length}</div>
+            <div>⭐ Pro: ${proUsers.length} ${proTrialUsers.length > 0 ? `<span class="text-cyan-400">(${proTrialUsers.length} trial)</span>` : ''}</div>
+            <div>👑 Elite: ${eliteUsers.length} ${eliteTrialUsers.length > 0 ? `<span class="text-cyan-400">(${eliteTrialUsers.length} trial)</span>` : ''}</div>
         `;
     }
     
-    // Back details - Listings (with PAID ONLY revenue)
-    const listingsDetail = $('adminStatListingsDetail');
-    if (listingsDetail) {
+    // ==================== ROW 2: REVENUE ====================
+    
+    // Pro Revenue Tile
+    const statProRevenue = $('adminStatProRevenue');
+    const statProRevenueSub = $('adminStatProRevenueSub');
+    if (statProRevenue) statProRevenue.textContent = `$${(proRevenue / 1000).toFixed(0)}k`;
+    if (statProRevenueSub) statProRevenueSub.textContent = `${proPaidUsers.length} paid × $25k`;
+    
+    const proRevenueDetail = $('adminStatProRevenueDetail');
+    if (proRevenueDetail) {
+        const paidList = proPaidUsers.map(u => 
+            `<div class="truncate">💰 ${u.username || u.email.split('@')[0]} - $25k</div>`
+        ).join('');
+        proRevenueDetail.innerHTML = `
+            <div class="mb-1 text-yellow-400 font-bold">$${proRevenue.toLocaleString()}/mo</div>
+            ${paidList || '<div class="text-gray-500">No paid Pro users</div>'}
+            ${proTrialUsers.length > 0 ? `<div class="text-cyan-400 mt-1">🎁 ${proTrialUsers.length} on free trial</div>` : ''}
+        `;
+    }
+    
+    // Elite Revenue Tile
+    const statEliteRevenue = $('adminStatEliteRevenue');
+    const statEliteRevenueSub = $('adminStatEliteRevenueSub');
+    if (statEliteRevenue) statEliteRevenue.textContent = `$${(eliteRevenue / 1000).toFixed(0)}k`;
+    if (statEliteRevenueSub) statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid × $50k`;
+    
+    const eliteRevenueDetail = $('adminStatEliteRevenueDetail');
+    if (eliteRevenueDetail) {
+        const paidList = elitePaidUsers.map(u => 
+            `<div class="truncate">💰 ${u.username || u.email.split('@')[0]} - $50k</div>`
+        ).join('');
+        eliteRevenueDetail.innerHTML = `
+            <div class="mb-1 text-purple-400 font-bold">$${eliteRevenue.toLocaleString()}/mo</div>
+            ${paidList || '<div class="text-gray-500">No paid Elite users</div>'}
+            ${eliteTrialUsers.length > 0 ? `<div class="text-cyan-400 mt-1">🎁 ${eliteTrialUsers.length} on free trial</div>` : ''}
+        `;
+    }
+    
+    // Premium Fees Tile
+    const statPremium = $('adminStatPremium');
+    const statPremiumSub = $('adminStatPremiumSub');
+    if (statPremium) statPremium.textContent = `$${(premiumMonthlyRevenue / 1000).toFixed(0)}k`;
+    if (statPremiumSub) statPremiumSub.textContent = `${premiumListingsCount} listings × $5k/wk`;
+    
+    const premiumDetail = $('adminStatPremiumDetail');
+    if (premiumDetail) {
+        // Get list of premium listings
+        const premiumListings = properties.filter(p => 
+            PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false)
+        );
+        const premiumList = premiumListings.slice(0, 4).map(p => 
+            `<div class="truncate">👑 ${p.title}</div>`
+        ).join('');
+        premiumDetail.innerHTML = `
+            <div class="mb-1 text-amber-400 font-bold">$${premiumMonthlyRevenue.toLocaleString()}/mo</div>
+            <div class="text-gray-400 text-xs mb-1">($${premiumFeeTotal.toLocaleString()}/wk × 4)</div>
+            ${premiumList || '<div class="text-gray-500">No premium listings</div>'}
+            ${premiumListings.length > 4 ? `<div class="text-gray-500">+${premiumListings.length - 4} more...</div>` : ''}
+        `;
+    }
+    
+    // Total Revenue Tile
+    const statTotalRevenue = $('adminStatTotalRevenue');
+    const statTotalRevenueSub = $('adminStatTotalRevenueSub');
+    if (statTotalRevenue) statTotalRevenue.textContent = `$${(totalRevenue / 1000).toFixed(0)}k`;
+    if (statTotalRevenueSub) {
         const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
-        listingsDetail.innerHTML = `
-            <div>🟢 Available: ${availableListings}</div>
-            <div>🔴 Rented: ${rentedListings}</div>
-            <div class="border-t border-gray-600 pt-2 mt-2">
-                <div class="text-green-400 font-bold">💵 Paid Revenue: $${totalPaidRevenue.toLocaleString()}/mo</div>
-                ${totalTrials > 0 ? `<div class="text-cyan-400 text-xs">🎁 ${totalTrials} trial user${totalTrials > 1 ? 's' : ''} (not counted)</div>` : ''}
+        statTotalRevenueSub.textContent = totalTrials > 0 ? `${totalTrials} on free trial` : 'Monthly income';
+    }
+    
+    const totalRevenueDetail = $('adminStatTotalRevenueDetail');
+    if (totalRevenueDetail) {
+        const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
+        totalRevenueDetail.innerHTML = `
+            <div class="text-green-400 font-bold mb-2">$${totalRevenue.toLocaleString()}/mo</div>
+            <div class="space-y-1 text-xs">
+                <div>⭐ Pro: $${proRevenue.toLocaleString()}</div>
+                <div>👑 Elite: $${eliteRevenue.toLocaleString()}</div>
+                <div>🏆 Premium: $${premiumMonthlyRevenue.toLocaleString()}</div>
             </div>
+            ${totalTrials > 0 ? `<div class="text-cyan-400 text-xs mt-2 border-t border-gray-600 pt-1">🎁 ${totalTrials} trial (not counted)</div>` : ''}
         `;
     }
 };
@@ -3630,7 +3710,7 @@ window.flipAdminTile = function(tileType) {
 
 // Reset all admin tiles to show front (unflipped) state
 window.resetAdminTiles = function() {
-    const tiles = ['Users', 'Pro', 'Elite', 'Listings'];
+    const tiles = ['Starter', 'Pro', 'Elite', 'Users', 'ProRevenue', 'EliteRevenue', 'Premium', 'TotalRevenue'];
     tiles.forEach(tileName => {
         const tile = $('adminTile' + tileName);
         if (tile) {
@@ -5277,6 +5357,23 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
     
     // Add to DOM
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add event listener to auto-fill notes when trial checkbox is checked
+    const trialCheckbox = $('upgradeTrialCheckbox');
+    const notesInput = $('upgradeNotes');
+    if (trialCheckbox && notesInput) {
+        trialCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                const tierName = newTier === 'pro' ? 'Pro' : 'Elite';
+                notesInput.value = `Enjoy a 30 day free trial of ${tierName} Membership on Pauly!`;
+            } else {
+                // Clear the auto-filled message if unchecked
+                if (notesInput.value.includes('free trial')) {
+                    notesInput.value = '';
+                }
+            }
+        });
+    }
 }
 
 window.closeUpgradeModal = function() {
