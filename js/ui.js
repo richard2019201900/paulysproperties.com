@@ -1686,6 +1686,13 @@ window.cancelCellEdit = function(input) {
 };
 
 async function renderProperties(list) {
+    // Debug: Log availability state for all properties in the list
+    console.log('[renderProperties] Availability state for rendered properties:');
+    list.forEach(p => {
+        const propId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+        console.log(`  Property ${propId} (${p.title}): state.availability[${propId}] = ${state.availability[propId]}`);
+    });
+    
     // Update property count
     $('propertyCount').textContent = `(${list.length})`;
     
@@ -1713,8 +1720,10 @@ async function renderProperties(list) {
     
     // First render with placeholder owner - include ALL properties, even those without images
     $('propertiesGrid').innerHTML = sortedList.filter(p => p).map(p => {
-        const available = state.availability[p.id] !== false;
-        const propData = state.propertyOverrides[p.id] || {};
+        // Ensure property ID is numeric for consistent lookup
+        const propId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+        const available = state.availability[propId] !== false;
+        const propData = state.propertyOverrides[propId] || {};
         const isPremium = propData.isPremium || p.isPremium;
         const hasImages = p.images && Array.isArray(p.images) && p.images.length > 0 && p.images[0];
         

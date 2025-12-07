@@ -494,15 +494,22 @@ const PropertyDataService = {
 function setupRealtimeListener() {
     db.collection('settings').doc('propertyAvailability')
         .onSnapshot(doc => {
+            console.log('[RealtimeListener] propertyAvailability snapshot received');
             if (doc.exists) {
                 const data = doc.data();
+                console.log('[RealtimeListener] Raw Firestore data:', JSON.stringify(data));
                 // Convert all keys to numbers for consistency
                 Object.keys(data).forEach(key => {
                     const numKey = parseInt(key);
                     if (!isNaN(numKey)) {
+                        const oldValue = state.availability[numKey];
                         state.availability[numKey] = data[key];
+                        if (oldValue !== data[key]) {
+                            console.log(`[RealtimeListener] Availability changed: property ${numKey}: ${oldValue} -> ${data[key]}`);
+                        }
                     }
                 });
+                console.log('[RealtimeListener] Updated state.availability:', JSON.stringify(state.availability));
             }
             renderProperties(state.filteredProperties);
             if (state.currentUser === 'owner') renderOwnerDashboard();
