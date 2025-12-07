@@ -3972,6 +3972,11 @@ window.loadAllUsers = async function() {
         if (!window.knownUserIds) window.knownUserIds = new Set();
         users.forEach(u => window.knownUserIds.add(u.id));
         
+        // Ensure base properties (1-14) are synced to admin
+        if (typeof ensureBasePropertiesSynced === 'function') {
+            ensureBasePropertiesSynced();
+        }
+        
         await updateAdminStats(users);
         
         if (users.length === 0) {
@@ -4288,6 +4293,13 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <div>
                                 <div class="text-white font-bold flex items-center flex-wrap">${displayName}${pendingBadge}</div>
                                 <div class="text-gray-500 text-xs">${user.email}</div>
+                                ${user.phone ? `<div class="text-gray-400 text-xs flex items-center gap-1">
+                                    📱 ${user.phone}
+                                    <button onclick="copyPhoneNumber('${(user.phone || '').replace(/[^0-9]/g, '')}')" 
+                                            class="text-cyan-400 hover:text-cyan-300 ml-1" title="Copy phone number">
+                                        📋
+                                    </button>
+                                </div>` : ''}
                             </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-sm mb-2">
@@ -5791,10 +5803,92 @@ window.adminDowngradeUser = async function(email, currentTier) {
 };
 
 // Admin Tools Functions
+window.syncBasePropertiesToAdmin = async function() {
+    const adminEmail = 'richard2019201900@gmail.com';
+    const adminEmailLower = adminEmail.toLowerCase();
+    
+    // Base property IDs from data.js (1-14)
+    const basePropertyIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+    
+    // Get current mapping from Firestore
+    const ownerMapDoc = await db.collection('settings').doc('ownerPropertyMap').get();
+    let currentMap = ownerMapDoc.exists ? ownerMapDoc.data() : {};
+    
+    // Ensure admin has all base properties
+    if (!currentMap[adminEmail]) {
+        currentMap[adminEmail] = [];
+    }
+    
+    let added = 0;
+    basePropertyIds.forEach(propId => {
+        if (!currentMap[adminEmail].includes(propId)) {
+            currentMap[adminEmail].push(propId);
+            added++;
+        }
+        // Also update local mapping
+        if (!ownerPropertyMap[adminEmailLower]) {
+            ownerPropertyMap[adminEmailLower] = [];
+        }
+        if (!ownerPropertyMap[adminEmailLower].includes(propId)) {
+            ownerPropertyMap[adminEmailLower].push(propId);
+        }
+        propertyOwnerEmail[propId] = adminEmailLower;
+    });
+    
+    // Save to Firestore
+    if (added > 0) {
+        await db.collection('settings').doc('ownerPropertyMap').set(currentMap, { merge: true });
+        console.log(`[syncBasePropertiesToAdmin] Added ${added} properties to admin mapping`);
+        
+        // Refresh the admin panel
+        if (window.adminUsersData && window.adminUsersData.length > 0) {
+            renderAdminUsersList(window.adminUsersData);
+            updateAdminStats(window.adminUsersData);
+        }
+        
+        showToast(`✓ Synced ${added} properties to admin`, 'success');
+    } else {
+        console.log('[syncBasePropertiesToAdmin] All base properties already mapped');
+        showToast('All base properties already synced', 'info');
+    }
+    
+    return added;
+};
+
+// Auto-sync base properties on admin panel load
+window.ensureBasePropertiesSynced = function() {
+    const adminEmail = 'richard2019201900@gmail.com'.toLowerCase();
+    const currentMapping = ownerPropertyMap[adminEmail] || [];
+    
+    // Check if property 13 (Villa) is missing
+    if (!currentMapping.includes(13)) {
+        console.log('[ensureBasePropertiesSynced] Property 13 (Villa) missing, syncing...');
+        syncBasePropertiesToAdmin();
+    }
+};
+
 window.copyBulkEmailList = function() {
     const emails = window.adminUsersData.map(u => u.email).join(', ');
     navigator.clipboard.writeText(emails).then(() => {
         alert(`Copied ${window.adminUsersData.length} emails to clipboard!`);
+    });
+};
+
+// Copy phone number (digits only, no formatting)
+window.copyPhoneNumber = function(phone) {
+    // Strip all non-numeric characters
+    const digitsOnly = (phone || '').replace(/[^0-9]/g, '');
+    navigator.clipboard.writeText(digitsOnly).then(() => {
+        showToast('📱 Phone copied: ' + digitsOnly, 'success');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = digitsOnly;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('📱 Phone copied: ' + digitsOnly, 'success');
     });
 };
 
