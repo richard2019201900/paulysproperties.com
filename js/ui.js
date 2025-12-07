@@ -3588,7 +3588,9 @@ window.updateAdminStats = async function(users) {
     // Back details - Users
     const usersDetail = $('adminStatUsersDetail');
     if (usersDetail) {
+        const adminUsers = users.filter(u => TierService.isMasterAdmin(u.email));
         usersDetail.innerHTML = `
+            <div>👑 Owner/Admin: ${adminUsers.length}</div>
             <div>🌱 Starter: ${starterUsers.length}</div>
             <div>⭐ Pro: ${proUsers.length} ${proTrialUsers.length > 0 ? `<span class="text-cyan-400">(${proTrialUsers.length} trial)</span>` : ''}</div>
             <div>👑 Elite: ${eliteUsers.length} ${eliteTrialUsers.length > 0 ? `<span class="text-cyan-400">(${eliteTrialUsers.length} trial)</span>` : ''}</div>

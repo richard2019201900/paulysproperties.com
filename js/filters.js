@@ -10,7 +10,15 @@ window.applyAllFilters = function() {
     const activeFilter = activeFilterBtn ? activeFilterBtn.textContent.toLowerCase() : 'all';
     if (activeFilter !== 'all') {
         // Map button text to property types
-        const typeMap = { 'houses': 'house', 'apartments': 'apartment', 'condos': 'condo', 'villas': 'villa' };
+        const typeMap = { 
+            'houses': 'house', 
+            'apartments': 'apartment', 
+            'condos': 'condo', 
+            'villas': 'villa',
+            'hotels': 'hotel',
+            'warehouses': 'warehouse',
+            'hideouts': 'hideout'
+        };
         const filterType = typeMap[activeFilter] || activeFilter;
         filtered = filtered.filter(p => p.type === filterType);
     }
@@ -35,7 +43,19 @@ window.applyAllFilters = function() {
     renderProperties(state.filteredProperties);
 };
 
-window.toggleHideUnavailable = function() {
+window.toggleHideUnavailable = async function() {
+    // Refresh availability from Firestore first to ensure accurate data
+    try {
+        const availDoc = await db.collection('settings').doc('propertyAvailability').get();
+        if (availDoc.exists) {
+            const availData = availDoc.data();
+            Object.keys(availData).forEach(key => {
+                state.availability[key] = availData[key];
+            });
+        }
+    } catch (err) {
+        console.warn('[toggleHideUnavailable] Could not refresh availability:', err);
+    }
     applyAllFilters();
 };
 
