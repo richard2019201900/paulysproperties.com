@@ -1366,7 +1366,7 @@ function renderOwnerDashboard() {
         if ((renterName || renterPhone || lastPaymentDate) && state.availability[p.id] !== false) {
             console.log(`[Auto-fix] Property ${p.id} has renter/payment info but was marked available - fixing to rented`);
             state.availability[p.id] = false;
-            PropertyDataService.write(p.id, 'isAvailable', false);
+            saveAvailability(p.id, false);
         }
     });
     
@@ -1658,8 +1658,7 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
             if (state.availability[propertyId] !== false) {
                 // Property is currently available, flip to rented
                 state.availability[propertyId] = false;
-                await PropertyDataService.write(propertyId, 'isAvailable', false);
-                console.log(`Auto-flipped property ${propertyId} to rented (${field} set)`);
+                await saveAvailability(propertyId, false);
             }
         }
         

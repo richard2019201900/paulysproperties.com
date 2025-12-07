@@ -582,7 +582,7 @@ function setupRealtimeListener() {
         });
 }
 
-async function saveAvailability(id, isAvailable) {
+window.saveAvailability = async function(id, isAvailable) {
     try {
         await db.collection('settings').doc('propertyAvailability').set({ [id]: isAvailable }, { merge: true });
         localStorage.setItem('propertyAvailability', JSON.stringify(state.availability));

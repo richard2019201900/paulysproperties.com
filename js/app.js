@@ -307,9 +307,8 @@ function renderPropertyStatsContent(id) {
     
     // AUTO-FIX: If renter info exists but property is marked available, fix it
     if ((renterName || renterPhone) && state.availability[id] !== false) {
-        console.log(`[Auto-fix] Property ${id} has renter info but was marked available - fixing to rented`);
         state.availability[id] = false;
-        PropertyDataService.write(id, 'isAvailable', false);
+        saveAvailability(id, false);
         // Re-render with corrected status
         setTimeout(() => renderPropertyStatsContent(id), 100);
         return;
@@ -1015,8 +1014,7 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             if (state.availability[propertyId] !== false) {
                 // Property is currently available, flip to rented
                 state.availability[propertyId] = false;
-                await PropertyDataService.write(propertyId, 'isAvailable', false);
-                console.log(`Auto-flipped property ${propertyId} to rented (renter info set)`);
+                await saveAvailability(propertyId, false);
             }
         }
         
