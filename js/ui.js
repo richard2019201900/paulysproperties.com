@@ -2711,6 +2711,15 @@ window.startAdminUsersListener = function() {
         // Ignore
     }
     
+    // Clean up: remove any pending notifications that are also in dismissed
+    window.dismissedAdminNotifications.forEach(id => {
+        window.pendingAdminNotifications.delete(id);
+    });
+    // Save cleaned pending set
+    try {
+        localStorage.setItem('pendingUserNotifications', JSON.stringify(Array.from(window.pendingAdminNotifications)));
+    } catch (e) {}
+    
     // First snapshot flag - used for catching "missed" users
     let isFirstSnapshot = true;
     
@@ -3139,7 +3148,7 @@ window.showNewListingNotification = function(listing, isMissed = false) {
         return;
     }
     
-    console.log('[showNewListingNotification] Creating notification for:', listing.title, 'isMissed:', isMissed);
+    console.log('[showNewListingNotification] Creating notification for:', listing.title, 'isMissed:', isMissed, 'isPremium:', listing.isPremium);
     
     // Get owner name
     const ownerEmail = listing.ownerEmail || 'Unknown';
@@ -3169,28 +3178,52 @@ window.showNewListingNotification = function(listing, isMissed = false) {
         });
     }
     
-    // Different styling for missed vs real-time
-    const gradientClass = isMissed 
-        ? 'from-emerald-700 to-green-600 border-emerald-500' 
-        : 'from-green-600 to-teal-600 border-green-500';
+    // Check if this is a premium listing
+    const isPremium = listing.isPremium === true;
+    const isPremiumTrial = listing.isPremiumTrial === true;
     
-    const titleText = isMissed 
-        ? '🏠 Listing While You Were Away...' 
-        : '🏠 New Listing Posted!';
+    // Different styling for missed vs real-time, and premium vs regular
+    let gradientClass, titleText, icon, premiumBadge = '';
+    
+    if (isPremium && !isPremiumTrial) {
+        // PAID PREMIUM - needs payment collection!
+        gradientClass = 'from-amber-600 to-orange-600 border-amber-400';
+        icon = '👑💰';
+        titleText = isMissed ? '👑 Premium Listing (Payment Due!)' : '👑 New Premium Listing!';
+        premiumBadge = `
+            <div class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded mt-2 animate-pulse">
+                ⚠️ COLLECT $10,000/week PAYMENT
+            </div>
+        `;
+    } else if (isPremium && isPremiumTrial) {
+        // Premium trial - no payment needed
+        gradientClass = 'from-cyan-600 to-blue-600 border-cyan-400';
+        icon = '🎁';
+        titleText = isMissed ? '🎁 Premium Trial Listing' : '🎁 New Premium Trial Listing';
+        premiumBadge = `<div class="text-cyan-300 text-xs mt-1">Free trial - no payment needed</div>`;
+    } else {
+        // Regular listing
+        gradientClass = isMissed 
+            ? 'from-emerald-700 to-green-600 border-emerald-500' 
+            : 'from-green-600 to-teal-600 border-green-500';
+        icon = isMissed ? '📬' : '🏠';
+        titleText = isMissed ? '🏠 Listing While You Were Away...' : '🏠 New Listing Posted!';
+    }
     
     const notificationHTML = `
         <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new" 
-             onclick="viewProperty(${listing.id})">
+             onclick="viewPropertyStats(${listing.id})">
             <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
                     class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
                 ✕
             </button>
             <div class="flex items-center gap-4 pr-8 cursor-pointer">
-                <span class="text-3xl">${isMissed ? '📬' : '🏠'}</span>
+                <span class="text-3xl">${icon}</span>
                 <div class="flex-1">
                     <div class="text-white font-bold text-lg">${titleText}</div>
                     <div class="text-white/90">${listing.title || 'New Property'}</div>
                     <div class="text-white/70 text-sm">by ${ownerName}</div>
+                    ${premiumBadge}
                     <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
                 </div>
             </div>
@@ -3426,14 +3459,35 @@ window.updateNotificationBadge = function() {
     let listingCount = 0;
     let premiumCount = 0;
     
-    if (window.pendingAdminNotifications) {
-        window.pendingAdminNotifications.forEach(id => {
+    // Count from actual visible notifications in the stack (more reliable)
+    const stack = $('adminNotificationsStack');
+    if (stack) {
+        const notifications = stack.querySelectorAll('[id^="notification-"]');
+        notifications.forEach(notif => {
+            const id = notif.id.replace('notification-', '');
             if (id.startsWith('new-user-')) {
                 userCount++;
             } else if (id.startsWith('new-listing-')) {
                 listingCount++;
             } else if (id.startsWith('new-premium-')) {
                 premiumCount++;
+            }
+        });
+    }
+    
+    // Also count from pending set (for notifications not yet rendered)
+    if (window.pendingAdminNotifications) {
+        window.pendingAdminNotifications.forEach(id => {
+            // Only count if not already counted from visible notifications
+            const notifEl = $('notification-' + id);
+            if (!notifEl && !window.dismissedAdminNotifications.has(id)) {
+                if (id.startsWith('new-user-')) {
+                    userCount++;
+                } else if (id.startsWith('new-listing-')) {
+                    listingCount++;
+                } else if (id.startsWith('new-premium-')) {
+                    premiumCount++;
+                }
             }
         });
     }
@@ -3491,6 +3545,11 @@ window.updateNotificationBadge = function() {
         } else {
             badgesContainer.style.display = 'none';
         }
+    }
+    
+    // Update clear all button visibility
+    if (typeof updateClearAllButton === 'function') {
+        updateClearAllButton();
     }
 };
 
@@ -3689,11 +3748,78 @@ window.handleAdminNotificationClick = function(notificationId, type) {
 };
 
 // Dismiss admin notification
+// Clear all admin notifications at once
+window.clearAllAdminNotifications = function() {
+    console.log('[AdminNotify] Clearing all notifications');
+    
+    const stack = $('adminNotificationsStack');
+    if (!stack) return;
+    
+    // Get all notification IDs
+    const notifications = stack.querySelectorAll('[id^="notification-"]');
+    notifications.forEach(notif => {
+        const id = notif.id.replace('notification-', '');
+        window.dismissedAdminNotifications.add(id);
+        window.pendingAdminNotifications.delete(id);
+    });
+    
+    // Clear all visual notifications
+    notifications.forEach(notif => notif.remove());
+    
+    // Hide the stack and clear button
+    stack.classList.add('hidden');
+    const clearBtn = $('clearAllNotificationsBtn');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    
+    // Save to localStorage
+    try {
+        localStorage.setItem('dismissedUserNotifications', JSON.stringify(Array.from(window.dismissedAdminNotifications)));
+        localStorage.setItem('pendingUserNotifications', JSON.stringify(Array.from(window.pendingAdminNotifications)));
+        localStorage.setItem('adminLastVisit', new Date().toISOString());
+    } catch (e) {}
+    
+    // Update badge
+    updateNotificationBadge();
+    
+    showToast('All notifications cleared', 'success');
+};
+
+// Show/hide clear all button based on notification count
+window.updateClearAllButton = function() {
+    const stack = $('adminNotificationsStack');
+    const clearBtn = $('clearAllNotificationsBtn');
+    if (!stack || !clearBtn) return;
+    
+    const notifications = stack.querySelectorAll('[id^="notification-"]');
+    if (notifications.length > 0) {
+        clearBtn.classList.remove('hidden');
+    } else {
+        clearBtn.classList.add('hidden');
+    }
+};
+
 window.dismissAdminNotification = async function(notificationId) {
     console.log('[AdminNotify] Dismissing notification:', notificationId);
     
     // Add to dismissed set (session-based - won't come back until page refresh)
     window.dismissedAdminNotifications.add(notificationId);
+    
+    // Remove from pending notifications (to update badge count)
+    window.pendingAdminNotifications.delete(notificationId);
+    // Also try to remove with 'new-' prefix variations
+    window.pendingAdminNotifications.delete('new-user-' + notificationId);
+    window.pendingAdminNotifications.delete('new-listing-' + notificationId);
+    window.pendingAdminNotifications.delete('new-premium-' + notificationId);
+    
+    // Save updated pending to localStorage
+    try {
+        const pending = Array.from(window.pendingAdminNotifications);
+        localStorage.setItem('pendingUserNotifications', JSON.stringify(pending));
+        localStorage.setItem('pendingListingNotifications', JSON.stringify(pending.filter(id => id.startsWith('new-listing-'))));
+    } catch (e) {}
+    
+    // Update the badge count
+    updateNotificationBadge();
     
     // Mark as dismissed in Firestore
     try {

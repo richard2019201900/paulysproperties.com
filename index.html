@@ -682,6 +682,12 @@
 
             <!-- Admin Persistent Notifications Stack -->
             <div id="adminNotificationsStack" class="hidden mb-6 space-y-3">
+                <!-- Clear All button (shown when there are notifications) -->
+                <div id="clearAllNotificationsBtn" class="hidden flex justify-end mb-2">
+                    <button onclick="clearAllAdminNotifications()" class="text-gray-400 hover:text-white text-sm font-medium px-3 py-1 bg-gray-700/50 hover:bg-gray-600 rounded-lg transition">
+                        ✓ Clear All Notifications
+                    </button>
+                </div>
                 <!-- Persistent notifications will be inserted here by JS -->
             </div>
 
