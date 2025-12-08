@@ -6169,10 +6169,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 interiorType, weeklyPrice, biweeklyPrice, monthlyPrice, isPremium
             });
             
-            // Parse images
+            // Parse images - empty array will trigger the card's built-in placeholder
             const images = imagesText 
                 ? imagesText.split('\n').map(url => url.trim()).filter(url => url)
-                : ['images/placeholder.jpg'];
+                : [];
             
             // Validate - only weekly price is required
             if (!title || !type || !location || !bedrooms || !bathrooms || !weeklyPrice) {
