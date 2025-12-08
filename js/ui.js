@@ -4397,32 +4397,35 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             : (isUserMasterAdmin ? 'border-red-600/50' : 'border-gray-700');
         
         return `
-            <div class="bg-gray-800 rounded-xl p-4 border ${cardBorder} admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
-                <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+            <div class="bg-gray-800 rounded-xl p-3 border ${cardBorder} admin-user-card" data-email="${user.email}" data-userid="${escapedId}">
+                <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-2">
                     <div class="flex-1">
-                        <div class="flex items-center gap-3 mb-2">
-                            <span class="text-2xl">${tierData.icon}</span>
-                            <div>
-                                <div class="text-white font-bold flex items-center flex-wrap">${displayName}${pendingBadge}</div>
-                                <div class="text-gray-500 text-xs">${user.email}</div>
-                                ${user.phone ? `<div class="text-gray-400 text-xs flex items-center gap-1">
-                                    📱 ${user.phone}
-                                    <button onclick="copyPhoneNumber('${(user.phone || '').replace(/[^0-9]/g, '')}')" 
-                                            class="text-cyan-400 hover:text-cyan-300 ml-1" title="Copy phone number">
-                                        📋
-                                    </button>
-                                </div>` : ''}
+                        <!-- Row 1: Icon, Name, Email -->
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xl">${tierData.icon}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-white font-bold">${displayName}</span>
+                                    ${pendingBadge}
+                                </div>
+                                <div class="text-gray-500 text-xs truncate">${user.email}</div>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-3 text-sm mb-2">
-                            <span class="px-2 py-1 rounded ${tierData.bgColor} text-white font-bold text-xs">${tierData.name}</span>
+                        <!-- Row 2: Tier badge, Phone, Listings, Properties toggle -->
+                        <div class="flex flex-wrap items-center gap-2 text-xs mb-2">
+                            <span class="px-2 py-0.5 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
+                            ${user.phone ? `<span class="text-gray-400 flex items-center gap-1">
+                                📱 ${user.phone}
+                                <button onclick="event.stopPropagation(); copyPhoneNumber('${(user.phone || '').replace(/[^0-9]/g, '')}')" 
+                                        class="text-cyan-400 hover:text-cyan-300" title="Copy phone number">📋</button>
+                            </span>` : ''}
                             <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
-                            <button onclick="toggleUserProperties('${escapedId}')" class="text-cyan-400 hover:underline text-xs flex items-center gap-1">
+                            <button onclick="toggleUserProperties('${escapedId}')" class="text-cyan-400 hover:underline flex items-center gap-1">
                                 <span id="propToggle_${escapedId}">▶</span> Properties (${listingCount})
                             </button>
                         </div>
-                        <!-- Activity Info -->
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-400 bg-gray-900/30 rounded-lg p-2 mb-2">
+                        <!-- Row 3: Activity Info (compact) -->
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 bg-gray-900/30 rounded-lg px-2 py-1.5 mb-2">
                             <div title="Account created">
                                 <span class="text-gray-500">📅 Joined:</span> 
                                 <span class="text-gray-300">${createdAt}</span>
@@ -4438,7 +4441,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         </div>
                         ${propBreakdownHTML}
                         <!-- Properties List -->
-                        <div id="propList_${escapedId}" class="hidden mt-3 bg-gray-900/50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                        <div id="propList_${escapedId}" class="hidden mt-2 bg-gray-900/50 rounded-lg p-2 max-h-32 overflow-y-auto">
                             ${propertiesHTML}
                         </div>
                         ${subscriptionHTML}
