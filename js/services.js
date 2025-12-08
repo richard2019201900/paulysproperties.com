@@ -150,6 +150,7 @@ const TierService = {
                 id: doc.id,
                 email: data.email,
                 username: data.username || data.email?.split('@')[0],
+                phone: data.phone || '',  // Phone number for admin contact
                 tier: data.tier || 'starter',
                 tierUpdatedAt: data.tierUpdatedAt,
                 tierUpdatedBy: data.tierUpdatedBy,
