@@ -2627,22 +2627,27 @@ window.startAdminNotificationsListener = function() {
     // Start listening for new properties
     startAdminPropertiesListener();
     
-    // Also try the adminNotifications collection (may fail due to rules, but that's ok)
+    // Also try the adminNotifications collection for premium requests
     try {
         if (window.adminNotifyUnsubscribe) {
             window.adminNotifyUnsubscribe();
         }
         
+        // Simplified query - just get recent notifications without composite index
         window.adminNotifyUnsubscribe = db.collection('adminNotifications')
-            .where('dismissed', '==', false)
             .orderBy('createdAt', 'desc')
             .limit(20)
             .onSnapshot((snapshot) => {
                 const notifications = [];
                 snapshot.forEach(doc => {
                     const data = doc.data();
-                    notifications.push({ id: doc.id, ...data });
+                    // Only include non-dismissed notifications
+                    if (!data.dismissed) {
+                        notifications.push({ id: doc.id, ...data });
+                    }
                 });
+                
+                console.log('[AdminNotify] Received', notifications.length, 'notifications from Firestore');
                 
                 // Check for NEW notifications (for flash effect)
                 const newNotifications = notifications.filter(n => 
@@ -2652,6 +2657,10 @@ window.startAdminNotificationsListener = function() {
                 
                 // Check if any new notification is a premium request
                 const hasPremiumNotification = newNotifications.some(n => n.type === 'premium_request');
+                
+                if (hasPremiumNotification) {
+                    console.log('[AdminNotify] New premium notification detected!');
+                }
                 
                 window.adminNotificationsData = notifications;
                 
@@ -2667,10 +2676,11 @@ window.startAdminNotificationsListener = function() {
                 updateNotificationBadge();
                 
             }, (error) => {
+                console.error('[AdminNotify] Listener error:', error);
                 // This is ok - we have the users listener as backup
             });
     } catch (e) {
-        // Non-critical error
+        console.error('[AdminNotify] Failed to start listener:', e);
     }
 };
 

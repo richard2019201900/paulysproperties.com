@@ -1416,18 +1416,21 @@ window.confirmPremiumEnable = async function(propertyId) {
         if (!TierService.isMasterAdmin(currentUserEmail)) {
             // Property owner enabled premium - notify admin
             try {
+                console.log('[Premium] Creating admin notification for property:', p.title);
                 await db.collection('adminNotifications').add({
                     type: 'premium_request',
                     propertyId: propertyId,
                     propertyTitle: p.title,
                     ownerEmail: ownerEmail,
                     isTrial: isTrial,
-                    requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     dismissed: false,
                     message: `${p.title} enabled premium${isTrial ? ' (trial)' : ' - collect $10k/week'}`
                 });
+                console.log('[Premium] Admin notification created successfully');
             } catch (e) {
-                // Non-critical error
+                console.error('[Premium] Failed to create admin notification:', e);
+                // Non-critical error - don't block the premium activation
             }
         }
         
