@@ -1492,6 +1492,9 @@ window.togglePremiumTrialStatus = async function(propertyId) {
 
 // Log a payment to the property's payment history
 window.logPayment = async function(propertyId, paymentData) {
+    console.log('[PaymentLog] Starting logPayment for property:', propertyId);
+    console.log('[PaymentLog] Payment data:', paymentData);
+    
     try {
         // Get existing payment history
         const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
@@ -1499,13 +1502,19 @@ window.logPayment = async function(propertyId, paymentData) {
         
         if (historyDoc.exists) {
             payments = historyDoc.data().payments || [];
+            console.log('[PaymentLog] Found existing payments:', payments.length);
+        } else {
+            console.log('[PaymentLog] No existing payments, creating new document');
         }
         
         // Add new payment
-        payments.push({
+        const newPayment = {
             ...paymentData,
             id: Date.now().toString() // Unique ID for this payment
-        });
+        };
+        payments.push(newPayment);
+        
+        console.log('[PaymentLog] Saving', payments.length, 'payments to Firestore');
         
         // Save back to Firestore
         await db.collection('paymentHistory').doc(String(propertyId)).set({
@@ -1514,24 +1523,40 @@ window.logPayment = async function(propertyId, paymentData) {
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        console.log('[PaymentLog] Payment logged successfully');
+        console.log('[PaymentLog] Payment logged successfully:', newPayment);
         return true;
     } catch (error) {
         console.error('[PaymentLog] Error logging payment:', error);
+        console.error('[PaymentLog] Error details:', error.code, error.message);
+        
+        // Show error toast if available
+        if (typeof showToast === 'function') {
+            showToast('⚠️ Payment may not have been logged: ' + error.message, 'error');
+        }
         return false;
     }
 };
 
 // Get payment history for a property
 window.getPaymentHistory = async function(propertyId) {
+    console.log('[PaymentLog] Fetching payment history for property:', propertyId);
     try {
         const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
         if (historyDoc.exists) {
-            return historyDoc.data().payments || [];
+            const payments = historyDoc.data().payments || [];
+            console.log('[PaymentLog] Found', payments.length, 'payments');
+            return payments;
         }
+        console.log('[PaymentLog] No payment history document found');
         return [];
     } catch (error) {
         console.error('[PaymentLog] Error fetching history:', error);
+        console.error('[PaymentLog] Error code:', error.code);
+        
+        // If permission denied, show a warning
+        if (error.code === 'permission-denied') {
+            console.warn('[PaymentLog] Permission denied - check Firestore rules for paymentHistory collection');
+        }
         return [];
     }
 };

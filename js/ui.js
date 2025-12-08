@@ -494,6 +494,13 @@ window.goToDashboard = function() {
         if (user && TierService.isMasterAdmin(user.email)) {
             resetAdminTiles(); // Reset tiles to front view
             loadAllUsers();
+            
+            // Re-render any pending notifications
+            setTimeout(() => {
+                if (typeof reRenderPendingNotifications === 'function') {
+                    reRenderPendingNotifications();
+                }
+            }, 300);
         }
         
         window.scrollTo(0, 0);
@@ -3558,7 +3565,10 @@ window.showNewUserNotifications = function(event) {
     event.stopPropagation();
     // Navigate to dashboard and switch to users tab
     goToDashboard();
+    
+    // Re-render pending notifications from the users list
     setTimeout(() => {
+        reRenderPendingNotifications();
         switchAdminTab('users');
     }, 100);
 };
@@ -3568,6 +3578,11 @@ window.showNewListingNotifications = function(event) {
     event.stopPropagation();
     // Navigate to dashboard - listings are shown in the notifications stack
     goToDashboard();
+    
+    // Re-render pending notifications
+    setTimeout(() => {
+        reRenderPendingNotifications();
+    }, 100);
 };
 
 // Show new premium notifications popup
@@ -3575,6 +3590,58 @@ window.showNewPremiumNotifications = function(event) {
     event.stopPropagation();
     // Navigate to dashboard - premium notifications are shown in the stack
     goToDashboard();
+    
+    // Re-render pending notifications
+    setTimeout(() => {
+        reRenderPendingNotifications();
+    }, 100);
+};
+
+// Re-render all pending notifications that might not be showing
+window.reRenderPendingNotifications = function() {
+    const stack = $('adminNotificationsStack');
+    if (!stack) return;
+    
+    console.log('[ReRenderNotifications] Checking for pending notifications...');
+    console.log('[ReRenderNotifications] Pending set:', Array.from(window.pendingAdminNotifications));
+    
+    // Go through all pending notifications and re-render any that aren't showing
+    window.pendingAdminNotifications.forEach(notificationId => {
+        // Skip if already dismissed
+        if (window.dismissedAdminNotifications.has(notificationId)) {
+            window.pendingAdminNotifications.delete(notificationId);
+            return;
+        }
+        
+        // Skip if already showing
+        if ($('notification-' + notificationId)) {
+            return;
+        }
+        
+        console.log('[ReRenderNotifications] Re-rendering:', notificationId);
+        
+        // Parse the notification ID to determine type
+        if (notificationId.startsWith('new-user-')) {
+            const userId = notificationId.replace('new-user-', '');
+            const user = window.adminUsersData?.find(u => u.id === userId);
+            if (user) {
+                showNewUserNotification(user, true);
+            }
+        } else if (notificationId.startsWith('new-listing-')) {
+            const listingId = parseInt(notificationId.replace('new-listing-', ''));
+            const listing = properties.find(p => p.id === listingId);
+            if (listing) {
+                showNewListingNotification(listing, true);
+            }
+        }
+    });
+    
+    // Make sure stack is visible if there are notifications
+    if (stack.querySelectorAll('[id^="notification-"]').length > 0) {
+        stack.classList.remove('hidden');
+    }
+    
+    updateNotificationBadge();
 };
 
 // Show a notification for a new premium activation
