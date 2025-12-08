@@ -1663,6 +1663,40 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
         // For empty date values, save empty string to clear the field
         await PropertyDataService.write(propertyId, field, newValue);
         
+        // LOG PAYMENT when lastPaymentDate is updated (same as property detail page)
+        if (field === 'lastPaymentDate' && newValue && typeof logPayment === 'function') {
+            const p = properties.find(prop => prop.id === propertyId);
+            const renterName = PropertyDataService.getValue(propertyId, 'renterName', p?.renterName || 'Unknown');
+            const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || 'weekly');
+            const weeklyPrice = PropertyDataService.getValue(propertyId, 'weeklyPrice', p?.weeklyPrice || 0);
+            const biweeklyPrice = PropertyDataService.getValue(propertyId, 'biweeklyPrice', p?.biweeklyPrice || 0);
+            const monthlyPrice = PropertyDataService.getValue(propertyId, 'monthlyPrice', p?.monthlyPrice || 0);
+            
+            // Calculate payment amount based on frequency
+            let paymentAmount = weeklyPrice;
+            if (paymentFrequency === 'biweekly') {
+                paymentAmount = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
+            } else if (paymentFrequency === 'monthly') {
+                paymentAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
+            }
+            
+            // Log payment to Firestore
+            const logSuccess = await logPayment(propertyId, {
+                paymentDate: newValue,
+                recordedAt: new Date().toISOString(),
+                renterName: renterName,
+                frequency: paymentFrequency,
+                amount: paymentAmount,
+                recordedBy: auth.currentUser?.email || 'owner'
+            });
+            console.log(`[PaymentLog] Dashboard: Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
+            
+            // Show toast notification for payment logged
+            if (logSuccess && typeof showToast === 'function') {
+                showToast(`💰 Payment logged: $${paymentAmount.toLocaleString()} from ${renterName}`, 'success');
+            }
+        }
+        
         // Auto-flip to "rented" when setting renter name, phone, or payment date
         if ((field === 'renterName' || field === 'renterPhone' || field === 'lastPaymentDate') && newValue) {
             if (state.availability[propertyId] !== false) {
