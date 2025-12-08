@@ -1620,22 +1620,29 @@ window.calculatePropertyAnalytics = function(payments, property) {
         ? Math.floor((now - firstPaymentDate) / (1000 * 60 * 60 * 24))
         : 0;
     
-    // Calculate occupancy rate (payments / expected payments based on frequency)
+    // Calculate occupancy rate (payments made / payments expected)
+    // This measures payment consistency - 100% means all expected payments were made
     let expectedPayments = 0;
-    if (firstPaymentDate && daysSinceFirstPayment > 0) {
-        const weeklyPrice = property?.weeklyPrice || 0;
+    let occupancyRate = 0;
+    
+    if (firstPaymentDate && totalPayments > 0) {
         const frequency = PropertyDataService.getValue(property?.id, 'paymentFrequency', 'weekly');
-        if (frequency === 'weekly') {
-            expectedPayments = Math.floor(daysSinceFirstPayment / 7);
-        } else if (frequency === 'biweekly') {
-            expectedPayments = Math.floor(daysSinceFirstPayment / 14);
-        } else {
-            expectedPayments = Math.floor(daysSinceFirstPayment / 30);
+        let daysBetweenPayments = 7; // default weekly
+        if (frequency === 'biweekly') daysBetweenPayments = 14;
+        else if (frequency === 'monthly') daysBetweenPayments = 30;
+        
+        // Expected payments = (days since first payment / days between payments) + 1 (for the first payment)
+        // Use ceiling to account for current period
+        expectedPayments = Math.max(1, Math.ceil(daysSinceFirstPayment / daysBetweenPayments) + 1);
+        
+        // Calculate occupancy - cap at 100%
+        occupancyRate = Math.min(100, Math.round((totalPayments / expectedPayments) * 100));
+        
+        // If only 1 payment and it's recent (within one payment cycle), show 100%
+        if (totalPayments === 1 && daysSinceFirstPayment < daysBetweenPayments) {
+            occupancyRate = 100;
         }
     }
-    const occupancyRate = expectedPayments > 0 
-        ? Math.min(100, Math.round((totalPayments / expectedPayments) * 100))
-        : 0;
     
     return {
         totalEarnings,
@@ -1679,25 +1686,25 @@ window.renderPropertyAnalytics = async function(propertyId) {
     container.innerHTML = `
         <!-- Summary Stats -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-gradient-to-br from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-600/30">
+            <div class="bg-gradient-to-br from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-600/30 cursor-help" title="Total rent collected from this property since tracking began">
                 <div class="text-green-400 text-sm font-semibold">💰 Total Earnings</div>
                 <div class="text-2xl font-black text-white">$${analytics.totalEarnings.toLocaleString()}</div>
-                <div class="text-green-300/70 text-xs">${analytics.totalPayments} payments</div>
+                <div class="text-green-300/70 text-xs">${analytics.totalPayments} payment${analytics.totalPayments !== 1 ? 's' : ''}</div>
             </div>
-            <div class="bg-gradient-to-br from-blue-900/50 to-cyan-900/50 rounded-xl p-4 border border-blue-600/30">
+            <div class="bg-gradient-to-br from-blue-900/50 to-cyan-900/50 rounded-xl p-4 border border-blue-600/30 cursor-help" title="Rent collected in ${new Date().getFullYear()} only">
                 <div class="text-blue-400 text-sm font-semibold">📅 YTD Earnings</div>
                 <div class="text-2xl font-black text-white">$${analytics.ytdEarnings.toLocaleString()}</div>
-                <div class="text-blue-300/70 text-xs">${analytics.ytdPaymentCount} payments this year</div>
+                <div class="text-blue-300/70 text-xs">${analytics.ytdPaymentCount} payment${analytics.ytdPaymentCount !== 1 ? 's' : ''} this year</div>
             </div>
-            <div class="bg-gradient-to-br from-purple-900/50 to-pink-900/50 rounded-xl p-4 border border-purple-600/30">
+            <div class="bg-gradient-to-br from-purple-900/50 to-pink-900/50 rounded-xl p-4 border border-purple-600/30 cursor-help" title="Average amount per payment (Total ÷ # of payments)">
                 <div class="text-purple-400 text-sm font-semibold">💵 Avg Payment</div>
                 <div class="text-2xl font-black text-white">$${analytics.avgRent.toLocaleString()}</div>
                 <div class="text-purple-300/70 text-xs">per payment cycle</div>
             </div>
-            <div class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-xl p-4 border border-amber-600/30">
+            <div class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-xl p-4 border border-amber-600/30 cursor-help" title="Payment consistency: 100% = all expected payments made on time. Calculated as (payments received ÷ payments expected) based on payment frequency.">
                 <div class="text-amber-400 text-sm font-semibold">📈 Occupancy</div>
                 <div class="text-2xl font-black text-white">${analytics.occupancyRate}%</div>
-                <div class="text-amber-300/70 text-xs">${analytics.daysSinceFirstPayment} days tracked</div>
+                <div class="text-amber-300/70 text-xs">${analytics.daysSinceFirstPayment} day${analytics.daysSinceFirstPayment !== 1 ? 's' : ''} tracked</div>
             </div>
         </div>
         
