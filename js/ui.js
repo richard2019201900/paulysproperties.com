@@ -2888,6 +2888,12 @@ window.startAdminPropertiesListener = function() {
 
 // Real-time listener for settings/properties document - this is where user-created properties are stored
 window.startSettingsPropertiesListener = function() {
+    // Prevent duplicate listeners - only restart if explicitly needed
+    if (window.settingsPropertiesListenerActive && window.settingsPropertiesUnsubscribe) {
+        console.log('[SettingsProperties] Listener already active, skipping restart');
+        return;
+    }
+    
     if (window.settingsPropertiesUnsubscribe) {
         window.settingsPropertiesUnsubscribe();
     }
@@ -2917,9 +2923,16 @@ window.startSettingsPropertiesListener = function() {
         }
     } catch (e) {}
     
-    // Track which property IDs we've SEEN in snapshots (not just locally)
-    let seenPropertyIds = new Set();
-    let isFirstSnapshot = true;
+    // Use GLOBAL seenPropertyIds set so it persists across listener restarts
+    if (!window.seenPropertyIds) {
+        window.seenPropertyIds = new Set();
+    }
+    
+    // Only treat as first snapshot if we haven't seen any properties yet
+    let isFirstSnapshot = window.seenPropertyIds.size === 0;
+    
+    // Mark listener as active
+    window.settingsPropertiesListenerActive = true;
     
     window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
         .onSnapshot((doc) => {
@@ -2958,7 +2971,7 @@ window.startSettingsPropertiesListener = function() {
                 }
                 
                 // Check if this is a NEW property (not seen in any previous snapshot)
-                const isNewToUs = !seenPropertyIds.has(propId);
+                const isNewToUs = !window.seenPropertyIds.has(propId);
                 
                 if (isNewToUs) {
                     console.log('[SettingsProperties] New property ID detected:', propId, prop.title, 'isFirst:', isFirstSnapshot);
@@ -3009,7 +3022,7 @@ window.startSettingsPropertiesListener = function() {
                 }
                 
                 // Mark this property ID as seen
-                seenPropertyIds.add(propId);
+                window.seenPropertyIds.add(propId);
             });
             
             // Update filtered properties
@@ -3063,7 +3076,7 @@ window.startSettingsPropertiesListener = function() {
             // Mark first snapshot as complete
             if (isFirstSnapshot) {
                 isFirstSnapshot = false;
-                console.log('[SettingsProperties] Initial load complete. Seen', seenPropertyIds.size, 'properties. Now listening for new listings...');
+                console.log('[SettingsProperties] Initial load complete. Seen', window.seenPropertyIds.size, 'properties. Now listening for new listings...');
             }
             
         }, (error) => {
