@@ -1385,6 +1385,7 @@ function renderOwnerDashboard() {
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
+        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
         const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
         const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
@@ -1398,7 +1399,9 @@ function renderOwnerDashboard() {
         if (lastPaymentDate) {
             const lastDate = parseLocalDate(lastPaymentDate);
             const nextDate = new Date(lastDate);
-            if (paymentFrequency === 'weekly') {
+            if (paymentFrequency === 'daily') {
+                nextDate.setDate(nextDate.getDate() + 1);
+            } else if (paymentFrequency === 'weekly') {
                 nextDate.setDate(nextDate.getDate() + 7);
             } else if (paymentFrequency === 'biweekly') {
                 nextDate.setDate(nextDate.getDate() + 14);
@@ -1426,10 +1429,14 @@ function renderOwnerDashboard() {
             
             // Generate reminder script - determine amount based on frequency
             let amountDue = weeklyPrice;
-            if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
+            if (paymentFrequency === 'daily' && dailyPrice > 0) {
+                amountDue = dailyPrice;
+            } else if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
                 amountDue = biweeklyPrice;
             } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
                 amountDue = monthlyPrice;
+            } else if (paymentFrequency === 'daily') {
+                amountDue = Math.round(weeklyPrice / 7);
             } else if (paymentFrequency === 'biweekly') {
                 // If no biweekly price set, use weekly * 2
                 amountDue = weeklyPrice * 2;
@@ -1587,6 +1594,7 @@ window.startCellEdit = function(propertyId, field, cell, type) {
             <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm" 
                     onchange="saveCellEdit(this, ${propertyId}, '${field}', '${type}')"
                     onblur="setTimeout(() => cancelCellEdit(this), 150)">
+                <option value="daily" ${currentValue === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
                 <option value="biweekly" ${currentValue === 'biweekly' ? 'selected' : ''}>Biweekly</option>
                 <option value="monthly" ${currentValue === 'monthly' ? 'selected' : ''}>Monthly</option>
@@ -1668,13 +1676,16 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
             const p = properties.find(prop => prop.id === propertyId);
             const renterName = PropertyDataService.getValue(propertyId, 'renterName', p?.renterName || 'Unknown');
             const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || 'weekly');
+            const dailyPrice = PropertyDataService.getValue(propertyId, 'dailyPrice', p?.dailyPrice || 0);
             const weeklyPrice = PropertyDataService.getValue(propertyId, 'weeklyPrice', p?.weeklyPrice || 0);
             const biweeklyPrice = PropertyDataService.getValue(propertyId, 'biweeklyPrice', p?.biweeklyPrice || 0);
             const monthlyPrice = PropertyDataService.getValue(propertyId, 'monthlyPrice', p?.monthlyPrice || 0);
             
             // Calculate payment amount based on frequency
             let paymentAmount = weeklyPrice;
-            if (paymentFrequency === 'biweekly') {
+            if (paymentFrequency === 'daily') {
+                paymentAmount = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+            } else if (paymentFrequency === 'biweekly') {
                 paymentAmount = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
             } else if (paymentFrequency === 'monthly') {
                 paymentAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;

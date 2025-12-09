@@ -343,6 +343,7 @@ function renderPropertyStatsContent(id) {
     const storage = PropertyDataService.getValue(id, 'storage', p.storage);
     const interiorType = PropertyDataService.getValue(id, 'interiorType', p.interiorType);
     const propertyType = PropertyDataService.getValue(id, 'type', p.type);
+    const dailyPrice = PropertyDataService.getValue(id, 'dailyPrice', p.dailyPrice || 0);
     const weeklyPrice = PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice);
     const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
     const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice);
@@ -378,7 +379,9 @@ function renderPropertyStatsContent(id) {
     if (lastPaymentDate) {
         const lastDate = parseLocalDate(lastPaymentDate);
         const nextDate = new Date(lastDate);
-        if (paymentFrequency === 'weekly') {
+        if (paymentFrequency === 'daily') {
+            nextDate.setDate(nextDate.getDate() + 1);
+        } else if (paymentFrequency === 'weekly') {
             nextDate.setDate(nextDate.getDate() + 7);
         } else if (paymentFrequency === 'biweekly') {
             nextDate.setDate(nextDate.getDate() + 14);
@@ -396,10 +399,14 @@ function renderPropertyStatsContent(id) {
         // Determine amount based on frequency
         const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
         let amountDue = weeklyPrice;
-        if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
+        if (paymentFrequency === 'daily' && dailyPrice > 0) {
+            amountDue = dailyPrice;
+        } else if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
             amountDue = biweeklyPrice;
         } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
             amountDue = monthlyPrice;
+        } else if (paymentFrequency === 'daily') {
+            amountDue = Math.round(weeklyPrice / 7);
         } else if (paymentFrequency === 'biweekly') {
             amountDue = weeklyPrice * 2;
         } else if (paymentFrequency === 'monthly') {
@@ -692,60 +699,74 @@ function renderPropertyStatsContent(id) {
         
         <!-- EDITABLE Income Stats -->
         <h3 class="text-xl font-bold text-gray-200 mb-4">Pricing & Status <span class="text-sm text-purple-400">(Click to edit)</span></h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+            <!-- Daily Rate Tile -->
+            <div id="tile-dailyPrice-${id}" 
+                 class="stat-tile bg-gradient-to-br from-cyan-600 to-teal-800 rounded-2xl shadow-xl p-5 text-white border border-cyan-500 cursor-pointer"
+                 onclick="startEditTile('dailyPrice', ${id}, 'number')"
+                 data-field="dailyPrice"
+                 data-original-value="${dailyPrice}">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-bold opacity-90">Daily Rate</h3>
+                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                </div>
+                <div id="value-dailyPrice-${id}" class="text-2xl font-black">${dailyPrice > 0 ? dailyPrice.toLocaleString() : 'Not set'}</div>
+                <div class="text-xs text-cyan-200 mt-1 opacity-70">Click to edit</div>
+            </div>
+            
             <!-- Weekly Rate Tile -->
             <div id="tile-weeklyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-6 text-white border border-blue-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-5 text-white border border-blue-500 cursor-pointer"
                  onclick="startEditTile('weeklyPrice', ${id}, 'number')"
                  data-field="weeklyPrice"
                  data-original-value="${weeklyPrice}">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-bold opacity-90">Weekly Rate</h3>
-                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <div id="value-weeklyPrice-${id}" class="text-3xl font-black">${weeklyPrice.toLocaleString()}</div>
-                <div class="text-xs text-blue-200 mt-2 opacity-70">Click to edit</div>
+                <div id="value-weeklyPrice-${id}" class="text-2xl font-black">${weeklyPrice.toLocaleString()}</div>
+                <div class="text-xs text-blue-200 mt-1 opacity-70">Click to edit</div>
             </div>
             
             <!-- Biweekly Rate Tile -->
             <div id="tile-biweeklyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-purple-600 to-violet-800 rounded-2xl shadow-xl p-6 text-white border border-purple-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-purple-600 to-violet-800 rounded-2xl shadow-xl p-5 text-white border border-purple-500 cursor-pointer"
                  onclick="startEditTile('biweeklyPrice', ${id}, 'number')"
                  data-field="biweeklyPrice"
                  data-original-value="${biweeklyPrice}">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-bold opacity-90">Biweekly Rate</h3>
-                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 </div>
-                <div id="value-biweeklyPrice-${id}" class="text-3xl font-black">${biweeklyPrice > 0 ? biweeklyPrice.toLocaleString() : 'Not set'}</div>
-                <div class="text-xs text-purple-200 mt-2 opacity-70">Click to edit</div>
+                <div id="value-biweeklyPrice-${id}" class="text-2xl font-black">${biweeklyPrice > 0 ? biweeklyPrice.toLocaleString() : 'Not set'}</div>
+                <div class="text-xs text-purple-200 mt-1 opacity-70">Click to edit</div>
             </div>
             
             <!-- Monthly Rate Tile -->
             <div id="tile-monthlyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-xl p-6 text-white border border-green-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-xl p-5 text-white border border-green-500 cursor-pointer"
                  onclick="startEditTile('monthlyPrice', ${id}, 'number')"
                  data-field="monthlyPrice"
                  data-original-value="${monthlyPrice}">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-bold opacity-90">Monthly Rate</h3>
-                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                 </div>
-                <div id="value-monthlyPrice-${id}" class="text-3xl font-black">${monthlyPrice.toLocaleString()}</div>
-                <div class="text-xs text-green-200 mt-2 opacity-70">Click to edit</div>
+                <div id="value-monthlyPrice-${id}" class="text-2xl font-black">${monthlyPrice.toLocaleString()}</div>
+                <div class="text-xs text-green-200 mt-1 opacity-70">Click to edit</div>
             </div>
             
             <!-- Status Tile (toggles availability) -->
             <div id="tile-status-${id}" 
-                 class="stat-tile bg-gradient-to-br ${isAvailable ? 'from-emerald-600 to-teal-800 border-emerald-500' : 'from-red-600 to-pink-800 border-red-500'} rounded-2xl shadow-xl p-6 text-white border cursor-pointer"
+                 class="stat-tile bg-gradient-to-br ${isAvailable ? 'from-emerald-600 to-teal-800 border-emerald-500' : 'from-red-600 to-pink-800 border-red-500'} rounded-2xl shadow-xl p-5 text-white border cursor-pointer"
                  onclick="togglePropertyStatus(${id})">
-                <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-bold opacity-90">Status</h3>
-                    <svg class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <div class="text-2xl font-black">${statusText}</div>
-                <div class="text-sm opacity-80 mt-1">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
-                <div class="text-xs mt-2 opacity-70">Click to toggle</div>
+                <div class="text-xl font-black">${statusText}</div>
+                <div class="text-sm opacity-80">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
+                <div class="text-xs mt-1 opacity-70">Click to toggle</div>
             </div>
         </div>
         
@@ -905,6 +926,7 @@ window.startEditTile = function(field, propertyId, type) {
     } else if (type === 'frequency') {
         inputHtml = `
             <select id="input-${field}-${propertyId}" class="stat-input text-lg w-full">
+                <option value="daily" ${currentValue === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
                 <option value="biweekly" ${currentValue === 'biweekly' ? 'selected' : ''}>Biweekly</option>
                 <option value="monthly" ${currentValue === 'monthly' ? 'selected' : ''}>Monthly</option>
@@ -1103,13 +1125,16 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             const p = properties.find(prop => prop.id === propertyId);
             const renterName = PropertyDataService.getValue(propertyId, 'renterName', p?.renterName || 'Unknown');
             const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || 'weekly');
+            const dailyPrice = PropertyDataService.getValue(propertyId, 'dailyPrice', p?.dailyPrice || 0);
             const weeklyPrice = PropertyDataService.getValue(propertyId, 'weeklyPrice', p?.weeklyPrice || 0);
             const biweeklyPrice = PropertyDataService.getValue(propertyId, 'biweeklyPrice', p?.biweeklyPrice || 0);
             const monthlyPrice = PropertyDataService.getValue(propertyId, 'monthlyPrice', p?.monthlyPrice || 0);
             
             // Calculate payment amount based on frequency
             let paymentAmount = weeklyPrice;
-            if (paymentFrequency === 'biweekly') {
+            if (paymentFrequency === 'daily') {
+                paymentAmount = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+            } else if (paymentFrequency === 'biweekly') {
                 paymentAmount = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
             } else if (paymentFrequency === 'monthly') {
                 paymentAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
