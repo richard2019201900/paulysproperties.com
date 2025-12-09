@@ -26,6 +26,96 @@ window.showToast = function(message, type = 'info') {
     }, 3000);
 };
 
+// ==================== PRICING TIERS RENDERER ====================
+// Renders all pricing options with discount badges for property cards
+window.renderPricingTiers = function(p, isPremium) {
+    const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+    const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+    const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+    const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+    const buyPrice = PropertyDataService.getValue(p.id, 'buyPrice', p.buyPrice || 0);
+    
+    // Calculate discounts based on daily rate (or weekly/7 if no daily)
+    const baseDaily = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+    
+    const calcDiscount = (actualPrice, equivalentDays) => {
+        if (baseDaily <= 0 || actualPrice <= 0) return 0;
+        const fullPrice = baseDaily * equivalentDays;
+        const discount = Math.round(((fullPrice - actualPrice) / fullPrice) * 100);
+        return discount > 0 ? discount : 0;
+    };
+    
+    const weeklyDiscount = calcDiscount(weeklyPrice, 7);
+    const biweeklyDiscount = calcDiscount(biweeklyPrice, 14);
+    const monthlyDiscount = calcDiscount(monthlyPrice, 30);
+    
+    let html = '<div class="space-y-1.5 mb-3">';
+    
+    // Daily
+    if (dailyPrice > 0) {
+        html += '<div class="flex items-center justify-between text-xs">';
+        html += '<span class="text-gray-400">Daily:</span>';
+        html += '<span class="text-cyan-400 font-bold">$' + dailyPrice.toLocaleString() + '</span>';
+        html += '</div>';
+    }
+    
+    // Weekly
+    if (weeklyPrice > 0) {
+        html += '<div class="flex items-center justify-between text-xs">';
+        html += '<span class="text-gray-400">Weekly:</span>';
+        html += '<div class="flex items-center gap-1.5">';
+        if (weeklyDiscount > 0) {
+            html += '<span class="bg-blue-500/20 text-blue-400 text-[10px] px-1.5 py-0.5 rounded font-bold">-' + weeklyDiscount + '%</span>';
+        }
+        html += '<span class="text-blue-400 font-bold">$' + weeklyPrice.toLocaleString() + '</span>';
+        html += '</div></div>';
+    }
+    
+    // Biweekly
+    if (biweeklyPrice > 0) {
+        html += '<div class="flex items-center justify-between text-xs">';
+        html += '<span class="text-gray-400">Biweekly:</span>';
+        html += '<div class="flex items-center gap-1.5">';
+        if (biweeklyDiscount > 0) {
+            html += '<span class="bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded font-bold">-' + biweeklyDiscount + '%</span>';
+        }
+        html += '<span class="text-purple-400 font-bold">$' + biweeklyPrice.toLocaleString() + '</span>';
+        html += '</div></div>';
+    }
+    
+    // Monthly (featured - larger)
+    if (monthlyPrice > 0) {
+        html += '<div class="flex items-center justify-between">';
+        html += '<span class="text-gray-400 text-xs">Monthly:</span>';
+        html += '<div class="flex items-center gap-1.5">';
+        if (monthlyDiscount > 0) {
+            html += '<span class="bg-green-500/20 text-green-400 text-[10px] px-1.5 py-0.5 rounded font-bold">-' + monthlyDiscount + '%</span>';
+        }
+        const monthlyColor = isPremium ? 'text-amber-400' : 'text-green-400';
+        html += '<span class="' + monthlyColor + ' font-black text-lg">$' + monthlyPrice.toLocaleString() + '</span>';
+        html += '</div></div>';
+    } else if (weeklyPrice > 0) {
+        // Estimate monthly if not set
+        const estimatedMonthly = Math.round(weeklyPrice * 3.5);
+        html += '<div class="flex items-center justify-between">';
+        html += '<span class="text-gray-400 text-xs">Monthly:</span>';
+        const monthlyColor = isPremium ? 'text-amber-400' : 'text-green-400';
+        html += '<span class="' + monthlyColor + ' font-black text-lg">~$' + estimatedMonthly.toLocaleString() + '</span>';
+        html += '</div>';
+    }
+    
+    // Buy Price
+    if (buyPrice > 0) {
+        html += '<div class="flex items-center justify-between border-t border-gray-700 pt-1.5 mt-1.5">';
+        html += '<span class="text-amber-400 text-xs font-semibold">🏠 Own It:</span>';
+        html += '<span class="text-amber-400 font-black text-lg">$' + buyPrice.toLocaleString() + '</span>';
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    return html;
+};
+
 // ==================== PRICE WARNING SYSTEM ====================
 // Check if biweekly/monthly prices are suspiciously low
 window.checkPriceWarning = function(weeklyEl, biweeklyEl, monthlyEl, warningEl) {
@@ -1808,31 +1898,15 @@ async function renderProperties(list) {
                 <p class="text-gray-300 mb-2 font-medium text-sm md:text-base">📝 ${sanitize(p.location)}</p>
                 <p class="text-xs md:text-sm text-gray-400 mb-2 font-semibold">Interior: ${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</p>
                 <p id="owner-${p.id}" class="text-xs md:text-sm text-blue-400 mb-4 font-semibold">👤 Owner: Loading...</p>
-                <div class="grid grid-cols-3 gap-2 mb-4 text-xs md:text-sm text-gray-300 font-semibold">
+                <div class="grid grid-cols-3 gap-2 mb-3 text-xs md:text-sm text-gray-300 font-semibold">
                     <div>${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)} Beds</div>
                     <div>${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)} Baths</div>
                     <div>${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</div>
                 </div>
-                <div class="mb-4">
-                    <div class="text-gray-400 font-semibold text-sm"><span class="font-bold text-gray-300">Weekly:</span> ${PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
-                    ${(() => {
-                        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
-                        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
-                        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
-                        
-                        if (monthlyPrice > 0) {
-                            return `<div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${monthlyPrice.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>`;
-                        } else if (biweeklyPrice > 0) {
-                            return `<div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">${biweeklyPrice.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/biweekly</span></div>`;
-                        } else if (weeklyPrice > 0) {
-                            // Calculate a reasonable monthly estimate (weekly * 3.5)
-                            const estimatedMonthly = Math.round(weeklyPrice * 3.5);
-                            return `<div class="${isPremium ? 'text-amber-400' : 'text-purple-400'} font-black text-xl md:text-2xl mt-1">~${estimatedMonthly.toLocaleString()}<span class="text-xs md:text-sm font-semibold text-gray-400">/month</span></div>`;
-                        } else {
-                            return `<div class="text-gray-500 font-bold text-xl mt-1">Contact for pricing</div>`;
-                        }
-                    })()}
-                </div>
+                
+                <!-- Pricing Tiers with Discount Badges -->
+                ${renderPricingTiers(p, isPremium)}
+                
                 <button onclick="viewProperty(${p.id})" class="w-full ${isPremium ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900' : 'gradient-bg text-white'} px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-2 text-sm md:text-base">View Details</button>
                 <button onclick="event.stopPropagation(); viewPropertyAndHighlightOffers(${p.id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm md:text-base">Make an Offer</button>
             </div>

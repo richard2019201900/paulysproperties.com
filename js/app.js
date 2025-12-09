@@ -140,16 +140,84 @@ window.viewProperty = function(id) {
             </div>
             ${luxuryFeatures}
             <div class="bg-gray-800 p-5 md:p-8 rounded-2xl mb-8 border border-gray-700">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    <div>
-                        <div class="text-gray-400 font-bold mb-2">Weekly Price</div>
-                        <div class="text-2xl md:text-3xl font-black text-green-400">$${PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice).toLocaleString()}</div>
-                    </div>
-                    <div>
-                        <div class="text-gray-400 font-bold mb-2">${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0) > 0 ? 'Monthly Price (Discounted)' : (PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0) > 0 ? 'Biweekly Price' : 'Monthly Price')}</div>
-                        <div class="text-3xl md:text-4xl font-black ${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0) > 0 || PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0) > 0 ? 'text-purple-400' : 'text-gray-500'}">$${PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0) > 0 ? PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice).toLocaleString() : (PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0) > 0 ? PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice).toLocaleString() : 'Contact for pricing')}</div>
-                    </div>
-                </div>
+                <h3 class="text-xl font-bold text-white mb-4">💰 Pricing Options</h3>
+                ${(() => {
+                    const dailyPrice = PropertyDataService.getValue(id, 'dailyPrice', p.dailyPrice || 0);
+                    const weeklyPrice = PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice || 0);
+                    const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
+                    const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice || 0);
+                    const buyPrice = PropertyDataService.getValue(id, 'buyPrice', p.buyPrice || 0);
+                    
+                    // Calculate discounts based on daily rate (or weekly/7 if no daily)
+                    const baseDaily = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+                    
+                    const calcDiscount = (actualPrice, equivalentDays) => {
+                        if (baseDaily <= 0 || actualPrice <= 0) return 0;
+                        const fullPrice = baseDaily * equivalentDays;
+                        const discount = Math.round(((fullPrice - actualPrice) / fullPrice) * 100);
+                        return discount > 0 ? discount : 0;
+                    };
+                    
+                    const weeklyDiscount = calcDiscount(weeklyPrice, 7);
+                    const biweeklyDiscount = calcDiscount(biweeklyPrice, 14);
+                    const monthlyDiscount = calcDiscount(monthlyPrice, 30);
+                    
+                    let html = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">';
+                    
+                    // Daily
+                    if (dailyPrice > 0) {
+                        html += '<div class="bg-gradient-to-br from-cyan-600/20 to-teal-700/20 border border-cyan-500/50 rounded-xl p-4 text-center">';
+                        html += '<div class="text-cyan-400 text-xs font-bold mb-1">DAILY</div>';
+                        html += '<div class="text-white text-xl md:text-2xl font-black">$' + dailyPrice.toLocaleString() + '</div>';
+                        html += '</div>';
+                    }
+                    
+                    // Weekly
+                    if (weeklyPrice > 0) {
+                        html += '<div class="bg-gradient-to-br from-blue-600/20 to-blue-700/20 border border-blue-500/50 rounded-xl p-4 text-center relative">';
+                        if (weeklyDiscount > 0) {
+                            html += '<div class="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SAVE ' + weeklyDiscount + '%</div>';
+                        }
+                        html += '<div class="text-blue-400 text-xs font-bold mb-1">WEEKLY</div>';
+                        html += '<div class="text-white text-xl md:text-2xl font-black">$' + weeklyPrice.toLocaleString() + '</div>';
+                        html += '</div>';
+                    }
+                    
+                    // Biweekly
+                    if (biweeklyPrice > 0) {
+                        html += '<div class="bg-gradient-to-br from-purple-600/20 to-violet-700/20 border border-purple-500/50 rounded-xl p-4 text-center relative">';
+                        if (biweeklyDiscount > 0) {
+                            html += '<div class="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SAVE ' + biweeklyDiscount + '%</div>';
+                        }
+                        html += '<div class="text-purple-400 text-xs font-bold mb-1">BIWEEKLY</div>';
+                        html += '<div class="text-white text-xl md:text-2xl font-black">$' + biweeklyPrice.toLocaleString() + '</div>';
+                        html += '</div>';
+                    }
+                    
+                    // Monthly (featured)
+                    if (monthlyPrice > 0) {
+                        html += '<div class="bg-gradient-to-br from-green-600/20 to-emerald-700/20 border-2 border-green-500 rounded-xl p-4 text-center relative">';
+                        if (monthlyDiscount > 0) {
+                            html += '<div class="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SAVE ' + monthlyDiscount + '%</div>';
+                        }
+                        html += '<div class="text-green-400 text-xs font-bold mb-1">⭐ MONTHLY</div>';
+                        html += '<div class="text-green-400 text-2xl md:text-3xl font-black">$' + monthlyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-green-300/70 text-[10px] mt-1">Best Value</div>';
+                        html += '</div>';
+                    }
+                    
+                    // Buy Price
+                    if (buyPrice > 0) {
+                        html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center">';
+                        html += '<div class="text-amber-400 text-xs font-bold mb-1">🏠 OWN IT</div>';
+                        html += '<div class="text-amber-400 text-2xl md:text-3xl font-black">$' + buyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-amber-300/70 text-[10px] mt-1">One-time purchase</div>';
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                    return html;
+                })()}
             </div>
             <button id="offerRentBtn" onclick="openContactModal('rent', '${sanitize(p.title)}', ${id})" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
             <button id="offerPurchaseBtn" onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
@@ -347,6 +415,7 @@ function renderPropertyStatsContent(id) {
     const weeklyPrice = PropertyDataService.getValue(id, 'weeklyPrice', p.weeklyPrice);
     const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
     const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice);
+    const buyPrice = PropertyDataService.getValue(id, 'buyPrice', p.buyPrice || 0);
     
     // Get reviews for this property
     const propertyReviews = state.reviews[id] || [];
@@ -699,73 +768,87 @@ function renderPropertyStatsContent(id) {
         
         <!-- EDITABLE Income Stats -->
         <h3 class="text-xl font-bold text-gray-200 mb-4">Pricing & Status <span class="text-sm text-purple-400">(Click to edit)</span></h3>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
             <!-- Daily Rate Tile -->
             <div id="tile-dailyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-cyan-600 to-teal-800 rounded-2xl shadow-xl p-5 text-white border border-cyan-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-cyan-600 to-teal-800 rounded-2xl shadow-xl p-4 text-white border border-cyan-500 cursor-pointer"
                  onclick="startEditTile('dailyPrice', ${id}, 'number')"
                  data-field="dailyPrice"
                  data-original-value="${dailyPrice}">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-bold opacity-90">Daily Rate</h3>
-                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-bold opacity-90">Daily</h3>
+                    <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                 </div>
-                <div id="value-dailyPrice-${id}" class="text-2xl font-black">${dailyPrice > 0 ? dailyPrice.toLocaleString() : 'Not set'}</div>
+                <div id="value-dailyPrice-${id}" class="text-xl font-black">${dailyPrice > 0 ? dailyPrice.toLocaleString() : 'Not set'}</div>
                 <div class="text-xs text-cyan-200 mt-1 opacity-70">Click to edit</div>
             </div>
             
             <!-- Weekly Rate Tile -->
             <div id="tile-weeklyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-5 text-white border border-blue-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-xl p-4 text-white border border-blue-500 cursor-pointer"
                  onclick="startEditTile('weeklyPrice', ${id}, 'number')"
                  data-field="weeklyPrice"
                  data-original-value="${weeklyPrice}">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-bold opacity-90">Weekly Rate</h3>
-                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-bold opacity-90">Weekly</h3>
+                    <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <div id="value-weeklyPrice-${id}" class="text-2xl font-black">${weeklyPrice.toLocaleString()}</div>
+                <div id="value-weeklyPrice-${id}" class="text-xl font-black">${weeklyPrice.toLocaleString()}</div>
                 <div class="text-xs text-blue-200 mt-1 opacity-70">Click to edit</div>
             </div>
             
             <!-- Biweekly Rate Tile -->
             <div id="tile-biweeklyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-purple-600 to-violet-800 rounded-2xl shadow-xl p-5 text-white border border-purple-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-purple-600 to-violet-800 rounded-2xl shadow-xl p-4 text-white border border-purple-500 cursor-pointer"
                  onclick="startEditTile('biweeklyPrice', ${id}, 'number')"
                  data-field="biweeklyPrice"
                  data-original-value="${biweeklyPrice}">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-bold opacity-90">Biweekly Rate</h3>
-                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-bold opacity-90">Biweekly</h3>
+                    <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 </div>
-                <div id="value-biweeklyPrice-${id}" class="text-2xl font-black">${biweeklyPrice > 0 ? biweeklyPrice.toLocaleString() : 'Not set'}</div>
+                <div id="value-biweeklyPrice-${id}" class="text-xl font-black">${biweeklyPrice > 0 ? biweeklyPrice.toLocaleString() : 'Not set'}</div>
                 <div class="text-xs text-purple-200 mt-1 opacity-70">Click to edit</div>
             </div>
             
             <!-- Monthly Rate Tile -->
             <div id="tile-monthlyPrice-${id}" 
-                 class="stat-tile bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-xl p-5 text-white border border-green-500 cursor-pointer"
+                 class="stat-tile bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-xl p-4 text-white border border-green-500 cursor-pointer"
                  onclick="startEditTile('monthlyPrice', ${id}, 'number')"
                  data-field="monthlyPrice"
                  data-original-value="${monthlyPrice}">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-bold opacity-90">Monthly Rate</h3>
-                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-bold opacity-90">Monthly</h3>
+                    <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                 </div>
-                <div id="value-monthlyPrice-${id}" class="text-2xl font-black">${monthlyPrice.toLocaleString()}</div>
+                <div id="value-monthlyPrice-${id}" class="text-xl font-black">${monthlyPrice.toLocaleString()}</div>
                 <div class="text-xs text-green-200 mt-1 opacity-70">Click to edit</div>
+            </div>
+            
+            <!-- Buy Price Tile -->
+            <div id="tile-buyPrice-${id}" 
+                 class="stat-tile bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-xl p-4 text-white border border-amber-400 cursor-pointer"
+                 onclick="startEditTile('buyPrice', ${id}, 'number')"
+                 data-field="buyPrice"
+                 data-original-value="${buyPrice}">
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-bold opacity-90">Buy Price</h3>
+                    <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                </div>
+                <div id="value-buyPrice-${id}" class="text-xl font-black">${buyPrice > 0 ? buyPrice.toLocaleString() : 'Not set'}</div>
+                <div class="text-xs text-amber-200 mt-1 opacity-70">Own it forever</div>
             </div>
             
             <!-- Status Tile (toggles availability) -->
             <div id="tile-status-${id}" 
-                 class="stat-tile bg-gradient-to-br ${isAvailable ? 'from-emerald-600 to-teal-800 border-emerald-500' : 'from-red-600 to-pink-800 border-red-500'} rounded-2xl shadow-xl p-5 text-white border cursor-pointer"
+                 class="stat-tile bg-gradient-to-br ${isAvailable ? 'from-emerald-600 to-teal-800 border-emerald-500' : 'from-red-600 to-pink-800 border-red-500'} rounded-2xl shadow-xl p-4 text-white border cursor-pointer"
                  onclick="togglePropertyStatus(${id})">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-sm font-bold opacity-90">Status</h3>
-                    <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div class="flex items-center justify-between mb-1">
+                    <h3 class="text-xs font-bold opacity-90">Status</h3>
+                    <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
-                <div class="text-xl font-black">${statusText}</div>
-                <div class="text-sm opacity-80">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
+                <div class="text-lg font-black">${statusText}</div>
+                <div class="text-xs opacity-80">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
                 <div class="text-xs mt-1 opacity-70">Click to toggle</div>
             </div>
         </div>
