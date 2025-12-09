@@ -54,8 +54,22 @@ const TierService = {
                 tier = userData.tier || 'starter';
             }
             
-            // Count user's listings
-            const listingCount = (ownerPropertyMap[normalizedEmail] || []).length;
+            // Count user's listings from FRESH Firestore data (not cached map)
+            // This ensures accurate count even after deletions
+            let listingCount = 0;
+            try {
+                const propsDoc = await db.collection('settings').doc('properties').get();
+                if (propsDoc.exists) {
+                    const propsData = propsDoc.data();
+                    listingCount = Object.values(propsData).filter(p => 
+                        p && p.ownerEmail && p.ownerEmail.toLowerCase() === normalizedEmail
+                    ).length;
+                }
+            } catch (e) {
+                // Fallback to cached map if Firestore query fails
+                listingCount = (ownerPropertyMap[normalizedEmail] || []).length;
+                console.warn('[TierService] Using cached listing count:', listingCount);
+            }
             
             return {
                 tier,

@@ -2774,6 +2774,9 @@ window.startAdminUsersListener = function() {
     // First snapshot flag - used for catching "missed" users
     let isFirstSnapshot = true;
     
+    // Track which user IDs from pending notifications actually exist
+    const validPendingUserIds = new Set();
+    
     // Simple listener - no orderBy to avoid index requirement
     window.adminUsersUnsubscribe = db.collection('users')
         .onSnapshot((snapshot) => {
@@ -2781,10 +2784,14 @@ window.startAdminUsersListener = function() {
             const newUsers = [];
             const missedUsers = []; // Users created while admin was away
             
+            // Build set of all current user IDs
+            const currentUserIds = new Set();
+            
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const user = { id: doc.id, ...data };
                 users.push(user);
+                currentUserIds.add(doc.id);
                 
                 const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
                 const notificationId = 'new-user-' + doc.id;
@@ -2794,6 +2801,7 @@ window.startAdminUsersListener = function() {
                     if (window.pendingAdminNotifications.has(notificationId)) {
                         if (!window.dismissedAdminNotifications.has(notificationId)) {
                             missedUsers.push(user);
+                            validPendingUserIds.add(notificationId);
                             console.log('[AdminUsers] Pending notification found:', user.email);
                         }
                     }
@@ -2864,10 +2872,37 @@ window.startAdminUsersListener = function() {
             // Update notification badge
             updateNotificationBadge();
             
-            // After first snapshot, mark as no longer first
+            // After first snapshot, mark as no longer first and clean up stale notifications
             if (isFirstSnapshot) {
                 isFirstSnapshot = false;
                 console.log('[AdminUsers] Initial load complete, now listening for new users');
+                
+                // Clean up stale pending notifications (users that were deleted)
+                const staleNotifications = [];
+                window.pendingAdminNotifications.forEach(id => {
+                    if (id.startsWith('new-user-')) {
+                        const userId = id.replace('new-user-', '');
+                        if (!currentUserIds.has(userId)) {
+                            staleNotifications.push(id);
+                        }
+                    }
+                });
+                
+                if (staleNotifications.length > 0) {
+                    console.log('[AdminUsers] Cleaning up stale notifications:', staleNotifications);
+                    staleNotifications.forEach(id => {
+                        window.pendingAdminNotifications.delete(id);
+                        window.dismissedAdminNotifications.add(id);
+                    });
+                    // Save cleaned set
+                    try {
+                        localStorage.setItem('pendingUserNotifications', JSON.stringify(
+                            Array.from(window.pendingAdminNotifications).filter(id => id.startsWith('new-user-'))
+                        ));
+                    } catch (e) {}
+                    // Update badge after cleanup
+                    updateNotificationBadge();
+                }
             }
             
         }, (error) => {
