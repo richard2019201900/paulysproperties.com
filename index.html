@@ -863,6 +863,27 @@
                     </div>
                 </div>
                 
+                <!-- Total Listings Quick Stat -->
+                <div class="mb-6 flex items-center gap-4">
+                    <div onclick="window.location.hash='properties'" class="flex-1 bg-gradient-to-r from-cyan-900/50 to-blue-900/50 rounded-xl p-4 border border-cyan-600/50 cursor-pointer hover:border-cyan-400 transition group">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-3xl">🏠</span>
+                                <div>
+                                    <div class="text-gray-400 text-sm">Total Listings</div>
+                                    <div class="flex items-baseline gap-2">
+                                        <span id="adminStatListings" class="text-2xl font-bold text-cyan-400">-</span>
+                                        <span id="adminStatListingsAvailable" class="text-green-400 text-sm"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-gray-500 group-hover:text-cyan-400 transition">
+                                <span class="text-sm">View All →</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Admin Tabs -->
                 <div class="flex flex-wrap gap-2 mb-6 border-b border-gray-700 pb-4">
                     <button id="adminTabUsers" onclick="switchAdminTab('users')" class="px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white">

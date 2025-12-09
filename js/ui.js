@@ -2888,14 +2888,11 @@ window.startAdminPropertiesListener = function() {
 
 // Real-time listener for settings/properties document - this is where user-created properties are stored
 window.startSettingsPropertiesListener = function() {
-    // Prevent duplicate listeners - only restart if explicitly needed
-    if (window.settingsPropertiesListenerActive && window.settingsPropertiesUnsubscribe) {
-        console.log('[SettingsProperties] Listener already active, skipping restart');
-        return;
-    }
-    
+    // Always unsubscribe existing listener first (prevents orphaned listeners)
     if (window.settingsPropertiesUnsubscribe) {
+        console.log('[SettingsProperties] Unsubscribing existing listener');
         window.settingsPropertiesUnsubscribe();
+        window.settingsPropertiesUnsubscribe = null;
     }
     
     console.log('[SettingsProperties] Starting real-time listener');
@@ -2923,30 +2920,37 @@ window.startSettingsPropertiesListener = function() {
         }
     } catch (e) {}
     
-    // Use GLOBAL seenPropertyIds set so it persists across listener restarts
+    // Use GLOBAL seenPropertyIds set so it persists
     if (!window.seenPropertyIds) {
         window.seenPropertyIds = new Set();
     }
     
-    // Only treat as first snapshot if we haven't seen any properties yet
-    let isFirstSnapshot = window.seenPropertyIds.size === 0;
-    
-    // Mark listener as active
-    window.settingsPropertiesListenerActive = true;
+    // Track if this is the VERY FIRST snapshot we've ever received
+    // Use a separate flag that persists
+    if (window.settingsPropertiesFirstLoadDone === undefined) {
+        window.settingsPropertiesFirstLoadDone = false;
+    }
     
     window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
         .onSnapshot((doc) => {
+            console.log('[SettingsProperties] === SNAPSHOT RECEIVED ===');
+            
             if (!doc.exists) {
                 console.log('[SettingsProperties] No properties document yet');
-                isFirstSnapshot = false;
                 return;
             }
             
             const propsData = doc.data();
             const newListings = [];
             const missedListings = [];
+            const isFirstSnapshot = !window.settingsPropertiesFirstLoadDone;
             
-            console.log('[SettingsProperties] Snapshot received, isFirst:', isFirstSnapshot, 'properties count:', Object.keys(propsData).length);
+            console.log('[SettingsProperties] Snapshot details:', {
+                isFirst: isFirstSnapshot,
+                propsCount: Object.keys(propsData).length,
+                seenCount: window.seenPropertyIds.size,
+                sessionStart: window.adminSessionStartTime?.toISOString()
+            });
             
             Object.keys(propsData).forEach(key => {
                 const propId = parseInt(key);
@@ -3073,11 +3077,16 @@ window.startSettingsPropertiesListener = function() {
                 }
             }
             
-            // Mark first snapshot as complete
-            if (isFirstSnapshot) {
-                isFirstSnapshot = false;
+            // Mark first snapshot as complete (use global flag)
+            if (!window.settingsPropertiesFirstLoadDone) {
+                window.settingsPropertiesFirstLoadDone = true;
                 console.log('[SettingsProperties] Initial load complete. Seen', window.seenPropertyIds.size, 'properties. Now listening for new listings...');
             }
+            
+            console.log('[SettingsProperties] === SNAPSHOT PROCESSING COMPLETE ===', {
+                newListings: newListings.length,
+                missedListings: missedListings.length
+            });
             
         }, (error) => {
             console.error('[SettingsProperties] Listener error:', error);
@@ -3423,6 +3432,9 @@ window.updateNotificationBadge = function() {
         const notifications = stack.querySelectorAll('[id^="notification-"]');
         notifications.forEach(notif => {
             const id = notif.id.replace('notification-', '');
+            // Skip if this notification has been dismissed
+            if (window.dismissedAdminNotifications.has(id)) return;
+            
             if (id.startsWith('new-user-')) {
                 userCount++;
             } else if (id.startsWith('new-listing-')) {
@@ -3436,9 +3448,12 @@ window.updateNotificationBadge = function() {
     // Also count from pending set (for notifications not yet rendered)
     if (window.pendingAdminNotifications) {
         window.pendingAdminNotifications.forEach(id => {
+            // Skip if dismissed
+            if (window.dismissedAdminNotifications.has(id)) return;
+            
             // Only count if not already counted from visible notifications
             const notifEl = $('notification-' + id);
-            if (!notifEl && !window.dismissedAdminNotifications.has(id)) {
+            if (!notifEl) {
                 if (id.startsWith('new-user-')) {
                     userCount++;
                 } else if (id.startsWith('new-listing-')) {
@@ -3449,6 +3464,8 @@ window.updateNotificationBadge = function() {
             }
         });
     }
+    
+    console.log('[Badge] Counts:', { userCount, listingCount, premiumCount });
     
     // Update badges container visibility
     const badgesContainer = $('adminNotificationBadges');
@@ -3822,39 +3839,61 @@ window.dismissAdminNotification = async function(notificationId) {
     // Add to dismissed set (session-based - won't come back until page refresh)
     window.dismissedAdminNotifications.add(notificationId);
     
-    // Remove from pending notifications (to update badge count)
+    // Remove from pending notifications - handle all possible ID formats
     window.pendingAdminNotifications.delete(notificationId);
-    // Also try to remove with 'new-' prefix variations
-    window.pendingAdminNotifications.delete('new-user-' + notificationId);
-    window.pendingAdminNotifications.delete('new-listing-' + notificationId);
-    window.pendingAdminNotifications.delete('new-premium-' + notificationId);
+    
+    // If the ID already has a prefix, also add the prefixed version to dismissed
+    if (notificationId.startsWith('new-user-') || notificationId.startsWith('new-listing-') || notificationId.startsWith('new-premium-')) {
+        window.dismissedAdminNotifications.add(notificationId);
+    } else {
+        // If it's a raw ID (like Firestore doc ID), add all possible prefixed versions to dismissed
+        window.dismissedAdminNotifications.add('new-user-' + notificationId);
+        window.dismissedAdminNotifications.add('new-listing-' + notificationId);
+        window.dismissedAdminNotifications.add('new-premium-' + notificationId);
+        // Also try to remove prefixed versions from pending
+        window.pendingAdminNotifications.delete('new-user-' + notificationId);
+        window.pendingAdminNotifications.delete('new-listing-' + notificationId);
+        window.pendingAdminNotifications.delete('new-premium-' + notificationId);
+    }
+    
+    // Remove the DOM element immediately
+    const notifEl = $('notification-' + notificationId);
+    if (notifEl) {
+        notifEl.remove();
+    }
     
     // Save updated pending to localStorage
     try {
         const pending = Array.from(window.pendingAdminNotifications);
-        localStorage.setItem('pendingUserNotifications', JSON.stringify(pending));
+        localStorage.setItem('pendingUserNotifications', JSON.stringify(pending.filter(id => id.startsWith('new-user-'))));
         localStorage.setItem('pendingListingNotifications', JSON.stringify(pending.filter(id => id.startsWith('new-listing-'))));
     } catch (e) {}
     
     // Update the badge count
+    console.log('[AdminNotify] After dismiss, pending set:', Array.from(window.pendingAdminNotifications));
     updateNotificationBadge();
     
-    // Mark as dismissed in Firestore
-    try {
-        await db.collection('adminNotifications').doc(notificationId).update({
-            dismissed: true,
-            dismissedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dismissedBy: auth.currentUser?.email
-        });
-    } catch (error) {
-        console.error('[AdminNotify] Error dismissing:', error);
+    // Mark as dismissed in Firestore (for premium notifications)
+    if (!notificationId.startsWith('new-user-') && !notificationId.startsWith('new-listing-')) {
+        try {
+            await db.collection('adminNotifications').doc(notificationId).update({
+                dismissed: true,
+                dismissedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                dismissedBy: auth.currentUser?.email
+            });
+        } catch (error) {
+            // Might fail if it's not a Firestore notification, that's OK
+            console.log('[AdminNotify] Firestore dismiss (may be expected to fail):', error.message);
+        }
     }
     
-    // Re-render
-    renderAdminNotificationStack(
-        window.adminNotificationsData.filter(n => n.id !== notificationId),
-        false
-    );
+    // Re-render remaining notifications
+    if (window.adminNotificationsData) {
+        renderAdminNotificationStack(
+            window.adminNotificationsData.filter(n => n.id !== notificationId),
+            false
+        );
+    }
 };
 
 window.updateAdminStats = async function(users) {
