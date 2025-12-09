@@ -387,6 +387,8 @@ function startPremiumListener() {
     console.log('[AdminNotify:Premium] Starting listener...');
     AdminNotifications.premiumListenerActive = true;
     
+    // Query all undismissed notifications, then filter by type in JS
+    // (Avoids requiring a compound Firestore index)
     db.collection('adminNotifications')
         .where('dismissed', '==', false)
         .onSnapshot((snapshot) => {
@@ -395,6 +397,12 @@ function startPremiumListener() {
             
             snapshot.forEach(doc => {
                 const data = doc.data();
+                
+                // Only process premium_request notifications (skip new_user, etc.)
+                if (data.type !== 'premium_request') {
+                    return;
+                }
+                
                 const notifId = NOTIFICATION_TYPES.PREMIUM.prefix + doc.id;
                 
                 // Check if new to us
@@ -442,9 +450,10 @@ function startPremiumListener() {
                 
                 // Create notifications
                 newPremium.forEach(prem => {
+                    const propertyTitle = prem.propertyTitle || 'Unknown Property';
                     createNotification(NOTIFICATION_TYPES.PREMIUM, prem.notifId, {
                         title: NOTIFICATION_TYPES.PREMIUM.title,
-                        message: `${prem.propertyTitle} - collect $10k/week`,
+                        message: `${propertyTitle} - collect $10k/week`,
                         timestamp: prem.createdAt,
                         data: prem
                     });

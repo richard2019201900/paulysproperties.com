@@ -533,10 +533,16 @@ function setupRealtimeListener() {
                     const propId = parseInt(key);
                     const propData = data[key];
                     
+                    // Only skip if property is completely invalid (must have at least a title)
+                    if (!propData || !propData.title) {
+                        return; // Skip invalid properties
+                    }
+                    
                     propData.id = propId;
                     
-                    if (!propData || !propData.images || !Array.isArray(propData.images) || propData.images.length === 0) {
-                        return; // Skip invalid properties
+                    // Ensure images array exists (even if empty)
+                    if (!propData.images || !Array.isArray(propData.images)) {
+                        propData.images = [];
                     }
                     
                     const existingIndex = properties.findIndex(p => p.id === propId);
@@ -681,9 +687,14 @@ async function initFirestore() {
                 // Ensure prop has the correct numeric ID
                 prop.id = propId;
                 
-                // Validate property has required fields
-                if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
+                // Only skip if property is completely invalid (must have at least a title)
+                if (!prop || !prop.title) {
                     return; // Skip invalid properties
+                }
+                
+                // Ensure images array exists (even if empty)
+                if (!prop.images || !Array.isArray(prop.images)) {
+                    prop.images = [];
                 }
                 
                 // Check if this property already exists in the static array
@@ -822,8 +833,14 @@ window.startPropertySyncListener = function() {
                 const propId = parseInt(key);
                 const prop = propsData[key];
                 
-                if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
+                // Only skip if property is completely invalid (must have at least a title)
+                if (!prop || !prop.title) {
                     return;
+                }
+                
+                // Ensure images array exists (even if empty)
+                if (!prop.images || !Array.isArray(prop.images)) {
+                    prop.images = [];
                 }
                 
                 prop.id = propId;
