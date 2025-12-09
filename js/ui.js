@@ -2939,8 +2939,9 @@ window.startSettingsPropertiesListener = function() {
                 const propId = parseInt(key);
                 const prop = propsData[key];
                 
-                if (!prop || !prop.images || !Array.isArray(prop.images) || prop.images.length === 0) {
-                    return; // Skip invalid properties
+                // Only skip if prop is completely invalid - allow empty images arrays
+                if (!prop || !prop.title) {
+                    return; // Skip invalid properties (must have at least a title)
                 }
                 
                 prop.id = propId;
@@ -4081,6 +4082,21 @@ window.updateAdminStats = async function(users) {
             </div>
             ${totalTrials > 0 ? `<div class="text-cyan-400 text-xs mt-2 border-t border-gray-600 pt-1">🎁 ${totalTrials} trial (not counted)</div>` : ''}
         `;
+    }
+    
+    // ==================== TOTAL LISTINGS STAT ====================
+    const totalListings = properties.length;
+    const availableListings = properties.filter(p => state.availability[p.id] !== false).length;
+    const rentedListings = totalListings - availableListings;
+    
+    const statListings = $('adminStatListings');
+    const statListingsAvailable = $('adminStatListingsAvailable');
+    
+    if (statListings) {
+        statListings.textContent = totalListings;
+    }
+    if (statListingsAvailable) {
+        statListingsAvailable.textContent = `(${availableListings} available, ${rentedListings} rented)`;
     }
 };
 
