@@ -2651,70 +2651,19 @@ window.knownUserIds = new Set();
 window.knownPropertyIds = new Set();
 window.knownSettingsPropertyIds = new Set();
 
-// Start listening for admin notifications (new users, new listings, etc.)
+// Start listening for admin notifications - uses new unified system
 window.startAdminNotificationsListener = function() {
-    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        console.log('[AdminNotify] Not admin, skipping');
+        return;
+    }
     
-    // Start listening for new users directly (more reliable than adminNotifications collection)
-    startAdminUsersListener();
-    
-    // Start listening for new properties
-    startAdminPropertiesListener();
-    
-    // Also try the adminNotifications collection for premium requests
-    try {
-        if (window.adminNotifyUnsubscribe) {
-            window.adminNotifyUnsubscribe();
-        }
-        
-        // Simplified query - just get recent notifications without composite index
-        window.adminNotifyUnsubscribe = db.collection('adminNotifications')
-            .orderBy('createdAt', 'desc')
-            .limit(20)
-            .onSnapshot((snapshot) => {
-                const notifications = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    // Only include non-dismissed notifications
-                    if (!data.dismissed) {
-                        notifications.push({ id: doc.id, ...data });
-                    }
-                });
-                
-                console.log('[AdminNotify] Received', notifications.length, 'notifications from Firestore');
-                
-                // Check for NEW notifications (for flash effect)
-                const newNotifications = notifications.filter(n => 
-                    !window.adminNotificationsData.some(old => old.id === n.id) &&
-                    !window.dismissedAdminNotifications.has(n.id)
-                );
-                
-                // Check if any new notification is a premium request
-                const hasPremiumNotification = newNotifications.some(n => n.type === 'premium_request');
-                
-                if (hasPremiumNotification) {
-                    console.log('[AdminNotify] New premium notification detected!');
-                }
-                
-                window.adminNotificationsData = notifications;
-                
-                // Render the notification stack
-                renderAdminNotificationStack(notifications, newNotifications.length > 0);
-                
-                // Flash amber for premium notifications
-                if (hasPremiumNotification) {
-                    flashScreen('orange');
-                }
-                
-                // Update the notification badges
-                updateNotificationBadge();
-                
-            }, (error) => {
-                console.error('[AdminNotify] Listener error:', error);
-                // This is ok - we have the users listener as backup
-            });
-    } catch (e) {
-        console.error('[AdminNotify] Failed to start listener:', e);
+    // Use new unified notification system
+    if (typeof initAdminNotifications === 'function') {
+        console.log('[AdminNotify] Using new unified notification system');
+        initAdminNotifications();
+    } else {
+        console.error('[AdminNotify] Unified notification system not loaded!');
     }
 };
 
@@ -3455,111 +3404,11 @@ window.dismissNewUserNotification = function(notificationId) {
 };
 
 // Update notification badge in header
+// OLD: updateNotificationBadge now delegates to new unified system
 window.updateNotificationBadge = function() {
-    // Count user vs listing vs premium notifications separately
-    let userCount = 0;
-    let listingCount = 0;
-    let premiumCount = 0;
-    
-    // Count from actual visible notifications in the stack (more reliable)
-    const stack = $('adminNotificationsStack');
-    if (stack) {
-        const notifications = stack.querySelectorAll('[id^="notification-"]');
-        notifications.forEach(notif => {
-            const id = notif.id.replace('notification-', '');
-            // Skip if this notification has been dismissed
-            if (window.dismissedAdminNotifications.has(id)) return;
-            
-            if (id.startsWith('new-user-')) {
-                userCount++;
-            } else if (id.startsWith('new-listing-')) {
-                listingCount++;
-            } else if (id.startsWith('new-premium-')) {
-                premiumCount++;
-            }
-        });
-    }
-    
-    // Also count from pending set (for notifications not yet rendered)
-    if (window.pendingAdminNotifications) {
-        window.pendingAdminNotifications.forEach(id => {
-            // Skip if dismissed
-            if (window.dismissedAdminNotifications.has(id)) return;
-            
-            // Only count if not already counted from visible notifications
-            const notifEl = $('notification-' + id);
-            if (!notifEl) {
-                if (id.startsWith('new-user-')) {
-                    userCount++;
-                } else if (id.startsWith('new-listing-')) {
-                    listingCount++;
-                } else if (id.startsWith('new-premium-')) {
-                    premiumCount++;
-                }
-            }
-        });
-    }
-    
-    console.log('[Badge] Counts:', { userCount, listingCount, premiumCount });
-    
-    // Update badges container visibility
-    const badgesContainer = $('adminNotificationBadges');
-    const userBadge = $('adminNewUserBadge');
-    const userCountEl = $('adminNewUserCount');
-    const listingBadge = $('adminNewListingBadge');
-    const listingCountEl = $('adminNewListingCount');
-    const premiumBadge = $('adminNewPremiumBadge');
-    const premiumCountEl = $('adminNewPremiumCount');
-    
-    // Only show for admins
-    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
-    
-    if (!isAdmin) {
-        if (badgesContainer) badgesContainer.style.display = 'none';
-        return;
-    }
-    
-    // Show/hide individual badges based on counts
-    if (userBadge && userCountEl) {
-        if (userCount > 0) {
-            userCountEl.textContent = userCount > 9 ? '9+' : userCount;
-            userBadge.style.display = 'flex';
-        } else {
-            userBadge.style.display = 'none';
-        }
-    }
-    
-    if (listingBadge && listingCountEl) {
-        if (listingCount > 0) {
-            listingCountEl.textContent = listingCount > 9 ? '9+' : listingCount;
-            listingBadge.style.display = 'flex';
-        } else {
-            listingBadge.style.display = 'none';
-        }
-    }
-    
-    if (premiumBadge && premiumCountEl) {
-        if (premiumCount > 0) {
-            premiumCountEl.textContent = premiumCount > 9 ? '9+' : premiumCount;
-            premiumBadge.style.display = 'flex';
-        } else {
-            premiumBadge.style.display = 'none';
-        }
-    }
-    
-    // Show container if any badge is visible
-    if (badgesContainer) {
-        if (userCount > 0 || listingCount > 0 || premiumCount > 0) {
-            badgesContainer.style.display = 'flex';
-            badgesContainer.classList.remove('hidden');
-        } else {
-            badgesContainer.style.display = 'none';
-        }
-    }
-    
-    // Update clear all button visibility
-    if (typeof updateClearAllButton === 'function') {
-        updateClearAllButton();
+    // Delegate to new unified notification system
+    if (typeof updateAllBadges === 'function') {
+        updateAllBadges();
     }
 };
 
@@ -3868,68 +3717,8 @@ window.updateClearAllButton = function() {
     }
 };
 
-window.dismissAdminNotification = async function(notificationId) {
-    console.log('[AdminNotify] Dismissing notification:', notificationId);
-    
-    // Add to dismissed set (session-based - won't come back until page refresh)
-    window.dismissedAdminNotifications.add(notificationId);
-    
-    // Remove from pending notifications - handle all possible ID formats
-    window.pendingAdminNotifications.delete(notificationId);
-    
-    // If the ID already has a prefix, also add the prefixed version to dismissed
-    if (notificationId.startsWith('new-user-') || notificationId.startsWith('new-listing-') || notificationId.startsWith('new-premium-')) {
-        window.dismissedAdminNotifications.add(notificationId);
-    } else {
-        // If it's a raw ID (like Firestore doc ID), add all possible prefixed versions to dismissed
-        window.dismissedAdminNotifications.add('new-user-' + notificationId);
-        window.dismissedAdminNotifications.add('new-listing-' + notificationId);
-        window.dismissedAdminNotifications.add('new-premium-' + notificationId);
-        // Also try to remove prefixed versions from pending
-        window.pendingAdminNotifications.delete('new-user-' + notificationId);
-        window.pendingAdminNotifications.delete('new-listing-' + notificationId);
-        window.pendingAdminNotifications.delete('new-premium-' + notificationId);
-    }
-    
-    // Remove the DOM element immediately
-    const notifEl = $('notification-' + notificationId);
-    if (notifEl) {
-        notifEl.remove();
-    }
-    
-    // Save updated pending to localStorage
-    try {
-        const pending = Array.from(window.pendingAdminNotifications);
-        localStorage.setItem('pendingUserNotifications', JSON.stringify(pending.filter(id => id.startsWith('new-user-'))));
-        localStorage.setItem('pendingListingNotifications', JSON.stringify(pending.filter(id => id.startsWith('new-listing-'))));
-    } catch (e) {}
-    
-    // Update the badge count
-    console.log('[AdminNotify] After dismiss, pending set:', Array.from(window.pendingAdminNotifications));
-    updateNotificationBadge();
-    
-    // Mark as dismissed in Firestore (for premium notifications)
-    if (!notificationId.startsWith('new-user-') && !notificationId.startsWith('new-listing-')) {
-        try {
-            await db.collection('adminNotifications').doc(notificationId).update({
-                dismissed: true,
-                dismissedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                dismissedBy: auth.currentUser?.email
-            });
-        } catch (error) {
-            // Might fail if it's not a Firestore notification, that's OK
-            console.log('[AdminNotify] Firestore dismiss (may be expected to fail):', error.message);
-        }
-    }
-    
-    // Re-render remaining notifications
-    if (window.adminNotificationsData) {
-        renderAdminNotificationStack(
-            window.adminNotificationsData.filter(n => n.id !== notificationId),
-            false
-        );
-    }
-};
+// OLD: dismissAdminNotification is now in notifications.js
+// The new unified notification system handles all dismissals
 
 window.updateAdminStats = async function(users) {
     const totalUsers = users.length;
