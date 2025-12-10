@@ -3836,8 +3836,23 @@ window.updateAdminStats = async function(users) {
     }
     
     // Calculate PAID revenue only (excluding trials)
-    const proRevenue = proPaidUsers.length * 25000;
-    const eliteRevenue = elitePaidUsers.length * 50000;
+    // Use actual subscriptionAmount when available (for prorated upgrades)
+    let proRevenue = 0;
+    let eliteRevenue = 0;
+    let proratedCount = 0;
+    
+    proPaidUsers.forEach(u => {
+        // Use stored subscriptionAmount if available, otherwise default
+        const amount = u.subscriptionAmount !== undefined ? u.subscriptionAmount : 25000;
+        proRevenue += amount;
+    });
+    
+    elitePaidUsers.forEach(u => {
+        // Use stored subscriptionAmount if available, otherwise default
+        const amount = u.subscriptionAmount !== undefined ? u.subscriptionAmount : 50000;
+        eliteRevenue += amount;
+        if (u.isProratedUpgrade) proratedCount++;
+    });
     
     // Calculate Premium Ad Fees (weekly fees from premium listings)
     let premiumFeeTotal = 0;
@@ -3976,13 +3991,21 @@ window.updateAdminStats = async function(users) {
     const statEliteRevenue = $('adminStatEliteRevenue');
     const statEliteRevenueSub = $('adminStatEliteRevenueSub');
     if (statEliteRevenue) statEliteRevenue.textContent = `$${(eliteRevenue / 1000).toFixed(0)}k`;
-    if (statEliteRevenueSub) statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid × $50k`;
+    if (statEliteRevenueSub) {
+        if (proratedCount > 0) {
+            statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid (${proratedCount} prorated)`;
+        } else {
+            statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid × $50k`;
+        }
+    }
     
     const eliteRevenueDetail = $('adminStatEliteRevenueDetail');
     if (eliteRevenueDetail) {
-        const paidList = elitePaidUsers.map(u => 
-            `<div class="truncate">💰 ${u.username || u.email.split('@')[0]} - $50k</div>`
-        ).join('');
+        const paidList = elitePaidUsers.map(u => {
+            const amount = u.subscriptionAmount !== undefined ? u.subscriptionAmount : 50000;
+            const proratedLabel = u.isProratedUpgrade ? ' <span class="text-amber-400">(prorated)</span>' : '';
+            return `<div class="truncate">💰 ${u.username || u.email.split('@')[0]} - $${(amount/1000).toFixed(0)}k${proratedLabel}</div>`;
+        }).join('');
         eliteRevenueDetail.innerHTML = `
             <div class="mb-1 text-purple-400 font-bold">$${eliteRevenue.toLocaleString()}/mo</div>
             ${paidList || '<div class="text-gray-500">No paid Elite users</div>'}
@@ -4249,10 +4272,14 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         let subscriptionHTML = '';
         if (!isUserMasterAdmin && (user.tier === 'pro' || user.tier === 'elite')) {
             const subLastPaid = user.subscriptionLastPaid || '';
-            const tierPrice = user.tier === 'pro' ? '$25,000' : '$50,000';
+            // Use actual subscription amount if set (for prorated upgrades), otherwise default
+            const defaultPrice = user.tier === 'pro' ? 25000 : 50000;
+            const actualAmount = user.subscriptionAmount !== undefined ? user.subscriptionAmount : defaultPrice;
+            const tierPrice = '$' + actualAmount.toLocaleString();
             const tierName = user.tier === 'pro' ? 'Pro ⭐' : 'Elite 👑';
             const isFreeTrial = user.isFreeTrial === true;
             const trialEndDate = user.trialEndDate || '';
+            const isProratedUpgrade = user.isProratedUpgrade === true;
             
             let nextDueDate = '';
             let daysUntilDue = null;
@@ -4338,6 +4365,8 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 </button>
             `;
             
+            const proratedBadge = isProratedUpgrade ? `<span class="bg-amber-600 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-2">💰 PRORATED</span>` : '';
+            
             const subscriptionLabel = isFreeTrial 
                 ? `${tierName} Trial` 
                 : `Subscription: ${tierPrice}/mo`;
@@ -4349,6 +4378,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <span class="text-lg">${statusIcon}</span>
                             <span class="text-white font-bold text-sm">${subscriptionLabel}</span>
                             ${trialBadge}
+                            ${proratedBadge}
                         </div>
                         <div class="flex items-center gap-2">
                             ${toggleTrialBtn}
@@ -5686,6 +5716,10 @@ window.adminUpgradeUser = async function(email, newTier, currentTier) {
 
 // Show upgrade modal with trial checkbox
 function showUpgradeModal(email, newTier, currentTier, tierData, price) {
+    // Check if this is an upgrade from Pro to Elite (prorated eligible)
+    const isProToElite = currentTier === 'pro' && newTier === 'elite';
+    const proratedPrice = '$25,000'; // Difference between Elite ($50k) and Pro ($25k)
+    
     // Create modal overlay
     const modalHTML = `
         <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'upgradeModal') closeUpgradeModal()">
@@ -5694,9 +5728,23 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
                 
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
                     <p class="text-gray-300 mb-2"><strong>User:</strong> ${email}</p>
+                    <p class="text-gray-300 mb-2"><strong>Current Tier:</strong> <span class="text-gray-400">${TIERS[currentTier]?.name || currentTier}</span></p>
                     <p class="text-gray-300"><strong>New Tier:</strong> <span class="${newTier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tierData.icon} ${tierData.name}</span></p>
-                    <p class="text-gray-300"><strong>Price:</strong> ${price}/month</p>
+                    <p class="text-gray-300"><strong>Standard Price:</strong> ${price}/month</p>
                 </div>
+                
+                ${isProToElite ? `
+                <!-- Prorated Upgrade Option (Pro → Elite) -->
+                <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="upgradeProratedCheckbox" class="w-5 h-5 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                        <div>
+                            <span class="text-amber-300 font-bold">💰 Prorated Upgrade (${proratedPrice})</span>
+                            <p class="text-amber-400/70 text-sm">User was already paying for Pro - only charge the $25k difference</p>
+                        </div>
+                    </label>
+                </div>
+                ` : ''}
                 
                 <!-- Free Trial Checkbox -->
                 <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
@@ -5717,6 +5765,12 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
                            placeholder="Payment confirmation or notes...">
                 </div>
                 
+                <!-- Amount Display -->
+                <div id="upgradeAmountDisplay" class="bg-gray-900/50 rounded-lg p-3 mb-4 text-center">
+                    <span class="text-gray-400">Amount to collect: </span>
+                    <span id="upgradeAmountValue" class="text-green-400 font-bold text-xl">${price}</span>
+                </div>
+                
                 <!-- Buttons -->
                 <div class="flex gap-3">
                     <button id="upgradeConfirmBtn" onclick="confirmUpgrade('${email}', '${newTier}', '${currentTier}')" 
@@ -5735,20 +5789,66 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
     // Add to DOM
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
-    // Add event listener to auto-fill notes when trial checkbox is checked
+    // Add event listeners
     const trialCheckbox = $('upgradeTrialCheckbox');
+    const proratedCheckbox = $('upgradeProratedCheckbox');
     const notesInput = $('upgradeNotes');
-    if (trialCheckbox && notesInput) {
+    const amountValue = $('upgradeAmountValue');
+    
+    // Function to update amount display
+    const updateAmountDisplay = () => {
+        const isTrial = trialCheckbox?.checked;
+        const isProrated = proratedCheckbox?.checked;
+        
+        if (isTrial) {
+            amountValue.textContent = '$0 (Trial)';
+            amountValue.className = 'text-cyan-400 font-bold text-xl';
+        } else if (isProrated) {
+            amountValue.textContent = proratedPrice;
+            amountValue.className = 'text-amber-400 font-bold text-xl';
+        } else {
+            amountValue.textContent = price;
+            amountValue.className = 'text-green-400 font-bold text-xl';
+        }
+    };
+    
+    if (trialCheckbox) {
         trialCheckbox.addEventListener('change', function() {
+            // Uncheck prorated if trial is checked
+            if (this.checked && proratedCheckbox) {
+                proratedCheckbox.checked = false;
+            }
+            
             if (this.checked) {
                 const tierName = newTier === 'pro' ? 'Pro' : 'Elite';
                 notesInput.value = `Enjoy a 30 day free trial of ${tierName} Membership on Pauly!`;
             } else {
-                // Clear the auto-filled message if unchecked
                 if (notesInput.value.includes('free trial')) {
                     notesInput.value = '';
                 }
             }
+            updateAmountDisplay();
+        });
+    }
+    
+    if (proratedCheckbox) {
+        proratedCheckbox.addEventListener('change', function() {
+            // Uncheck trial if prorated is checked
+            if (this.checked && trialCheckbox) {
+                trialCheckbox.checked = false;
+                if (notesInput.value.includes('free trial')) {
+                    notesInput.value = '';
+                }
+            }
+            
+            if (this.checked) {
+                notesInput.value = `Prorated upgrade from Pro to Elite - paid $25k difference`;
+            } else {
+                if (notesInput.value.includes('Prorated')) {
+                    notesInput.value = '';
+                }
+            }
+            updateAmountDisplay();
         });
     }
 }
@@ -5760,8 +5860,17 @@ window.closeUpgradeModal = function() {
 
 window.confirmUpgrade = async function(email, newTier, currentTier) {
     const isTrial = $('upgradeTrialCheckbox')?.checked || false;
+    const isProrated = $('upgradeProratedCheckbox')?.checked || false;
     const notes = $('upgradeNotes')?.value || '';
     const tierData = TIERS[newTier];
+    
+    // Calculate actual subscription amount
+    let subscriptionAmount = newTier === 'pro' ? 25000 : 50000; // Standard prices
+    if (isTrial) {
+        subscriptionAmount = 0;
+    } else if (isProrated && currentTier === 'pro' && newTier === 'elite') {
+        subscriptionAmount = 25000; // Only the difference
+    }
     
     // Show loading state on button
     const confirmBtn = $('upgradeConfirmBtn');
@@ -5778,7 +5887,7 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
     try {
         await TierService.setUserTier(email, newTier, currentTier, notes, isTrial);
         
-        // Set subscription data including trial status
+        // Set subscription data including trial status and actual amount
         const snapshot = await db.collection('users').where('email', '==', email).get();
         if (!snapshot.empty) {
             const userId = snapshot.docs[0].id;
@@ -5788,15 +5897,22 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
             const trialEndDate = new Date();
             trialEndDate.setDate(trialEndDate.getDate() + 30);
             
-            await db.collection('users').doc(userId).update({
+            const updateData = {
                 subscriptionLastPaid: today,
                 subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 isFreeTrial: isTrial,
                 trialStartDate: isTrial ? today : null,
                 trialEndDate: isTrial ? trialEndDate.toISOString().split('T')[0] : null,
-                trialNotes: isTrial ? (notes || 'Free trial upgrade') : null
-            });
-            console.log(`[Subscription] Set for ${email}: trial=${isTrial}, date=${today}`);
+                trialNotes: isTrial ? (notes || 'Free trial upgrade') : null,
+                // NEW: Track actual subscription amount for prorated upgrades
+                subscriptionAmount: subscriptionAmount,
+                isProratedUpgrade: isProrated,
+                proratedFrom: isProrated ? currentTier : null,
+                upgradeNotes: notes || null
+            };
+            
+            await db.collection('users').doc(userId).update(updateData);
+            console.log(`[Subscription] Set for ${email}: trial=${isTrial}, prorated=${isProrated}, amount=$${subscriptionAmount}`);
         }
         
         // Show success briefly then close
@@ -5818,7 +5934,8 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
         
         // Show toast and refresh users
         const trialMsg = isTrial ? ' (Trial)' : '';
-        showToast(`${email} upgraded to ${tierData.name}!${trialMsg}`, 'success');
+        const proratedMsg = isProrated ? ` (Prorated: $${(subscriptionAmount/1000).toFixed(0)}k)` : '';
+        showToast(`${email} upgraded to ${tierData.name}!${trialMsg}${proratedMsg}`, 'success');
         
         // Refresh users list
         if (typeof loadAllUsers === 'function') {
