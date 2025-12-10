@@ -4406,32 +4406,52 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             `;
         }
         
-        const actionButtons = isUserMasterAdmin ? '' : `
-            <div class="flex flex-wrap gap-2">
-                ${user.tier !== 'pro' ? `
-                    <button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
-                        class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                        ⭐ Upgrade to Pro
-                    </button>
-                ` : ''}
-                ${user.tier !== 'elite' ? `
-                    <button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
-                        class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                        👑 Upgrade to Elite
-                    </button>
-                ` : ''}
-                ${user.tier !== 'starter' ? `
-                    <button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}')" 
-                        class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                        🌱 Downgrade
-                    </button>
-                ` : ''}
-                <button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
-                    class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                    🗑️ Delete
-                </button>
-            </div>
-        `;
+        // Build action buttons based on current tier
+        let actionButtonsHTML = '';
+        if (!isUserMasterAdmin) {
+            const buttons = [];
+            
+            if (user.tier === 'starter') {
+                // Starter can upgrade to Pro or Elite
+                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
+                    class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                    ⭐ Upgrade to Pro
+                </button>`);
+                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
+                    class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                    👑 Upgrade to Elite
+                </button>`);
+            } else if (user.tier === 'pro') {
+                // Pro can upgrade to Elite or downgrade to Starter
+                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
+                    class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                    👑 Upgrade to Elite
+                </button>`);
+                buttons.push(`<button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}', 'starter')" 
+                    class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                    🌱 Downgrade
+                </button>`);
+            } else if (user.tier === 'elite') {
+                // Elite can downgrade to Pro or Starter
+                buttons.push(`<button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}', 'pro')" 
+                    class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                    ⭐ Downgrade to Pro
+                </button>`);
+                buttons.push(`<button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}', 'starter')" 
+                    class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                    🌱 Downgrade to Starter
+                </button>`);
+            }
+            
+            // Delete button for all
+            buttons.push(`<button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
+                class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                🗑️ Delete
+            </button>`);
+            
+            actionButtonsHTML = `<div class="flex flex-wrap gap-2">${buttons.join('')}</div>`;
+        }
+        const actionButtons = actionButtonsHTML;
         
         const cardBorder = hasPendingRequest 
             ? 'border-orange-500 ring-2 ring-orange-500/50 animate-pulse'
@@ -4515,13 +4535,27 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
     
     // Elite section (expanded by default)
     if (groups.elite.length > 0) {
+        // Calculate actual elite revenue for header
+        const elitePaidCount = groups.elite.filter(u => !u.isFreeTrial).length;
+        const eliteTrialCount = groups.elite.filter(u => u.isFreeTrial).length;
+        const proratedEliteCount = groups.elite.filter(u => u.isProratedUpgrade && !u.isFreeTrial).length;
+        let eliteSubLabel = '';
+        if (elitePaidCount > 0 && proratedEliteCount > 0) {
+            eliteSubLabel = `${elitePaidCount} paid (${proratedEliteCount} prorated)`;
+        } else if (elitePaidCount > 0) {
+            eliteSubLabel = `${elitePaidCount} × $50k/mo`;
+        }
+        if (eliteTrialCount > 0) {
+            eliteSubLabel += eliteSubLabel ? `, ${eliteTrialCount} trial` : `${eliteTrialCount} on trial`;
+        }
+        
         html += `
             <div class="mb-6">
                 <div class="flex items-center gap-2 mb-3 pb-2 border-b border-yellow-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('eliteGroup')">
                     <span id="eliteGroupToggle" class="text-gray-400 transition">▼</span>
                     <span class="text-xl">👑</span>
                     <h5 class="text-yellow-400 font-bold">Elite Members</h5>
-                    <span class="text-gray-500 text-sm">(${groups.elite.length}) • $50k/mo each</span>
+                    <span class="text-gray-500 text-sm">(${groups.elite.length})${eliteSubLabel ? ' • ' + eliteSubLabel : ''}</span>
                 </div>
                 <div id="eliteGroup" class="space-y-3">
                     ${groups.elite.map(renderUserCard).join('')}
@@ -6014,30 +6048,54 @@ window.markAsTrial = async function(userId, email) {
     }
 };
 
-window.adminDowngradeUser = async function(email, currentTier) {
-    if (!confirm(`Are you sure you want to reset ${email} to Starter tier?\n\nThis will also clear their subscription payment history and trial status.`)) return;
+window.adminDowngradeUser = async function(email, currentTier, targetTier = 'starter') {
+    const tierName = targetTier === 'pro' ? 'Pro' : 'Starter';
+    const confirmMsg = targetTier === 'starter' 
+        ? `Are you sure you want to reset ${email} to Starter tier?\n\nThis will also clear their subscription payment history and trial status.`
+        : `Are you sure you want to downgrade ${email} to Pro tier?\n\nTheir subscription will be adjusted to $25,000/mo.`;
+    
+    if (!confirm(confirmMsg)) return;
     
     const reason = prompt('Reason for downgrade (optional):');
     if (reason === null) return;
     
     try {
-        await TierService.setUserTier(email, 'starter', currentTier, `Downgraded: ${reason || 'No reason given'}`);
+        await TierService.setUserTier(email, targetTier, currentTier, `Downgraded to ${tierName}: ${reason || 'No reason given'}`);
         
-        // Clear subscription data AND trial data when downgrading
         const snapshot = await db.collection('users').where('email', '==', email).get();
         if (!snapshot.empty) {
             const userId = snapshot.docs[0].id;
-            await db.collection('users').doc(userId).update({
-                subscriptionLastPaid: '',
-                subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                isFreeTrial: false,
-                trialStartDate: null,
-                trialEndDate: null,
-                trialNotes: null
-            });
+            
+            if (targetTier === 'starter') {
+                // Clear subscription data AND trial data when downgrading to starter
+                await db.collection('users').doc(userId).update({
+                    subscriptionLastPaid: '',
+                    subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    subscriptionAmount: null,
+                    isProratedUpgrade: false,
+                    proratedFrom: null,
+                    isFreeTrial: false,
+                    trialStartDate: null,
+                    trialEndDate: null,
+                    trialNotes: null
+                });
+            } else if (targetTier === 'pro') {
+                // Downgrading from Elite to Pro - keep subscription but adjust amount
+                const today = new Date().toISOString().split('T')[0];
+                await db.collection('users').doc(userId).update({
+                    subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    subscriptionAmount: 25000, // Pro price
+                    isProratedUpgrade: false,
+                    proratedFrom: null,
+                    isFreeTrial: false,
+                    trialStartDate: null,
+                    trialEndDate: null,
+                    trialNotes: null
+                });
+            }
         }
         
-        alert(`${email} reset to Starter tier.`);
+        alert(`${email} downgraded to ${tierName} tier.`);
         loadAllUsers();
     } catch (error) {
         console.error('Error downgrading user:', error);

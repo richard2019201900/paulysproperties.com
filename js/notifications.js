@@ -186,6 +186,10 @@ function startUserListener() {
             // Skip admin
             if (TierService.isMasterAdmin(data.email)) return;
             
+            // Check if this notification is pending (loaded from storage but needs content)
+            const isPending = AdminNotifications.visible.has(notifId) && 
+                              AdminNotifications.visible.get(notifId).pending === true;
+            
             // Check if this is new to us
             if (!AdminNotifications.seenUsers.has(doc.id)) {
                 AdminNotifications.seenUsers.add(doc.id);
@@ -201,6 +205,28 @@ function startUserListener() {
                         tier: data.tier || 'starter',
                         createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date()
                     });
+                }
+                
+                // If this was a pending notification, populate its content
+                if (isPending) {
+                    const userData = {
+                        id: doc.id,
+                        notifId: notifId,
+                        email: data.email,
+                        displayName: data.displayName || data.email?.split('@')[0],
+                        tier: data.tier || 'starter',
+                        createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date()
+                    };
+                    AdminNotifications.visible.set(notifId, {
+                        type: 'user',
+                        content: {
+                            title: NOTIFICATION_TYPES.USER.title,
+                            message: `${userData.displayName} created a ${userData.tier} account`,
+                            timestamp: userData.createdAt,
+                            data: userData
+                        }
+                    });
+                    console.log('[AdminNotify:Users] Populated pending notification:', notifId);
                 }
             }
         });
@@ -300,6 +326,10 @@ function startListingListener() {
             const notifId = NOTIFICATION_TYPES.LISTING.prefix + propId;
             currentListingIds.add(propId);
             
+            // Check if this notification is pending (loaded from storage but needs content)
+            const isPending = AdminNotifications.visible.has(notifId) && 
+                              AdminNotifications.visible.get(notifId).pending === true;
+            
             // Check if new to us
             if (!AdminNotifications.seenListings.has(propId)) {
                 AdminNotifications.seenListings.add(propId);
@@ -318,6 +348,29 @@ function startListingListener() {
                         isPremium: prop.isPremium || false,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     });
+                }
+                
+                // If this was a pending notification, populate its content
+                if (isPending && !isAdminListing) {
+                    const listingData = {
+                        id: propId,
+                        notifId: notifId,
+                        title: prop.title,
+                        ownerEmail: prop.ownerEmail,
+                        ownerName: prop.ownerName || prop.ownerEmail?.split('@')[0],
+                        isPremium: prop.isPremium || false,
+                        createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
+                    };
+                    AdminNotifications.visible.set(notifId, {
+                        type: 'listing',
+                        content: {
+                            title: prop.isPremium ? 'New Premium Listing!' : NOTIFICATION_TYPES.LISTING.title,
+                            message: `${prop.title} by ${listingData.ownerName}`,
+                            timestamp: listingData.createdAt,
+                            data: listingData
+                        }
+                    });
+                    console.log('[AdminNotify:Listings] Populated pending notification:', notifId);
                 }
             }
         });
