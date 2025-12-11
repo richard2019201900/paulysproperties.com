@@ -101,6 +101,13 @@ window.initAdminNotifications = function() {
     // Set session start time
     AdminNotifications.sessionStart = new Date();
     
+    // Pre-populate seenListings with base property IDs (1-14) to prevent
+    // false "new listing" notifications when admin edits their own properties
+    for (let i = 1; i <= 14; i++) {
+        AdminNotifications.seenListings.add(i);
+    }
+    console.log('[AdminNotify] Pre-populated base property IDs 1-14 as seen');
+    
     // Load dismissed from localStorage
     try {
         const dismissed = localStorage.getItem('adminDismissedNotifications');
@@ -334,17 +341,34 @@ function startListingListener() {
             if (!AdminNotifications.seenListings.has(propId)) {
                 AdminNotifications.seenListings.add(propId);
                 
-                // Skip admin's own listings
-                const isAdminListing = TierService.isMasterAdmin(prop.ownerEmail);
+                // Determine if this is an admin listing (should be skipped)
+                // 1. ownerEmail matches admin email
+                // 2. Property ID 1-14 (base properties owned by admin)
+                // 3. No owner set AND it's a base property (1-14)
+                const isBaseProperty = propId >= 1 && propId <= 14;
+                const hasAdminEmail = prop.ownerEmail && TierService.isMasterAdmin(prop.ownerEmail);
+                const noOwnerSet = !prop.ownerEmail;
+                // Skip if admin email OR it's a base property (admin's default properties)
+                const isAdminListing = hasAdminEmail || isBaseProperty;
                 
                 if (!isFirst && !isAdminListing && !AdminNotifications.dismissed.has(notifId)) {
                     console.log('[AdminNotify:Listings] NEW LISTING:', prop.title, 'by', prop.ownerEmail);
+                    
+                    // Get owner name with proper fallback
+                    let ownerName = prop.ownerName;
+                    if (!ownerName && prop.ownerEmail) {
+                        ownerName = prop.ownerEmail.split('@')[0];
+                    }
+                    if (!ownerName) {
+                        ownerName = 'Unknown Owner';
+                    }
+                    
                     newListings.push({
                         id: propId,
                         notifId: notifId,
                         title: prop.title,
                         ownerEmail: prop.ownerEmail,
-                        ownerName: prop.ownerName || prop.ownerEmail?.split('@')[0],
+                        ownerName: ownerName,
                         isPremium: prop.isPremium || false,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     });
@@ -352,12 +376,20 @@ function startListingListener() {
                 
                 // If this was a pending notification, populate its content
                 if (isPending && !isAdminListing) {
+                    let ownerName = prop.ownerName;
+                    if (!ownerName && prop.ownerEmail) {
+                        ownerName = prop.ownerEmail.split('@')[0];
+                    }
+                    if (!ownerName) {
+                        ownerName = 'Unknown Owner';
+                    }
+                    
                     const listingData = {
                         id: propId,
                         notifId: notifId,
                         title: prop.title,
                         ownerEmail: prop.ownerEmail,
-                        ownerName: prop.ownerName || prop.ownerEmail?.split('@')[0],
+                        ownerName: ownerName,
                         isPremium: prop.isPremium || false,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     };

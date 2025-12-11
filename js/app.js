@@ -2211,6 +2211,11 @@ window.saveNewImage = async function() {
         prop.images.push(imageUrl);
         state.currentImages = prop.images;
         
+        // Ensure owner info is set (especially for base properties being edited)
+        if (!prop.ownerEmail) {
+            prop.ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
+        }
+        
         // Save to Firestore
         await db.collection('settings').doc('properties').set({
             [propertyId]: prop
@@ -2245,6 +2250,11 @@ window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
         // Remove image from array
         prop.images.splice(imageIndex, 1);
         state.currentImages = prop.images;
+        
+        // Ensure owner info is set (especially for base properties being edited)
+        if (!prop.ownerEmail) {
+            prop.ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
+        }
         
         // Save to Firestore
         await db.collection('settings').doc('properties').set({
