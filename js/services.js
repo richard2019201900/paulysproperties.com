@@ -164,6 +164,7 @@ const TierService = {
                 id: doc.id,
                 email: data.email,
                 username: data.username || data.email?.split('@')[0],
+                displayName: data.displayName || data.username || data.email?.split('@')[0],
                 phone: data.phone || '',  // Phone number for admin contact
                 tier: data.tier || 'starter',
                 tierUpdatedAt: data.tierUpdatedAt,
@@ -176,6 +177,11 @@ const TierService = {
                 lastPropertyPostedAt: data.lastPropertyPostedAt || '', // ISO string fallback
                 // Subscription fields
                 subscriptionLastPaid: data.subscriptionLastPaid || '',
+                subscriptionAmount: data.subscriptionAmount,  // Actual amount paid (for prorated upgrades)
+                isProratedUpgrade: data.isProratedUpgrade === true,
+                proratedFrom: data.proratedFrom || null,
+                upgradeNotes: data.upgradeNotes || '',
+                // Trial fields
                 isFreeTrial: data.isFreeTrial === true,
                 trialStartDate: data.trialStartDate || '',
                 trialEndDate: data.trialEndDate || '',
