@@ -2310,7 +2310,11 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
     const tierData = TIERS[newTier];
     const price = newTier === 'pro' ? '$25,000' : '$50,000';
     
-    // Show approval modal with trial option
+    // Check if this is a Pro → Elite upgrade (prorated eligible)
+    const isProToElite = currentTier === 'pro' && newTier === 'elite';
+    const proratedPrice = '$25,000'; // Difference between Elite ($50k) and Pro ($25k)
+    
+    // Show approval modal with trial and prorated options
     const modalHTML = `
         <div id="approveModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
             <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-green-700">
@@ -2318,9 +2322,23 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
                 
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
                     <p class="text-gray-300 mb-2"><strong>User:</strong> ${userEmail}</p>
+                    <p class="text-gray-300 mb-2"><strong>Current Tier:</strong> <span class="text-gray-400">${TIERS[currentTier]?.name || currentTier}</span></p>
                     <p class="text-gray-300"><strong>Requested Tier:</strong> <span class="${newTier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tierData?.icon || '⭐'} ${tierData?.name || newTier}</span></p>
-                    <p class="text-gray-300"><strong>Price:</strong> ${price}/month</p>
+                    <p class="text-gray-300"><strong>Standard Price:</strong> ${price}/month</p>
                 </div>
+                
+                ${isProToElite ? `
+                <!-- Prorated Upgrade Option (Pro → Elite) -->
+                <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" id="approveProratedCheckbox" class="w-5 h-5 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                        <div>
+                            <span class="text-amber-300 font-bold">💰 Prorated Upgrade (${proratedPrice})</span>
+                            <p class="text-amber-400/70 text-sm">User was already paying for Pro - only charge the $25k difference</p>
+                        </div>
+                    </label>
+                </div>
+                ` : ''}
                 
                 <!-- Free Trial Checkbox -->
                 <div class="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-500/30 rounded-xl p-4 mb-4">
@@ -2339,6 +2357,12 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
                     <input type="text" id="approveNotes" 
                            class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500"
                            placeholder="Payment confirmation or notes...">
+                </div>
+                
+                <!-- Amount Display -->
+                <div id="approveAmountDisplay" class="bg-gray-900/50 rounded-lg p-3 mb-4 text-center">
+                    <span class="text-gray-400">Amount to collect: </span>
+                    <span id="approveAmountValue" class="text-green-400 font-bold text-xl">${price}</span>
                 </div>
                 
                 <!-- Buttons -->
@@ -2362,6 +2386,57 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
     
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Set up checkbox event listeners
+    const trialCheckbox = $('approveTrialCheckbox');
+    const proratedCheckbox = $('approveProratedCheckbox');
+    const notesInput = $('approveNotes');
+    const amountValue = $('approveAmountValue');
+    
+    // Function to update amount display
+    const updateAmountDisplay = () => {
+        const isTrial = trialCheckbox?.checked;
+        const isProrated = proratedCheckbox?.checked;
+        
+        if (isTrial) {
+            amountValue.textContent = '$0 (Trial)';
+            amountValue.className = 'text-cyan-400 font-bold text-xl';
+        } else if (isProrated) {
+            amountValue.textContent = proratedPrice;
+            amountValue.className = 'text-amber-400 font-bold text-xl';
+        } else {
+            amountValue.textContent = price;
+            amountValue.className = 'text-green-400 font-bold text-xl';
+        }
+    };
+    
+    if (trialCheckbox) {
+        trialCheckbox.addEventListener('change', function() {
+            // Uncheck prorated if trial is checked
+            if (this.checked && proratedCheckbox) {
+                proratedCheckbox.checked = false;
+            }
+            updateAmountDisplay();
+        });
+    }
+    
+    if (proratedCheckbox) {
+        proratedCheckbox.addEventListener('change', function() {
+            // Uncheck trial if prorated is checked
+            if (this.checked && trialCheckbox) {
+                trialCheckbox.checked = false;
+            }
+            
+            if (this.checked) {
+                notesInput.value = `Prorated upgrade from Pro to Elite - paid $25k difference`;
+            } else {
+                if (notesInput.value.includes('Prorated')) {
+                    notesInput.value = '';
+                }
+            }
+            updateAmountDisplay();
+        });
+    }
 };
 
 window.closeApproveModal = function() {
@@ -2371,8 +2446,17 @@ window.closeApproveModal = function() {
 
 window.confirmApproveRequest = async function(requestId, userEmail, newTier, currentTier) {
     const isTrial = $('approveTrialCheckbox')?.checked || false;
+    const isProrated = $('approveProratedCheckbox')?.checked || false;
     const paymentNote = $('approveNotes')?.value || '';
     const tierData = TIERS[newTier];
+    
+    // Calculate actual subscription amount
+    let subscriptionAmount = newTier === 'pro' ? 25000 : 50000; // Standard prices
+    if (isTrial) {
+        subscriptionAmount = 0;
+    } else if (isProrated && currentTier === 'pro' && newTier === 'elite') {
+        subscriptionAmount = 25000; // Only the difference
+    }
     
     // Show loading state
     const confirmBtn = $('approveConfirmBtn');
@@ -2393,15 +2477,22 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
             const trialEndDate = new Date();
             trialEndDate.setDate(trialEndDate.getDate() + 30);
             
-            await db.collection('users').doc(userId).update({
+            const updateData = {
                 subscriptionLastPaid: today,
                 subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 isFreeTrial: isTrial,
                 trialStartDate: isTrial ? today : null,
                 trialEndDate: isTrial ? trialEndDate.toISOString().split('T')[0] : null,
-                trialNotes: isTrial ? (paymentNote || 'Free trial from upgrade request') : null
-            });
-            console.log(`[Subscription] Set for ${userEmail}: trial=${isTrial}, date=${today}`);
+                trialNotes: isTrial ? (paymentNote || 'Free trial from upgrade request') : null,
+                // Track actual subscription amount for prorated upgrades
+                subscriptionAmount: subscriptionAmount,
+                isProratedUpgrade: isProrated,
+                proratedFrom: isProrated ? currentTier : null,
+                upgradeNotes: paymentNote || null
+            };
+            
+            await db.collection('users').doc(userId).update(updateData);
+            console.log(`[Subscription] Set for ${userEmail}: trial=${isTrial}, prorated=${isProrated}, amount=$${subscriptionAmount}`);
         }
         
         // Mark request as approved
@@ -2410,18 +2501,24 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
             approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
             approvedBy: auth.currentUser?.email,
             paymentNote: paymentNote,
-            isFreeTrial: isTrial
+            isFreeTrial: isTrial,
+            isProratedUpgrade: isProrated,
+            subscriptionAmount: subscriptionAmount
         });
         
         // Create notification for user
         const trialNote = isTrial ? ' (Free Trial)' : '';
+        const proratedNote = isProrated ? ' (Prorated from Pro)' : '';
         await db.collection('userNotifications').add({
             userEmail: userEmail.toLowerCase(),
             type: 'upgrade_approved',
             title: '🎉 Upgrade Approved!',
-            message: `Your upgrade to ${tierData?.name || newTier}${trialNote} has been approved! You now have access to ${tierData?.maxListings === Infinity ? 'unlimited' : tierData?.maxListings} listings.`,
+            message: `Your upgrade to ${tierData?.name || newTier}${trialNote}${proratedNote} has been approved! You now have access to ${tierData?.maxListings === Infinity ? 'unlimited' : tierData?.maxListings} listings.`,
             newTier: newTier,
+            previousTier: currentTier,
             isFreeTrial: isTrial,
+            isProratedUpgrade: isProrated,
+            subscriptionAmount: subscriptionAmount,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             read: false
         });
@@ -2434,7 +2531,8 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
         setTimeout(() => {
             closeApproveModal();
             const trialMsg = isTrial ? ' as FREE TRIAL' : '';
-            showToast(`${userEmail} upgraded to ${tierData?.name || newTier}${trialMsg}!`, 'success');
+            const proratedMsg = isProrated ? ` (Prorated: $${(subscriptionAmount/1000).toFixed(0)}k)` : '';
+            showToast(`${userEmail} upgraded to ${tierData?.name || newTier}${trialMsg}${proratedMsg}!`, 'success');
             loadUpgradeRequests();
             loadAllUsers();
         }, 800);
@@ -6754,9 +6852,14 @@ window.loadUserNotifications = async function() {
             .where('userEmail', '==', user.email.toLowerCase())
             .where('read', '==', false)
             .onSnapshot((snapshot) => {
+                const userBadge = $('userNotificationBadge');
+                const userCount = $('userNotificationCount');
+                
                 if (snapshot.empty) {
                     hideElement(banner);
                     container.innerHTML = '';
+                    // Hide header badge
+                    if (userBadge) hideElement(userBadge);
                     return;
                 }
                 
@@ -6764,6 +6867,12 @@ window.loadUserNotifications = async function() {
                 snapshot.forEach(doc => {
                     notifications.push({ id: doc.id, ...doc.data() });
                 });
+                
+                // Update header badge
+                if (userBadge && userCount) {
+                    userCount.textContent = notifications.length > 9 ? '9+' : notifications.length;
+                    showElement(userBadge);
+                }
                 
                 // Check for upgrade-related notifications to refresh pending status
                 const hasUpgradeNotification = notifications.some(n => 
@@ -6817,6 +6926,8 @@ window.loadUserNotifications = async function() {
                 // Handle permission errors silently - user just won't see notifications
                 console.log('Notification listener error (may need Firestore rules):', error.message);
                 hideElement(banner);
+                const userBadge = $('userNotificationBadge');
+                if (userBadge) hideElement(userBadge);
             });
         
     } catch (error) {
@@ -6857,6 +6968,24 @@ window.dismissNotification = async function(notificationId) {
 // ==================== USER TIER REAL-TIME SYNC ====================
 window.userTierUnsubscribe = null;
 window.isCreatingAccount = false; // Flag to prevent false "deleted" detection during account creation
+
+// Scroll to user notifications banner when clicking header badge
+window.scrollToUserNotifications = function() {
+    const banner = $('userNotificationsBanner');
+    const dashboard = $('ownerDashboard');
+    
+    // Make sure dashboard is visible
+    if (dashboard && dashboard.classList.contains('hidden')) {
+        goToDashboard();
+    }
+    
+    // Scroll to banner
+    if (banner) {
+        setTimeout(() => {
+            banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
+};
 
 window.startUserTierListener = function() {
     const user = auth.currentUser;

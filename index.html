@@ -619,6 +619,12 @@
                                     <span id="adminNewPremiumCount">0</span>
                                 </span>
                             </div>
+                            <!-- User notification badge (for non-admin users) -->
+                            <div id="userNotificationBadge" class="hidden absolute -top-2 -right-2 z-10">
+                                <span class="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="scrollToUserNotifications()" title="You have notifications!">
+                                    <span id="userNotificationCount">!</span>
+                                </span>
+                            </div>
                             <div class="text-right cursor-pointer hover:bg-gray-700/50 px-3 py-2 rounded-xl transition" onclick="toggleUserDropdown()">
                                 <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
                                 <div id="navUserTier" class="text-xs text-gray-400"></div>
