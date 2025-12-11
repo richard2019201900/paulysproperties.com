@@ -2528,6 +2528,17 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
             confirmBtn.innerHTML = '✓ Approved!';
         }
         
+        // Log to activity log
+        logAdminActivity('upgrade', {
+            email: userEmail,
+            previousTier: currentTier,
+            newTier: newTier,
+            isTrial: isTrial,
+            isProrated: isProrated,
+            amount: subscriptionAmount,
+            approvedBy: auth.currentUser?.email
+        });
+        
         setTimeout(() => {
             closeApproveModal();
             const trialMsg = isTrial ? ' as FREE TRIAL' : '';
@@ -2535,6 +2546,7 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
             showToast(`${userEmail} upgraded to ${tierData?.name || newTier}${trialMsg}${proratedMsg}!`, 'success');
             loadUpgradeRequests();
             loadAllUsers();
+            loadActivityLog(); // Refresh activity log
         }, 800);
         
     } catch (error) {
@@ -2590,9 +2602,19 @@ window.denyUpgradeRequest = async function(requestId, userEmail) {
             read: false
         });
         
+        // Log to activity log
+        logAdminActivity('denial', {
+            email: userEmail,
+            requestedTier: requestData?.requestedTier,
+            currentTier: requestData?.currentTier,
+            reason: reason || 'No reason provided',
+            deniedBy: auth.currentUser?.email
+        });
+        
         alert(`Request from ${userEmail} has been denied. User will be notified.`);
         loadUpgradeRequests();
         loadUpgradeHistory(); // Refresh history to show denial
+        loadActivityLog(); // Refresh activity log
         
     } catch (error) {
         console.error('Error denying request:', error);
@@ -3443,14 +3465,51 @@ window.loadActivityLog = function() {
             case 'upgrade':
                 icon = '⬆️';
                 bgColor = 'from-purple-900/50 to-pink-900/50 border-purple-600/30';
-                title = 'User Upgraded';
-                description = `${entry.data.email} upgraded to ${entry.data.newTier}`;
+                title = entry.data.isTrial ? 'User Upgraded (Trial)' : 'User Upgraded';
+                const amountStr = entry.data.amount ? ` - $${(entry.data.amount/1000).toFixed(0)}k` : '';
+                const proratedStr = entry.data.isProrated ? ' (prorated)' : '';
+                description = `${entry.data.email?.split('@')[0] || 'User'}: ${entry.data.previousTier || 'starter'} → ${entry.data.newTier}${amountStr}${proratedStr}`;
+                break;
+            case 'downgrade':
+                icon = '⬇️';
+                bgColor = 'from-orange-900/50 to-amber-900/50 border-orange-600/30';
+                title = 'User Downgraded';
+                description = `${entry.data.email?.split('@')[0] || 'User'}: ${entry.data.previousTier || 'unknown'} → ${entry.data.newTier}${entry.data.reason ? ' - ' + entry.data.reason : ''}`;
+                break;
+            case 'denial':
+                icon = '❌';
+                bgColor = 'from-red-900/50 to-rose-900/50 border-red-600/30';
+                title = 'Upgrade Request Denied';
+                description = `${entry.data.email?.split('@')[0] || 'User'} denied ${entry.data.requestedTier}${entry.data.reason ? ': ' + entry.data.reason : ''}`;
+                break;
+            case 'deletion':
+                icon = '🗑️';
+                bgColor = 'from-red-900/50 to-gray-900/50 border-red-600/30';
+                title = 'User Deleted';
+                const propInfo = entry.data.propertiesDeleted > 0 
+                    ? ` (${entry.data.propertiesDeleted} properties deleted)` 
+                    : entry.data.propertiesOrphaned > 0 
+                        ? ` (${entry.data.propertiesOrphaned} properties orphaned)` 
+                        : '';
+                description = `${entry.data.email?.split('@')[0] || 'User'} account removed${propInfo}`;
                 break;
             case 'payment':
                 icon = '💰';
                 bgColor = 'from-green-900/50 to-emerald-900/50 border-green-600/30';
                 title = 'Payment Received';
                 description = entry.data.description || 'Payment recorded';
+                break;
+            case 'trial_conversion':
+                icon = '💳';
+                bgColor = 'from-green-900/50 to-teal-900/50 border-green-600/30';
+                title = 'Trial Converted to Paid';
+                description = `${entry.data.email?.split('@')[0] || 'User'} converted from trial to paid`;
+                break;
+            case 'payment_adjustment':
+                icon = '💵';
+                bgColor = 'from-yellow-900/50 to-amber-900/50 border-yellow-600/30';
+                title = 'Payment Amount Adjusted';
+                description = `${entry.data.email?.split('@')[0] || 'User'}: $${(entry.data.previousAmount/1000).toFixed(0)}k → $${(entry.data.newAmount/1000).toFixed(0)}k`;
                 break;
             default:
                 icon = '📋';
@@ -4469,12 +4528,21 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 ? `${tierName} Trial` 
                 : `Subscription: ${tierPrice}/mo`;
             
+            // Add edit amount button for non-trial users
+            const editAmountBtn = !isFreeTrial ? `
+                <button onclick="editSubscriptionAmount('${escapedId}', '${escapedEmail}', ${actualAmount})" 
+                    class="text-gray-400 hover:text-white text-xs ml-1" title="Edit subscription amount">
+                    ✏️
+                </button>
+            ` : '';
+            
             subscriptionHTML = `
                 <div class="mt-3 p-3 rounded-lg border ${statusBg}">
                     <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div class="flex items-center gap-2">
                             <span class="text-lg">${statusIcon}</span>
                             <span class="text-white font-bold text-sm">${subscriptionLabel}</span>
+                            ${editAmountBtn}
                             ${trialBadge}
                             ${proratedBadge}
                         </div>
@@ -4924,6 +4992,50 @@ window.saveSubscriptionDate = async function(userId, email, date) {
     }
 };
 
+// Edit subscription amount for a user
+window.editSubscriptionAmount = async function(userId, email, currentAmount) {
+    const newAmount = prompt(
+        `Edit subscription amount for ${email}\n\n` +
+        `Current amount: $${(currentAmount/1000).toFixed(0)}k/month\n\n` +
+        `Enter new amount in dollars (e.g., 25000 for $25k):`,
+        currentAmount
+    );
+    
+    if (newAmount === null) return;
+    
+    const amount = parseInt(newAmount);
+    if (isNaN(amount) || amount < 0) {
+        alert('Invalid amount. Please enter a positive number.');
+        return;
+    }
+    
+    // Determine if this is a prorated amount
+    const isProrated = amount < 50000 && amount > 0;
+    
+    try {
+        await db.collection('users').doc(userId).update({
+            subscriptionAmount: amount,
+            isProratedUpgrade: isProrated,
+            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Log to activity
+        logAdminActivity('payment_adjustment', {
+            email: email,
+            previousAmount: currentAmount,
+            newAmount: amount,
+            adjustedBy: auth.currentUser?.email
+        });
+        
+        showToast(`Subscription amount updated to $${(amount/1000).toFixed(0)}k for ${email.split('@')[0]}`, 'success');
+        loadAllUsers();
+        loadActivityLog();
+    } catch (error) {
+        console.error('Error updating subscription amount:', error);
+        alert('Error: ' + error.message);
+    }
+};
+
 // Open subscription reminder modal with editable text
 window.openSubscriptionReminderModal = function(userId, email, displayName, tier, price, daysUntilDue) {
     const tierName = tier === 'pro' ? 'Pro ⭐' : 'Elite 👑';
@@ -5312,9 +5424,18 @@ window.adminDeleteUser = async function(userId, email) {
             ? `✓ User ${email} and their ${propertyCount} properties deleted.`
             : `✓ User ${email} deleted.${propertyCount > 0 ? ` Their ${propertyCount} properties are now unassigned.` : ''}`;
         
+        // Log to activity log
+        logAdminActivity('deletion', {
+            email: email,
+            propertiesDeleted: deleteProperties ? propertyCount : 0,
+            propertiesOrphaned: !deleteProperties ? propertyCount : 0,
+            deletedBy: auth.currentUser?.email
+        });
+        
         alert(resultMsg);
         loadAllUsers();
         renderProperties(properties);
+        loadActivityLog(); // Refresh activity log
         
     } catch (error) {
         console.error('Error deleting user:', error);
@@ -6069,9 +6190,25 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
         const proratedMsg = isProrated ? ` (Prorated: $${(subscriptionAmount/1000).toFixed(0)}k)` : '';
         showToast(`${email} upgraded to ${tierData.name}!${trialMsg}${proratedMsg}`, 'success');
         
+        // Log to activity log
+        logAdminActivity('upgrade', {
+            email: email,
+            previousTier: currentTier,
+            newTier: newTier,
+            isTrial: isTrial,
+            isProrated: isProrated,
+            amount: subscriptionAmount,
+            upgradedBy: auth.currentUser?.email
+        });
+        
         // Refresh users list
         if (typeof loadAllUsers === 'function') {
             loadAllUsers();
+        }
+        
+        // Refresh activity log
+        if (typeof loadActivityLog === 'function') {
+            loadActivityLog();
         }
         
     } catch (error) {
@@ -6110,8 +6247,16 @@ window.convertTrialToPaid = async function(userId, email) {
             trialConversionNotes: paymentNote || 'Converted to paid'
         });
         
+        // Log to activity log
+        logAdminActivity('trial_conversion', {
+            email: email,
+            paymentNote: paymentNote,
+            convertedBy: auth.currentUser?.email
+        });
+        
         alert(`✓ ${email} is now a PAID subscriber!\n\nSubscription date set to today.`);
         loadAllUsers();
+        loadActivityLog(); // Refresh activity log
     } catch (error) {
         console.error('Error converting trial:', error);
         alert('Error: ' + error.message);
@@ -6193,8 +6338,18 @@ window.adminDowngradeUser = async function(email, currentTier, targetTier = 'sta
             }
         }
         
+        // Log to activity log
+        logAdminActivity('downgrade', {
+            email: email,
+            previousTier: currentTier,
+            newTier: targetTier,
+            reason: reason || 'No reason given',
+            downgradedBy: auth.currentUser?.email
+        });
+        
         alert(`${email} downgraded to ${tierName} tier.`);
         loadAllUsers();
+        loadActivityLog(); // Refresh activity log
     } catch (error) {
         console.error('Error downgrading user:', error);
         alert('Error: ' + error.message);
@@ -6263,6 +6418,103 @@ window.ensureBasePropertiesSynced = function() {
     if (!currentMapping.includes(13)) {
         console.log('[ensureBasePropertiesSynced] Property 13 (Villa) missing, syncing...');
         syncBasePropertiesToAdmin();
+    }
+};
+
+// Show subscription amount fixer tool
+window.showSubscriptionAmountFixer = async function() {
+    const container = $('subscriptionFixerResult');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-gray-400 animate-pulse">Loading paid users...</p>';
+    
+    try {
+        // Get all users with Pro or Elite tier who are NOT on trial
+        const paidUsers = (window.adminUsersData || []).filter(u => 
+            (u.tier === 'pro' || u.tier === 'elite') && 
+            !u.isFreeTrial &&
+            !TierService.isMasterAdmin(u.email)
+        );
+        
+        if (paidUsers.length === 0) {
+            container.innerHTML = '<p class="text-green-400">✓ No paid subscription users found that need fixing.</p>';
+            return;
+        }
+        
+        // Show each user with their current subscription amount
+        let html = '<div class="space-y-2">';
+        
+        for (const user of paidUsers) {
+            const defaultAmount = user.tier === 'pro' ? 25000 : 50000;
+            const currentAmount = user.subscriptionAmount !== undefined ? user.subscriptionAmount : defaultAmount;
+            const isUsingDefault = user.subscriptionAmount === undefined;
+            const isProratedFlag = user.isProratedUpgrade === true;
+            
+            const userId = user.id;
+            const email = user.email;
+            const displayName = user.displayName || user.username || email.split('@')[0];
+            
+            const warningClass = isUsingDefault ? 'border-amber-500 bg-amber-900/20' : 'border-gray-600 bg-gray-800/50';
+            const warningLabel = isUsingDefault ? '<span class="text-amber-400 text-xs">(using default)</span>' : '<span class="text-green-400 text-xs">(set)</span>';
+            
+            html += `
+                <div class="p-2 rounded border ${warningClass}">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="${user.tier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${user.tier === 'pro' ? '⭐' : '👑'}</span>
+                            <span class="text-white text-sm">${displayName}</span>
+                            ${isProratedFlag ? '<span class="text-amber-400 text-xs ml-1">(prorated)</span>' : ''}
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-300 text-sm">$${(currentAmount/1000).toFixed(0)}k</span>
+                            ${warningLabel}
+                            <button onclick="quickFixAmount('${userId}', '${email}', 25000)" 
+                                class="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs">$25k</button>
+                            <button onclick="quickFixAmount('${userId}', '${email}', 50000)" 
+                                class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs">$50k</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        html += `<p class="text-gray-500 text-xs mt-2">Users with "(using default)" need their amounts set manually. Click $25k or $50k to set.</p>`;
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading subscription fixer:', error);
+        container.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+    }
+};
+
+// Quick fix subscription amount
+window.quickFixAmount = async function(userId, email, amount) {
+    try {
+        await db.collection('users').doc(userId).update({
+            subscriptionAmount: amount,
+            isProratedUpgrade: amount < 50000,
+            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Log to activity
+        logAdminActivity('payment_adjustment', {
+            email: email,
+            previousAmount: 'unknown (default)',
+            newAmount: amount,
+            adjustedBy: auth.currentUser?.email
+        });
+        
+        showToast(`✓ Set ${email.split('@')[0]} to $${(amount/1000).toFixed(0)}k`, 'success');
+        
+        // Refresh the fixer and user list
+        await loadAllUsers();
+        showSubscriptionAmountFixer();
+        
+    } catch (error) {
+        console.error('Error fixing amount:', error);
+        alert('Error: ' + error.message);
     }
 };
 
