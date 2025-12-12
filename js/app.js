@@ -225,7 +225,7 @@ window.viewProperty = function(id) {
                         html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center overflow-hidden">';
                         html += '<div class="text-amber-400 text-xs font-bold mb-1">🏠 OWN IT</div>';
                         html += '<div class="text-amber-400 ' + getLargePriceTextSize(buyPrice) + ' font-black truncate">$' + buyPrice.toLocaleString() + '</div>';
-                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% fee ($' + feeAmount.toLocaleString() + ')</div>';
+                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% PMA Realtor Fee ($' + feeAmount.toLocaleString() + ')</div>';
                         html += '</div>';
                     }
                     

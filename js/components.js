@@ -130,7 +130,7 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
             disclaimer.innerHTML = `
                 <div class="text-xs text-gray-400 mt-2 space-y-1">
                     <div><strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. This website serves as a listing platform only.</div>
-                    <div><strong>💰 Fee:</strong> A standard <span class="text-amber-400 font-bold">10% PMA realtor fee</span> applies to all property purchases on top of the listed price.</div>
+                    <div><strong>💰 City Fee:</strong> A standard <span class="text-amber-400 font-bold">10% PMA Realtor Fee</span> (city requirement) applies to all property purchases. This fee is not charged by PaulysProperties.com.</div>
                 </div>
             `;
         }
