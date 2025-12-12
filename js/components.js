@@ -202,34 +202,69 @@ window.openPhotoServicesModal = function() {
     }
 };
 
-// Close photo promo bar (desktop)
-window.closePhotoPromoBar = function() {
-    const bar = $('photoPromoBar');
-    if (bar) {
-        bar.style.display = 'none';
-        // Remember dismissal for this session
-        sessionStorage.setItem('photoPromoBarDismissed', 'true');
+// Collapse photo promo bar (desktop) - shows minimal tab
+window.collapsePhotoPromoBar = function() {
+    const expanded = $('photoPromoExpanded');
+    const collapsed = $('photoPromoCollapsed');
+    if (expanded && collapsed) {
+        expanded.classList.add('hidden');
+        collapsed.classList.remove('hidden');
+        sessionStorage.setItem('photoPromoBarCollapsed', 'true');
     }
 };
 
-// Close mobile photo promo bar
-window.closeMobilePhotoPromoBar = function() {
+// Expand photo promo bar (desktop)
+window.expandPhotoPromoBar = function() {
+    const expanded = $('photoPromoExpanded');
+    const collapsed = $('photoPromoCollapsed');
+    if (expanded && collapsed) {
+        expanded.classList.remove('hidden');
+        collapsed.classList.add('hidden');
+        sessionStorage.removeItem('photoPromoBarCollapsed');
+    }
+};
+
+// Collapse mobile photo promo bar
+window.collapseMobilePhotoPromoBar = function() {
     const bar = $('mobilePhotoPromoBar');
-    if (bar) {
-        bar.style.display = 'none';
-        sessionStorage.setItem('mobilePhotoPromoBarDismissed', 'true');
+    const collapsed = $('mobilePhotoPromoCollapsed');
+    if (bar && collapsed) {
+        bar.classList.add('hidden');
+        collapsed.classList.remove('hidden');
+        sessionStorage.setItem('mobilePhotoPromoBarCollapsed', 'true');
     }
 };
 
-// Check if promo bars should be hidden (on page load)
-window.checkPhotoPromoBarState = function() {
-    if (sessionStorage.getItem('photoPromoBarDismissed') === 'true') {
-        const bar = $('photoPromoBar');
-        if (bar) bar.style.display = 'none';
+// Expand mobile photo promo bar
+window.expandMobilePhotoPromoBar = function() {
+    const bar = $('mobilePhotoPromoBar');
+    const collapsed = $('mobilePhotoPromoCollapsed');
+    if (bar && collapsed) {
+        bar.classList.remove('hidden');
+        collapsed.classList.add('hidden');
+        sessionStorage.removeItem('mobilePhotoPromoBarCollapsed');
     }
-    if (sessionStorage.getItem('mobilePhotoPromoBarDismissed') === 'true') {
+};
+
+// Check if promo bars should be collapsed (on page load)
+window.checkPhotoPromoBarState = function() {
+    // Desktop
+    if (sessionStorage.getItem('photoPromoBarCollapsed') === 'true') {
+        const expanded = $('photoPromoExpanded');
+        const collapsed = $('photoPromoCollapsed');
+        if (expanded && collapsed) {
+            expanded.classList.add('hidden');
+            collapsed.classList.remove('hidden');
+        }
+    }
+    // Mobile
+    if (sessionStorage.getItem('mobilePhotoPromoBarCollapsed') === 'true') {
         const bar = $('mobilePhotoPromoBar');
-        if (bar) bar.style.display = 'none';
+        const collapsed = $('mobilePhotoPromoCollapsed');
+        if (bar && collapsed) {
+            bar.classList.add('hidden');
+            collapsed.classList.remove('hidden');
+        }
     }
 };
 
