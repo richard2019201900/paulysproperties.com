@@ -1686,6 +1686,86 @@ window.getPaymentHistory = async function(propertyId) {
     }
 };
 
+// Delete a payment from the ledger
+window.deletePayment = async function(propertyId, paymentId) {
+    // Confirm deletion
+    if (!confirm('Are you sure you want to delete this payment? This will update all financial stats.')) {
+        return;
+    }
+    
+    console.log('[PaymentLog] Deleting payment:', paymentId, 'from property:', propertyId);
+    
+    try {
+        // Get existing payment history
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        
+        if (!historyDoc.exists) {
+            showToast('❌ Payment history not found', 'error');
+            return;
+        }
+        
+        let payments = historyDoc.data().payments || [];
+        const originalCount = payments.length;
+        
+        // Find and remove the payment
+        payments = payments.filter(p => p.id !== paymentId);
+        
+        if (payments.length === originalCount) {
+            showToast('❌ Payment not found', 'error');
+            return;
+        }
+        
+        // Save back to Firestore
+        await db.collection('paymentHistory').doc(String(propertyId)).set({
+            propertyId: propertyId,
+            payments: payments,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('[PaymentLog] Payment deleted, remaining:', payments.length);
+        showToast('🗑️ Payment deleted - refreshing stats...', 'success');
+        
+        // Refresh the analytics view
+        await refreshPropertyAnalytics(propertyId);
+        
+    } catch (error) {
+        console.error('[PaymentLog] Error deleting payment:', error);
+        showToast('❌ Error deleting payment: ' + error.message, 'error');
+    }
+};
+
+// Refresh property analytics after payment changes
+window.refreshPropertyAnalytics = async function(propertyId) {
+    console.log('[Analytics] Refreshing analytics for property:', propertyId);
+    
+    // Find the property
+    const property = properties.find(p => p.id === propertyId);
+    if (!property) {
+        console.error('[Analytics] Property not found:', propertyId);
+        return;
+    }
+    
+    // Re-fetch payment history
+    const payments = await getPaymentHistory(propertyId);
+    
+    // Recalculate analytics
+    const analytics = calculatePropertyAnalytics(payments, property);
+    
+    // Update the analytics container if it exists
+    const analyticsContainer = document.getElementById(`propertyAnalytics-${propertyId}`);
+    if (analyticsContainer) {
+        analyticsContainer.innerHTML = renderPropertyAnalytics(property, payments, analytics);
+    }
+    
+    // Also refresh the detail view if we're viewing this property
+    if (currentDetailProperty && currentDetailProperty.id === propertyId) {
+        // Re-render the detail view
+        showPropertyDetail(propertyId);
+    }
+    
+    console.log('[Analytics] Refresh complete');
+};
+
 // Calculate property analytics from payment history
 window.calculatePropertyAnalytics = function(payments, property) {
     const now = new Date();
@@ -1882,7 +1962,7 @@ window.renderPropertyAnalytics = async function(propertyId) {
             <div id="paymentLedger-${propertyId}" class="space-y-2 max-h-80 overflow-y-auto">
                 ${payments.length > 0 
                     ? analytics.sortedPayments.slice().reverse().slice(0, 10).map((p, i) => `
-                        <div class="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between text-sm ${i === 0 ? 'ring-2 ring-green-500/50' : ''}">
+                        <div class="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between text-sm ${i === 0 ? 'ring-2 ring-green-500/50' : ''} group">
                             <div class="flex items-center gap-3">
                                 <div class="text-2xl">${i === 0 ? '✅' : '💵'}</div>
                                 <div>
@@ -1894,11 +1974,18 @@ window.renderPropertyAnalytics = async function(propertyId) {
                                     </div>
                                 </div>
                             </div>
-                            <div class="text-right">
-                                <div class="text-green-400 font-bold">$${(p.amount || 0).toLocaleString()}</div>
-                                <div class="text-gray-500 text-xs">
-                                    ${new Date(p.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                            <div class="flex items-center gap-3">
+                                <div class="text-right">
+                                    <div class="text-green-400 font-bold">$${(p.amount || 0).toLocaleString()}</div>
+                                    <div class="text-gray-500 text-xs">
+                                        ${new Date(p.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                    </div>
                                 </div>
+                                <button onclick="deletePayment(${propertyId}, '${p.id}')" 
+                                    class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-400 hover:text-red-300 transition-all"
+                                    title="Delete this payment">
+                                    🗑️
+                                </button>
                             </div>
                         </div>
                     `).join('')
@@ -1970,7 +2057,7 @@ window.showFullLedger = async function(propertyId) {
     
     const modalHTML = `
         <div id="fullLedgerModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-purple-700">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-purple-700">
                 <div class="bg-gradient-to-r from-purple-900 to-pink-900 p-6">
                     <div class="flex items-center justify-between">
                         <div>
@@ -2001,17 +2088,19 @@ window.showFullLedger = async function(propertyId) {
                                 <th class="pb-3">Frequency</th>
                                 <th class="pb-3 text-right">Amount</th>
                                 <th class="pb-3 text-right">Recorded</th>
+                                <th class="pb-3 text-center w-16">Delete</th>
                             </tr>
                         </thead>
                         <tbody class="text-sm">
                             ${sortedPayments.map((payment, i) => `
-                                <tr class="border-b border-gray-700/50 hover:bg-gray-700/30">
+                                <tr class="border-b border-gray-700/50 hover:bg-gray-700/30 group">
                                     <td class="py-3 text-white font-medium">${formatDate(payment.paymentDate)}</td>
                                     <td class="py-3 text-gray-300">${payment.renterName || 'Unknown'}</td>
                                     <td class="py-3">
                                         <span class="px-2 py-1 rounded-full text-xs font-semibold ${
                                             payment.frequency === 'monthly' ? 'bg-purple-500/20 text-purple-300' :
                                             payment.frequency === 'biweekly' ? 'bg-blue-500/20 text-blue-300' :
+                                            payment.frequency === 'daily' ? 'bg-cyan-500/20 text-cyan-300' :
                                             'bg-green-500/20 text-green-300'
                                         }">
                                             ${payment.frequency || 'weekly'}
@@ -2020,6 +2109,13 @@ window.showFullLedger = async function(propertyId) {
                                     <td class="py-3 text-right text-green-400 font-bold">$${(payment.amount || 0).toLocaleString()}</td>
                                     <td class="py-3 text-right text-gray-500 text-xs">
                                         ${new Date(payment.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                                    </td>
+                                    <td class="py-3 text-center">
+                                        <button onclick="deletePaymentFromModal(${propertyId}, '${payment.id}')" 
+                                            class="opacity-50 group-hover:opacity-100 p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-400 hover:text-red-300 transition-all"
+                                            title="Delete this payment">
+                                            🗑️
+                                        </button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -2035,6 +2131,51 @@ window.showFullLedger = async function(propertyId) {
     if (existing) existing.remove();
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+// Delete payment from the full ledger modal (refreshes modal after)
+window.deletePaymentFromModal = async function(propertyId, paymentId) {
+    if (!confirm('Are you sure you want to delete this payment? This will update all financial stats.')) {
+        return;
+    }
+    
+    console.log('[PaymentLog] Deleting payment from modal:', paymentId);
+    
+    try {
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        
+        if (!historyDoc.exists) {
+            showToast('❌ Payment history not found', 'error');
+            return;
+        }
+        
+        let payments = historyDoc.data().payments || [];
+        const originalCount = payments.length;
+        payments = payments.filter(p => p.id !== paymentId);
+        
+        if (payments.length === originalCount) {
+            showToast('❌ Payment not found', 'error');
+            return;
+        }
+        
+        await db.collection('paymentHistory').doc(String(propertyId)).set({
+            propertyId: propertyId,
+            payments: payments,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('🗑️ Payment deleted', 'success');
+        
+        // Refresh the modal
+        await showFullLedger(propertyId);
+        
+        // Also refresh analytics
+        await refreshPropertyAnalytics(propertyId);
+        
+    } catch (error) {
+        console.error('[PaymentLog] Error deleting payment:', error);
+        showToast('❌ Error: ' + error.message, 'error');
+    }
 };
 
 window.closeFullLedger = function() {
