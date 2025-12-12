@@ -193,10 +193,30 @@ window.openPhotoServicesModal = function() {
     openModal('photoServicesModal');
     // Update opt-in content based on login status
     updateManagedServicesOptIn();
+    
+    // Reset package selection
+    window.selectedPhotoPackage = null;
+    
+    // Reset UI state for package options
+    const singleOption = $('photoOptionSingle');
+    const bundleOption = $('photoOptionBundle');
+    const singleCheck = $('photoSingleCheck');
+    const bundleCheck = $('photoBundleCheck');
+    
+    if (singleOption) {
+        singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
+        singleOption.classList.add('border-gray-600');
+    }
+    if (bundleOption) {
+        bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
+    }
+    if (singleCheck) singleCheck.classList.add('hidden');
+    if (bundleCheck) bundleCheck.classList.add('hidden');
+    
     // Reset the copy button state
     const btn = $('photoServicesCopyBtn');
     if (btn) {
-        btn.innerHTML = '<span>📱</span> Copy & Notify: 2057028233';
+        btn.innerHTML = '<span>📱</span> Select a Package Above';
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
@@ -371,9 +391,66 @@ window.optOutManagedServices = async function() {
     }
 };
 
+// Track selected photo package
+window.selectedPhotoPackage = null;
+
+// Select a photo package
+window.selectPhotoPackage = function(packageType) {
+    window.selectedPhotoPackage = packageType;
+    
+    const singleOption = $('photoOptionSingle');
+    const bundleOption = $('photoOptionBundle');
+    const singleCheck = $('photoSingleCheck');
+    const bundleCheck = $('photoBundleCheck');
+    const copyBtn = $('photoServicesCopyBtn');
+    
+    if (packageType === 'single') {
+        // Select single photo option
+        singleOption.classList.remove('border-gray-600');
+        singleOption.classList.add('border-green-500', 'ring-2', 'ring-green-500/50');
+        singleCheck.classList.remove('hidden');
+        
+        // Deselect bundle
+        bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
+        bundleOption.classList.add('border-amber-500');
+        bundleCheck.classList.add('hidden');
+        
+        // Update button text
+        if (copyBtn) {
+            copyBtn.innerHTML = '<span>📷</span> Copy & Notify: Per Photo ($10k)';
+        }
+    } else if (packageType === 'bundle') {
+        // Select bundle option
+        bundleOption.classList.add('ring-2', 'ring-amber-500/50');
+        bundleCheck.classList.remove('hidden');
+        
+        // Deselect single
+        singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
+        singleOption.classList.add('border-gray-600');
+        singleCheck.classList.add('hidden');
+        
+        // Update button text
+        if (copyBtn) {
+            copyBtn.innerHTML = '<span>🎬</span> Copy & Notify: Premium Bundle ($125k)';
+        }
+    }
+    
+    console.log('[PhotoServices] Selected package:', packageType);
+};
+
 window.copyAndNotifyPhotoServices = async function() {
     const user = auth.currentUser;
     const btn = $('photoServicesCopyBtn');
+    
+    // Check if package is selected
+    if (!window.selectedPhotoPackage) {
+        showToast('⚠️ Please select a package first (Per Photo or Premium Bundle)', 'warning');
+        return;
+    }
+    
+    const packageType = window.selectedPhotoPackage;
+    const packageName = packageType === 'bundle' ? 'Premium Bundle ($125k)' : 'Per Photo ($10k)';
+    const packageEmoji = packageType === 'bundle' ? '🎬' : '📷';
     
     // Copy phone number to clipboard
     try {
@@ -400,20 +477,22 @@ window.copyAndNotifyPhotoServices = async function() {
             userId: user?.uid || null,
             requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
             type: 'photo_inquiry',
+            packageType: packageType,  // 'single' or 'bundle'
+            packageName: packageName,
             status: 'pending',
             viewed: false
         });
         
-        console.log('[PhotoServices] Request notification created for:', userEmail);
+        console.log('[PhotoServices] Request notification created for:', userEmail, 'Package:', packageType);
         
         // Update button to show success
         if (btn) {
-            btn.innerHTML = '<span>✅</span> Copied! Team Notified';
+            btn.innerHTML = `<span>✅</span> ${packageEmoji} ${packageName} - Team Notified!`;
             btn.disabled = true;
             btn.classList.add('opacity-50', 'cursor-not-allowed');
         }
         
-        showToast('📸 Phone copied! Our team has been notified of your interest.', 'success');
+        showToast(`${packageEmoji} Phone copied! Our team has been notified you want the ${packageName}!`, 'success');
         
     } catch (error) {
         console.error('[PhotoServices] Error creating notification:', error);

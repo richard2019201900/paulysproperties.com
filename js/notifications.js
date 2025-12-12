@@ -598,12 +598,14 @@ function startPhotoRequestListener() {
                     AdminNotifications.seenPhotoRequests.add(doc.id);
                     
                     if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
-                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail);
+                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail, 'Package:', data.packageType);
                         newRequests.push({
                             id: doc.id,
                             notifId: notifId,
                             userEmail: data.userEmail || 'Anonymous',
                             username: data.username || 'Anonymous',
+                            packageType: data.packageType || 'unknown',
+                            packageName: data.packageName || 'Photo Services',
                             requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date()
                         });
                     }
@@ -636,9 +638,11 @@ function startPhotoRequestListener() {
                 
                 // Create notifications
                 newRequests.forEach(req => {
+                    const packageEmoji = req.packageType === 'bundle' ? '🎬' : '📷';
+                    const packageLabel = req.packageType === 'bundle' ? 'PREMIUM BUNDLE $125k' : 'Per Photo $10k';
                     createNotification(NOTIFICATION_TYPES.PHOTO, req.notifId, {
-                        title: NOTIFICATION_TYPES.PHOTO.title,
-                        message: `${req.username} wants photo services - CALL THEM!`,
+                        title: `${packageEmoji} ${NOTIFICATION_TYPES.PHOTO.title}`,
+                        message: `${req.username} wants ${packageLabel} - CALL THEM!`,
                         timestamp: req.requestedAt,
                         data: req
                     });
