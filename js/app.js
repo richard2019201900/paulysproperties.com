@@ -162,13 +162,26 @@ window.viewProperty = function(id) {
                     const biweeklyDiscount = calcDiscount(biweeklyPrice, 14);
                     const monthlyDiscount = calcDiscount(monthlyPrice, 30);
                     
+                    // Helper function to get dynamic text size based on price
+                    const getPriceTextSize = (price) => {
+                        if (price >= 10000000) return 'text-base md:text-lg'; // 10M+
+                        if (price >= 1000000) return 'text-lg md:text-xl';   // 1M+
+                        return 'text-xl md:text-2xl';                         // Under 1M
+                    };
+                    
+                    const getLargePriceTextSize = (price) => {
+                        if (price >= 10000000) return 'text-lg md:text-xl'; // 10M+
+                        if (price >= 1000000) return 'text-xl md:text-2xl';   // 1M+
+                        return 'text-2xl md:text-3xl';                         // Under 1M
+                    };
+                    
                     let html = '<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">';
                     
                     // Daily
                     if (dailyPrice > 0) {
                         html += '<div class="bg-gradient-to-br from-cyan-600/20 to-teal-700/20 border border-cyan-500/50 rounded-xl p-4 text-center">';
                         html += '<div class="text-cyan-400 text-xs font-bold mb-1">DAILY</div>';
-                        html += '<div class="text-white text-xl md:text-2xl font-black">$' + dailyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-white ' + getPriceTextSize(dailyPrice) + ' font-black truncate">$' + dailyPrice.toLocaleString() + '</div>';
                         html += '</div>';
                     }
                     
@@ -179,7 +192,7 @@ window.viewProperty = function(id) {
                             html += '<div class="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SAVE ' + weeklyDiscount + '%</div>';
                         }
                         html += '<div class="text-blue-400 text-xs font-bold mb-1">WEEKLY</div>';
-                        html += '<div class="text-white text-xl md:text-2xl font-black">$' + weeklyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-white ' + getPriceTextSize(weeklyPrice) + ' font-black truncate">$' + weeklyPrice.toLocaleString() + '</div>';
                         html += '</div>';
                     }
                     
@@ -190,7 +203,7 @@ window.viewProperty = function(id) {
                             html += '<div class="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SAVE ' + biweeklyDiscount + '%</div>';
                         }
                         html += '<div class="text-purple-400 text-xs font-bold mb-1">BIWEEKLY</div>';
-                        html += '<div class="text-white text-xl md:text-2xl font-black">$' + biweeklyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-white ' + getPriceTextSize(biweeklyPrice) + ' font-black truncate">$' + biweeklyPrice.toLocaleString() + '</div>';
                         html += '</div>';
                     }
                     
@@ -201,7 +214,7 @@ window.viewProperty = function(id) {
                             html += '<div class="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">SAVE ' + monthlyDiscount + '%</div>';
                         }
                         html += '<div class="text-green-400 text-xs font-bold mb-1">⭐ MONTHLY</div>';
-                        html += '<div class="text-green-400 text-2xl md:text-3xl font-black">$' + monthlyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-green-400 ' + getLargePriceTextSize(monthlyPrice) + ' font-black truncate">$' + monthlyPrice.toLocaleString() + '</div>';
                         html += '<div class="text-green-300/70 text-[10px] mt-1">Best Value</div>';
                         html += '</div>';
                     }
@@ -209,10 +222,10 @@ window.viewProperty = function(id) {
                     // Buy Price
                     if (buyPrice > 0) {
                         const feeAmount = Math.round(buyPrice * 0.1);
-                        html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center">';
+                        html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center overflow-hidden">';
                         html += '<div class="text-amber-400 text-xs font-bold mb-1">🏠 OWN IT</div>';
-                        html += '<div class="text-amber-400 text-2xl md:text-3xl font-black">$' + buyPrice.toLocaleString() + '</div>';
-                        html += '<div class="text-amber-300/70 text-[10px] mt-1">+10% realtor fee ($' + feeAmount.toLocaleString() + ')</div>';
+                        html += '<div class="text-amber-400 ' + getLargePriceTextSize(buyPrice) + ' font-black truncate">$' + buyPrice.toLocaleString() + '</div>';
+                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% fee ($' + feeAmount.toLocaleString() + ')</div>';
                         html += '</div>';
                     }
                     

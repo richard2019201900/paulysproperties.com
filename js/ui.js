@@ -3511,6 +3511,12 @@ window.loadActivityLog = function() {
                 title = 'Payment Amount Adjusted';
                 description = `${entry.data.email?.split('@')[0] || 'User'}: $${(entry.data.previousAmount/1000).toFixed(0)}k → $${(entry.data.newAmount/1000).toFixed(0)}k`;
                 break;
+            case 'managed_services_optin':
+                icon = '🚀';
+                bgColor = 'from-purple-900/50 to-pink-900/50 border-purple-600/30';
+                title = 'VIP Lead - Managed Services Interest';
+                description = `${entry.data.username || entry.data.email?.split('@')[0] || 'User'} opted in for managed services`;
+                break;
             default:
                 icon = '📋';
                 bgColor = 'from-gray-800 to-gray-900 border-gray-600/30';
@@ -4641,6 +4647,9 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         <!-- Row 2: Tier badge, Phone, Listings, Properties toggle -->
                         <div class="flex flex-wrap items-center gap-2 text-xs mb-2">
                             <span class="px-2 py-0.5 rounded ${tierData.bgColor} text-white font-bold">${tierData.name}</span>
+                            ${user.managedServicesInterest ? `<span class="px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold flex items-center gap-1 animate-pulse" title="Interested in Managed Services">
+                                🚀 VIP LEAD
+                            </span>` : ''}
                             ${user.phone ? `<span class="text-gray-400 flex items-center gap-1">
                                 📱 ${user.phone}
                                 <button onclick="event.stopPropagation(); copyPhoneNumber('${(user.phone || '').replace(/[^0-9]/g, '')}')" 
@@ -4681,6 +4690,25 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
     
     // Render grouped sections
     let html = '';
+    
+    // VIP Leads section - Users interested in managed services (at the top!)
+    const vipLeads = sortedUsers.filter(u => u.managedServicesInterest === true && !TierService.isMasterAdmin(u.email));
+    if (vipLeads.length > 0) {
+        html += `
+            <div class="mb-6 bg-gradient-to-r from-purple-900/20 to-pink-900/20 rounded-xl p-4 border border-purple-500/50">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-500/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('vipLeadsGroup')">
+                    <span id="vipLeadsGroupToggle" class="text-gray-400 transition">▼</span>
+                    <span class="text-xl">🚀</span>
+                    <h5 class="text-transparent bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text font-black">VIP LEADS - Managed Services Interest</h5>
+                    <span class="text-purple-300 text-sm font-bold">(${vipLeads.length})</span>
+                    <span class="ml-auto bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] px-2 py-1 rounded-full font-bold animate-pulse">💰 HIGH VALUE</span>
+                </div>
+                <div id="vipLeadsGroup" class="space-y-3">
+                    ${vipLeads.map(renderUserCard).join('')}
+                </div>
+            </div>
+        `;
+    }
     
     // Owner/Admin section (collapsed by default)
     if (groups.owner.length > 0) {

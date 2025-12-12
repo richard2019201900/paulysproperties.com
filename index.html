@@ -172,49 +172,58 @@
                     <p class="text-gray-300 text-sm">Properties with professional photos rent <span class="text-green-400 font-bold">3x faster</span> and can command <span class="text-green-400 font-bold">higher prices</span>. Don't let a blurry screenshot cost you money!</p>
                 </div>
                 
-                <!-- What We Offer -->
-                <div class="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
-                    <h3 class="text-lg font-bold text-white mb-3">📷 What's Included</h3>
-                    <ul class="space-y-2 text-gray-300 text-sm">
-                        <li class="flex items-start gap-2"><span class="text-green-400">✓</span> High-definition exterior shots</li>
-                        <li class="flex items-start gap-2"><span class="text-green-400">✓</span> Interior room photography</li>
-                        <li class="flex items-start gap-2"><span class="text-green-400">✓</span> Storage space documentation</li>
-                        <li class="flex items-start gap-2"><span class="text-green-400">✓</span> Neighborhood/location context shots</li>
-                        <li class="flex items-start gap-2"><span class="text-green-400">✓</span> Professional editing & optimization</li>
-                        <li class="flex items-start gap-2"><span class="text-green-400">✓</span> Same-day turnaround available</li>
-                    </ul>
-                </div>
-                
                 <!-- Pricing -->
                 <div class="bg-gradient-to-r from-green-900/30 to-emerald-900/30 rounded-xl p-5 border border-green-500/30">
-                    <h3 class="text-lg font-bold text-green-400 mb-3">💰 Simple Pricing</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-gray-800/50 rounded-lg p-4 text-center">
-                            <div class="text-2xl font-black text-white">$5,000</div>
-                            <div class="text-gray-400 text-xs">Per Property</div>
-                            <div class="text-green-400 text-xs mt-1">Basic Package</div>
+                    <h3 class="text-lg font-bold text-green-400 mb-4">💰 Simple Pricing</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Per Photo Option -->
+                        <div class="bg-gray-800/70 rounded-xl p-5 text-center border border-gray-600 hover:border-green-500/50 transition">
+                            <div class="text-green-400 text-xs font-bold mb-2">📷 PER PHOTO</div>
+                            <div class="text-3xl font-black text-white mb-2">$10,000</div>
+                            <div class="text-gray-400 text-sm mb-3">Per HD Photo</div>
+                            <ul class="text-left text-xs text-gray-300 space-y-1">
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Professional HD shot</li>
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Edited & optimized</li>
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Same-day delivery</li>
+                            </ul>
                         </div>
-                        <div class="bg-gray-800/50 rounded-lg p-4 text-center border border-amber-500/50">
-                            <div class="text-2xl font-black text-amber-400">$10,000</div>
-                            <div class="text-gray-400 text-xs">Per Property</div>
-                            <div class="text-amber-400 text-xs mt-1">Premium + Video Tour</div>
+                        
+                        <!-- Premium Bundle -->
+                        <div class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-xl p-5 text-center border-2 border-amber-500 relative">
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full">⭐ BEST VALUE</div>
+                            <div class="text-amber-400 text-xs font-bold mb-2 mt-2">🎬 PREMIUM BUNDLE</div>
+                            <div class="text-3xl font-black text-amber-400 mb-2">$125,000</div>
+                            <div class="text-amber-300/80 text-sm mb-3">Complete Package</div>
+                            <ul class="text-left text-xs text-gray-200 space-y-1">
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> 6-7 HD Photos</li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> Professional Video Tour</li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> <span class="text-amber-400 font-bold">4 Weeks Premium Listing!</span></li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> Priority placement</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
                 
                 <!-- Coming Soon: Managed Services Teaser -->
                 <div class="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-5 border border-purple-500/30">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">COMING SOON</span>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">COMING SOON</span>
                         <h3 class="text-lg font-bold text-purple-400">🏠 Full Property Management</h3>
                     </div>
-                    <p class="text-gray-300 text-sm">Too busy to manage your rentals? We're launching a complete managed services offering — from photography to tenant placement to key management. Stay tuned!</p>
+                    <p class="text-gray-300 text-sm mb-4">Too busy to manage your rentals? We're launching a complete managed services offering — from photography to tenant placement to key management. Be the first to know!</p>
+                    
+                    <!-- Opt-in Section -->
+                    <div id="managedServicesOptIn" class="bg-purple-900/30 rounded-lg p-4 border border-purple-500/50">
+                        <div id="optInContent">
+                            <!-- Will be populated by JS based on login status and opt-in status -->
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Contact CTA -->
                 <div class="text-center pt-4">
                     <p class="text-gray-400 text-sm mb-4">Ready to showcase your property? Contact Pauly in-city!</p>
-                    <div class="flex gap-4 justify-center">
+                    <div class="flex gap-4 justify-center flex-wrap">
                         <button onclick="copyPhotoServicePhone()" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
                             📱 Copy Phone: 2057028233
                         </button>

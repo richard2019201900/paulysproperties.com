@@ -191,6 +191,106 @@ window.openRegisterContactModal = function() {
 // ==================== PHOTO SERVICES ====================
 window.openPhotoServicesModal = function() {
     openModal('photoServicesModal');
+    // Update opt-in content based on login status
+    updateManagedServicesOptIn();
+};
+
+window.updateManagedServicesOptIn = async function() {
+    const container = $('optInContent');
+    if (!container) return;
+    
+    const user = auth.currentUser;
+    
+    if (!user) {
+        // Not logged in
+        container.innerHTML = `
+            <div class="text-center">
+                <p class="text-gray-300 text-sm mb-3">🔒 Log in to get notified when managed services launch!</p>
+                <button onclick="closeModal('photoServicesModal'); openModal('loginModal');" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                    Log In to Opt-In
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    // Check if user is already opted in
+    try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userData = userDoc.data();
+        const isOptedIn = userData?.managedServicesInterest === true;
+        
+        if (isOptedIn) {
+            container.innerHTML = `
+                <div class="text-center">
+                    <div class="flex items-center justify-center gap-2 text-green-400 mb-2">
+                        <span class="text-2xl">✅</span>
+                        <span class="font-bold">You're on the list!</span>
+                    </div>
+                    <p class="text-gray-300 text-sm mb-3">We'll contact you when managed services launch.</p>
+                    <button onclick="optOutManagedServices()" class="text-gray-400 hover:text-red-400 text-xs underline transition">
+                        Remove me from the list
+                    </button>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="text-center">
+                    <p class="text-gray-300 text-sm mb-3">🔔 Want to be notified when this launches?</p>
+                    <button onclick="optInManagedServices()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg flex items-center gap-2 mx-auto">
+                        <span>🚀</span> Yes, I'm Interested!
+                    </button>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error checking opt-in status:', error);
+        container.innerHTML = `<p class="text-gray-400 text-sm text-center">Error loading status</p>`;
+    }
+};
+
+window.optInManagedServices = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+        await db.collection('users').doc(user.uid).update({
+            managedServicesInterest: true,
+            managedServicesOptInDate: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('🚀 You\'re on the list! We\'ll notify you when managed services launch.', 'success');
+        updateManagedServicesOptIn();
+        
+        // Log to activity
+        if (typeof logAdminActivity === 'function') {
+            logAdminActivity('managed_services_optin', {
+                email: user.email,
+                username: user.displayName || user.email?.split('@')[0]
+            });
+        }
+    } catch (error) {
+        console.error('Error opting in:', error);
+        showToast('Error saving preference. Please try again.', 'error');
+    }
+};
+
+window.optOutManagedServices = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+        await db.collection('users').doc(user.uid).update({
+            managedServicesInterest: false,
+            managedServicesOptOutDate: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('You\'ve been removed from the list.', 'info');
+        updateManagedServicesOptIn();
+    } catch (error) {
+        console.error('Error opting out:', error);
+        showToast('Error saving preference. Please try again.', 'error');
+    }
 };
 
 window.copyPhotoServicePhone = function() {

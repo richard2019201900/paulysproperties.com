@@ -185,7 +185,10 @@ const TierService = {
                 isFreeTrial: data.isFreeTrial === true,
                 trialStartDate: data.trialStartDate || '',
                 trialEndDate: data.trialEndDate || '',
-                trialNotes: data.trialNotes || ''
+                trialNotes: data.trialNotes || '',
+                // Managed services interest
+                managedServicesInterest: data.managedServicesInterest === true,
+                managedServicesOptInDate: data.managedServicesOptInDate || null
             };
         });
     },
