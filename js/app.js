@@ -208,10 +208,11 @@ window.viewProperty = function(id) {
                     
                     // Buy Price
                     if (buyPrice > 0) {
+                        const feeAmount = Math.round(buyPrice * 0.1);
                         html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center">';
                         html += '<div class="text-amber-400 text-xs font-bold mb-1">🏠 OWN IT</div>';
                         html += '<div class="text-amber-400 text-2xl md:text-3xl font-black">$' + buyPrice.toLocaleString() + '</div>';
-                        html += '<div class="text-amber-300/70 text-[10px] mt-1">One-time purchase</div>';
+                        html += '<div class="text-amber-300/70 text-[10px] mt-1">+10% realtor fee ($' + feeAmount.toLocaleString() + ')</div>';
                         html += '</div>';
                     }
                     

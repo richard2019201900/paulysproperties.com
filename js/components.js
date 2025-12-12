@@ -106,15 +106,35 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     const colors = isRent ? ['purple', 'blue'] : ['amber', 'orange'];
     const defaultPhone = '2057028233';
     
-    $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer';
+    $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer to Purchase';
     $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
-    $('modalPropertyName').textContent = (isRent ? 'Rent: ' : 'Contact Us About: ') + propertyTitle;
+    $('modalPropertyName').textContent = (isRent ? 'Rent: ' : 'Purchase: ') + propertyTitle;
     $('modalMessage').value = isRent 
         ? `Hi! I'm interested in renting ${propertyTitle}. Please contact me ASAP to discuss availability and next steps.`
         : `Hi! I'm interested in making an offer on ${propertyTitle}. Please contact me ASAP to discuss further.`;
     
     const accent = $('modalAccent');
     accent.className = `bg-gradient-to-r from-${colors[0]}-900 to-${colors[1]}-900 p-4 rounded-xl mb-6 text-center border border-${colors[0]}-700`;
+    
+    // Show appropriate disclaimer
+    const disclaimer = $('modalDisclaimer');
+    if (disclaimer) {
+        if (isRent) {
+            disclaimer.innerHTML = `
+                <div class="text-xs text-gray-400 mt-2">
+                    <strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. 
+                    This website serves as a listing platform only.
+                </div>
+            `;
+        } else {
+            disclaimer.innerHTML = `
+                <div class="text-xs text-gray-400 mt-2 space-y-1">
+                    <div><strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. This website serves as a listing platform only.</div>
+                    <div><strong>💰 Fee:</strong> A standard <span class="text-amber-400 font-bold">10% PMA realtor fee</span> applies to all property purchases on top of the listed price.</div>
+                </div>
+            `;
+        }
+    }
     
     // Reset to default phone first
     $('modalPhone').value = defaultPhone;
@@ -158,10 +178,34 @@ window.openRegisterContactModal = function() {
     $('modalMessage').value = "Hi! I'm interested in creating a new account as a Property Owner. Please contact me to get started. Thank you!";
     $('modalPhone').value = defaultPhone;
     
+    // Clear disclaimer for registration
+    const disclaimer = $('modalDisclaimer');
+    if (disclaimer) disclaimer.innerHTML = '';
+    
     const accent = $('modalAccent');
     accent.className = 'bg-gradient-to-r from-cyan-900 to-blue-900 p-4 rounded-xl mb-6 text-center border border-cyan-700';
     
     openModal('contactModal');
+};
+
+// ==================== PHOTO SERVICES ====================
+window.openPhotoServicesModal = function() {
+    openModal('photoServicesModal');
+};
+
+window.copyPhotoServicePhone = function() {
+    navigator.clipboard.writeText('2057028233').then(() => {
+        showToast('📱 Phone number copied!', 'success');
+    }).catch(() => {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = '2057028233';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('📱 Phone number copied!', 'success');
+    });
 };
 
 window.updateRegisterMessage = function() {

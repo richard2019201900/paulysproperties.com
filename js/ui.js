@@ -107,8 +107,8 @@ window.renderPricingTiers = function(p, isPremium) {
     // Buy Price
     if (buyPrice > 0) {
         html += '<div class="flex items-center justify-between border-t border-gray-700 pt-1.5 mt-1.5">';
-        html += '<span class="text-amber-400 text-xs font-semibold">🏠 Own It:</span>';
-        html += '<span class="text-amber-400 font-black text-lg">$' + buyPrice.toLocaleString() + '</span>';
+        html += '<span class="text-amber-400 text-xs font-semibold" title="+10% PMA realtor fee applies">🏠 Own It:</span>';
+        html += '<div class="text-right"><span class="text-amber-400 font-black text-lg">$' + buyPrice.toLocaleString() + '</span><span class="text-amber-400/60 text-[9px] block">+10% fee</span></div>';
         html += '</div>';
     }
     
