@@ -48,6 +48,16 @@ const NOTIFICATION_TYPES = {
         icon: '👑',
         title: 'Premium Listing Activated!',
         storageKey: 'adminPendingPremium'
+    },
+    PHOTO: {
+        prefix: 'photo-request-',
+        color: 'orange',
+        bgGradient: 'from-orange-500 to-pink-500',
+        badgeColor: 'bg-orange-500',
+        flashColor: 'orange',
+        icon: '📸',
+        title: '💰 Photo Service Inquiry!',
+        storageKey: 'adminPendingPhotoRequests'
     }
 };
 
@@ -61,6 +71,7 @@ window.AdminNotifications = {
     seenUsers: new Set(),
     seenListings: new Set(),
     seenPremium: new Set(),
+    seenPhotoRequests: new Set(),
     
     // Currently visible notifications (keyed by full notification ID)
     visible: new Map(),
@@ -75,11 +86,13 @@ window.AdminNotifications = {
     usersListenerActive: false,
     listingsListenerActive: false,
     premiumListenerActive: false,
+    photoRequestsListenerActive: false,
     
     // First snapshot flags
     usersFirstSnapshot: true,
     listingsFirstSnapshot: true,
-    premiumFirstSnapshot: true
+    premiumFirstSnapshot: true,
+    photoRequestsFirstSnapshot: true
 };
 
 // ============================================================================
@@ -123,6 +136,7 @@ window.initAdminNotifications = function() {
     startUserListener();
     startListingListener();
     startPremiumListener();
+    startPhotoRequestListener();
     
     // Initial badge update
     updateAllBadges();
@@ -555,6 +569,92 @@ function startPremiumListener() {
 }
 
 // ============================================================================
+// PHOTO SERVICE REQUEST LISTENER (Revenue generating - IMPORTANT!)
+// ============================================================================
+
+function startPhotoRequestListener() {
+    if (AdminNotifications.photoRequestsListenerActive) {
+        console.log('[AdminNotify:Photo] Listener already active');
+        return;
+    }
+    
+    console.log('[AdminNotify:Photo] Starting listener...');
+    AdminNotifications.photoRequestsListenerActive = true;
+    
+    // Listen to photoServiceRequests collection
+    db.collection('photoServiceRequests')
+        .where('viewed', '==', false)
+        .orderBy('requestedAt', 'desc')
+        .onSnapshot((snapshot) => {
+            const isFirst = AdminNotifications.photoRequestsFirstSnapshot;
+            const newRequests = [];
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const notifId = NOTIFICATION_TYPES.PHOTO.prefix + doc.id;
+                
+                // Check if new to us
+                if (!AdminNotifications.seenPhotoRequests.has(doc.id)) {
+                    AdminNotifications.seenPhotoRequests.add(doc.id);
+                    
+                    if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
+                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail);
+                        newRequests.push({
+                            id: doc.id,
+                            notifId: notifId,
+                            userEmail: data.userEmail || 'Anonymous',
+                            username: data.username || 'Anonymous',
+                            requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date()
+                        });
+                    }
+                }
+                
+                // Add to visible if not dismissed
+                if (!AdminNotifications.dismissed.has(notifId)) {
+                    if (!AdminNotifications.visible.has(notifId)) {
+                        AdminNotifications.visible.set(notifId, {
+                            type: 'photo',
+                            data: { ...data, id: doc.id, notifId }
+                        });
+                    }
+                }
+            });
+            
+            // Mark first snapshot complete
+            if (isFirst) {
+                AdminNotifications.photoRequestsFirstSnapshot = false;
+                console.log('[AdminNotify:Photo] Initial load complete, seen', AdminNotifications.seenPhotoRequests.size, 'photo requests');
+                
+                // Render existing photo notifications
+                renderPendingNotifications(NOTIFICATION_TYPES.PHOTO);
+            }
+            
+            // Handle new photo requests
+            if (newRequests.length > 0) {
+                // Flash screen (orange for revenue-generating!)
+                flashScreen(NOTIFICATION_TYPES.PHOTO.flashColor);
+                
+                // Create notifications
+                newRequests.forEach(req => {
+                    createNotification(NOTIFICATION_TYPES.PHOTO, req.notifId, {
+                        title: NOTIFICATION_TYPES.PHOTO.title,
+                        message: `${req.username} wants photo services - CALL THEM!`,
+                        timestamp: req.requestedAt,
+                        data: req
+                    });
+                });
+            }
+            
+            // Update badges
+            updateAllBadges();
+            
+        }, error => {
+            console.error('[AdminNotify:Photo] Error:', error);
+            AdminNotifications.photoRequestsListenerActive = false;
+        });
+}
+
+// ============================================================================
 // NOTIFICATION RENDERING
 // ============================================================================
 
@@ -709,6 +809,19 @@ window.dismissAdminNotification = async function(notifId) {
         }
     }
     
+    // If it's a photo service request, mark as viewed in Firestore
+    if (notifId.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
+        const docId = notifId.replace(NOTIFICATION_TYPES.PHOTO.prefix, '');
+        try {
+            await db.collection('photoServiceRequests').doc(docId).update({
+                viewed: true,
+                viewedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (e) {
+            console.log('[AdminNotify] Photo request dismiss error:', e.message);
+        }
+    }
+    
     // Update badges
     updateAllBadges();
     
@@ -743,6 +856,7 @@ function updateAllBadges() {
     let userCount = 0;
     let listingCount = 0;
     let premiumCount = 0;
+    let photoCount = 0;
     
     AdminNotifications.visible.forEach((data, notifId) => {
         if (AdminNotifications.dismissed.has(notifId)) return;
@@ -753,10 +867,12 @@ function updateAllBadges() {
             listingCount++;
         } else if (notifId.startsWith(NOTIFICATION_TYPES.PREMIUM.prefix)) {
             premiumCount++;
+        } else if (notifId.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
+            photoCount++;
         }
     });
     
-    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount });
+    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount });
     
     // Update user badge
     const userBadge = document.getElementById('adminNewUserBadge');
@@ -794,10 +910,22 @@ function updateAllBadges() {
         }
     }
     
+    // Update photo request badge (revenue generating - important!)
+    const photoBadge = document.getElementById('adminNewPhotoBadge');
+    const photoCountEl = document.getElementById('adminNewPhotoCount');
+    if (photoBadge && photoCountEl) {
+        if (photoCount > 0) {
+            photoCountEl.textContent = photoCount > 9 ? '9+' : photoCount;
+            photoBadge.style.display = 'flex';
+        } else {
+            photoBadge.style.display = 'none';
+        }
+    }
+    
     // Update container visibility
     const badgesContainer = document.getElementById('adminNotificationBadges');
     if (badgesContainer) {
-        const total = userCount + listingCount + premiumCount;
+        const total = userCount + listingCount + premiumCount + photoCount;
         badgesContainer.style.display = total > 0 ? 'flex' : 'none';
     }
 }
@@ -814,6 +942,7 @@ function flashScreen(color) {
         blue: 'rgba(59, 130, 246, 0.3)',
         green: 'rgba(16, 185, 129, 0.3)',
         gold: 'rgba(245, 158, 11, 0.3)',
+        orange: 'rgba(249, 115, 22, 0.4)',
         red: 'rgba(239, 68, 68, 0.3)'
     };
     

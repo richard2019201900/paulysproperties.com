@@ -3697,6 +3697,18 @@ window.showNewPremiumNotifications = function(event) {
     }, 100);
 };
 
+// Show new photo service request notifications popup
+window.showNewPhotoNotifications = function(event) {
+    event.stopPropagation();
+    // Navigate to dashboard - photo notifications are shown in the stack
+    goToDashboard();
+    
+    // Re-render pending notifications
+    setTimeout(() => {
+        reRenderPendingNotifications();
+    }, 100);
+};
+
 // Re-render all pending notifications that might not be showing
 window.reRenderPendingNotifications = function() {
     const stack = $('adminNotificationsStack');

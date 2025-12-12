@@ -193,7 +193,50 @@ window.openPhotoServicesModal = function() {
     openModal('photoServicesModal');
     // Update opt-in content based on login status
     updateManagedServicesOptIn();
+    // Reset the copy button state
+    const btn = $('photoServicesCopyBtn');
+    if (btn) {
+        btn.innerHTML = '<span>📱</span> Copy & Notify: 2057028233';
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
 };
+
+// Close photo promo bar (desktop)
+window.closePhotoPromoBar = function() {
+    const bar = $('photoPromoBar');
+    if (bar) {
+        bar.style.display = 'none';
+        // Remember dismissal for this session
+        sessionStorage.setItem('photoPromoBarDismissed', 'true');
+    }
+};
+
+// Close mobile photo promo bar
+window.closeMobilePhotoPromoBar = function() {
+    const bar = $('mobilePhotoPromoBar');
+    if (bar) {
+        bar.style.display = 'none';
+        sessionStorage.setItem('mobilePhotoPromoBarDismissed', 'true');
+    }
+};
+
+// Check if promo bars should be hidden (on page load)
+window.checkPhotoPromoBarState = function() {
+    if (sessionStorage.getItem('photoPromoBarDismissed') === 'true') {
+        const bar = $('photoPromoBar');
+        if (bar) bar.style.display = 'none';
+    }
+    if (sessionStorage.getItem('mobilePhotoPromoBarDismissed') === 'true') {
+        const bar = $('mobilePhotoPromoBar');
+        if (bar) bar.style.display = 'none';
+    }
+};
+
+// Call on page load
+document.addEventListener('DOMContentLoaded', function() {
+    checkPhotoPromoBarState();
+});
 
 window.updateManagedServicesOptIn = async function() {
     const container = $('optInContent');
@@ -293,10 +336,14 @@ window.optOutManagedServices = async function() {
     }
 };
 
-window.copyPhotoServicePhone = function() {
-    navigator.clipboard.writeText('2057028233').then(() => {
-        showToast('📱 Phone number copied!', 'success');
-    }).catch(() => {
+window.copyAndNotifyPhotoServices = async function() {
+    const user = auth.currentUser;
+    const btn = $('photoServicesCopyBtn');
+    
+    // Copy phone number to clipboard
+    try {
+        await navigator.clipboard.writeText('2057028233');
+    } catch (e) {
         // Fallback
         const textarea = document.createElement('textarea');
         textarea.value = '2057028233';
@@ -304,8 +351,48 @@ window.copyPhotoServicePhone = function() {
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
+    }
+    
+    // Create notification for admin
+    try {
+        const userEmail = user?.email || 'Anonymous Visitor';
+        const username = user?.displayName || user?.email?.split('@')[0] || 'Anonymous';
+        
+        // Save to Firestore photoServiceRequests collection
+        await db.collection('photoServiceRequests').add({
+            userEmail: userEmail,
+            username: username,
+            userId: user?.uid || null,
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            type: 'photo_inquiry',
+            status: 'pending',
+            viewed: false
+        });
+        
+        console.log('[PhotoServices] Request notification created for:', userEmail);
+        
+        // Update button to show success
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied! Team Notified';
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        showToast('📸 Phone copied! Our team has been notified of your interest.', 'success');
+        
+    } catch (error) {
+        console.error('[PhotoServices] Error creating notification:', error);
+        // Still show success for copy even if notification failed
         showToast('📱 Phone number copied!', 'success');
-    });
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+        }
+    }
+};
+
+// Legacy function for backwards compatibility
+window.copyPhotoServicePhone = function() {
+    copyAndNotifyPhotoServices();
 };
 
 window.updateRegisterMessage = function() {
