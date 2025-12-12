@@ -198,28 +198,40 @@ window.openPhotoServicesModal = function() {
     window.selectedPhotoPackage = null;
     
     // Reset UI state for package options
-    const singleOption = $('photoOptionSingle');
-    const bundleOption = $('photoOptionBundle');
-    const singleCheck = $('photoSingleCheck');
-    const bundleCheck = $('photoBundleCheck');
+    const singleOption = document.getElementById('photoOptionSingle');
+    const bundleOption = document.getElementById('photoOptionBundle');
+    const singleCheck = document.getElementById('photoSingleCheck');
+    const bundleCheck = document.getElementById('photoBundleCheck');
     
     if (singleOption) {
         singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
         singleOption.classList.add('border-gray-600');
+        // Attach click handler directly
+        singleOption.onclick = function(e) {
+            e.stopPropagation();
+            selectPhotoPackage('single');
+        };
     }
     if (bundleOption) {
         bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
+        // Attach click handler directly
+        bundleOption.onclick = function(e) {
+            e.stopPropagation();
+            selectPhotoPackage('bundle');
+        };
     }
     if (singleCheck) singleCheck.classList.add('hidden');
     if (bundleCheck) bundleCheck.classList.add('hidden');
     
     // Reset the copy button state
-    const btn = $('photoServicesCopyBtn');
+    const btn = document.getElementById('photoServicesCopyBtn');
     if (btn) {
         btn.innerHTML = '<span>📱</span> Select a Package Above';
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
+    
+    console.log('[PhotoServices] Modal opened, handlers attached');
 };
 
 // Collapse photo promo bar (desktop) - shows minimal tab
@@ -396,24 +408,39 @@ window.selectedPhotoPackage = null;
 
 // Select a photo package
 window.selectPhotoPackage = function(packageType) {
+    console.log('[PhotoServices] selectPhotoPackage called with:', packageType);
+    
     window.selectedPhotoPackage = packageType;
     
-    const singleOption = $('photoOptionSingle');
-    const bundleOption = $('photoOptionBundle');
-    const singleCheck = $('photoSingleCheck');
-    const bundleCheck = $('photoBundleCheck');
-    const copyBtn = $('photoServicesCopyBtn');
+    const singleOption = document.getElementById('photoOptionSingle');
+    const bundleOption = document.getElementById('photoOptionBundle');
+    const singleCheck = document.getElementById('photoSingleCheck');
+    const bundleCheck = document.getElementById('photoBundleCheck');
+    const copyBtn = document.getElementById('photoServicesCopyBtn');
+    
+    console.log('[PhotoServices] Elements found:', {
+        singleOption: !!singleOption,
+        bundleOption: !!bundleOption,
+        singleCheck: !!singleCheck,
+        bundleCheck: !!bundleCheck,
+        copyBtn: !!copyBtn
+    });
+    
+    if (!singleOption || !bundleOption) {
+        console.error('[PhotoServices] Package option elements not found!');
+        return;
+    }
     
     if (packageType === 'single') {
         // Select single photo option
         singleOption.classList.remove('border-gray-600');
         singleOption.classList.add('border-green-500', 'ring-2', 'ring-green-500/50');
-        singleCheck.classList.remove('hidden');
+        if (singleCheck) singleCheck.classList.remove('hidden');
         
         // Deselect bundle
         bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
         bundleOption.classList.add('border-amber-500');
-        bundleCheck.classList.add('hidden');
+        if (bundleCheck) bundleCheck.classList.add('hidden');
         
         // Update button text
         if (copyBtn) {
@@ -422,12 +449,12 @@ window.selectPhotoPackage = function(packageType) {
     } else if (packageType === 'bundle') {
         // Select bundle option
         bundleOption.classList.add('ring-2', 'ring-amber-500/50');
-        bundleCheck.classList.remove('hidden');
+        if (bundleCheck) bundleCheck.classList.remove('hidden');
         
         // Deselect single
         singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
         singleOption.classList.add('border-gray-600');
-        singleCheck.classList.add('hidden');
+        if (singleCheck) singleCheck.classList.add('hidden');
         
         // Update button text
         if (copyBtn) {
@@ -440,7 +467,7 @@ window.selectPhotoPackage = function(packageType) {
 
 window.copyAndNotifyPhotoServices = async function() {
     const user = auth.currentUser;
-    const btn = $('photoServicesCopyBtn');
+    const btn = document.getElementById('photoServicesCopyBtn');
     
     // Check if package is selected
     if (!window.selectedPhotoPackage) {

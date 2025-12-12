@@ -1757,10 +1757,10 @@ window.refreshPropertyAnalytics = async function(propertyId) {
         analyticsContainer.innerHTML = renderPropertyAnalytics(property, payments, analytics);
     }
     
-    // Also refresh the detail view if we're viewing this property
-    if (currentDetailProperty && currentDetailProperty.id === propertyId) {
-        // Re-render the detail view
-        showPropertyDetail(propertyId);
+    // Also refresh the stats page if we're viewing this property
+    if (state && state.currentPropertyId === propertyId) {
+        // Re-render the stats page content
+        renderPropertyStatsContent(propertyId);
     }
     
     console.log('[Analytics] Refresh complete');
