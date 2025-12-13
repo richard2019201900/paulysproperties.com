@@ -1248,9 +1248,23 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             });
             console.log(`[PaymentLog] Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
             
-            // Show toast notification for payment logged
-            if (logSuccess && typeof showToast === 'function') {
-                showToast(`💰 Payment logged: $${paymentAmount.toLocaleString()} from ${renterName}`, 'success');
+            // Calculate next due date for thank you message
+            const lastDate = parseLocalDate(newValue);
+            const nextDate = new Date(lastDate);
+            if (paymentFrequency === 'daily') {
+                nextDate.setDate(nextDate.getDate() + 1);
+            } else if (paymentFrequency === 'weekly') {
+                nextDate.setDate(nextDate.getDate() + 7);
+            } else if (paymentFrequency === 'biweekly') {
+                nextDate.setDate(nextDate.getDate() + 14);
+            } else {
+                nextDate.setMonth(nextDate.getMonth() + 1);
+            }
+            const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            // Show thank you message popup with copy functionality
+            if (logSuccess) {
+                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount);
             }
         }
         
@@ -1659,6 +1673,95 @@ window.logPayment = async function(propertyId, paymentData) {
             showToast('⚠️ Payment may not have been logged: ' + error.message, 'error');
         }
         return false;
+    }
+};
+
+// Show payment confirmation modal with copyable thank you message
+window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount) {
+    // Get first name only for friendlier message
+    const firstName = renterName.split(' ')[0];
+    
+    // Create the thank you message
+    const thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+    
+    // Create modal HTML
+    const modalHTML = `
+        <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closePaymentConfirmModal()">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl" onclick="event.stopPropagation()">
+                <div class="text-center mb-4">
+                    <div class="text-5xl mb-3">✅</div>
+                    <h3 class="text-2xl font-bold text-green-400">Payment Logged!</h3>
+                    <p class="text-gray-400 mt-1">$${amount.toLocaleString()} from ${renterName}</p>
+                </div>
+                
+                <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${firstName}:</span>
+                    </div>
+                    <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600">
+                        ${thankYouMessage}
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="copyThankYouMessage()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Message
+                    </button>
+                    <button onclick="closePaymentConfirmModal()" class="flex-1 bg-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove any existing modal
+    const existing = document.getElementById('paymentConfirmModal');
+    if (existing) existing.remove();
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Store message for copy function
+    window.currentThankYouMessage = thankYouMessage;
+};
+
+window.copyThankYouMessage = async function() {
+    try {
+        await navigator.clipboard.writeText(window.currentThankYouMessage);
+        
+        // Update button to show success
+        const btn = document.querySelector('#paymentConfirmModal button');
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.remove('from-green-500', 'to-emerald-600');
+            btn.classList.add('from-blue-500', 'to-purple-600');
+        }
+        
+        if (typeof showToast === 'function') {
+            showToast('📋 Message copied to clipboard!', 'success');
+        }
+    } catch (e) {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = window.currentThankYouMessage;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        if (typeof showToast === 'function') {
+            showToast('📋 Message copied!', 'success');
+        }
+    }
+};
+
+window.closePaymentConfirmModal = function() {
+    const modal = document.getElementById('paymentConfirmModal');
+    if (modal) {
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.2s';
+        setTimeout(() => modal.remove(), 200);
     }
 };
 

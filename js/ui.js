@@ -1884,9 +1884,23 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
             });
             console.log(`[PaymentLog] Dashboard: Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
             
-            // Show toast notification for payment logged
-            if (logSuccess && typeof showToast === 'function') {
-                showToast(`💰 Payment logged: $${paymentAmount.toLocaleString()} from ${renterName}`, 'success');
+            // Calculate next due date for thank you message
+            const lastDate = parseLocalDate(newValue);
+            const nextDate = new Date(lastDate);
+            if (paymentFrequency === 'daily') {
+                nextDate.setDate(nextDate.getDate() + 1);
+            } else if (paymentFrequency === 'weekly') {
+                nextDate.setDate(nextDate.getDate() + 7);
+            } else if (paymentFrequency === 'biweekly') {
+                nextDate.setDate(nextDate.getDate() + 14);
+            } else {
+                nextDate.setMonth(nextDate.getMonth() + 1);
+            }
+            const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            // Show thank you message popup with copy functionality
+            if (logSuccess && typeof showPaymentConfirmationModal === 'function') {
+                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount);
             }
         }
         
