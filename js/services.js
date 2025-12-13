@@ -423,9 +423,19 @@ const PropertyDataService = {
             .onSnapshot(doc => {
                 if (doc.exists) {
                     const data = doc.data();
-                    Object.keys(data).forEach(propId => {
-                        if (!isNaN(parseInt(propId))) {
-                            state.propertyOverrides[propId] = data[propId];
+                    // Parse flat structure: "1.bedrooms" -> state.propertyOverrides[1].bedrooms
+                    // MUST match the parsing logic in setupAvailabilityListener
+                    Object.keys(data).forEach(key => {
+                        const parts = key.split('.');
+                        if (parts.length === 2) {
+                            const propId = parts[0];
+                            const field = parts[1];
+                            if (!isNaN(parseInt(propId))) {
+                                if (!state.propertyOverrides[propId]) {
+                                    state.propertyOverrides[propId] = {};
+                                }
+                                state.propertyOverrides[propId][field] = data[key];
+                            }
                         }
                     });
                     if (callback) callback(data);

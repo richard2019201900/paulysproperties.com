@@ -582,15 +582,20 @@ function startPhotoRequestListener() {
     AdminNotifications.photoRequestsListenerActive = true;
     
     // Listen to photoServiceRequests collection
+    // Note: Using simple query without composite index requirement
     db.collection('photoServiceRequests')
-        .where('viewed', '==', false)
         .orderBy('requestedAt', 'desc')
+        .limit(50)
         .onSnapshot((snapshot) => {
             const isFirst = AdminNotifications.photoRequestsFirstSnapshot;
             const newRequests = [];
             
             snapshot.forEach(doc => {
                 const data = doc.data();
+                
+                // Skip viewed requests (filtered client-side to avoid composite index)
+                if (data.viewed === true) return;
+                
                 const notifId = NOTIFICATION_TYPES.PHOTO.prefix + doc.id;
                 
                 // Check if new to us
