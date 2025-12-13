@@ -206,19 +206,9 @@ window.openPhotoServicesModal = function() {
     if (singleOption) {
         singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
         singleOption.classList.add('border-gray-600');
-        // Attach click handler directly
-        singleOption.onclick = function(e) {
-            e.stopPropagation();
-            selectPhotoPackage('single');
-        };
     }
     if (bundleOption) {
         bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
-        // Attach click handler directly
-        bundleOption.onclick = function(e) {
-            e.stopPropagation();
-            selectPhotoPackage('bundle');
-        };
     }
     if (singleCheck) singleCheck.classList.add('hidden');
     if (bundleCheck) bundleCheck.classList.add('hidden');
@@ -231,8 +221,40 @@ window.openPhotoServicesModal = function() {
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
     
-    console.log('[PhotoServices] Modal opened, handlers attached');
+    console.log('[PhotoServices] Modal opened');
 };
+
+// Initialize photo package click handlers using event delegation
+(function initPhotoPackageHandlers() {
+    function setupDelegation() {
+        // Use event delegation on document to catch clicks on photo package options
+        document.addEventListener('click', function(e) {
+            // Check if clicked element or its parent is a photo option
+            const singleOption = e.target.closest('#photoOptionSingle');
+            const bundleOption = e.target.closest('#photoOptionBundle');
+            
+            if (singleOption) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[PhotoServices] Single package clicked via delegation');
+                window.selectPhotoPackage('single');
+            } else if (bundleOption) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[PhotoServices] Bundle package clicked via delegation');
+                window.selectPhotoPackage('bundle');
+            }
+        });
+        console.log('[PhotoServices] Event delegation initialized');
+    }
+    
+    // Run immediately if DOM is ready, otherwise wait
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupDelegation);
+    } else {
+        setupDelegation();
+    }
+})();
 
 // Collapse photo promo bar (desktop) - shows minimal tab
 window.collapsePhotoPromoBar = function() {
