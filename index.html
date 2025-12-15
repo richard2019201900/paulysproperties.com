@@ -1273,7 +1273,15 @@
             <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
                 <div class="flex flex-wrap justify-between items-center mb-6 gap-2">
                     <h3 class="text-2xl md:text-3xl font-bold text-gray-200">🏠 Your Properties</h3>
-                    <span class="text-sm text-purple-400 font-medium">💡 Click any value to edit</span>
+                    <div class="flex items-center gap-3">
+                        <!-- Elite Reports Button -->
+                        <button id="eliteReportsBtn" onclick="openReportsModal()" 
+                            class="hidden bg-gradient-to-r from-yellow-500 to-amber-600 text-gray-900 px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2 text-sm">
+                            <span>📊</span> Reports
+                            <span class="bg-yellow-300 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">ELITE</span>
+                        </button>
+                        <span class="text-sm text-purple-400 font-medium">💡 Click any value to edit</span>
+                    </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-gray-700">
                     <table class="w-full text-gray-300 text-sm md:text-base" id="dashboardTable" style="border-collapse: separate; border-spacing: 0;">
@@ -1671,6 +1679,56 @@
     <script src="js/ui.js"></script>
     <script src="js/filters.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Elite Reports Modal -->
+    <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center hidden overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 max-w-6xl w-full mx-4 my-8 border border-yellow-500/50 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 class="text-3xl font-black bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent flex items-center gap-3">
+                        📊 Portfolio Reports
+                        <span class="bg-gradient-to-r from-yellow-500 to-amber-600 text-gray-900 text-xs px-2 py-1 rounded-full font-bold">👑 ELITE</span>
+                    </h2>
+                    <p class="text-gray-400 mt-2">Analyze your rental portfolio performance</p>
+                </div>
+                <button onclick="closeModal('reportsModal')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <!-- Report Tabs -->
+            <div class="flex flex-wrap gap-2 mb-6 border-b border-gray-700 pb-4">
+                <button onclick="switchReportTab('overview')" id="reportTab-overview" class="report-tab active px-4 py-2 rounded-lg font-bold text-sm transition bg-yellow-500 text-gray-900">
+                    📈 Overview
+                </button>
+                <button onclick="switchReportTab('income')" id="reportTab-income" class="report-tab px-4 py-2 rounded-lg font-bold text-sm transition bg-gray-700 text-gray-300 hover:bg-gray-600">
+                    💰 Income Analysis
+                </button>
+                <button onclick="switchReportTab('occupancy')" id="reportTab-occupancy" class="report-tab px-4 py-2 rounded-lg font-bold text-sm transition bg-gray-700 text-gray-300 hover:bg-gray-600">
+                    🏠 Occupancy
+                </button>
+                <button onclick="switchReportTab('payments')" id="reportTab-payments" class="report-tab px-4 py-2 rounded-lg font-bold text-sm transition bg-gray-700 text-gray-300 hover:bg-gray-600">
+                    📅 Payment History
+                </button>
+            </div>
+            
+            <!-- Report Content -->
+            <div id="reportContent" class="min-h-[400px]">
+                <div class="flex items-center justify-center h-64">
+                    <div class="text-center">
+                        <div class="text-4xl mb-3 animate-pulse">📊</div>
+                        <p class="text-gray-400">Loading reports...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Export Options -->
+            <div class="mt-6 pt-4 border-t border-gray-700 flex justify-between items-center">
+                <p class="text-gray-500 text-sm">Data updated in real-time from your payment history</p>
+                <button onclick="exportReportData()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2">
+                    <span>📥</span> Export Data
+                </button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
