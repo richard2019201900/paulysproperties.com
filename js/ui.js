@@ -8133,10 +8133,7 @@ function renderPerformanceReport(data) {
 // Show/hide Elite Reports button based on tier
 function updateEliteReportsButton() {
     const btn = document.getElementById('eliteReportsBtn');
-    if (!btn) {
-        console.log('[Reports] Button element not found');
-        return;
-    }
+    if (!btn) return;
     
     const user = auth.currentUser;
     if (!user) {
@@ -8149,7 +8146,6 @@ function updateEliteReportsButton() {
     if (TierService.isMasterAdmin(user.email)) {
         btn.classList.remove('hidden');
         btn.classList.add('flex');
-        console.log('[Reports] Button visible for master admin');
         return;
     }
     
@@ -8157,7 +8153,6 @@ function updateEliteReportsButton() {
     if (state.ownerData?.tier === 'elite') {
         btn.classList.remove('hidden');
         btn.classList.add('flex');
-        console.log('[Reports] Button visible for Elite user (from cache)');
         return;
     }
     
@@ -8166,25 +8161,17 @@ function updateEliteReportsButton() {
         .then(snapshot => {
             if (!snapshot.empty) {
                 const userData = snapshot.docs[0].data();
-                const isElite = userData.tier === 'elite';
-                
-                console.log('[Reports] User tier from Firestore:', userData.tier, 'isElite:', isElite);
-                
-                if (isElite) {
+                if (userData.tier === 'elite') {
                     btn.classList.remove('hidden');
                     btn.classList.add('flex');
-                    console.log('[Reports] Button visible for Elite user');
                 } else {
                     btn.classList.add('hidden');
                     btn.classList.remove('flex');
-                    console.log('[Reports] Button hidden - user tier:', userData.tier);
                 }
-            } else {
-                console.log('[Reports] No user document found for', user.email);
             }
         })
-        .catch(err => {
-            console.error('[Reports] Error checking tier:', err);
+        .catch(() => {
+            // Silently fail - button just won't show
         });
 }
 
@@ -8713,61 +8700,30 @@ window.exportReportData = async function() {
 // Helper to get owner properties
 function getOwnerProperties() {
     const user = auth.currentUser;
-    if (!user) {
-        console.log('[getOwnerProperties] No user logged in');
-        return [];
-    }
+    if (!user) return [];
     
     // Master admin sees all properties
     if (TierService.isMasterAdmin(user.email)) {
-        console.log('[getOwnerProperties] Master admin - returning all', properties.length, 'properties');
         return properties;
     }
     
     const userEmail = user.email.toLowerCase();
-    console.log('[getOwnerProperties] User email:', userEmail);
-    console.log('[getOwnerProperties] Total properties array length:', properties.length);
-    console.log('[getOwnerProperties] ownerPropertyMap for user:', ownerPropertyMap[userEmail]);
-    
-    // Regular users see their own properties
-    // Check ownerEmail field (used when creating properties)
-    // Also check ownerPropertyMap as a backup
     const userPropertyIds = ownerPropertyMap[userEmail] || [];
     
-    const result = properties.filter(p => {
+    return properties.filter(p => {
         // Primary check: ownerEmail field
         const propOwnerEmail = (p.ownerEmail || '').toLowerCase();
-        if (propOwnerEmail === userEmail) {
-            console.log('[getOwnerProperties] Match via ownerEmail:', p.id, p.title);
-            return true;
-        }
+        if (propOwnerEmail === userEmail) return true;
         
         // Secondary check: ownerPropertyMap
-        if (userPropertyIds.includes(p.id)) {
-            console.log('[getOwnerProperties] Match via ownerPropertyMap:', p.id, p.title);
-            return true;
-        }
+        if (userPropertyIds.includes(p.id)) return true;
         
         // Legacy check: owner field (old properties)
         const legacyOwner = PropertyDataService.getValue(p.id, 'owner', p.owner || '');
-        if (legacyOwner && legacyOwner.toLowerCase() === userEmail) {
-            console.log('[getOwnerProperties] Match via legacy owner field:', p.id, p.title);
-            return true;
-        }
+        if (legacyOwner && legacyOwner.toLowerCase() === userEmail) return true;
         
         return false;
     });
-    
-    console.log('[getOwnerProperties] Found', result.length, 'properties for', userEmail);
-    if (result.length === 0 && properties.length > 0) {
-        // Debug: Log first few properties to see their ownerEmail
-        console.log('[getOwnerProperties] DEBUG - First 3 properties in array:');
-        properties.slice(0, 3).forEach(p => {
-            console.log('  Property', p.id, ':', p.title, '| ownerEmail:', p.ownerEmail);
-        });
-    }
-    
-    return result;
 }
 
 // Format large numbers
