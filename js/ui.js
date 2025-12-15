@@ -6312,6 +6312,27 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
             
             await db.collection('users').doc(userId).update(updateData);
             console.log(`[Subscription] Set for ${email}: trial=${isTrial}, prorated=${isProrated}, amount=$${subscriptionAmount}`);
+            
+            // CREATE USER NOTIFICATION so they see the upgrade in their dashboard
+            const trialLabel = isTrial ? ' (Free Trial)' : '';
+            const defaultMessage = isTrial 
+                ? `Congratulations! You've been upgraded to ${tierData.name}${trialLabel}. Enjoy your free trial!`
+                : `Congratulations! You've been upgraded to ${tierData.name}. Thank you for your subscription!`;
+            
+            await db.collection('userNotifications').add({
+                userEmail: email.toLowerCase(),
+                type: 'upgrade',
+                title: `🎉 Welcome to ${tierData.name}!`,
+                message: notes || defaultMessage,
+                newTier: newTier,
+                previousTier: currentTier,
+                isTrial: isTrial,
+                trialEndDate: isTrial ? trialEndDate.toISOString().split('T')[0] : null,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                read: false,
+                dismissed: false
+            });
+            console.log(`[Upgrade] User notification created for ${email}`);
         }
         
         // Show success briefly then close
@@ -6321,15 +6342,10 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
             confirmBtn.classList.add('from-green-600', 'to-emerald-600');
         }
         
-        // Close modal and refresh after brief delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Force close modal
-        const modal = $('upgradeModal');
-        if (modal) {
-            modal.remove();
-            console.log('[Upgrade] Modal closed');
-        }
+        // Close modal after brief delay
+        setTimeout(() => {
+            closeUpgradeModal();
+        }, 800);
         
         // Show toast and refresh users
         const trialMsg = isTrial ? ' (Trial)' : '';
@@ -7274,7 +7290,7 @@ window.loadUserNotifications = async function() {
                 
                 // Check for upgrade-related notifications to refresh pending status
                 const hasUpgradeNotification = notifications.some(n => 
-                    n.type === 'upgrade_approved' || n.type === 'upgrade_denied'
+                    n.type === 'upgrade_approved' || n.type === 'upgrade_denied' || n.type === 'upgrade'
                 );
                 if (hasUpgradeNotification) {
                     // Refresh pending upgrade request status
@@ -7292,10 +7308,30 @@ window.loadUserNotifications = async function() {
                 const recentNotifs = notifications.slice(0, 5);
                 
                 container.innerHTML = recentNotifs.map(notif => {
-                    const isApproval = notif.type === 'upgrade_approved';
-                    const bgColor = isApproval ? 'from-green-600/20 to-emerald-600/20' : 'from-red-600/20 to-orange-600/20';
-                    const borderColor = isApproval ? 'border-green-500/50' : 'border-red-500/50';
-                    const icon = isApproval ? '🎉' : '❌';
+                    const isApproval = notif.type === 'upgrade_approved' || notif.type === 'upgrade';
+                    const isDenial = notif.type === 'upgrade_denied';
+                    
+                    let bgColor, borderColor, icon;
+                    if (isApproval) {
+                        bgColor = 'from-green-600/20 to-emerald-600/20';
+                        borderColor = 'border-green-500/50';
+                        icon = '🎉';
+                    } else if (isDenial) {
+                        bgColor = 'from-red-600/20 to-orange-600/20';
+                        borderColor = 'border-red-500/50';
+                        icon = '❌';
+                    } else {
+                        bgColor = 'from-blue-600/20 to-purple-600/20';
+                        borderColor = 'border-blue-500/50';
+                        icon = '📢';
+                    }
+                    
+                    // Special styling for trial notifications
+                    if (notif.isTrial) {
+                        bgColor = 'from-cyan-600/20 to-blue-600/20';
+                        borderColor = 'border-cyan-500/50';
+                        icon = '🎁';
+                    }
                     
                     return `
                         <div id="notif-${notif.id}" class="bg-gradient-to-r ${bgColor} border ${borderColor} rounded-xl p-4 flex items-start justify-between gap-4">
@@ -7304,6 +7340,7 @@ window.loadUserNotifications = async function() {
                                 <div>
                                     <h4 class="text-white font-bold">${notif.title}</h4>
                                     <p class="text-gray-300 text-sm mt-1">${notif.message}</p>
+                                    ${notif.isTrial && notif.trialEndDate ? `<p class="text-cyan-400 text-xs mt-2 font-medium">Trial ends: ${new Date(notif.trialEndDate).toLocaleDateString()}</p>` : ''}
                                     ${notif.createdAt?.toDate ? `<p class="text-gray-500 text-xs mt-2">${notif.createdAt.toDate().toLocaleString()}</p>` : ''}
                                 </div>
                             </div>
