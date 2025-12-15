@@ -8136,6 +8136,15 @@ function updateEliteReportsButton() {
     const user = auth.currentUser;
     if (!user) {
         btn.classList.add('hidden');
+        btn.classList.remove('flex');
+        return;
+    }
+    
+    // Master admin (owner) always gets access
+    if (TierService.isMasterAdmin(user.email)) {
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+        console.log('[Reports] Button visible for master admin');
         return;
     }
     
@@ -8145,87 +8154,21 @@ function updateEliteReportsButton() {
             if (!snapshot.empty) {
                 const userData = snapshot.docs[0].data();
                 const isElite = userData.tier === 'elite';
-                // Also allow master admin to see it
-                const isMasterAdmin = user.email === 'richard2019201900@gmail.com';
                 
-                if (isElite || isMasterAdmin) {
+                if (isElite) {
                     btn.classList.remove('hidden');
+                    btn.classList.add('flex');
+                    console.log('[Reports] Button visible for Elite user');
                 } else {
                     btn.classList.add('hidden');
+                    btn.classList.remove('flex');
                 }
             }
         });
 }
 
-// Open Reports Modal
-window.openReportsModal = async function() {
-    const user = auth.currentUser;
-    if (!user) {
-        showToast('Please log in to view reports', 'error');
-        return;
-    }
-    
-    // Check Elite access
-    const snapshot = await db.collection('users').where('email', '==', user.email.toLowerCase()).get();
-    if (snapshot.empty) return;
-    
-    const userData = snapshot.docs[0].data();
-    const isElite = userData.tier === 'elite';
-    const isMasterAdmin = user.email === 'richard2019201900@gmail.com';
-    
-    if (!isElite && !isMasterAdmin) {
-        showToast('📊 Portfolio Reports is an Elite-only feature. Upgrade to unlock!', 'info');
-        openUpgradeModal('Access Elite Reports and analytics', userData.tier || 'starter');
-        return;
-    }
-    
-    openModal('reportsModal');
-    switchReportTab('overview');
-};
-
-// Switch report tabs
-window.switchReportTab = function(tabName) {
-    // Update tab styles
-    document.querySelectorAll('.report-tab').forEach(tab => {
-        tab.classList.remove('bg-yellow-500', 'text-gray-900');
-        tab.classList.add('bg-gray-700', 'text-gray-300');
-    });
-    
-    const activeTab = document.getElementById(`reportTab-${tabName}`);
-    if (activeTab) {
-        activeTab.classList.remove('bg-gray-700', 'text-gray-300');
-        activeTab.classList.add('bg-yellow-500', 'text-gray-900');
-    }
-    
-    // Load report content
-    const content = document.getElementById('reportContent');
-    content.innerHTML = `
-        <div class="flex items-center justify-center h-64">
-            <div class="text-center">
-                <div class="text-4xl mb-3 animate-pulse">📊</div>
-                <p class="text-gray-400">Loading ${tabName} report...</p>
-            </div>
-        </div>
-    `;
-    
-    // Generate report based on tab
-    switch(tabName) {
-        case 'overview':
-            generateOverviewReport();
-            break;
-        case 'income':
-            generateIncomeReport();
-            break;
-        case 'occupancy':
-            generateOccupancyReport();
-            break;
-        case 'payments':
-            generatePaymentsReport();
-            break;
-    }
-};
-
-// Generate Overview Report
+// ==================== ADDITIONAL REPORT HELPERS ====================
+// These are used by the dynamically generated reports modal
 async function generateOverviewReport() {
     const content = document.getElementById('reportContent');
     const ownerProps = getOwnerProperties();
