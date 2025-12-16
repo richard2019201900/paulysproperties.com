@@ -1283,12 +1283,14 @@ window.showDeletedAccountToast = function() {
 
 // ==================== CALCULATIONS ====================
 function getAvailableCount() {
-    const ownerProps = getOwnerProperties();
-    return ownerProps.filter(p => state.availability[p.id] !== false).length;
+    // Use owned properties for financial counts, not all visible properties
+    const ownedProps = getOwnedProperties();
+    return ownedProps.filter(p => state.availability[p.id] !== false).length;
 }
 
 function calculateTotals() {
-    const ownerProps = getOwnerProperties();
+    // Use owned properties for financial calculations, not all visible properties
+    const ownedProps = getOwnedProperties();
     const details = {
         dailyPayers: [],    // Properties where renter pays daily
         weeklyPayers: [],   // Properties where renter pays weekly
@@ -1300,7 +1302,7 @@ function calculateTotals() {
     let weeklyIncome = 0;
     let monthlyIncome = 0;
     
-    ownerProps.forEach(p => {
+    ownedProps.forEach(p => {
         const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
         const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
@@ -1531,16 +1533,21 @@ function renderOwnerDashboard() {
     // Show Elite Reports button if user is Elite tier
     updateEliteReportsButton();
     
-    const ownerProps = getOwnerProperties();
+    // Properties user can VIEW (admin sees all for management)
+    const viewableProps = getOwnerProperties();
+    // Properties user actually OWNS (for financials)
+    const ownedProps = getOwnedProperties();
+    
     const totals = calculateTotals();
     $('weeklyIncomeDisplay').textContent = formatPrice(totals.weekly);
     $('monthlyIncomeDisplay').textContent = formatPrice(totals.monthly);
-    $('unitsAvailableDisplay').textContent = `${getAvailableCount()}/${ownerProps.length}`;
+    // Units Available uses OWNED properties count, not all viewable
+    $('unitsAvailableDisplay').textContent = `${getAvailableCount()}/${ownedProps.length}`;
     
     // Populate breakdown panels
     updateIncomeBreakdowns(totals.details);
     
-    if (ownerProps.length === 0) {
+    if (viewableProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
             <tr>
                 <td colspan="11" class="px-6 py-12 text-center text-gray-400">
@@ -1554,7 +1561,7 @@ function renderOwnerDashboard() {
     }
     
     // AUTO-FIX: Check all properties for inconsistent renter/availability status
-    ownerProps.forEach(p => {
+    viewableProps.forEach(p => {
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const renterPhone = PropertyDataService.getValue(p.id, 'renterPhone', p.renterPhone || '');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
@@ -1565,7 +1572,7 @@ function renderOwnerDashboard() {
         }
     });
     
-    $('ownerPropertiesTable').innerHTML = ownerProps.map((p, index) => {
+    $('ownerPropertiesTable').innerHTML = viewableProps.map((p, index) => {
         // Get renter and payment info
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
@@ -7623,14 +7630,15 @@ window.updateNavTierDisplay = function(tier) {
 // ============================================
 
 window.openReportsModal = function() {
-    const ownerProps = getOwnerProperties();
-    if (ownerProps.length === 0) {
-        showToast('No properties to generate reports for', 'error');
+    // Use OWNED properties for reports (not all viewable)
+    const ownedProps = getOwnedProperties();
+    if (ownedProps.length === 0) {
+        showToast('No properties owned by this account to generate reports for', 'error');
         return;
     }
     
     // Generate report data
-    const reportData = generateReportData(ownerProps);
+    const reportData = generateReportData(ownedProps);
     
     const modalHTML = `
         <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto" onclick="if(event.target.id === 'reportsModal') closeReportsModal()">
@@ -8190,7 +8198,7 @@ function updateEliteReportsButton() {
 // These are used by the dynamically generated reports modal
 async function generateOverviewReport() {
     const content = document.getElementById('reportContent');
-    const ownerProps = getOwnerProperties();
+    const ownerProps = getOwnedProperties();
     
     // Calculate stats
     let totalWeeklyIncome = 0;
@@ -8347,7 +8355,7 @@ function generateTopPerformersPreview(ownerProps) {
 // Generate Income Report
 async function generateIncomeReport() {
     const content = document.getElementById('reportContent');
-    const ownerProps = getOwnerProperties();
+    const ownerProps = getOwnedProperties();
     
     // Gather all payment data
     const paymentPromises = ownerProps.map(p => getPaymentHistory(p.id));
@@ -8439,7 +8447,7 @@ async function generateIncomeReport() {
 // Generate Occupancy Report
 async function generateOccupancyReport() {
     const content = document.getElementById('reportContent');
-    const ownerProps = getOwnerProperties();
+    const ownerProps = getOwnedProperties();
     
     // Calculate occupancy stats
     const occupied = ownerProps.filter(p => state.availability[p.id] === false);
@@ -8553,7 +8561,7 @@ async function generateOccupancyReport() {
 // Generate Payments Report
 async function generatePaymentsReport() {
     const content = document.getElementById('reportContent');
-    const ownerProps = getOwnerProperties();
+    const ownerProps = getOwnedProperties();
     
     // Gather all payment data
     const paymentPromises = ownerProps.map(p => getPaymentHistory(p.id));
@@ -8674,7 +8682,7 @@ async function generatePaymentsReport() {
 
 // Export report data
 window.exportReportData = async function() {
-    const ownerProps = getOwnerProperties();
+    const ownerProps = getOwnedProperties();
     
     // Gather all payment data
     const paymentPromises = ownerProps.map(p => getPaymentHistory(p.id));
@@ -8708,15 +8716,23 @@ window.exportReportData = async function() {
     showToast('📥 Report exported!', 'success');
 };
 
-// Helper to get owner properties
+// Helper to get owner properties (for VIEWING - admin sees all)
 function getOwnerProperties() {
     const user = auth.currentUser;
     if (!user) return [];
     
-    // Master admin sees all properties
+    // Master admin sees all properties for management
     if (TierService.isMasterAdmin(user.email)) {
         return properties;
     }
+    
+    return getOwnedProperties();
+}
+
+// Helper to get properties user actually OWNS (for FINANCIALS - never all properties)
+function getOwnedProperties() {
+    const user = auth.currentUser;
+    if (!user) return [];
     
     const userEmail = user.email.toLowerCase();
     const userPropertyIds = ownerPropertyMap[userEmail] || [];
