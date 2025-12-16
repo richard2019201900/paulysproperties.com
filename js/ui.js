@@ -1305,7 +1305,7 @@ function calculateTotals() {
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
         const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
         const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
-        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const isRented = state.availability[p.id] === false;
         
@@ -1568,7 +1568,7 @@ function renderOwnerDashboard() {
     $('ownerPropertiesTable').innerHTML = ownerProps.map((p, index) => {
         // Get renter and payment info
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
-        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
@@ -1704,7 +1704,7 @@ function renderOwnerDashboard() {
                         <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
                             <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             <span class="text-gray-500">Frequency:</span>
-                            <span class="cell-value text-white font-medium capitalize">${paymentFrequency}</span>
+                            <span class="cell-value text-white font-medium capitalize">${paymentFrequency || '<span class="text-orange-400 italic">⚠️ Not set</span>'}</span>
                             <svg class="w-3 h-3 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </div>
                         <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
@@ -1740,6 +1740,16 @@ function renderOwnerDashboard() {
 window.startCellEdit = function(propertyId, field, cell, type) {
     // Don't start if already editing
     if (cell.querySelector('input, select')) return;
+    
+    // VALIDATION: Block lastPaymentDate if frequency is not set
+    if (field === 'lastPaymentDate') {
+        const p = properties.find(prop => prop.id === propertyId);
+        const frequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || '');
+        if (!frequency) {
+            alert('⚠️ Please set the Payment Frequency first!\n\nThe frequency determines how the next due date is calculated and how payments are logged.\n\nClick on "Frequency" in the row above to set it.');
+            return;
+        }
+    }
     
     const currentValue = PropertyDataService.getValue(propertyId, field, properties.find(p => p.id === propertyId)?.[field]) || '';
     const originalHTML = cell.innerHTML;
@@ -1779,6 +1789,7 @@ window.startCellEdit = function(propertyId, field, cell, type) {
             <select class="cell-input bg-gray-800 border border-purple-500 rounded px-2 py-1 text-white text-sm" 
                     onchange="saveCellEdit(this, ${propertyId}, '${field}', '${type}')"
                     onblur="setTimeout(() => cancelCellEdit(this), 150)">
+                <option value="" ${!currentValue ? 'selected' : ''}>-- Select --</option>
                 <option value="daily" ${currentValue === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
                 <option value="biweekly" ${currentValue === 'biweekly' ? 'selected' : ''}>Biweekly</option>
@@ -7736,7 +7747,7 @@ function generateReportData(properties) {
     properties.forEach(p => {
         const isAvailable = state.availability[p.id] !== false;
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
-        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
         const weeklyPrice = p.weeklyPrice || 0;

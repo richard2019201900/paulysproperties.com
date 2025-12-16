@@ -442,7 +442,7 @@ function renderPropertyStatsContent(id) {
     const renterPhoneRaw = PropertyDataService.getValue(id, 'renterPhone', p.renterPhone || '');
     const renterPhone = renterPhoneRaw ? renterPhoneRaw.replace(/\D/g, '') : '';
     const renterNotes = PropertyDataService.getValue(id, 'renterNotes', p.renterNotes || '');
-    const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || 'weekly');
+    const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || '');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
     // AUTO-FIX: If renter info exists but property is marked available, fix it
@@ -727,8 +727,8 @@ function renderPropertyStatsContent(id) {
                             <svg class="w-6 h-6 text-teal-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             <span class="text-teal-200 font-semibold">Payment Frequency</span>
                         </div>
-                        <div id="value-paymentFrequency-${id}" class="text-lg font-bold text-white capitalize">${paymentFrequency}</div>
-                        <div class="text-xs text-teal-300 mt-2 opacity-70">Click to edit</div>
+                        <div id="value-paymentFrequency-${id}" class="text-lg font-bold text-white capitalize">${paymentFrequency || '<span class="text-teal-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-teal-300 mt-2 opacity-70">${paymentFrequency ? 'Click to edit' : '⚠️ Set this first!'}</div>
                     </div>
                     
                     <!-- Last Payment Date -->
@@ -1008,6 +1008,16 @@ window.startEditTile = function(field, propertyId, type) {
     
     if (!tile || !valueEl || tile.classList.contains('editing')) return;
     
+    // VALIDATION: Block lastPaymentDate if frequency is not set
+    if (field === 'lastPaymentDate') {
+        const p = properties.find(prop => prop.id === propertyId);
+        const frequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || '');
+        if (!frequency) {
+            alert('⚠️ Please set the Payment Frequency first!\n\nThe frequency determines how the next due date is calculated and how payments are logged.\n\n1. Click on "Payment Frequency"\n2. Select: Daily, Weekly, Biweekly, or Monthly\n3. Then you can set the Last Payment date');
+            return;
+        }
+    }
+    
     tile.classList.add('editing');
     
     const currentValue = PropertyDataService.getValue(propertyId, field, tile.dataset.originalValue);
@@ -1023,6 +1033,7 @@ window.startEditTile = function(field, propertyId, type) {
     } else if (type === 'frequency') {
         inputHtml = `
             <select id="input-${field}-${propertyId}" class="stat-input text-lg w-full">
+                <option value="" ${!currentValue ? 'selected' : ''}>-- Select Frequency --</option>
                 <option value="daily" ${currentValue === 'daily' ? 'selected' : ''}>Daily</option>
                 <option value="weekly" ${currentValue === 'weekly' ? 'selected' : ''}>Weekly</option>
                 <option value="biweekly" ${currentValue === 'biweekly' ? 'selected' : ''}>Biweekly</option>
