@@ -11,9 +11,11 @@ window.hasUnreadSiteUpdate = function() {
 // Mark site update as read
 window.markSiteUpdateAsRead = function() {
     localStorage.setItem('lastSeenSiteUpdate', LATEST_SITE_UPDATE_VERSION);
-    // Hide the badge in dropdown
-    const badge = $('siteUpdateBadge');
-    if (badge) badge.classList.add('hidden');
+    // Hide both badges
+    const navBadge = $('siteUpdateNavBadge');
+    const dropdownBadge = $('siteUpdateBadge');
+    if (navBadge) navBadge.classList.add('hidden');
+    if (dropdownBadge) dropdownBadge.classList.add('hidden');
     // Remove site update notification from dashboard
     const siteUpdateNotif = $('siteUpdateNotification');
     if (siteUpdateNotif) {
@@ -26,13 +28,24 @@ window.markSiteUpdateAsRead = function() {
 
 // Update site update badge visibility
 window.updateSiteUpdateBadge = function() {
-    const badge = $('siteUpdateBadge');
-    if (badge) {
-        if (hasUnreadSiteUpdate()) {
-            badge.classList.remove('hidden');
+    const navBadge = $('siteUpdateNavBadge');
+    const dropdownBadge = $('siteUpdateBadge');
+    const dropdownMenu = $('userDropdownMenu');
+    const isDropdownOpen = dropdownMenu && !dropdownMenu.classList.contains('hidden');
+    
+    if (hasUnreadSiteUpdate()) {
+        // If dropdown is open, show badge in dropdown, hide nav badge
+        if (isDropdownOpen) {
+            if (navBadge) navBadge.classList.add('hidden');
+            if (dropdownBadge) dropdownBadge.classList.remove('hidden');
         } else {
-            badge.classList.add('hidden');
+            // If dropdown is closed, show nav badge, hide dropdown badge
+            if (navBadge) navBadge.classList.remove('hidden');
+            if (dropdownBadge) dropdownBadge.classList.add('hidden');
         }
+    } else {
+        if (navBadge) navBadge.classList.add('hidden');
+        if (dropdownBadge) dropdownBadge.classList.add('hidden');
     }
 };
 
@@ -414,6 +427,8 @@ window.toggleUserDropdown = function() {
     const dropdown = $('userDropdownMenu');
     if (dropdown) {
         dropdown.classList.toggle('hidden');
+        // Update badge position after toggle
+        setTimeout(updateSiteUpdateBadge, 10);
     }
 };
 
@@ -421,6 +436,8 @@ window.closeUserDropdown = function() {
     const dropdown = $('userDropdownMenu');
     if (dropdown) {
         dropdown.classList.add('hidden');
+        // Update badge position after close
+        setTimeout(updateSiteUpdateBadge, 10);
     }
 };
 
@@ -429,7 +446,10 @@ document.addEventListener('click', function(e) {
     const dropdown = $('userDropdownMenu');
     const navUserDisplay = $('navUserDisplay');
     if (dropdown && navUserDisplay && !navUserDisplay.contains(e.target)) {
+        const wasOpen = !dropdown.classList.contains('hidden');
         dropdown.classList.add('hidden');
+        // Update badge if dropdown was open
+        if (wasOpen) setTimeout(updateSiteUpdateBadge, 10);
     }
 });
 
