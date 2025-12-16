@@ -1,3 +1,71 @@
+// ==================== SITE UPDATE NOTIFICATIONS ====================
+// Change this version string whenever you publish a new site update
+const LATEST_SITE_UPDATE_VERSION = '2024-12-15-v1';
+
+// Check if user has seen the latest site update
+window.hasUnreadSiteUpdate = function() {
+    const lastSeen = localStorage.getItem('lastSeenSiteUpdate');
+    return lastSeen !== LATEST_SITE_UPDATE_VERSION;
+};
+
+// Mark site update as read
+window.markSiteUpdateAsRead = function() {
+    localStorage.setItem('lastSeenSiteUpdate', LATEST_SITE_UPDATE_VERSION);
+    // Hide the badge in dropdown
+    const badge = $('siteUpdateBadge');
+    if (badge) badge.classList.add('hidden');
+    // Remove site update notification from dashboard
+    const siteUpdateNotif = $('siteUpdateNotification');
+    if (siteUpdateNotif) {
+        siteUpdateNotif.style.transition = 'all 0.3s ease';
+        siteUpdateNotif.style.opacity = '0';
+        siteUpdateNotif.style.transform = 'translateX(20px)';
+        setTimeout(() => siteUpdateNotif.remove(), 300);
+    }
+};
+
+// Update site update badge visibility
+window.updateSiteUpdateBadge = function() {
+    const badge = $('siteUpdateBadge');
+    if (badge) {
+        if (hasUnreadSiteUpdate()) {
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+};
+
+// Render site update notification for dashboard
+window.renderSiteUpdateNotification = function() {
+    if (!hasUnreadSiteUpdate()) return '';
+    
+    return `
+        <div id="siteUpdateNotification" class="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/50 rounded-xl p-4 flex items-start justify-between gap-4 mb-4">
+            <div class="flex items-start gap-3 cursor-pointer" onclick="goToBlog()">
+                <span class="text-2xl">📰</span>
+                <div>
+                    <h4 class="text-white font-bold">New Site Update Available!</h4>
+                    <p class="text-gray-300 text-sm mt-1">Check out the latest features and improvements we've added to PaulysProperties.com</p>
+                    <p class="text-purple-400 text-xs mt-2 font-medium hover:text-purple-300">Click to view Site Updates →</p>
+                </div>
+            </div>
+            <button onclick="event.stopPropagation(); dismissSiteUpdateNotification()" 
+                class="text-gray-400 hover:text-white transition p-1 flex-shrink-0"
+                title="Dismiss notification">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    `;
+};
+
+// Dismiss site update notification (X button)
+window.dismissSiteUpdateNotification = function() {
+    markSiteUpdateAsRead();
+};
+
 // ==================== TOAST NOTIFICATIONS ====================
 window.showToast = function(message, type = 'info') {
     const bgColors = {
@@ -294,6 +362,9 @@ async function updateNavUserDisplay() {
     const user = auth.currentUser;
     if (!user) return;
     
+    // Update site update badge
+    updateSiteUpdateBadge();
+    
     const navUserName = $('navUserName');
     const navUserTier = $('navUserTier');
     const navUpgradeOption = $('navUpgradeOption');
@@ -383,6 +454,7 @@ window.goToProfileSettings = function() {
 // Navigate to blog/updates page
 window.goToBlog = function() {
     closeUserDropdown();
+    markSiteUpdateAsRead();
     navigateTo('blog');
 };
 
@@ -1667,6 +1739,13 @@ function updateIncomeBreakdowns(details) {
 function renderOwnerDashboard() {
     // Load user notifications
     loadUserNotifications();
+    
+    // Render site update notification if there's a new one
+    const siteUpdateContainer = $('siteUpdateNotificationContainer');
+    if (siteUpdateContainer) {
+        siteUpdateContainer.innerHTML = renderSiteUpdateNotification();
+    }
+    updateSiteUpdateBadge();
     
     // Show Elite Reports button if user is Elite tier
     updateEliteReportsButton();

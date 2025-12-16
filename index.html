@@ -734,9 +734,10 @@
                                     <span class="text-lg">⚙️</span>
                                     <span class="font-medium">Profile Settings</span>
                                 </a>
-                                <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition relative">
                                     <span class="text-lg">📰</span>
                                     <span class="font-medium">Site Updates</span>
+                                    <span id="siteUpdateBadge" class="hidden absolute right-3 top-1/2 -translate-y-1/2 bg-pink-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">NEW</span>
                                 </a>
                                 <a id="navUpgradeOption" onclick="openUpgradeModal('Upgrade your account', state.userTier || 'starter'); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-purple-400 hover:bg-gray-700 cursor-pointer transition">
                                     <span class="text-lg">⭐</span>
@@ -776,6 +777,11 @@
                 <h2 class="text-4xl md:text-5xl font-black bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Property Owner Dashboard</h2>
                 <p id="syncStatus" class="text-green-400 mt-2 font-medium">✓ Real-time sync enabled</p>
                 <p class="text-gray-400 mt-1 text-sm">💡 Click on any property name below to view detailed stats</p>
+            </div>
+
+            <!-- Site Update Notification -->
+            <div id="siteUpdateNotificationContainer" class="mb-6">
+                <!-- Site update notification will be inserted here by JS -->
             </div>
 
             <!-- User Notifications Banner -->
