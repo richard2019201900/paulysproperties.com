@@ -668,17 +668,18 @@ function renderPropertyStatsContent(id) {
                          onclick="startEditTile('renterName', ${id}, 'text')"
                          data-field="renterName"
                          data-original-value="${sanitize(renterName)}">
-                        <div class="flex items-center gap-3 mb-2">
+                        <div class="flex items-center gap-3 mb-1">
                             <svg class="w-6 h-6 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             <span class="text-sky-200 font-semibold">Renter Name</span>
                         </div>
+                        <div class="text-xs text-sky-300 mb-2 opacity-80">🔒 Private</div>
                         <div id="value-renterName-${id}" class="text-lg font-bold text-white">${renterName || '<span class="text-sky-300 opacity-70">Not set</span>'}</div>
-                        <div class="text-xs text-sky-300 mt-2 opacity-70">Click to edit</div>
+                        <div class="text-xs text-sky-300 mt-2 opacity-70">${renterName ? 'Click to edit' : '⚠️ Set before logging payments!'}</div>
                     </div>
                     
                     <!-- Renter Phone -->
                     <div class="stat-tile p-4 bg-gradient-to-br from-pink-600 to-pink-800 rounded-xl border border-pink-500">
-                        <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center justify-between mb-1">
                             <div class="flex items-center gap-3">
                                 <svg class="w-6 h-6 text-pink-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                                 <span class="text-pink-200 font-semibold">Renter Phone</span>
@@ -690,6 +691,7 @@ function renderPropertyStatsContent(id) {
                             </button>
                             ` : ''}
                         </div>
+                        <div class="text-xs text-pink-300 mb-2 opacity-80">🔒 Private</div>
                         <div id="tile-renterPhone-${id}" 
                              class="cursor-pointer"
                              onclick="startEditTile('renterPhone', ${id}, 'tel')"
@@ -727,8 +729,8 @@ function renderPropertyStatsContent(id) {
                             <svg class="w-6 h-6 text-teal-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             <span class="text-teal-200 font-semibold">Payment Frequency</span>
                         </div>
-                        <div id="value-paymentFrequency-${id}" class="text-lg font-bold text-white capitalize">${paymentFrequency || '<span class="text-teal-300 opacity-70">Not set</span>'}</div>
-                        <div class="text-xs text-teal-300 mt-2 opacity-70">${paymentFrequency ? 'Click to edit' : '⚠️ Set this first!'}</div>
+                        <div id="value-paymentFrequency-${id}" class="text-lg font-bold text-white capitalize">${paymentFrequency || '<span class="text-teal-300 opacity-70">Not Set</span>'}</div>
+                        <div class="text-xs text-teal-300 mt-2 opacity-70">${paymentFrequency ? 'Click to edit' : '⚠️ Set before logging payments!'}</div>
                     </div>
                     
                     <!-- Last Payment Date -->
@@ -742,7 +744,7 @@ function renderPropertyStatsContent(id) {
                             <span class="text-lime-200 font-semibold">Last Payment</span>
                         </div>
                         <div id="value-lastPaymentDate-${id}" class="text-lg font-bold text-white">${lastPaymentDate ? formatDate(lastPaymentDate) : '<span class="text-lime-300 opacity-70">Not set</span>'}</div>
-                        <div class="text-xs text-lime-300 mt-2 opacity-70">Click to edit</div>
+                        <div class="text-xs text-lime-300 mt-2 opacity-70">${(!renterName || !paymentFrequency) ? '⚠️ Set name & frequency first!' : 'Click to edit'}</div>
                     </div>
                     
                     <!-- Next Due Date (calculated, not editable) -->

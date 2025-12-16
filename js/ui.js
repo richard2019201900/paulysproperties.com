@@ -380,6 +380,97 @@ window.goToProfileSettings = function() {
     }, 300);
 };
 
+// Navigate to blog/updates page
+window.goToBlog = function() {
+    closeUserDropdown();
+    navigateTo('blog');
+};
+
+// Render blog page content
+window.renderBlogPage = function() {
+    const blogPage = $('blogPage');
+    if (!blogPage) return;
+    
+    // Blog posts data - add new posts at the top
+    const blogPosts = [
+        {
+            date: 'December 15, 2024',
+            title: '🚀 Platform Launch & Major Features',
+            category: 'Release',
+            categoryColor: 'bg-green-500',
+            content: `
+                <p class="mb-4">After 13 days of intensive development with <strong>228 commits</strong>, PaulysProperties.com is officially live!</p>
+                <h4 class="font-bold text-white mb-2">What's New:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>Elite Portfolio Reports</strong> - 4-tab analytics dashboard with vacancy loss calculator and cash flow forecasts</li>
+                    <li><strong>3-Tier Subscription System</strong> - Starter (free), Pro ($25k/mo), Elite ($50k/mo)</li>
+                    <li><strong>Payment Tracking</strong> - Auto-calculated due dates with ledger history</li>
+                    <li><strong>Photo Services</strong> - Professional photography packages available</li>
+                    <li><strong>Admin Dashboard</strong> - 8 stat tiles, user management, notifications</li>
+                </ul>
+                <p class="text-gray-400 text-sm">The platform spans over 8,700 lines of code across 9 modular JavaScript files.</p>
+            `
+        },
+        {
+            date: 'December 15, 2024',
+            title: '📊 Elite Reports Enhanced',
+            category: 'Update',
+            categoryColor: 'bg-blue-500',
+            content: `
+                <p class="mb-4">Elite members now have access to enhanced portfolio analytics:</p>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>Overdue Payment Alerts</strong> - See which tenants are late at a glance</li>
+                    <li><strong>Upcoming Payments</strong> - Track payments due in the next 3 days</li>
+                    <li><strong>Vacancy Loss Calculator</strong> - Know exactly how much empty units cost you</li>
+                    <li><strong>4-Week Cash Flow Forecast</strong> - Project your income ahead</li>
+                    <li><strong>Property addresses</strong> now display instead of property numbers</li>
+                </ul>
+                <p class="text-gray-400 text-sm">Upgrade to Elite for unlimited listings and full analytics access.</p>
+            `
+        }
+    ];
+    
+    blogPage.innerHTML = `
+        <div class="max-w-4xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-10">
+                <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-3">
+                    📰 Site Updates
+                </h1>
+                <p class="text-gray-400">Stay informed about new features and improvements</p>
+            </div>
+            
+            <!-- Blog Posts -->
+            <div class="space-y-8">
+                ${blogPosts.map(post => `
+                    <article class="bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden hover:border-purple-500/50 transition">
+                        <div class="p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span class="${post.categoryColor} text-white text-xs font-bold px-3 py-1 rounded-full">${post.category}</span>
+                                <span class="text-gray-500 text-sm">${post.date}</span>
+                            </div>
+                            <h2 class="text-2xl font-bold text-white mb-4">${post.title}</h2>
+                            <div class="text-gray-300 leading-relaxed">
+                                ${post.content}
+                            </div>
+                        </div>
+                    </article>
+                `).join('')}
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-center mt-12 py-8 border-t border-gray-700">
+                <p class="text-gray-500 text-sm">
+                    Questions or suggestions? Contact us through the dashboard.
+                </p>
+                <button onclick="navigateTo('home')" class="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-xl font-bold hover:opacity-90 transition">
+                    ← Back to Home
+                </button>
+            </div>
+        </div>
+    `;
+};
+
 window.handleAuthClick = function() {
     hideElement($('mobileMenu'));
     state.currentUser === 'owner' ? logout() : openModal('loginModal');
@@ -576,6 +667,7 @@ window.goToDashboard = function() {
         hideElement($('renterSection'));
         hideElement($('propertyDetailPage'));
         hideElement($('propertyStatsPage'));
+        hideElement($('blogPage'));
         showElement($('ownerDashboard'));
         renderOwnerDashboard();
         
@@ -599,6 +691,7 @@ window.goToDashboard = function() {
 
 window.backToDashboard = function() {
     hideElement($('propertyStatsPage'));
+    hideElement($('blogPage'));
     showElement($('ownerDashboard'));
     window.scrollTo(0, 0);
 };
@@ -612,6 +705,7 @@ window.goHome = function() {
     hideElement($('ownerDashboard'));
     hideElement($('propertyDetailPage'));
     hideElement($('propertyStatsPage'));
+    hideElement($('blogPage'));
     showElement($('renterSection'));
     window.scrollTo(0, 0);
 };
@@ -626,6 +720,17 @@ window.navigateTo = function(section) {
     hideElement($('ownerDashboard'));
     hideElement($('propertyDetailPage'));
     hideElement($('propertyStatsPage'));
+    hideElement($('blogPage'));
+    
+    // Handle blog page specially
+    if (section === 'blog') {
+        hideElement($('renterSection'));
+        showElement($('blogPage'));
+        renderBlogPage();
+        window.scrollTo(0, 0);
+        return;
+    }
+    
     showElement($('renterSection'));
     setTimeout(() => $(section)?.scrollIntoView({ behavior: 'smooth' }), 100);
 };
@@ -1533,21 +1638,19 @@ function renderOwnerDashboard() {
     // Show Elite Reports button if user is Elite tier
     updateEliteReportsButton();
     
-    // Properties user can VIEW (admin sees all for management)
-    const viewableProps = getOwnerProperties();
-    // Properties user actually OWNS (for financials)
+    // Properties user actually OWNS (dashboard should only show your properties)
     const ownedProps = getOwnedProperties();
     
     const totals = calculateTotals();
     $('weeklyIncomeDisplay').textContent = formatPrice(totals.weekly);
     $('monthlyIncomeDisplay').textContent = formatPrice(totals.monthly);
-    // Units Available uses OWNED properties count, not all viewable
+    // Units Available uses OWNED properties count
     $('unitsAvailableDisplay').textContent = `${getAvailableCount()}/${ownedProps.length}`;
     
     // Populate breakdown panels
     updateIncomeBreakdowns(totals.details);
     
-    if (viewableProps.length === 0) {
+    if (ownedProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
             <tr>
                 <td colspan="11" class="px-6 py-12 text-center text-gray-400">
@@ -1561,7 +1664,7 @@ function renderOwnerDashboard() {
     }
     
     // AUTO-FIX: Check all properties for inconsistent renter/availability status
-    viewableProps.forEach(p => {
+    ownedProps.forEach(p => {
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const renterPhone = PropertyDataService.getValue(p.id, 'renterPhone', p.renterPhone || '');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
@@ -1572,7 +1675,7 @@ function renderOwnerDashboard() {
         }
     });
     
-    $('ownerPropertiesTable').innerHTML = viewableProps.map((p, index) => {
+    $('ownerPropertiesTable').innerHTML = ownedProps.map((p, index) => {
         // Get renter and payment info
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
