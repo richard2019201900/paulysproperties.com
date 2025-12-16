@@ -2197,10 +2197,8 @@ async function renderProperties(list) {
     
     // Sort premium listings to the top
     const sortedList = [...list].sort((a, b) => {
-        const aData = state.propertyOverrides[a.id] || {};
-        const bData = state.propertyOverrides[b.id] || {};
-        const aPremium = aData.isPremium || a.isPremium;
-        const bPremium = bData.isPremium || b.isPremium;
+        const aPremium = PropertyDataService.getValue(a.id, 'isPremium', a.isPremium || false);
+        const bPremium = PropertyDataService.getValue(b.id, 'isPremium', b.isPremium || false);
         if (aPremium && !bPremium) return -1;
         if (!aPremium && bPremium) return 1;
         return 0;
@@ -2222,8 +2220,7 @@ async function renderProperties(list) {
         // Ensure property ID is numeric for consistent lookup
         const propId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
         const available = state.availability[propId] !== false;
-        const propData = state.propertyOverrides[propId] || {};
-        const isPremium = propData.isPremium || p.isPremium;
+        const isPremium = PropertyDataService.getValue(propId, 'isPremium', p.isPremium || false);
         const hasImages = p.images && Array.isArray(p.images) && p.images.length > 0 && p.images[0];
         
         // Premium styling
@@ -9121,18 +9118,31 @@ function getOwnedProperties() {
     const userEmail = user.email.toLowerCase();
     const userPropertyIds = ownerPropertyMap[userEmail] || [];
     
+    console.log('[getOwnedProperties] Checking properties for:', userEmail);
+    console.log('[getOwnedProperties] User property IDs from map:', userPropertyIds);
+    
     return properties.filter(p => {
-        // Primary check: ownerEmail field
+        // Primary check: ownerEmail field (MOST IMPORTANT)
         const propOwnerEmail = (p.ownerEmail || '').toLowerCase();
-        if (propOwnerEmail === userEmail) return true;
         
-        // Secondary check: ownerPropertyMap
-        if (userPropertyIds.includes(p.id)) return true;
+        // If property has an ownerEmail set, ONLY that owner can see it
+        if (propOwnerEmail) {
+            const isOwner = propOwnerEmail === userEmail;
+            if (!isOwner) {
+                console.log(`[getOwnedProperties] Property ${p.id} (${p.title}) belongs to ${propOwnerEmail}, not ${userEmail}`);
+            }
+            return isOwner;
+        }
         
-        // Legacy check: owner field (old properties)
-        const legacyOwner = PropertyDataService.getValue(p.id, 'owner', p.owner || '');
-        if (legacyOwner && legacyOwner.toLowerCase() === userEmail) return true;
+        // For legacy properties WITHOUT ownerEmail, use ownerPropertyMap
+        // ONLY if this user is explicitly in the map for this property
+        if (userPropertyIds.includes(p.id)) {
+            console.log(`[getOwnedProperties] Property ${p.id} found in ownerPropertyMap for ${userEmail}`);
+            return true;
+        }
         
+        // No owner set and not in map - property is orphaned, don't show to anyone
+        console.log(`[getOwnedProperties] Property ${p.id} (${p.title}) has no owner - skipping`);
         return false;
     });
 }
