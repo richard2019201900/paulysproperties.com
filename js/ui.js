@@ -395,37 +395,70 @@ window.renderBlogPage = function() {
     const blogPosts = [
         {
             date: 'December 15, 2024',
-            title: '🚀 Platform Launch & Major Features',
-            category: 'Release',
-            categoryColor: 'bg-green-500',
+            title: '🚀 Two Weeks In - A Complete Property Management Platform',
+            category: 'Milestone',
+            categoryColor: 'bg-amber-500',
             content: `
-                <p class="mb-4">After 13 days of intensive development with <strong>228 commits</strong>, PaulysProperties.com is officially live!</p>
-                <h4 class="font-bold text-white mb-2">What's New:</h4>
+                <p class="mb-4">Two weeks ago, PaulysProperties.com was just an idea. Today, we're a fully operational property management platform with nearly <strong>15 registered users</strong> and <strong>30+ active listings</strong> across Los Santos.</p>
+                
+                <p class="mb-4">Here's everything we've built since December 2nd:</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">For Property Owners:</h4>
                 <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
-                    <li><strong>Elite Portfolio Reports</strong> - 4-tab analytics dashboard with vacancy loss calculator and cash flow forecasts</li>
-                    <li><strong>3-Tier Subscription System</strong> - Starter (free), Pro ($25k/mo), Elite ($50k/mo)</li>
-                    <li><strong>Payment Tracking</strong> - Auto-calculated due dates with ledger history</li>
-                    <li><strong>Photo Services</strong> - Professional photography packages available</li>
-                    <li><strong>Admin Dashboard</strong> - 8 stat tiles, user management, notifications</li>
+                    <li>Create and manage unlimited listings with full image galleries</li>
+                    <li>7 property types supported: Apartments, Houses, Condos, Villas, Hotels, Warehouses, and Hideouts</li>
+                    <li>Flexible pricing options: Daily, Weekly, Biweekly, Monthly rates plus Buy Price</li>
+                    <li>Automatic discount badges that calculate savings for longer-term rentals</li>
+                    <li>One-click property status toggling between Available and Rented</li>
                 </ul>
-                <p class="text-gray-400 text-sm">The platform spans over 8,700 lines of code across 9 modular JavaScript files.</p>
-            `
-        },
-        {
-            date: 'December 15, 2024',
-            title: '📊 Elite Reports Enhanced',
-            category: 'Update',
-            categoryColor: 'bg-blue-500',
-            content: `
-                <p class="mb-4">Elite members now have access to enhanced portfolio analytics:</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">Tenant & Payment Management:</h4>
                 <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
-                    <li><strong>Overdue Payment Alerts</strong> - See which tenants are late at a glance</li>
-                    <li><strong>Upcoming Payments</strong> - Track payments due in the next 3 days</li>
-                    <li><strong>Vacancy Loss Calculator</strong> - Know exactly how much empty units cost you</li>
-                    <li><strong>4-Week Cash Flow Forecast</strong> - Project your income ahead</li>
-                    <li><strong>Property addresses</strong> now display instead of property numbers</li>
+                    <li>Track renter names, phone numbers, and private notes for each property</li>
+                    <li>Set payment frequency and log payment dates</li>
+                    <li>Auto-calculated due dates so you never miss a collection</li>
+                    <li>Full payment ledger with history tracking</li>
+                    <li>One-click reminder script generation for late payments</li>
+                    <li>Overdue alerts that show exactly who owes you money</li>
                 </ul>
-                <p class="text-gray-400 text-sm">Upgrade to Elite for unlimited listings and full analytics access.</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">Elite Portfolio Reports <span class="text-amber-400">(Elite Members)</span>:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>4-tab analytics dashboard: Overview, Revenue, Occupancy, and Top Performers</li>
+                    <li>Vacancy Loss Calculator showing exactly how much empty units cost you weekly and monthly</li>
+                    <li>4-Week Cash Flow Forecast to project your upcoming income</li>
+                    <li>Overdue and upcoming payment alerts at a glance</li>
+                    <li>Top earners ranked by current rent and all-time collections</li>
+                    <li>Occupancy breakdowns by property type</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">3-Tier Subscription System:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>🌱 <strong>Starter</strong> (Free) - 1 listing, perfect for getting started</li>
+                    <li>⭐ <strong>Pro</strong> ($25,000/mo) - Up to 3 listings for growing landlords</li>
+                    <li>👑 <strong>Elite</strong> ($50,000/mo) - Unlimited listings plus exclusive Portfolio Reports</li>
+                    <li>Prorated upgrades so you only pay the difference when moving up</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">Photo Services:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Per Photo package: $10,000 for professional HD shots</li>
+                    <li>Premium Bundle: $125,000 for 6-7 photos, video tour, and 4 weeks of premium placement</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">Admin Tools:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Real-time dashboard with 8 interactive stat tiles</li>
+                    <li>User management: create accounts, adjust tiers, handle upgrades</li>
+                    <li>4-type notification system for new users, listings, upgrade requests, and premium activations</li>
+                    <li>Property reassignment between owners</li>
+                    <li>CSV export for external reporting</li>
+                    <li>Activity logging and VIP leads tracking</li>
+                </ul>
+                
+                <p class="mt-6 text-gray-300">This is just the beginning. We're releasing updates weekly based on your feedback. Have a feature request or question? <strong class="text-green-400">Text Pauly in city</strong> for the fastest response.</p>
+                
+                <p class="mt-4 text-gray-400 italic">Thank you to everyone who's joined us in these first two weeks. Here's to building something great together.</p>
             `
         }
     ];
@@ -461,7 +494,7 @@ window.renderBlogPage = function() {
             <!-- Footer -->
             <div class="text-center mt-12 py-8 border-t border-gray-700">
                 <p class="text-gray-500 text-sm">
-                    Questions or suggestions? Contact us through the dashboard.
+                    Updates posted weekly. Text Pauly in city with questions or feedback.
                 </p>
                 <button onclick="navigateTo('home')" class="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-xl font-bold hover:opacity-90 transition">
                     ← Back to Home
