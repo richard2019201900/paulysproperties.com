@@ -148,8 +148,6 @@ const TierService = {
             price: isFreeTrial ? 0 : (newTier === 'pro' ? 25000 : (newTier === 'elite' ? 50000 : 0)),
             isFreeTrial: isFreeTrial
         });
-        
-        console.log(`[TierService] Updated ${userEmail} from ${oldTier} to ${newTier} tier${isFreeTrial ? ' (FREE TRIAL)' : ''}`);
     },
     
     /**
@@ -223,7 +221,6 @@ const TierService = {
         };
         
         await db.collection('upgradeRequests').add(request);
-        console.log('[TierService] Upgrade request submitted:', request);
     },
     
     /**

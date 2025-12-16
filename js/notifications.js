@@ -105,12 +105,8 @@ window.AdminNotifications = {
  */
 window.initAdminNotifications = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
-        console.log('[AdminNotify] Not admin, skipping initialization');
         return;
     }
-    
-    console.log('[AdminNotify] Initializing notification system...');
-    
     // Set session start time
     AdminNotifications.sessionStart = new Date();
     
@@ -119,8 +115,6 @@ window.initAdminNotifications = function() {
     for (let i = 1; i <= 14; i++) {
         AdminNotifications.seenListings.add(i);
     }
-    console.log('[AdminNotify] Pre-populated base property IDs 1-14 as seen');
-    
     // Load dismissed from localStorage
     try {
         const dismissed = localStorage.getItem('adminDismissedNotifications');
@@ -140,8 +134,6 @@ window.initAdminNotifications = function() {
     
     // Initial badge update
     updateAllBadges();
-    
-    console.log('[AdminNotify] Initialization complete');
 };
 
 /**
@@ -187,11 +179,8 @@ function savePendingToStorage() {
 
 function startUserListener() {
     if (AdminNotifications.usersListenerActive) {
-        console.log('[AdminNotify:Users] Listener already active');
         return;
     }
-    
-    console.log('[AdminNotify:Users] Starting listener...');
     AdminNotifications.usersListenerActive = true;
     
     db.collection('users').onSnapshot((snapshot) => {
@@ -217,7 +206,6 @@ function startUserListener() {
                 
                 if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
                     // Real-time new user!
-                    console.log('[AdminNotify:Users] NEW USER:', data.email);
                     newUsers.push({
                         id: doc.id,
                         notifId: notifId,
@@ -247,7 +235,6 @@ function startUserListener() {
                             data: userData
                         }
                     });
-                    console.log('[AdminNotify:Users] Populated pending notification:', notifId);
                 }
             }
         });
@@ -264,7 +251,6 @@ function startUserListener() {
                 }
             });
             toRemove.forEach(id => {
-                console.log('[AdminNotify:Users] Removing stale:', id);
                 AdminNotifications.visible.delete(id);
                 AdminNotifications.dismissed.add(id);
             });
@@ -273,8 +259,6 @@ function startUserListener() {
         // Mark first snapshot complete
         if (isFirst) {
             AdminNotifications.usersFirstSnapshot = false;
-            console.log('[AdminNotify:Users] Initial load complete, seen', AdminNotifications.seenUsers.size, 'users');
-            
             // Re-render any pending notifications that are valid
             renderPendingNotifications(NOTIFICATION_TYPES.USER);
         }
@@ -320,16 +304,12 @@ function startUserListener() {
 
 function startListingListener() {
     if (AdminNotifications.listingsListenerActive) {
-        console.log('[AdminNotify:Listings] Listener already active');
         return;
     }
-    
-    console.log('[AdminNotify:Listings] Starting listener...');
     AdminNotifications.listingsListenerActive = true;
     
     db.collection('settings').doc('properties').onSnapshot((doc) => {
         if (!doc.exists) {
-            console.log('[AdminNotify:Listings] No properties document');
             return;
         }
         
@@ -366,8 +346,6 @@ function startListingListener() {
                 const isAdminListing = hasAdminEmail || isBaseProperty;
                 
                 if (!isFirst && !isAdminListing && !AdminNotifications.dismissed.has(notifId)) {
-                    console.log('[AdminNotify:Listings] NEW LISTING:', prop.title, 'by', prop.ownerEmail);
-                    
                     // Get owner name with proper fallback
                     let ownerName = prop.ownerName;
                     if (!ownerName && prop.ownerEmail) {
@@ -416,7 +394,6 @@ function startListingListener() {
                             data: listingData
                         }
                     });
-                    console.log('[AdminNotify:Listings] Populated pending notification:', notifId);
                 }
             }
         });
@@ -433,7 +410,6 @@ function startListingListener() {
                 }
             });
             toRemove.forEach(id => {
-                console.log('[AdminNotify:Listings] Removing stale:', id);
                 AdminNotifications.visible.delete(id);
                 AdminNotifications.dismissed.add(id);
             });
@@ -442,8 +418,6 @@ function startListingListener() {
         // Mark first snapshot complete
         if (isFirst) {
             AdminNotifications.listingsFirstSnapshot = false;
-            console.log('[AdminNotify:Listings] Initial load complete, seen', AdminNotifications.seenListings.size, 'listings');
-            
             // Re-render any pending notifications that are valid
             renderPendingNotifications(NOTIFICATION_TYPES.LISTING);
         }
@@ -479,11 +453,8 @@ function startListingListener() {
 
 function startPremiumListener() {
     if (AdminNotifications.premiumListenerActive) {
-        console.log('[AdminNotify:Premium] Listener already active');
         return;
     }
-    
-    console.log('[AdminNotify:Premium] Starting listener...');
     AdminNotifications.premiumListenerActive = true;
     
     // Query all undismissed notifications, then filter by type in JS
@@ -509,7 +480,6 @@ function startPremiumListener() {
                     AdminNotifications.seenPremium.add(doc.id);
                     
                     if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
-                        console.log('[AdminNotify:Premium] NEW PREMIUM:', data.propertyTitle);
                         newPremium.push({
                             id: doc.id,
                             notifId: notifId,
@@ -536,8 +506,6 @@ function startPremiumListener() {
             // Mark first snapshot complete
             if (isFirst) {
                 AdminNotifications.premiumFirstSnapshot = false;
-                console.log('[AdminNotify:Premium] Initial load complete, seen', AdminNotifications.seenPremium.size, 'premium requests');
-                
                 // Render existing premium notifications
                 renderPendingNotifications(NOTIFICATION_TYPES.PREMIUM);
             }
@@ -574,11 +542,8 @@ function startPremiumListener() {
 
 function startPhotoRequestListener() {
     if (AdminNotifications.photoRequestsListenerActive) {
-        console.log('[AdminNotify:Photo] Listener already active');
         return;
     }
-    
-    console.log('[AdminNotify:Photo] Starting listener...');
     AdminNotifications.photoRequestsListenerActive = true;
     
     // Listen to photoServiceRequests collection
@@ -603,7 +568,6 @@ function startPhotoRequestListener() {
                     AdminNotifications.seenPhotoRequests.add(doc.id);
                     
                     if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
-                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail, 'Package:', data.packageType);
                         newRequests.push({
                             id: doc.id,
                             notifId: notifId,
@@ -630,8 +594,6 @@ function startPhotoRequestListener() {
             // Mark first snapshot complete
             if (isFirst) {
                 AdminNotifications.photoRequestsFirstSnapshot = false;
-                console.log('[AdminNotify:Photo] Initial load complete, seen', AdminNotifications.seenPhotoRequests.size, 'photo requests');
-                
                 // Render existing photo notifications
                 renderPendingNotifications(NOTIFICATION_TYPES.PHOTO);
             }
@@ -779,8 +741,6 @@ function renderPendingNotifications(type) {
  * Dismiss a notification (admin notifications)
  */
 window.dismissAdminNotification = async function(notifId) {
-    console.log('[AdminNotify] Dismissing:', notifId);
-    
     // Add to dismissed set
     AdminNotifications.dismissed.add(notifId);
     
@@ -814,7 +774,6 @@ window.dismissAdminNotification = async function(notifId) {
                 dismissedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } catch (e) {
-            console.log('[AdminNotify] Firestore dismiss error (may be expected):', e.message);
         }
     }
     
@@ -827,7 +786,6 @@ window.dismissAdminNotification = async function(notifId) {
                 viewedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } catch (e) {
-            console.log('[AdminNotify] Photo request dismiss error:', e.message);
         }
     }
     
@@ -845,8 +803,6 @@ window.dismissAdminNotification = async function(notifId) {
  * Clear all notifications
  */
 window.clearAllAdminNotifications = async function() {
-    console.log('[AdminNotify] Clearing all notifications');
-    
     // Dismiss all visible
     const toRemove = Array.from(AdminNotifications.visible.keys());
     for (const notifId of toRemove) {
@@ -880,9 +836,6 @@ function updateAllBadges() {
             photoCount++;
         }
     });
-    
-    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount });
-    
     // Update user badge
     const userBadge = document.getElementById('adminNewUserBadge');
     const userCountEl = document.getElementById('adminNewUserCount');
@@ -1043,5 +996,3 @@ if (!document.getElementById('notification-flash-styles')) {
 // Make key functions available globally
 window.updateAllBadges = updateAllBadges;
 window.NOTIFICATION_TYPES = NOTIFICATION_TYPES;
-
-console.log('[AdminNotify] Notification module loaded');

@@ -220,8 +220,6 @@ window.openPhotoServicesModal = function() {
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
-    
-    console.log('[PhotoServices] Modal opened');
 };
 
 // Initialize photo package click handlers using event delegation
@@ -236,16 +234,13 @@ window.openPhotoServicesModal = function() {
             if (singleOption) {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[PhotoServices] Single package clicked via delegation');
                 window.selectPhotoPackage('single');
             } else if (bundleOption) {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[PhotoServices] Bundle package clicked via delegation');
                 window.selectPhotoPackage('bundle');
             }
         });
-        console.log('[PhotoServices] Event delegation initialized');
     }
     
     // Run immediately if DOM is ready, otherwise wait
@@ -430,8 +425,6 @@ window.selectedPhotoPackage = null;
 
 // Select a photo package
 window.selectPhotoPackage = function(packageType) {
-    console.log('[PhotoServices] selectPhotoPackage called with:', packageType);
-    
     window.selectedPhotoPackage = packageType;
     
     const singleOption = document.getElementById('photoOptionSingle');
@@ -439,15 +432,6 @@ window.selectPhotoPackage = function(packageType) {
     const singleCheck = document.getElementById('photoSingleCheck');
     const bundleCheck = document.getElementById('photoBundleCheck');
     const copyBtn = document.getElementById('photoServicesCopyBtn');
-    
-    console.log('[PhotoServices] Elements found:', {
-        singleOption: !!singleOption,
-        bundleOption: !!bundleOption,
-        singleCheck: !!singleCheck,
-        bundleCheck: !!bundleCheck,
-        copyBtn: !!copyBtn
-    });
-    
     if (!singleOption || !bundleOption) {
         console.error('[PhotoServices] Package option elements not found!');
         return;
@@ -483,8 +467,6 @@ window.selectPhotoPackage = function(packageType) {
             copyBtn.innerHTML = '<span>🎬</span> Copy & Notify: Premium Bundle ($125k)';
         }
     }
-    
-    console.log('[PhotoServices] Selected package:', packageType);
 };
 
 window.copyAndNotifyPhotoServices = async function() {
@@ -531,9 +513,6 @@ window.copyAndNotifyPhotoServices = async function() {
             status: 'pending',
             viewed: false
         });
-        
-        console.log('[PhotoServices] Request notification created for:', userEmail, 'Package:', packageType);
-        
         // Update button to show success
         if (btn) {
             btn.innerHTML = `<span>✅</span> ${packageEmoji} ${packageName} - Team Notified!`;

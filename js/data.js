@@ -145,11 +145,8 @@ async function getPropertyOwnerWithTier(propertyId) {
 // Preload usernames for all property owners (call this after properties load)
 async function preloadOwnerUsernames() {
     const uniqueEmails = [...new Set(Object.values(propertyOwnerEmail))];
-    console.log('[Cache] Preloading usernames for', uniqueEmails.length, 'owners');
-    
     // Load all in parallel
     await Promise.all(uniqueEmails.map(email => getUsernameByEmail(email)));
-    console.log('[Cache] Preload complete');
 }
 
 // Get properties for the current logged-in owner

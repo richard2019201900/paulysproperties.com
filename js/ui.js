@@ -713,9 +713,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Create the user with Firebase Auth
                 const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
-                
-                console.log('[Auth] Account created:', user.email);
-                
                 // Create user document with starter tier and display name
                 await db.collection('users').doc(user.uid).set({
                     email: user.email.toLowerCase(),
@@ -723,9 +720,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     tier: 'starter',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                
-                console.log('[Auth] User document created with starter tier');
-                
                 // CREATE ADMIN NOTIFICATION for new user signup (wrapped in try-catch to not break flow)
                 try {
                     await db.collection('adminNotifications').add({
@@ -736,7 +730,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         dismissed: false
                     });
-                    console.log('[Auth] Admin notification created for new user');
                 } catch (notifyError) {
                     console.warn('[Auth] Could not create admin notification (non-critical):', notifyError);
                     // Don't break the flow - account creation succeeded
@@ -1433,8 +1426,6 @@ window.logout = function() {
 
 // Force logout - used when user is deleted by admin
 window.forceLogout = function() {
-    console.log('[ForceLogout] User account deleted - forcing logout');
-    
     // Clean up all listeners first (prevent further callbacks)
     if (window.userNotificationUnsubscribe) {
         window.userNotificationUnsubscribe();
@@ -1485,7 +1476,6 @@ window.showDeletedAccountToast = function() {
     
     // Don't show if we're in the middle of creating an account
     if (window.isCreatingAccount) {
-        console.log('[Toast] Suppressing deleted account toast during account creation');
         return;
     }
     
@@ -1801,7 +1791,6 @@ function renderOwnerDashboard() {
         const renterPhone = PropertyDataService.getValue(p.id, 'renterPhone', p.renterPhone || '');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         if ((renterName || renterPhone || lastPaymentDate) && state.availability[p.id] !== false) {
-            console.log(`[Auto-fix] Property ${p.id} has renter/payment info but was marked available - fixing to rented`);
             state.availability[p.id] = false;
             saveAvailability(p.id, false);
         }
@@ -2138,8 +2127,6 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
                 amount: paymentAmount,
                 recordedBy: auth.currentUser?.email || 'owner'
             });
-            console.log(`[PaymentLog] Dashboard: Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
-            
             // Calculate next due date for thank you message
             const lastDate = parseLocalDate(newValue);
             const nextDate = new Date(lastDate);
@@ -2473,7 +2460,6 @@ window.checkPendingUpgradeRequest = async function(email) {
         }
         
     } catch (error) {
-        console.log('Could not check pending upgrade request:', error.message);
         // Hide indicators on error
         if (pendingBadge) hideElement(pendingBadge);
         if (pendingBanner) hideElement(pendingBanner);
@@ -2851,7 +2837,6 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
             };
             
             await db.collection('users').doc(userId).update(updateData);
-            console.log(`[Subscription] Set for ${userEmail}: trial=${isTrial}, prorated=${isProrated}, amount=$${subscriptionAmount}`);
         }
         
         // Mark request as approved
@@ -3218,13 +3203,11 @@ window.knownSettingsPropertyIds = new Set();
 // Start listening for admin notifications - uses new unified system
 window.startAdminNotificationsListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
-        console.log('[AdminNotify] Not admin, skipping');
         return;
     }
     
     // Use new unified notification system
     if (typeof initAdminNotifications === 'function') {
-        console.log('[AdminNotify] Using new unified notification system');
         initAdminNotifications();
     } else {
         console.error('[AdminNotify] Unified notification system not loaded!');
@@ -3315,7 +3298,6 @@ window.startAdminUsersListener = function() {
                         if (!window.dismissedAdminNotifications.has(notificationId)) {
                             missedUsers.push(user);
                             validPendingUserIds.add(notificationId);
-                            console.log('[AdminUsers] Pending notification found:', user.email);
                         }
                     }
                     // Also check for users created since last visit (new missed users)
@@ -3324,7 +3306,6 @@ window.startAdminUsersListener = function() {
                             missedUsers.push(user);
                             // Add to pending so it persists across refreshes
                             window.pendingAdminNotifications.add(notificationId);
-                            console.log('[AdminUsers] Missed user found:', user.email, 'created:', createdAt);
                         }
                     }
                 } else {
@@ -3354,8 +3335,6 @@ window.startAdminUsersListener = function() {
             
             // Show notifications for MISSED users (created while away or pending from last session)
             if (isFirstSnapshot && missedUsers.length > 0) {
-                console.log('[AdminUsers] Showing notifications for', missedUsers.length, 'missed user(s)');
-                
                 // Show notification for each missed user (no flash for these)
                 missedUsers.forEach(user => {
                     showNewUserNotification(user, true); // true = missed (not real-time)
@@ -3364,8 +3343,6 @@ window.startAdminUsersListener = function() {
             
             // Show notifications for REAL-TIME new users
             if (newUsers.length > 0) {
-                console.log('[AdminUsers] New user(s) detected:', newUsers.map(u => u.email));
-                
                 // Flash screen for real-time only
                 flashScreen();
                 
@@ -3388,8 +3365,6 @@ window.startAdminUsersListener = function() {
             // After first snapshot, mark as no longer first and clean up stale notifications
             if (isFirstSnapshot) {
                 isFirstSnapshot = false;
-                console.log('[AdminUsers] Initial load complete, now listening for new users');
-                
                 // Clean up stale pending notifications (users that were deleted)
                 const staleNotifications = [];
                 window.pendingAdminNotifications.forEach(id => {
@@ -3402,7 +3377,6 @@ window.startAdminUsersListener = function() {
                 });
                 
                 if (staleNotifications.length > 0) {
-                    console.log('[AdminUsers] Cleaning up stale notifications:', staleNotifications);
                     staleNotifications.forEach(id => {
                         window.pendingAdminNotifications.delete(id);
                         window.dismissedAdminNotifications.add(id);
@@ -3426,9 +3400,6 @@ window.startAdminUsersListener = function() {
 // Real-time listener for properties - detects new listings AND updates admin panel data
 window.startAdminPropertiesListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
-    
-    console.log('[AdminProperties] Starting properties listener via settings/properties');
-    
     // The actual property data is stored in settings/properties document, not a 'properties' collection
     // So we just need to call the settings listener
     startSettingsPropertiesListener();
@@ -3438,17 +3409,12 @@ window.startAdminPropertiesListener = function() {
 window.startSettingsPropertiesListener = function() {
     // Always unsubscribe existing listener first (prevents orphaned listeners)
     if (window.settingsPropertiesUnsubscribe) {
-        console.log('[SettingsProperties] Unsubscribing existing listener');
         window.settingsPropertiesUnsubscribe();
         window.settingsPropertiesUnsubscribe = null;
     }
-    
-    console.log('[SettingsProperties] Starting real-time listener');
-    
     // Ensure adminSessionStartTime is set (backup if users listener hasn't set it yet)
     if (!window.adminSessionStartTime) {
         window.adminSessionStartTime = new Date();
-        console.log('[SettingsProperties] Set adminSessionStartTime:', window.adminSessionStartTime);
     }
     
     // Get admin's last visit time from localStorage for missed listings detection
@@ -3481,10 +3447,7 @@ window.startSettingsPropertiesListener = function() {
     
     window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
         .onSnapshot((doc) => {
-            console.log('[SettingsProperties] === SNAPSHOT RECEIVED ===');
-            
             if (!doc.exists) {
-                console.log('[SettingsProperties] No properties document yet');
                 return;
             }
             
@@ -3492,14 +3455,6 @@ window.startSettingsPropertiesListener = function() {
             const newListings = [];
             const missedListings = [];
             const isFirstSnapshot = !window.settingsPropertiesFirstLoadDone;
-            
-            console.log('[SettingsProperties] Snapshot details:', {
-                isFirst: isFirstSnapshot,
-                propsCount: Object.keys(propsData).length,
-                seenCount: window.seenPropertyIds.size,
-                sessionStart: window.adminSessionStartTime?.toISOString()
-            });
-            
             Object.keys(propsData).forEach(key => {
                 const propId = parseInt(key);
                 const prop = propsData[key];
@@ -3526,8 +3481,6 @@ window.startSettingsPropertiesListener = function() {
                 const isNewToUs = !window.seenPropertyIds.has(propId);
                 
                 if (isNewToUs) {
-                    console.log('[SettingsProperties] New property ID detected:', propId, prop.title, 'isFirst:', isFirstSnapshot);
-                    
                     // Add to local properties array if not already there
                     const existingIndex = properties.findIndex(p => p.id === propId);
                     if (existingIndex === -1) {
@@ -3553,13 +3506,11 @@ window.startSettingsPropertiesListener = function() {
                         if (window.pendingAdminNotifications.has(notificationId)) {
                             if (!window.dismissedAdminNotifications.has(notificationId)) {
                                 missedListings.push(prop);
-                                console.log('[SettingsProperties] Pending missed listing:', prop.title);
                             }
                         } else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
                             if (!window.dismissedAdminNotifications.has(notificationId)) {
                                 missedListings.push(prop);
                                 window.pendingAdminNotifications.add(notificationId);
-                                console.log('[SettingsProperties] Missed listing (created while away):', prop.title);
                             }
                         }
                     } else {
@@ -3568,7 +3519,6 @@ window.startSettingsPropertiesListener = function() {
                         if (!createdAt || createdAt > window.adminSessionStartTime) {
                             newListings.push(prop);
                             window.pendingAdminNotifications.add(notificationId);
-                            console.log('[SettingsProperties] REAL-TIME new listing:', prop.title, 'by', prop.ownerEmail);
                         }
                     }
                 }
@@ -3588,7 +3538,6 @@ window.startSettingsPropertiesListener = function() {
             
             // Show notifications for MISSED listings (on first load only)
             if (isFirstSnapshot && missedListings.length > 0) {
-                console.log('[SettingsProperties] Showing', missedListings.length, 'missed listing notification(s)');
                 missedListings.forEach(listing => {
                     showNewListingNotification(listing, true);
                 });
@@ -3604,8 +3553,6 @@ window.startSettingsPropertiesListener = function() {
                 );
                 
                 if (otherUsersListings.length > 0) {
-                    console.log('[SettingsProperties] FLASHING SCREEN for', otherUsersListings.length, 'new listing(s)');
-                    
                     // Flash screen green!
                     flashScreen('green');
                     
@@ -3628,14 +3575,7 @@ window.startSettingsPropertiesListener = function() {
             // Mark first snapshot as complete (use global flag)
             if (!window.settingsPropertiesFirstLoadDone) {
                 window.settingsPropertiesFirstLoadDone = true;
-                console.log('[SettingsProperties] Initial load complete. Seen', window.seenPropertyIds.size, 'properties. Now listening for new listings...');
             }
-            
-            console.log('[SettingsProperties] === SNAPSHOT PROCESSING COMPLETE ===', {
-                newListings: newListings.length,
-                missedListings: missedListings.length
-            });
-            
         }, (error) => {
             console.error('[SettingsProperties] Listener error:', error);
         });
@@ -3645,7 +3585,6 @@ window.startSettingsPropertiesListener = function() {
 window.showNewListingNotification = function(listing, isMissed = false) {
     const stack = $('adminNotificationsStack');
     if (!stack) {
-        console.log('[showNewListingNotification] No notification stack found!');
         return;
     }
     
@@ -3655,16 +3594,11 @@ window.showNewListingNotification = function(listing, isMissed = false) {
     
     // Don't add if already dismissed or already showing
     if (window.dismissedAdminNotifications.has(notificationId)) {
-        console.log('[showNewListingNotification] Already dismissed:', notificationId);
         return;
     }
     if ($('notification-' + notificationId)) {
-        console.log('[showNewListingNotification] Already showing:', notificationId);
         return;
     }
-    
-    console.log('[showNewListingNotification] Creating notification for:', listing.title, 'isMissed:', isMissed, 'isPremium:', listing.isPremium);
-    
     // Get owner name
     const ownerEmail = listing.ownerEmail || 'Unknown';
     const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
@@ -3984,7 +3918,6 @@ window.dismissNewUserNotification = function(notificationId) {
         // If all notifications are dismissed, update lastVisit time
         if (window.pendingAdminNotifications.size === 0) {
             localStorage.setItem('adminLastVisit', new Date().toISOString());
-            console.log('[AdminNotify] All notifications dismissed, updated lastVisit');
         }
     } catch (e) {
         console.warn('[AdminNotify] Could not save dismissed state');
@@ -4072,10 +4005,6 @@ window.showNewPhotoNotifications = function(event) {
 window.reRenderPendingNotifications = function() {
     const stack = $('adminNotificationsStack');
     if (!stack) return;
-    
-    console.log('[ReRenderNotifications] Checking for pending notifications...');
-    console.log('[ReRenderNotifications] Pending set:', Array.from(window.pendingAdminNotifications));
-    
     // Go through all pending notifications and re-render any that aren't showing
     window.pendingAdminNotifications.forEach(notificationId => {
         // Skip if already dismissed
@@ -4088,9 +4017,6 @@ window.reRenderPendingNotifications = function() {
         if ($('notification-' + notificationId)) {
             return;
         }
-        
-        console.log('[ReRenderNotifications] Re-rendering:', notificationId);
-        
         // Parse the notification ID to determine type
         if (notificationId.startsWith('new-user-')) {
             const userId = notificationId.replace('new-user-', '');
@@ -4119,7 +4045,6 @@ window.reRenderPendingNotifications = function() {
 window.showNewPremiumNotification = function(property, ownerEmail, isMissed = false) {
     const stack = $('adminNotificationsStack');
     if (!stack) {
-        console.log('[showNewPremiumNotification] No notification stack found!');
         return;
     }
     
@@ -4129,9 +4054,6 @@ window.showNewPremiumNotification = function(property, ownerEmail, isMissed = fa
     
     // Don't add if already dismissed
     if (window.dismissedAdminNotifications.has(notificationId)) return;
-    
-    console.log('[showNewPremiumNotification] Creating notification for:', property.title);
-    
     // Get owner name
     const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
     
@@ -4288,8 +4210,6 @@ window.handleAdminNotificationClick = function(notificationId, type) {
 // Dismiss admin notification
 // Clear all admin notifications at once
 window.clearAllAdminNotifications = function() {
-    console.log('[AdminNotify] Clearing all notifications');
-    
     const stack = $('adminNotificationsStack');
     if (!stack) return;
     
@@ -5345,15 +5265,10 @@ window.confirmSubscriptionDate = async function(userId, email) {
 // Save subscription date to Firestore
 window.saveSubscriptionDate = async function(userId, email, date) {
     try {
-        console.log(`[Subscription] Attempting to save for userId: ${userId}, email: ${email}, date: ${date}`);
-        
         await db.collection('users').doc(userId).update({
             subscriptionLastPaid: date || '',
             subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
-        console.log(`[Subscription] Successfully updated last paid for ${email}: ${date}`);
-        
         // Show success toast
         const toast = document.createElement('div');
         toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-xl shadow-2xl z-[60] flex items-center gap-2';
@@ -5701,8 +5616,6 @@ window.updateAdminUserField = async function(userId, email, field, value) {
             [field]: value,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        console.log(`[Admin] Updated ${field} for ${email}: ${value}`);
-        
         // Update cache and sync everywhere
         if (field === 'username') {
             window.ownerUsernameCache = window.ownerUsernameCache || {};
@@ -5744,8 +5657,6 @@ window.syncOwnerNameEverywhere = function(email, newName) {
             el.textContent = newName;
         }
     });
-    
-    console.log(`[Sync] Updated owner name everywhere for ${email} to ${newName}`);
 };
 
 window.adminDeleteUser = async function(userId, email) {
@@ -5789,13 +5700,11 @@ window.adminDeleteUser = async function(userId, email) {
             for (const prop of userProperties) {
                 await deletePropertyCompletely(prop.id, email);
             }
-            console.log(`[Admin] Deleted ${propertyCount} properties for ${email}`);
         } else if (propertyCount > 0) {
             // Orphan properties - clear owner but keep property
             for (const prop of userProperties) {
                 await orphanProperty(prop.id);
             }
-            console.log(`[Admin] Orphaned ${propertyCount} properties for ${email}`);
         }
         
         // Delete user document from Firestore
@@ -5805,7 +5714,6 @@ window.adminDeleteUser = async function(userId, email) {
         try {
             const deleteAuthUser = functions.httpsCallable('deleteAuthUser');
             const result = await deleteAuthUser({ email: email });
-            console.log('[Admin] Auth user deleted:', result.data);
         } catch (authError) {
             console.warn('[Admin] Could not delete Auth user (Cloud Function may not be deployed):', authError.message);
             // Continue - Firestore deletion was successful
@@ -5876,8 +5784,6 @@ window.orphanProperty = async function(propertyId) {
                 ownerPropertyMap[lowerEmail] = ownerPropertyMap[lowerEmail].filter(id => id !== propertyId);
             }
         }
-        
-        console.log(`[Admin] Property ${propertyId} orphaned (owner cleared)`);
         return true;
     } catch (error) {
         console.error(`Error orphaning property ${propertyId}:`, error);
@@ -6016,9 +5922,6 @@ window.confirmReassignProperty = async function() {
         if (window.ownerUsernameCache && oldOwnerEmail) {
             delete window.ownerUsernameCache[oldOwnerEmail.toLowerCase()];
         }
-        
-        console.log(`[Admin] Property ${propertyId} reassigned from ${oldOwnerEmail || 'unassigned'} to ${actualNewEmail || 'unassigned'}`);
-        
         successDiv.textContent = '✓ Property reassigned successfully!';
         showElement(successDiv);
         btn.textContent = '✓ Done!';
@@ -6111,11 +6014,8 @@ window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
                         acknowledged: false
                     }
                 });
-                console.log(`[Admin] Set deletion notification on user document for ${lowerEmail}`);
             }
         }
-        
-        console.log(`[Admin] Property ${propertyId} deleted completely`);
         return true;
     } catch (error) {
         console.error(`Error deleting property ${propertyId}:`, error);
@@ -6185,7 +6085,6 @@ window.adminCreateUser = async function(email, password, displayName, tier) {
             displayName: displayName 
         });
         uid = result.data.uid;
-        console.log('[Admin] User created via Cloud Function:', uid);
     } catch (cfError) {
         console.warn('[Admin] Cloud Function not available, using secondary auth:', cfError.message);
         
@@ -6198,7 +6097,6 @@ window.adminCreateUser = async function(email, password, displayName, tier) {
             const userCredential = await secondaryAuth.createUserWithEmailAndPassword(email, password);
             uid = userCredential.user.uid;
             await secondaryAuth.signOut();
-            console.log('[Admin] User created via secondary auth:', uid);
         } catch (authError) {
             try { await secondaryAuth.signOut(); } catch(e) {}
             throw authError;
@@ -6350,8 +6248,6 @@ window.deleteUpgradeHistory = async function(entryId) {
             entryEl.style.transform = 'translateX(20px)';
             setTimeout(() => entryEl.remove(), 300);
         }
-        
-        console.log('[Admin] Deleted upgrade history entry:', entryId);
     } catch (error) {
         console.error('Error deleting history entry:', error);
         alert('Error deleting entry: ' + error.message);
@@ -6564,8 +6460,6 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
             };
             
             await db.collection('users').doc(userId).update(updateData);
-            console.log(`[Subscription] Set for ${email}: trial=${isTrial}, prorated=${isProrated}, amount=$${subscriptionAmount}`);
-            
             // CREATE USER NOTIFICATION so they see the upgrade in their dashboard
             const trialLabel = isTrial ? ' (Free Trial)' : '';
             const defaultMessage = isTrial 
@@ -6585,7 +6479,6 @@ window.confirmUpgrade = async function(email, newTier, currentTier) {
                 read: false,
                 dismissed: false
             });
-            console.log(`[Upgrade] User notification created for ${email}`);
         }
         
         // Show success briefly then close
@@ -6823,8 +6716,6 @@ window.syncBasePropertiesToAdmin = async function() {
     // Save to Firestore
     if (added > 0) {
         await db.collection('settings').doc('ownerPropertyMap').set(currentMap, { merge: true });
-        console.log(`[syncBasePropertiesToAdmin] Added ${added} properties to admin mapping`);
-        
         // Refresh the admin panel
         if (window.adminUsersData && window.adminUsersData.length > 0) {
             renderAdminUsersList(window.adminUsersData);
@@ -6833,7 +6724,6 @@ window.syncBasePropertiesToAdmin = async function() {
         
         showToast(`✓ Synced ${added} properties to admin`, 'success');
     } else {
-        console.log('[syncBasePropertiesToAdmin] All base properties already mapped');
         showToast('All base properties already synced', 'info');
     }
     
@@ -6847,7 +6737,6 @@ window.ensureBasePropertiesSynced = function() {
     
     // Check if property 13 (Villa) is missing
     if (!currentMapping.includes(13)) {
-        console.log('[ensureBasePropertiesSynced] Property 13 (Villa) missing, syncing...');
         syncBasePropertiesToAdmin();
     }
 };
@@ -7133,11 +7022,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const isPremium = $('newListingPremium')?.checked || false;
             
             // Debug logging
-            console.log('[CreateListing] Form values:', {
-                title, type, location, bedrooms, bathrooms, storage, 
-                interiorType, weeklyPrice, biweeklyPrice, monthlyPrice, isPremium
-            });
-            
             // Parse images - empty array will trigger the card's built-in placeholder
             const images = imagesText 
                 ? imagesText.split('\n').map(url => url.trim()).filter(url => url)
@@ -7190,8 +7074,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // CRITICAL: Clear any stale property overrides for this ID FIRST
                 // This must happen BEFORE adding to local state or saving to Firestore
-                console.log('[CreateListing] Clearing overrides for property', newId);
-                console.log('[CreateListing] Current state.propertyOverrides[' + newId + ']:', state.propertyOverrides[newId]);
                 delete state.propertyOverrides[newId];
                 
                 // Get all fields that need to be deleted (all possible override fields)
@@ -7204,14 +7086,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 overrideFields.forEach(field => {
                     deleteUpdates[`${newId}.${field}`] = firebase.firestore.FieldValue.delete();
                 });
-                
-                console.log('[CreateListing] Deleting these fields from Firestore:', Object.keys(deleteUpdates));
                 await db.collection('settings').doc('propertyOverrides').update(deleteUpdates).catch(err => {
                     // Ignore if fields don't exist
-                    console.log('[CreateListing] No stale overrides to clean up for property', newId, err?.message);
                 });
-                console.log('[CreateListing] Override cleanup complete');
-                
                 // NOW add to local properties array (after cleanup)
                 properties.push(newProperty);
                 
@@ -7244,7 +7121,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             lastPropertyPostedAt: new Date().toISOString(),
                             lastPropertyPosted: firebase.firestore.FieldValue.serverTimestamp()
                         }, { merge: true });
-                        console.log('[CreateListing] Updated lastPropertyPosted time');
                     }
                 } catch (e) {
                     console.warn('[CreateListing] Could not update lastPropertyPosted:', e);
@@ -7262,7 +7138,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             notes: 'Premium listing activation - weekly fee',
                             recordedAt: new Date().toISOString()
                         });
-                        console.log('[CreateListing] Premium listing fee logged: $10,000');
                     } catch (e) {
                         console.warn('[CreateListing] Could not log premium fee:', e);
                     }
@@ -7344,9 +7219,6 @@ window.executeDeleteProperty = async function() {
         const actualOwnerEmail = (propertyOwnerEmail[propertyId] || '').toLowerCase();
         const currentUserEmail = (auth.currentUser?.email || '').toLowerCase();
         const isAdminDeleting = currentUserEmail !== actualOwnerEmail && actualOwnerEmail !== '';
-        
-        console.log('[Delete] Property:', propertyId, 'Owner:', actualOwnerEmail, 'Deleted by:', currentUserEmail, 'Admin?', isAdminDeleting);
-        
         // Remove from local properties array
         const propIndex = properties.findIndex(p => p.id === propertyId);
         if (propIndex !== -1) {
@@ -7398,7 +7270,6 @@ window.executeDeleteProperty = async function() {
         
         await db.collection('settings').doc('propertyOverrides').update(deleteUpdates).catch(err => {
             // Ignore if fields don't exist
-            console.log('[Delete] No overrides to clean up for property', propertyId);
         });
         
         // CREATE DELETION NOTIFICATION for the property owner (if admin is deleting someone else's property)
@@ -7420,7 +7291,6 @@ window.executeDeleteProperty = async function() {
                         acknowledged: false
                     }
                 });
-                console.log('[Delete] Set deletion notification on user document:', actualOwnerEmail);
             }
         }
         
@@ -7630,7 +7500,6 @@ window.loadUserNotifications = async function() {
                 
             }, (error) => {
                 // Handle permission errors silently - user just won't see notifications
-                console.log('Notification listener error (may need Firestore rules):', error.message);
                 hideElement(banner);
                 const userBadge = $('userNotificationBadge');
                 if (userBadge) hideElement(userBadge);
@@ -7712,11 +7581,9 @@ window.startUserTierListener = function() {
                 if (!doc.exists) {
                     // Check if we're in the middle of creating an account
                     if (window.isCreatingAccount) {
-                        console.log('[UserSync] Document not found but account is being created - ignoring');
                         return;
                     }
                     // User document was deleted - force logout
-                    console.log('[UserSync] User document deleted - forcing logout');
                     forceLogout();
                     return;
                 }
@@ -7726,8 +7593,6 @@ window.startUserTierListener = function() {
                 
                 // CHECK FOR PROPERTY DELETION NOTIFICATION
                 if (data.deletedProperty && !data.deletedProperty.acknowledged) {
-                    console.log('[PropertySync] Property deletion detected:', data.deletedProperty);
-                    
                     const deletedProp = data.deletedProperty;
                     
                     // Remove from local properties array
@@ -7736,7 +7601,6 @@ window.startUserTierListener = function() {
                     );
                     if (index !== -1) {
                         properties.splice(index, 1);
-                        console.log('[PropertySync] Removed property from local array');
                     }
                     
                     // Remove from owner map
@@ -7762,8 +7626,6 @@ window.startUserTierListener = function() {
                 
                 // Check if tier changed
                 if (state.userTier && state.userTier !== newTier) {
-                    console.log('[TierSync] Tier changed from', state.userTier, 'to', newTier);
-                    
                     // Update state
                     state.userTier = newTier;
                     
@@ -7779,10 +7641,8 @@ window.startUserTierListener = function() {
                     state.userTier = newTier;
                 }
             }, (error) => {
-                console.log('User tier listener error:', error.message);
                 // If permission denied, user may have been deleted
                 if (error.code === 'permission-denied') {
-                    console.log('[UserSync] Permission denied - user may have been deleted');
                     forceLogout();
                 }
             });
@@ -9117,10 +8977,6 @@ function getOwnedProperties() {
     
     const userEmail = user.email.toLowerCase();
     const userPropertyIds = ownerPropertyMap[userEmail] || [];
-    
-    console.log('[getOwnedProperties] Checking properties for:', userEmail);
-    console.log('[getOwnedProperties] User property IDs from map:', userPropertyIds);
-    
     return properties.filter(p => {
         // Primary check: ownerEmail field (MOST IMPORTANT)
         const propOwnerEmail = (p.ownerEmail || '').toLowerCase();
@@ -9129,7 +8985,6 @@ function getOwnedProperties() {
         if (propOwnerEmail) {
             const isOwner = propOwnerEmail === userEmail;
             if (!isOwner) {
-                console.log(`[getOwnedProperties] Property ${p.id} (${p.title}) belongs to ${propOwnerEmail}, not ${userEmail}`);
             }
             return isOwner;
         }
@@ -9137,12 +8992,10 @@ function getOwnedProperties() {
         // For legacy properties WITHOUT ownerEmail, use ownerPropertyMap
         // ONLY if this user is explicitly in the map for this property
         if (userPropertyIds.includes(p.id)) {
-            console.log(`[getOwnedProperties] Property ${p.id} found in ownerPropertyMap for ${userEmail}`);
             return true;
         }
         
         // No owner set and not in map - property is orphaned, don't show to anyone
-        console.log(`[getOwnedProperties] Property ${p.id} (${p.title}) has no owner - skipping`);
         return false;
     });
 }

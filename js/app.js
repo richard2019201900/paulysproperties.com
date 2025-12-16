@@ -299,8 +299,6 @@ window.viewPropertyAndHighlightOffers = function(id) {
  * All editable fields sync in real-time with Firestore
  */
 window.viewPropertyStats = async function(id) {
-    console.log('[viewPropertyStats] Opening stats page for property:', id);
-    
     const p = properties.find(prop => prop.id === id);
     if (!p) {
         console.error('[viewPropertyStats] Property not found:', id);
@@ -313,9 +311,6 @@ window.viewPropertyStats = async function(id) {
         alert('You do not have access to this property.');
         return;
     }
-    
-    console.log('[viewPropertyStats] Access granted, loading property:', p.title);
-    
     state.currentPropertyId = id;
     state.currentImages = p.images;
     
@@ -333,7 +328,6 @@ window.viewPropertyStats = async function(id) {
     PropertyDataService.subscribeAll((data) => {
         // Re-render when data changes from another source
         if (state.currentPropertyId === id) {
-            console.log('Real-time update received, refreshing stats page');
             renderPropertyStatsContent(id);
             loadStatsOwnerName(id);
         }
@@ -1259,8 +1253,6 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 amount: paymentAmount,
                 recordedBy: auth.currentUser?.email || 'owner'
             });
-            console.log(`[PaymentLog] Logged payment for property ${propertyId}: ${renterName} paid $${paymentAmount} for ${newValue}`);
-            
             // Calculate next due date for thank you message
             const lastDate = parseLocalDate(newValue);
             const nextDate = new Date(lastDate);
@@ -1565,7 +1557,6 @@ window.confirmPremiumEnable = async function(propertyId) {
         if (!TierService.isMasterAdmin(currentUserEmail)) {
             // Property owner enabled premium - notify admin
             try {
-                console.log('[Premium] Creating admin notification for property:', p.title);
                 await db.collection('adminNotifications').add({
                     type: 'premium_request',
                     propertyId: propertyId,
@@ -1576,7 +1567,6 @@ window.confirmPremiumEnable = async function(propertyId) {
                     dismissed: false,
                     message: `${p.title} enabled premium${isTrial ? ' (trial)' : ' - collect $10k/week'}`
                 });
-                console.log('[Premium] Admin notification created successfully');
             } catch (e) {
                 console.error('[Premium] Failed to create admin notification:', e);
                 // Non-critical error - don't block the premium activation
@@ -1644,9 +1634,6 @@ window.togglePremiumTrialStatus = async function(propertyId) {
 
 // Log a payment to the property's payment history
 window.logPayment = async function(propertyId, paymentData) {
-    console.log('[PaymentLog] Starting logPayment for property:', propertyId);
-    console.log('[PaymentLog] Payment data:', paymentData);
-    
     try {
         // Get existing payment history
         const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
@@ -1654,9 +1641,7 @@ window.logPayment = async function(propertyId, paymentData) {
         
         if (historyDoc.exists) {
             payments = historyDoc.data().payments || [];
-            console.log('[PaymentLog] Found existing payments:', payments.length);
         } else {
-            console.log('[PaymentLog] No existing payments, creating new document');
         }
         
         // Add new payment
@@ -1665,17 +1650,12 @@ window.logPayment = async function(propertyId, paymentData) {
             id: Date.now().toString() // Unique ID for this payment
         };
         payments.push(newPayment);
-        
-        console.log('[PaymentLog] Saving', payments.length, 'payments to Firestore');
-        
         // Save back to Firestore
         await db.collection('paymentHistory').doc(String(propertyId)).set({
             propertyId: propertyId,
             payments: payments,
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
-        console.log('[PaymentLog] Payment logged successfully:', newPayment);
         return true;
     } catch (error) {
         console.error('[PaymentLog] Error logging payment:', error);
@@ -1780,15 +1760,12 @@ window.closePaymentConfirmModal = function() {
 
 // Get payment history for a property
 window.getPaymentHistory = async function(propertyId) {
-    console.log('[PaymentLog] Fetching payment history for property:', propertyId);
     try {
         const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
         if (historyDoc.exists) {
             const payments = historyDoc.data().payments || [];
-            console.log('[PaymentLog] Found', payments.length, 'payments');
             return payments;
         }
-        console.log('[PaymentLog] No payment history document found');
         return [];
     } catch (error) {
         console.error('[PaymentLog] Error fetching history:', error);
@@ -1808,9 +1785,6 @@ window.deletePayment = async function(propertyId, paymentId) {
     if (!confirm('Are you sure you want to delete this payment? This will update all financial stats.')) {
         return;
     }
-    
-    console.log('[PaymentLog] Deleting payment:', paymentId, 'from property:', propertyId);
-    
     try {
         // Get existing payment history
         const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
@@ -1837,8 +1811,6 @@ window.deletePayment = async function(propertyId, paymentId) {
             payments: payments,
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
-        console.log('[PaymentLog] Payment deleted, remaining:', payments.length);
         showToast('🗑️ Payment deleted - refreshing stats...', 'success');
         
         // Refresh the analytics view
@@ -1852,8 +1824,6 @@ window.deletePayment = async function(propertyId, paymentId) {
 
 // Refresh property analytics after payment changes
 window.refreshPropertyAnalytics = async function(propertyId) {
-    console.log('[Analytics] Refreshing analytics for property:', propertyId);
-    
     // Find the property
     const property = properties.find(p => p.id === propertyId);
     if (!property) {
@@ -1878,8 +1848,6 @@ window.refreshPropertyAnalytics = async function(propertyId) {
         // Re-render the stats page content
         renderPropertyStatsContent(propertyId);
     }
-    
-    console.log('[Analytics] Refresh complete');
 };
 
 // Calculate property analytics from payment history
@@ -2254,9 +2222,6 @@ window.deletePaymentFromModal = async function(propertyId, paymentId) {
     if (!confirm('Are you sure you want to delete this payment? This will update all financial stats.')) {
         return;
     }
-    
-    console.log('[PaymentLog] Deleting payment from modal:', paymentId);
-    
     try {
         const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
         
@@ -2727,7 +2692,6 @@ async function init() {
     auth.onAuthStateChanged(async (user) => {
         if (user) {
             // User is signed in - restore owner session
-            console.log('[Auth] User session restored:', user.email);
             state.currentUser = 'owner';
             updateAuthButton(true);
             
@@ -2741,13 +2705,11 @@ async function init() {
                         tier: 'starter',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
-                    console.log('[Auth] Set default starter tier for user');
                 }
                 
                 // Store user tier in state for quick access
                 const updatedDoc = await db.collection('users').doc(user.uid).get();
                 state.userTier = updatedDoc.data()?.tier || 'starter';
-                console.log('[Auth] User tier:', state.userTier);
             } catch (error) {
                 console.error('[Auth] Error checking user tier:', error);
                 state.userTier = 'starter';
@@ -2759,7 +2721,6 @@ async function init() {
                     lastLoginAt: new Date().toISOString(),
                     lastLogin: firebase.firestore.FieldValue.serverTimestamp()
                 }, { merge: true });
-                console.log('[Auth] Updated last login time');
             } catch (e) {
                 console.warn('[Auth] Could not update last login:', e);
             }
@@ -2778,7 +2739,6 @@ async function init() {
             }
         } else {
             // No user signed in
-            console.log('[Auth] No active session');
             state.currentUser = null;
             state.userTier = null;
             updateAuthButton(false);
