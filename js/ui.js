@@ -7656,18 +7656,18 @@ window.openReportsModal = function() {
                 </div>
                 
                 <!-- Report Tabs -->
-                <div class="border-b border-gray-700 px-6">
-                    <div class="flex gap-1 -mb-px">
-                        <button id="reportTab-overview" onclick="switchReportTab('overview')" class="px-4 py-3 text-sm font-medium text-yellow-400 border-b-2 border-yellow-400">
+                <div class="border-b border-gray-700 px-6 pt-2">
+                    <div class="flex gap-2">
+                        <button id="reportTab-overview" onclick="switchReportTab('overview')" class="px-4 py-2 text-sm font-medium rounded-t-lg bg-gray-800 text-yellow-400 border border-gray-600 border-b-0 -mb-px relative z-10">
                             📈 Overview
                         </button>
-                        <button id="reportTab-revenue" onclick="switchReportTab('revenue')" class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 border-b-2 border-transparent">
+                        <button id="reportTab-revenue" onclick="switchReportTab('revenue')" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition">
                             💰 Revenue
                         </button>
-                        <button id="reportTab-occupancy" onclick="switchReportTab('occupancy')" class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 border-b-2 border-transparent">
+                        <button id="reportTab-occupancy" onclick="switchReportTab('occupancy')" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition">
                             🏠 Occupancy
                         </button>
-                        <button id="reportTab-performance" onclick="switchReportTab('performance')" class="px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 border-b-2 border-transparent">
+                        <button id="reportTab-performance" onclick="switchReportTab('performance')" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition">
                             🏆 Top Performers
                         </button>
                     </div>
@@ -7716,15 +7716,17 @@ window.closeReportsModal = function() {
 };
 
 window.switchReportTab = function(tabName) {
-    // Update tab buttons
+    // Update tab buttons - remove active styling from all
     document.querySelectorAll('[id^="reportTab-"]').forEach(btn => {
-        btn.classList.remove('text-yellow-400', 'border-yellow-400');
-        btn.classList.add('text-gray-400', 'border-transparent');
+        btn.classList.remove('bg-gray-800', 'text-yellow-400', 'border', 'border-gray-600', 'border-b-0', '-mb-px', 'relative', 'z-10');
+        btn.classList.add('text-gray-400');
     });
+    
+    // Add active styling to selected tab
     const activeTab = document.getElementById(`reportTab-${tabName}`);
     if (activeTab) {
-        activeTab.classList.remove('text-gray-400', 'border-transparent');
-        activeTab.classList.add('text-yellow-400', 'border-yellow-400');
+        activeTab.classList.remove('text-gray-400');
+        activeTab.classList.add('bg-gray-800', 'text-yellow-400', 'border', 'border-gray-600', 'border-b-0', '-mb-px', 'relative', 'z-10');
     }
     
     // Update content
@@ -7810,7 +7812,8 @@ function generateReportData(properties) {
         // Property stats for ranking
         data.propertyStats.push({
             id: p.id,
-            name: p.name || `Property #${p.id}`,
+            name: p.title || `Property #${p.id}`,
+            title: p.title || `Property #${p.id}`,
             type: propType,
             isRented: !isAvailable,
             renterName: renterName,
@@ -7838,6 +7841,48 @@ function renderOverviewReport(data) {
     const occupancyColor = data.occupancyRate >= 80 ? 'text-green-400' : 
                            data.occupancyRate >= 50 ? 'text-yellow-400' : 'text-red-400';
     
+    // Calculate vacancy loss (potential revenue from empty units)
+    const avgRentPerUnit = data.rentedProperties > 0 ? data.totalMonthlyRevenue / data.rentedProperties : 0;
+    const weeklyVacancyLoss = Math.round((avgRentPerUnit / 4) * data.availableProperties);
+    const monthlyVacancyLoss = Math.round(avgRentPerUnit * data.availableProperties);
+    
+    // Calculate cash flow forecast (next 4 weeks)
+    const weeklyIncome = Math.round(data.totalMonthlyRevenue / 4);
+    const forecast = [
+        { week: 'This Week', amount: weeklyIncome },
+        { week: 'Week 2', amount: weeklyIncome },
+        { week: 'Week 3', amount: weeklyIncome },
+        { week: 'Week 4', amount: weeklyIncome }
+    ];
+    
+    // Find overdue payments (properties with past due dates)
+    const now = new Date();
+    const overdueProps = data.propertyStats.filter(p => {
+        if (!p.isRented || !p.lastPaymentDate) return false;
+        const freq = p.frequency || 'weekly';
+        const lastPay = new Date(p.lastPaymentDate + 'T00:00:00');
+        let dueDate = new Date(lastPay);
+        if (freq === 'daily') dueDate.setDate(dueDate.getDate() + 1);
+        else if (freq === 'weekly') dueDate.setDate(dueDate.getDate() + 7);
+        else if (freq === 'biweekly') dueDate.setDate(dueDate.getDate() + 14);
+        else dueDate.setMonth(dueDate.getMonth() + 1);
+        return now > dueDate;
+    });
+    
+    // Find upcoming payments (due within 3 days)
+    const upcomingProps = data.propertyStats.filter(p => {
+        if (!p.isRented || !p.lastPaymentDate) return false;
+        const freq = p.frequency || 'weekly';
+        const lastPay = new Date(p.lastPaymentDate + 'T00:00:00');
+        let dueDate = new Date(lastPay);
+        if (freq === 'daily') dueDate.setDate(dueDate.getDate() + 1);
+        else if (freq === 'weekly') dueDate.setDate(dueDate.getDate() + 7);
+        else if (freq === 'biweekly') dueDate.setDate(dueDate.getDate() + 14);
+        else dueDate.setMonth(dueDate.getMonth() + 1);
+        const daysUntil = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+        return daysUntil >= 0 && daysUntil <= 3;
+    });
+    
     return `
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div class="bg-gray-900 rounded-xl p-4 border border-gray-700">
@@ -7858,7 +7903,45 @@ function renderOverviewReport(data) {
             </div>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Payment Alerts Section -->
+        ${(overdueProps.length > 0 || upcomingProps.length > 0) ? `
+            <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${overdueProps.length > 0 ? `
+                    <div class="bg-gradient-to-r from-red-900/30 to-red-800/20 rounded-xl p-4 border border-red-500/30">
+                        <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                            🚨 Overdue Payments (${overdueProps.length})
+                        </h4>
+                        <div class="space-y-2 max-h-32 overflow-y-auto">
+                            ${overdueProps.slice(0, 5).map(p => `
+                                <div class="flex justify-between items-center text-sm bg-red-900/20 rounded-lg px-3 py-2">
+                                    <span class="text-white truncate max-w-[60%]">${p.name}</span>
+                                    <span class="text-red-400 font-medium">${p.renterName || 'Tenant'}</span>
+                                </div>
+                            `).join('')}
+                            ${overdueProps.length > 5 ? `<p class="text-red-400/60 text-xs text-center">+${overdueProps.length - 5} more</p>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+                ${upcomingProps.length > 0 ? `
+                    <div class="bg-gradient-to-r from-amber-900/30 to-yellow-800/20 rounded-xl p-4 border border-amber-500/30">
+                        <h4 class="text-amber-400 font-bold mb-3 flex items-center gap-2">
+                            ⏰ Due Soon (${upcomingProps.length})
+                        </h4>
+                        <div class="space-y-2 max-h-32 overflow-y-auto">
+                            ${upcomingProps.slice(0, 5).map(p => `
+                                <div class="flex justify-between items-center text-sm bg-amber-900/20 rounded-lg px-3 py-2">
+                                    <span class="text-white truncate max-w-[60%]">${p.name}</span>
+                                    <span class="text-amber-400 font-medium">${p.renterName || 'Tenant'}</span>
+                                </div>
+                            `).join('')}
+                            ${upcomingProps.length > 5 ? `<p class="text-amber-400/60 text-xs text-center">+${upcomingProps.length - 5} more</p>` : ''}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        ` : ''}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <!-- Occupancy Chart -->
             <div class="bg-gray-900 rounded-xl p-4 border border-gray-700">
                 <h4 class="text-white font-bold mb-4">📊 Portfolio Status</h4>
@@ -7907,6 +7990,72 @@ function renderOverviewReport(data) {
                             </div>
                         `;
                     }).join('')}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vacancy Loss & Cash Flow Forecast -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Vacancy Loss Calculator -->
+            <div class="bg-gradient-to-br from-red-900/20 to-orange-900/20 rounded-xl p-4 border border-red-500/20">
+                <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                    💸 Vacancy Loss Calculator
+                </h4>
+                ${data.availableProperties > 0 ? `
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400 text-sm">Empty Units:</span>
+                            <span class="text-white font-bold">${data.availableProperties}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400 text-sm">Avg Rent/Unit:</span>
+                            <span class="text-white font-bold">${formatPrice(avgRentPerUnit)}/mo</span>
+                        </div>
+                        <div class="border-t border-gray-700 pt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-gray-300 text-sm">Weekly Loss:</span>
+                                <span class="text-red-400 font-bold">-${formatPrice(weeklyVacancyLoss)}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-300 text-sm">Monthly Loss:</span>
+                                <span class="text-red-400 font-bold text-lg">-${formatPrice(monthlyVacancyLoss)}</span>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 italic">Fill vacancies to reclaim this income!</p>
+                    </div>
+                ` : `
+                    <div class="text-center py-4">
+                        <p class="text-green-400 font-bold">🎉 No Vacancies!</p>
+                        <p class="text-gray-400 text-sm">All units generating income</p>
+                    </div>
+                `}
+            </div>
+            
+            <!-- Cash Flow Forecast -->
+            <div class="bg-gradient-to-br from-blue-900/20 to-cyan-900/20 rounded-xl p-4 border border-blue-500/20">
+                <h4 class="text-blue-400 font-bold mb-3 flex items-center gap-2">
+                    📈 4-Week Cash Flow Forecast
+                </h4>
+                <div class="space-y-2">
+                    ${forecast.map((f, i) => {
+                        const width = data.totalMonthlyRevenue > 0 ? (f.amount / (weeklyIncome * 1.2)) * 100 : 0;
+                        return `
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 text-xs w-16">${f.week}</span>
+                                <div class="flex-1 bg-gray-700 rounded-full h-4 relative overflow-hidden">
+                                    <div class="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all" 
+                                         style="width: ${Math.min(width, 100)}%"></div>
+                                </div>
+                                <span class="text-green-400 font-bold text-sm w-20 text-right">+${formatPrice(f.amount)}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="border-t border-gray-700 mt-3 pt-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300 font-medium">Projected Total:</span>
+                        <span class="text-green-400 font-bold text-lg">+${formatPrice(weeklyIncome * 4)}</span>
+                    </div>
                 </div>
             </div>
         </div>
