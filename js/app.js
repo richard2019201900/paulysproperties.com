@@ -24,6 +24,9 @@ window.viewProperty = function(id) {
     const hasImages = p.images && Array.isArray(p.images) && p.images.length > 0;
     const firstImage = hasImages ? p.images[0] : '';
     
+    // Get premium status early for all styling
+    const isPremium = PropertyDataService.getValue(id, 'isPremium', p.isPremium || false);
+    
     // Image placeholder HTML
     const imagePlaceholder = `
         <div class="w-full h-60 md:h-80 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center rounded-xl shadow-lg border border-gray-600">
@@ -84,14 +87,21 @@ window.viewProperty = function(id) {
             </button>
         </div>` : '';
 
+    // Premium badge for images section
+    const premiumImageBadge = isPremium 
+        ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' 
+        : '';
+
     // Build images section - show placeholder if no images
     const imagesSection = hasImages 
-        ? `<div class="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 p-4 md:p-6">
+        ? `<div class="relative grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 p-4 md:p-6">
+            ${premiumImageBadge}
             ${p.images.map((img, i) => `
                 <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-60 md:h-80 object-cover rounded-xl shadow-lg border border-gray-600 ${i === 0 ? 'md:col-span-2' : ''}" loading="lazy" onerror="${imgErrorHandler}">
             `).join('')}
            </div>`
-        : `<div class="p-4 md:p-6">
+        : `<div class="relative p-4 md:p-6">
+            ${premiumImageBadge}
             <div class="md:col-span-2 w-full h-72 md:h-96 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center rounded-xl shadow-lg border border-gray-600">
                 <span class="text-8xl mb-4">🏠</span>
                 <span class="text-gray-400 font-semibold text-xl">Photos Coming Soon</span>
@@ -102,7 +112,15 @@ window.viewProperty = function(id) {
     // Video poster - use first image or empty
     const videoPoster = firstImage || '';
 
+    // Premium banner for top of page
+    const premiumBanner = isPremium 
+        ? `<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-3 font-black text-lg tracking-wider flex items-center justify-center gap-2">
+            <span>👑</span> PREMIUM LISTING <span>👑</span>
+           </div>` 
+        : '';
+
     $('propertyDetailContent').innerHTML = `
+        ${premiumBanner}
         ${ownerTabs}
         ${p.videoUrl ? `
         <div class="p-4 md:p-6 bg-gradient-to-r from-red-900 to-pink-900 border-b border-gray-700">

@@ -373,6 +373,8 @@ const PropertyDataService = {
     async write(propertyId, field, value) {
         const prop = properties.find(p => p.id === propertyId);
         const isUserCreated = prop && prop.ownerEmail;
+        // Ensure propertyId is numeric for consistent state storage
+        const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
         
         try {
             if (isUserCreated) {
@@ -393,10 +395,11 @@ const PropertyDataService = {
                     [`${propertyId}.updatedBy`]: auth.currentUser?.email || 'unknown'
                 };
                 await db.collection(this.collectionName).doc(this.docName).set(updateData, { merge: true });
-                if (!state.propertyOverrides[propertyId]) {
-                    state.propertyOverrides[propertyId] = {};
+                // Use numeric ID for consistent state lookup
+                if (!state.propertyOverrides[numericId]) {
+                    state.propertyOverrides[numericId] = {};
                 }
-                state.propertyOverrides[propertyId][field] = value;
+                state.propertyOverrides[numericId][field] = value;
             }
             return true;
         } catch (error) {
@@ -425,9 +428,9 @@ const PropertyDataService = {
                     Object.keys(data).forEach(key => {
                         const parts = key.split('.');
                         if (parts.length === 2) {
-                            const propId = parts[0];
+                            const propId = parseInt(parts[0]); // CRITICAL: Convert to number for consistent lookup
                             const field = parts[1];
-                            if (!isNaN(parseInt(propId))) {
+                            if (!isNaN(propId)) {
                                 if (!state.propertyOverrides[propId]) {
                                     state.propertyOverrides[propId] = {};
                                 }
@@ -453,7 +456,9 @@ const PropertyDataService = {
      * @param {any} defaultValue - Default value if not found
      */
     getValue(propertyId, field, defaultValue) {
-        const prop = properties.find(p => p.id === propertyId);
+        // Ensure propertyId is numeric for consistent lookup
+        const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
+        const prop = properties.find(p => p.id === numericId);
         
         // User-created properties: Use property data directly (single source of truth)
         if (prop && prop.ownerEmail) {
@@ -461,7 +466,7 @@ const PropertyDataService = {
         }
         
         // Static properties: Check overrides first, then property data
-        const override = state.propertyOverrides[propertyId]?.[field];
+        const override = state.propertyOverrides[numericId]?.[field];
         if (override !== undefined) {
             return override;
         }
@@ -522,9 +527,9 @@ function setupRealtimeListener() {
                 Object.keys(data).forEach(key => {
                     const parts = key.split('.');
                     if (parts.length === 2) {
-                        const propId = parts[0];
+                        const propId = parseInt(parts[0]); // CRITICAL: Convert to number for consistent lookup
                         const field = parts[1];
-                        if (!isNaN(parseInt(propId))) {
+                        if (!isNaN(propId)) {
                             if (!state.propertyOverrides[propId]) {
                                 state.propertyOverrides[propId] = {};
                             }
