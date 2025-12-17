@@ -717,19 +717,6 @@ function setupRealtimeListener() {
                 }
             }
         });
-    
-    // Listen for owner property map changes from Firestore
-    // NOTE: We don't merge this data - instead we rebuild from properties (single source of truth)
-    // This listener is mainly for triggering UI updates when the Firestore doc changes
-    db.collection('settings').doc('ownerPropertyMap')
-        .onSnapshot(doc => {
-            if (doc.exists) {
-                // Rebuild from properties to ensure consistency
-                // The Firestore ownerPropertyMap doc may have stale data
-                OwnershipService.rebuildOwnerPropertyMap();
-                if (state.currentUser === 'owner') renderOwnerDashboard();
-            }
-        });
 }
 
 window.saveAvailability = async function(id, isAvailable) {
@@ -857,23 +844,8 @@ async function initFirestore() {
             state.filteredProperties = [...properties];
         }
         
-        // Load owner property mappings for user-created properties
-        const ownerMapDoc = await db.collection('settings').doc('ownerPropertyMap').get();
-        if (ownerMapDoc.exists) {
-            const ownerMapData = ownerMapDoc.data();
-            Object.keys(ownerMapData).forEach(email => {
-                const lowerEmail = email.toLowerCase();
-                if (!ownerPropertyMap[lowerEmail]) {
-                    ownerPropertyMap[lowerEmail] = [];
-                }
-                ownerMapData[email].forEach(propId => {
-                    if (!ownerPropertyMap[lowerEmail].includes(propId)) {
-                        ownerPropertyMap[lowerEmail].push(propId);
-                        propertyOwnerEmail[propId] = lowerEmail;
-                    }
-                });
-            });
-        }
+        // Rebuild ownerPropertyMap from properties array (single source of truth)
+        OwnershipService.rebuildOwnerPropertyMap();
         
         // Load property overrides
         const overridesDoc = await db.collection('settings').doc('propertyOverrides').get();

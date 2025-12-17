@@ -5901,14 +5901,10 @@ window.confirmReassignProperty = async function() {
             const oldLower = oldOwnerEmail.toLowerCase();
             if (ownerPropertyMap[oldLower]) {
                 ownerPropertyMap[oldLower] = ownerPropertyMap[oldLower].filter(id => id !== propertyId);
-                // CRITICAL FIX: Save updated old owner's map to Firestore
-                await db.collection('settings').doc('ownerPropertyMap').set({
-                    [oldLower]: ownerPropertyMap[oldLower]
-                }, { merge: true });
             }
         }
         
-        // Add to new owner's property list
+        // Add to new owner's property list (local cache only - will be rebuilt from properties)
         if (actualNewEmail) {
             if (!ownerPropertyMap[actualNewEmail]) {
                 ownerPropertyMap[actualNewEmail] = [];
@@ -5916,10 +5912,6 @@ window.confirmReassignProperty = async function() {
             if (!ownerPropertyMap[actualNewEmail].includes(propertyId)) {
                 ownerPropertyMap[actualNewEmail].push(propertyId);
             }
-            // CRITICAL FIX: Save updated new owner's map to Firestore
-            await db.collection('settings').doc('ownerPropertyMap').set({
-                [actualNewEmail]: ownerPropertyMap[actualNewEmail]
-            }, { merge: true });
         }
         
         // Clear username cache for this property to force refresh
@@ -6692,34 +6684,20 @@ window.syncBasePropertiesToAdmin = async function() {
     // Base property IDs from data.js (1-14)
     const basePropertyIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
     
-    // Get current mapping from Firestore
-    const ownerMapDoc = await db.collection('settings').doc('ownerPropertyMap').get();
-    let currentMap = ownerMapDoc.exists ? ownerMapDoc.data() : {};
-    
-    // Ensure admin has all base properties
-    if (!currentMap[adminEmail]) {
-        currentMap[adminEmail] = [];
-    }
-    
     let added = 0;
     basePropertyIds.forEach(propId => {
-        if (!currentMap[adminEmail].includes(propId)) {
-            currentMap[adminEmail].push(propId);
-            added++;
-        }
-        // Also update local mapping
+        // Update local mapping only (ownerPropertyMap is now a local cache)
         if (!ownerPropertyMap[adminEmailLower]) {
             ownerPropertyMap[adminEmailLower] = [];
         }
         if (!ownerPropertyMap[adminEmailLower].includes(propId)) {
             ownerPropertyMap[adminEmailLower].push(propId);
+            added++;
         }
         propertyOwnerEmail[propId] = adminEmailLower;
     });
     
-    // Save to Firestore
     if (added > 0) {
-        await db.collection('settings').doc('ownerPropertyMap').set(currentMap, { merge: true });
         // Refresh the admin panel
         if (window.adminUsersData && window.adminUsersData.length > 0) {
             renderAdminUsersList(window.adminUsersData);
@@ -7107,14 +7085,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 state.availability[newId] = true;
                 await db.collection('settings').doc('propertyAvailability').set({ [newId]: true }, { merge: true });
                 
-                // Save property to Firestore
+                // Save property to Firestore (ownerEmail field is the source of truth)
                 await db.collection('settings').doc('properties').set({
                     [newId]: newProperty
-                }, { merge: true });
-                
-                // Save owner property map to Firestore
-                await db.collection('settings').doc('ownerPropertyMap').set({
-                    [ownerEmail]: ownerPropertyMap[ownerEmail]
                 }, { merge: true });
                 
                 // Track last property posted time for this user
@@ -7245,15 +7218,10 @@ window.executeDeleteProperty = async function() {
         // Remove from local propertyOverrides
         delete state.propertyOverrides[propertyId];
         
-        // Remove from Firestore - properties doc
+        // Remove from Firestore - properties doc (this removes the ownerEmail source of truth)
         await db.collection('settings').doc('properties').update({
             [propertyId]: firebase.firestore.FieldValue.delete()
         });
-        
-        // Update owner map in Firestore
-        await db.collection('settings').doc('ownerPropertyMap').set({
-            [ownerForMap]: ownerPropertyMap[ownerForMap] || []
-        }, { merge: true });
         
         // Remove availability
         await db.collection('settings').doc('propertyAvailability').update({
