@@ -460,17 +460,20 @@ const PropertyDataService = {
         const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
         const prop = properties.find(p => p.id === numericId);
         
-        // User-created properties: Use property data directly (single source of truth)
-        if (prop && prop.ownerEmail) {
-            return prop?.[field] ?? defaultValue;
-        }
-        
-        // Static properties: Check overrides first, then property data
+        // PRIORITY 1: Check propertyOverrides first (explicit customizations)
+        // This catches premium status for static properties and any manual overrides
         const override = state.propertyOverrides[numericId]?.[field];
         if (override !== undefined) {
             return override;
         }
-        return prop?.[field] ?? defaultValue;
+        
+        // PRIORITY 2: Check property object (base data or synced from Firestore)
+        if (prop?.[field] !== undefined) {
+            return prop[field];
+        }
+        
+        // PRIORITY 3: Return default
+        return defaultValue;
     },
     
     /**
@@ -550,6 +553,11 @@ function setupRealtimeListener() {
             if (doc.exists) {
                 const data = doc.data();
                 let hasChanges = false;
+                
+                // CRITICAL FIX: Rebuild ownerPropertyMap from Firestore data to ensure consistency
+                // This prevents orphaned or duplicate ownership entries
+                const newOwnerMap = {};
+                
                 Object.keys(data).forEach(key => {
                     const propId = parseInt(key);
                     const propData = data[key];
@@ -566,34 +574,63 @@ function setupRealtimeListener() {
                         propData.images = [];
                     }
                     
+                    // Track ownership from Firestore property data (single source of truth)
+                    if (propData.ownerEmail) {
+                        const email = propData.ownerEmail.toLowerCase();
+                        if (!newOwnerMap[email]) {
+                            newOwnerMap[email] = [];
+                        }
+                        if (!newOwnerMap[email].includes(propId)) {
+                            newOwnerMap[email].push(propId);
+                        }
+                        propertyOwnerEmail[propId] = email;
+                    }
+                    
                     const existingIndex = properties.findIndex(p => p.id === propId);
                     if (existingIndex === -1) {
+                        // New property - add to array
                         properties.push(propData);
-                        state.availability[propId] = true;
+                        state.availability[propId] = propData.availability !== false;
                         hasChanges = true;
-                        
-                        if (propData.ownerEmail) {
-                            const email = propData.ownerEmail.toLowerCase();
-                            if (!ownerPropertyMap[email]) {
-                                ownerPropertyMap[email] = [];
-                            }
-                            if (!ownerPropertyMap[email].includes(propId)) {
-                                ownerPropertyMap[email].push(propId);
-                            }
-                            propertyOwnerEmail[propId] = email;
-                        }
                     } else {
+                        // Existing property - update ALL fields from Firestore
+                        // CRITICAL: Always sync from Firestore, it's the source of truth
                         const existingProp = properties[existingIndex];
-                        if (existingProp.ownerEmail) {
-                            Object.keys(propData).forEach(field => {
-                                if (existingProp[field] !== propData[field]) {
-                                    existingProp[field] = propData[field];
-                                    hasChanges = true;
-                                }
-                            });
-                        }
+                        Object.keys(propData).forEach(field => {
+                            if (existingProp[field] !== propData[field]) {
+                                existingProp[field] = propData[field];
+                                hasChanges = true;
+                            }
+                        });
                     }
                 });
+                
+                // Merge new ownership data into ownerPropertyMap
+                // This ensures user-created properties are properly tracked
+                Object.keys(newOwnerMap).forEach(email => {
+                    if (!ownerPropertyMap[email]) {
+                        ownerPropertyMap[email] = [];
+                    }
+                    newOwnerMap[email].forEach(propId => {
+                        // Only add if not already present
+                        if (!ownerPropertyMap[email].includes(propId)) {
+                            ownerPropertyMap[email].push(propId);
+                        }
+                    });
+                    
+                    // CRITICAL: Remove properties that are no longer owned by this email
+                    // This fixes the ownership corruption bug
+                    ownerPropertyMap[email] = ownerPropertyMap[email].filter(propId => {
+                        const prop = properties.find(p => p.id === propId);
+                        // Keep if: property exists and has this owner, OR property is in static data
+                        if (prop && prop.ownerEmail) {
+                            return prop.ownerEmail.toLowerCase() === email;
+                        }
+                        // For static properties without ownerEmail, keep based on base mapping
+                        return propId <= 14; // Static properties are 1-14
+                    });
+                });
+                
                 if (hasChanges) {
                     state.filteredProperties = [...properties];
                     renderProperties(state.filteredProperties);
@@ -603,6 +640,7 @@ function setupRealtimeListener() {
         });
     
     // Listen for owner property map changes
+    // CRITICAL: This listener now validates against property ownerEmail to prevent corruption
     db.collection('settings').doc('ownerPropertyMap')
         .onSnapshot(doc => {
             if (doc.exists) {
@@ -613,6 +651,16 @@ function setupRealtimeListener() {
                         ownerPropertyMap[lowerEmail] = [];
                     }
                     data[email].forEach(propId => {
+                        // CRITICAL FIX: Validate that property actually belongs to this owner
+                        // If property has ownerEmail set, that is the source of truth
+                        const prop = properties.find(p => p.id === propId);
+                        if (prop && prop.ownerEmail) {
+                            // Property has explicit owner - only add if it matches
+                            if (prop.ownerEmail.toLowerCase() !== lowerEmail) {
+                                return; // Skip - property belongs to someone else
+                            }
+                        }
+                        
                         if (!ownerPropertyMap[lowerEmail].includes(propId)) {
                             ownerPropertyMap[lowerEmail].push(propId);
                             propertyOwnerEmail[propId] = lowerEmail;

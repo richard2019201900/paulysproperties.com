@@ -5905,6 +5905,10 @@ window.confirmReassignProperty = async function() {
             const oldLower = oldOwnerEmail.toLowerCase();
             if (ownerPropertyMap[oldLower]) {
                 ownerPropertyMap[oldLower] = ownerPropertyMap[oldLower].filter(id => id !== propertyId);
+                // CRITICAL FIX: Save updated old owner's map to Firestore
+                await db.collection('settings').doc('ownerPropertyMap').set({
+                    [oldLower]: ownerPropertyMap[oldLower]
+                }, { merge: true });
             }
         }
         
@@ -5916,6 +5920,10 @@ window.confirmReassignProperty = async function() {
             if (!ownerPropertyMap[actualNewEmail].includes(propertyId)) {
                 ownerPropertyMap[actualNewEmail].push(propertyId);
             }
+            // CRITICAL FIX: Save updated new owner's map to Firestore
+            await db.collection('settings').doc('ownerPropertyMap').set({
+                [actualNewEmail]: ownerPropertyMap[actualNewEmail]
+            }, { merge: true });
         }
         
         // Clear username cache for this property to force refresh

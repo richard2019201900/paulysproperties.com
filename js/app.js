@@ -112,9 +112,20 @@ window.viewProperty = function(id) {
     // Video poster - use first image or empty
     const videoPoster = firstImage || '';
 
-    // Premium banner for top of page
+    // Premium styling - apply to container
+    const detailContainer = $('propertyDetailContent');
+    if (detailContainer) {
+        if (isPremium) {
+            detailContainer.className = 'glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 border-amber-500 ring-2 ring-amber-500/50 shadow-amber-500/30';
+        } else {
+            detailContainer.className = 'glass-effect rounded-2xl shadow-2xl overflow-hidden';
+        }
+    }
+
+    // Premium banner for top of page - same style as Owner Stats
+    // Note: rounded-t-2xl for top corners when there are no owner tabs above
     const premiumBanner = isPremium 
-        ? `<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-3 font-black text-lg tracking-wider flex items-center justify-center gap-2">
+        ? `<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-2 font-black text-sm tracking-wider flex items-center justify-center gap-2">
             <span>👑</span> PREMIUM LISTING <span>👑</span>
            </div>` 
         : '';
