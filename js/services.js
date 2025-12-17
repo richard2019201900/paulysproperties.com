@@ -33,6 +33,123 @@ const TIERS = {
 const MASTER_ADMIN_EMAIL = 'richard2019201900@gmail.com';
 
 /**
+ * OwnershipService - SINGLE SOURCE OF TRUTH for property ownership
+ * All ownership queries should go through this service to ensure consistency
+ */
+const OwnershipService = {
+    /**
+     * Get properties owned by a specific email
+     * Priority:
+     * 1. prop.ownerEmail field (Firestore data)
+     * 2. propertyOwnerEmail map (for static properties without ownerEmail)
+     * @param {string} email - Owner email
+     * @returns {Array} - Array of property objects owned by this email
+     */
+    getPropertiesForOwner(email) {
+        if (!email) return [];
+        const normalizedEmail = email.toLowerCase();
+        return properties.filter(p => {
+            // Primary check: ownerEmail field on property
+            const propOwner = (p.ownerEmail || '').toLowerCase();
+            if (propOwner) {
+                return propOwner === normalizedEmail;
+            }
+            
+            // Secondary check: propertyOwnerEmail reverse map (for static properties)
+            const mappedOwner = (propertyOwnerEmail[p.id] || '').toLowerCase();
+            return mappedOwner === normalizedEmail;
+        });
+    },
+    
+    /**
+     * Count listings for an owner
+     * @param {string} email - Owner email
+     * @returns {number} - Number of properties owned
+     */
+    getListingCount(email) {
+        return this.getPropertiesForOwner(email).length;
+    },
+    
+    /**
+     * Check if a user owns a specific property
+     * @param {string} email - User email
+     * @param {number} propertyId - Property ID
+     * @returns {boolean}
+     */
+    ownsProperty(email, propertyId) {
+        if (!email) return false;
+        const normalizedEmail = email.toLowerCase();
+        const prop = properties.find(p => p.id === propertyId);
+        if (!prop) return false;
+        
+        // Primary check: ownerEmail field
+        const propOwner = (prop.ownerEmail || '').toLowerCase();
+        if (propOwner) {
+            return propOwner === normalizedEmail;
+        }
+        
+        // Secondary check: propertyOwnerEmail map
+        const mappedOwner = (propertyOwnerEmail[propertyId] || '').toLowerCase();
+        return mappedOwner === normalizedEmail;
+    },
+    
+    /**
+     * Rebuild ownerPropertyMap from properties array
+     * This ensures the cached map stays in sync with actual property data
+     */
+    rebuildOwnerPropertyMap() {
+        // Clear existing entries for emails we've seen
+        const emailsToClean = new Set(Object.keys(ownerPropertyMap));
+        
+        // Rebuild from properties
+        properties.forEach(p => {
+            if (p) {
+                // Check ownerEmail first (Firestore data)
+                let email = (p.ownerEmail || '').toLowerCase();
+                
+                // Fallback to propertyOwnerEmail map (for static properties)
+                if (!email && propertyOwnerEmail[p.id]) {
+                    email = propertyOwnerEmail[p.id].toLowerCase();
+                }
+                
+                if (email) {
+                    if (!ownerPropertyMap[email]) {
+                        ownerPropertyMap[email] = [];
+                    }
+                    if (!ownerPropertyMap[email].includes(p.id)) {
+                        ownerPropertyMap[email].push(p.id);
+                    }
+                    emailsToClean.delete(email);
+                    
+                    // Update reverse map
+                    propertyOwnerEmail[p.id] = email;
+                }
+            }
+        });
+        
+        // Clean up ownerPropertyMap entries for emails that no longer own anything
+        // But preserve the admin email's static properties
+        emailsToClean.forEach(email => {
+            const adminEmail = 'richard2019201900@gmail.com';
+            if (email !== adminEmail) {
+                // Filter out properties this email doesn't actually own
+                ownerPropertyMap[email] = (ownerPropertyMap[email] || []).filter(propId => {
+                    const prop = properties.find(p => p.id === propId);
+                    if (prop && prop.ownerEmail) {
+                        return prop.ownerEmail.toLowerCase() === email;
+                    }
+                    // Keep if propertyOwnerEmail says so
+                    return propertyOwnerEmail[propId]?.toLowerCase() === email;
+                });
+            }
+        });
+    }
+};
+
+// Make it globally available
+window.OwnershipService = OwnershipService;
+
+/**
  * TierService - Handles user tier operations
  */
 const TierService = {
@@ -554,10 +671,6 @@ function setupRealtimeListener() {
                 const data = doc.data();
                 let hasChanges = false;
                 
-                // CRITICAL FIX: Rebuild ownerPropertyMap from Firestore data to ensure consistency
-                // This prevents orphaned or duplicate ownership entries
-                const newOwnerMap = {};
-                
                 Object.keys(data).forEach(key => {
                     const propId = parseInt(key);
                     const propData = data[key];
@@ -572,18 +685,6 @@ function setupRealtimeListener() {
                     // Ensure images array exists (even if empty)
                     if (!propData.images || !Array.isArray(propData.images)) {
                         propData.images = [];
-                    }
-                    
-                    // Track ownership from Firestore property data (single source of truth)
-                    if (propData.ownerEmail) {
-                        const email = propData.ownerEmail.toLowerCase();
-                        if (!newOwnerMap[email]) {
-                            newOwnerMap[email] = [];
-                        }
-                        if (!newOwnerMap[email].includes(propId)) {
-                            newOwnerMap[email].push(propId);
-                        }
-                        propertyOwnerEmail[propId] = email;
                     }
                     
                     const existingIndex = properties.findIndex(p => p.id === propId);
@@ -605,31 +706,9 @@ function setupRealtimeListener() {
                     }
                 });
                 
-                // Merge new ownership data into ownerPropertyMap
-                // This ensures user-created properties are properly tracked
-                Object.keys(newOwnerMap).forEach(email => {
-                    if (!ownerPropertyMap[email]) {
-                        ownerPropertyMap[email] = [];
-                    }
-                    newOwnerMap[email].forEach(propId => {
-                        // Only add if not already present
-                        if (!ownerPropertyMap[email].includes(propId)) {
-                            ownerPropertyMap[email].push(propId);
-                        }
-                    });
-                    
-                    // CRITICAL: Remove properties that are no longer owned by this email
-                    // This fixes the ownership corruption bug
-                    ownerPropertyMap[email] = ownerPropertyMap[email].filter(propId => {
-                        const prop = properties.find(p => p.id === propId);
-                        // Keep if: property exists and has this owner, OR property is in static data
-                        if (prop && prop.ownerEmail) {
-                            return prop.ownerEmail.toLowerCase() === email;
-                        }
-                        // For static properties without ownerEmail, keep based on base mapping
-                        return propId <= 14; // Static properties are 1-14
-                    });
-                });
+                // CRITICAL: Rebuild ownerPropertyMap from actual property data
+                // This is the SINGLE SOURCE OF TRUTH fix
+                OwnershipService.rebuildOwnerPropertyMap();
                 
                 if (hasChanges) {
                     state.filteredProperties = [...properties];
@@ -639,34 +718,15 @@ function setupRealtimeListener() {
             }
         });
     
-    // Listen for owner property map changes
-    // CRITICAL: This listener now validates against property ownerEmail to prevent corruption
+    // Listen for owner property map changes from Firestore
+    // NOTE: We don't merge this data - instead we rebuild from properties (single source of truth)
+    // This listener is mainly for triggering UI updates when the Firestore doc changes
     db.collection('settings').doc('ownerPropertyMap')
         .onSnapshot(doc => {
             if (doc.exists) {
-                const data = doc.data();
-                Object.keys(data).forEach(email => {
-                    const lowerEmail = email.toLowerCase();
-                    if (!ownerPropertyMap[lowerEmail]) {
-                        ownerPropertyMap[lowerEmail] = [];
-                    }
-                    data[email].forEach(propId => {
-                        // CRITICAL FIX: Validate that property actually belongs to this owner
-                        // If property has ownerEmail set, that is the source of truth
-                        const prop = properties.find(p => p.id === propId);
-                        if (prop && prop.ownerEmail) {
-                            // Property has explicit owner - only add if it matches
-                            if (prop.ownerEmail.toLowerCase() !== lowerEmail) {
-                                return; // Skip - property belongs to someone else
-                            }
-                        }
-                        
-                        if (!ownerPropertyMap[lowerEmail].includes(propId)) {
-                            ownerPropertyMap[lowerEmail].push(propId);
-                            propertyOwnerEmail[propId] = lowerEmail;
-                        }
-                    });
-                });
+                // Rebuild from properties to ensure consistency
+                // The Firestore ownerPropertyMap doc may have stale data
+                OwnershipService.rebuildOwnerPropertyMap();
                 if (state.currentUser === 'owner') renderOwnerDashboard();
             }
         });

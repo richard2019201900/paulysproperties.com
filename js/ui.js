@@ -976,8 +976,7 @@ window.navigateStats = function(direction) {
         userProperties = properties;
     } else {
         // Regular user can only navigate their own properties
-        const userPropertyIds = ownerPropertyMap[userEmail] || [];
-        userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+        userProperties = OwnershipService.getPropertiesForOwner(userEmail);
     }
     
     if (userProperties.length === 0) return;
@@ -1016,8 +1015,7 @@ window.updateStatsNavCounter = function() {
     if (isMasterAdmin) {
         userProperties = properties;
     } else {
-        const userPropertyIds = ownerPropertyMap[userEmail] || [];
-        userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+        userProperties = OwnershipService.getPropertiesForOwner(userEmail);
     }
     
     const currentIndex = userProperties.findIndex(p => p.id === currentId);
@@ -1164,7 +1162,8 @@ window.canNavigateAway = function() {
 
 window.updateTierBadge = function(tier, email) {
     const isMasterAdmin = TierService.isMasterAdmin(email);
-    const listingCount = (ownerPropertyMap[email.toLowerCase()] || []).length;
+    // CRITICAL: Use OwnershipService for consistent listing count
+    const listingCount = OwnershipService.getListingCount(email);
     
     const iconEl = $('tierIcon');
     const nameEl = $('tierName');
@@ -4336,11 +4335,9 @@ window.updateAdminStats = async function(users) {
     // Total revenue
     const totalRevenue = proRevenue + eliteRevenue + premiumMonthlyRevenue;
     
-    // Helper function to get user listing count
+    // Helper function to get user listing count - uses OwnershipService for consistency
     const getUserListings = (user) => {
-        const userEmail = user.email?.toLowerCase();
-        const userProps = ownerPropertyMap[userEmail] || [];
-        return userProps.length;
+        return OwnershipService.getListingCount(user.email);
     };
     
     // ==================== ROW 1: USER TYPES ====================
@@ -4637,8 +4634,8 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             ? { icon: '👑', name: 'Owner', bgColor: 'bg-red-600', maxListings: Infinity }
             : (TIERS[user.tier] || TIERS.starter);
         
-        const userPropertyIds = ownerPropertyMap[user.email?.toLowerCase()] || [];
-        const userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+        // CRITICAL: Use OwnershipService for consistent property ownership
+        const userProperties = OwnershipService.getPropertiesForOwner(user.email);
         const listingCount = userProperties.length;
         const maxListings = (isUserMasterAdmin || tierData.maxListings === Infinity) ? '∞' : tierData.maxListings;
         const escapedEmail = user.email.replace(/'/g, "\\'");
@@ -5660,9 +5657,8 @@ window.syncOwnerNameEverywhere = function(email, newName) {
 };
 
 window.adminDeleteUser = async function(userId, email) {
-    // Get user's properties
-    const userPropertyIds = ownerPropertyMap[email.toLowerCase()] || [];
-    const userProperties = userPropertyIds.map(id => properties.find(p => p.id === id)).filter(p => p);
+    // CRITICAL: Use OwnershipService for consistent property ownership
+    const userProperties = OwnershipService.getPropertiesForOwner(email);
     const propertyCount = userProperties.length;
     
     // Build confirmation message
@@ -6874,7 +6870,7 @@ window.copyPhoneNumber = function(phone) {
 window.exportUsersCSV = function() {
     const headers = ['Email', 'Display Name', 'Tier', 'Created', 'Listings'];
     const rows = window.adminUsersData.map(u => {
-        const listingCount = (ownerPropertyMap[u.email?.toLowerCase()] || []).length;
+        const listingCount = OwnershipService.getListingCount(u.email);
         const created = u.createdAt?.toDate ? u.createdAt.toDate().toLocaleDateString() : 'Unknown';
         return [u.email, u.username || '', u.tier, created, listingCount];
     });
@@ -8979,33 +8975,12 @@ function getOwnerProperties() {
 }
 
 // Helper to get properties user actually OWNS (for FINANCIALS - never all properties)
+// CRITICAL: Uses OwnershipService for consistent ownership across entire application
 function getOwnedProperties() {
     const user = auth.currentUser;
     if (!user) return [];
     
-    const userEmail = user.email.toLowerCase();
-    const userPropertyIds = ownerPropertyMap[userEmail] || [];
-    return properties.filter(p => {
-        // Primary check: ownerEmail field (MOST IMPORTANT)
-        const propOwnerEmail = (p.ownerEmail || '').toLowerCase();
-        
-        // If property has an ownerEmail set, ONLY that owner can see it
-        if (propOwnerEmail) {
-            const isOwner = propOwnerEmail === userEmail;
-            if (!isOwner) {
-            }
-            return isOwner;
-        }
-        
-        // For legacy properties WITHOUT ownerEmail, use ownerPropertyMap
-        // ONLY if this user is explicitly in the map for this property
-        if (userPropertyIds.includes(p.id)) {
-            return true;
-        }
-        
-        // No owner set and not in map - property is orphaned, don't show to anyone
-        return false;
-    });
+    return OwnershipService.getPropertiesForOwner(user.email);
 }
 
 // Format large numbers
