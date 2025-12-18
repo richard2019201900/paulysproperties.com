@@ -533,31 +533,44 @@ function renderPropertyStatsContent(id) {
     
     const showReminderSection = renterName && (daysUntilDue !== null && daysUntilDue <= 1);
     
-    $('propertyStatsContent').innerHTML = `
-        ${isPremium ? `
-        <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-2 font-black text-sm tracking-wider flex items-center justify-center gap-2 rounded-t-2xl">
+    // Premium styling - apply to container (same approach as Property View)
+    const statsContainer = $('propertyStatsContent');
+    if (statsContainer) {
+        if (isPremium) {
+            statsContainer.className = 'glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 border-amber-500 ring-2 ring-amber-500/50 shadow-amber-500/30';
+        } else {
+            statsContainer.className = 'glass-effect rounded-2xl shadow-2xl overflow-hidden';
+        }
+    }
+    
+    // Premium banner inside container (same as Property View)
+    const premiumBanner = isPremium 
+        ? `<div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-gray-900 text-center py-2 font-black text-sm tracking-wider flex items-center justify-center gap-2">
             <span>👑</span> PREMIUM LISTING <span>👑</span>
-        </div>` : ''}
-        <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden mb-8 ${isPremium ? 'border-2 border-amber-500 ring-2 ring-amber-500/50 rounded-t-none' : ''}">
-            <!-- View Toggle Tabs -->
-            <div class="flex border-b border-gray-700">
-                <button onclick="viewProperty(${id})" class="flex-1 py-4 px-6 text-center font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
-                    <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
-                    Property View
-                </button>
-                <button onclick="viewPropertyStats(${id})" class="flex-1 py-4 px-6 text-center font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 border-b-2 border-amber-400">
-                    <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
-                    Owner Stats
-                </button>
+           </div>` 
+        : '';
+    
+    $('propertyStatsContent').innerHTML = `
+        ${premiumBanner}
+        <!-- View Toggle Tabs -->
+        <div class="flex border-b border-gray-700">
+            <button onclick="viewProperty(${id})" class="flex-1 py-4 px-6 text-center font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
+                Property View
+            </button>
+            <button onclick="viewPropertyStats(${id})" class="flex-1 py-4 px-6 text-center font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 border-b-2 border-amber-400">
+                <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
+                Owner Stats
+            </button>
+        </div>
+        
+        <!-- Property Header -->
+        <div class="relative">
+            <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover">
+            <div class="absolute top-4 right-4 bg-gradient-to-r ${statusClass} text-white px-4 py-2 rounded-xl font-bold shadow-lg">
+                ${statusText}
             </div>
-            
-            <!-- Property Header -->
-            <div class="relative">
-                <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover">
-                <div class="absolute top-4 right-4 bg-gradient-to-r ${statusClass} text-white px-4 py-2 rounded-xl font-bold shadow-lg">
-                    ${statusText}
-                </div>
-                ${isPremium ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' : ''}
+            ${isPremium ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' : ''}
             </div>
             
             <div class="p-6 md:p-8">

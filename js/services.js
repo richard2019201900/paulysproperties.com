@@ -493,8 +493,14 @@ const PropertyDataService = {
         // Ensure propertyId is numeric for consistent state storage
         const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
         
+        // CRITICAL: Premium-related fields ALWAYS go to propertyOverrides
+        // This ensures ONE source of truth for premium status across all property types
+        const premiumFields = ['isPremium', 'isPremiumTrial', 'premiumStartDate', 'premiumLastPayment', 'premiumUpdatedAt'];
+        const forcePropOverrides = premiumFields.includes(field);
+        
         try {
-            if (isUserCreated) {
+            if (isUserCreated && !forcePropOverrides) {
+                // User-created property: write to properties doc
                 const updateData = {
                     [`${propertyId}.${field}`]: value,
                     [`${propertyId}.updatedAt`]: firebase.firestore.FieldValue.serverTimestamp(),
@@ -505,6 +511,7 @@ const PropertyDataService = {
                     prop[field] = value;
                 }
             } else {
+                // Static property OR premium field: write to propertyOverrides
                 const updatePath = `${propertyId}.${field}`;
                 const updateData = {
                     [updatePath]: value,
@@ -517,6 +524,11 @@ const PropertyDataService = {
                     state.propertyOverrides[numericId] = {};
                 }
                 state.propertyOverrides[numericId][field] = value;
+                
+                // Also update local property object for immediate UI consistency
+                if (prop) {
+                    prop[field] = value;
+                }
             }
             return true;
         } catch (error) {
