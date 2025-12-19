@@ -8027,7 +8027,7 @@ window.updateNavTierDisplay = function(tier) {
 // ELITE REPORTS SYSTEM
 // ============================================
 
-window.openReportsModal = function() {
+window.openReportsModal = async function() {
     // Use OWNED properties for reports (not all viewable)
     const ownedProps = getOwnedProperties();
     if (ownedProps.length === 0) {
@@ -8035,8 +8035,35 @@ window.openReportsModal = function() {
         return;
     }
     
-    // Generate report data
-    const reportData = generateReportData(ownedProps);
+    // Show loading modal first
+    const loadingHTML = `
+        <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl p-8 text-center">
+                <div class="text-4xl mb-4 animate-pulse">📊</div>
+                <p class="text-white font-bold">Loading Elite Portfolio Reports...</p>
+                <p class="text-gray-400 text-sm mt-2">Fetching payment data from database</p>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+    
+    try {
+        // Fetch actual payment data from Firestore for all properties
+        const reportData = await generateReportDataAsync(ownedProps);
+        
+        // Remove loading modal
+        document.getElementById('reportsModal')?.remove();
+        
+        // Show the full reports modal
+        renderReportsModal(reportData);
+    } catch (error) {
+        console.error('[EliteReports] Error:', error);
+        document.getElementById('reportsModal')?.remove();
+        showToast('Error loading reports: ' + error.message, 'error');
+    }
+};
+
+function renderReportsModal(reportData) {
     
     const modalHTML = `
         <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto" onclick="if(event.target.id === 'reportsModal') closeReportsModal()">
@@ -8055,12 +8082,15 @@ window.openReportsModal = function() {
                 
                 <!-- Report Tabs -->
                 <div class="border-b border-gray-700 px-6 pt-2">
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 flex-wrap">
                         <button id="reportTab-overview" onclick="switchReportTab('overview')" class="px-4 py-2 text-sm font-medium rounded-t-lg bg-gray-800 text-yellow-400 border border-gray-600 border-b-0 -mb-px relative z-10">
                             📈 Overview
                         </button>
                         <button id="reportTab-revenue" onclick="switchReportTab('revenue')" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition">
                             💰 Revenue
+                        </button>
+                        <button id="reportTab-renters" onclick="switchReportTab('renters')" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition">
+                            👥 Renter Earnings
                         </button>
                         <button id="reportTab-occupancy" onclick="switchReportTab('occupancy')" class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 transition">
                             🏠 Occupancy
@@ -8081,6 +8111,11 @@ window.openReportsModal = function() {
                     <!-- Revenue Tab -->
                     <div id="reportContent-revenue" class="report-tab-content hidden">
                         ${renderRevenueReport(reportData)}
+                    </div>
+                    
+                    <!-- Renter Earnings Tab -->
+                    <div id="reportContent-renters" class="report-tab-content hidden">
+                        ${renderRenterEarningsReport(reportData)}
                     </div>
                     
                     <!-- Occupancy Tab -->
@@ -8137,7 +8172,11 @@ window.switchReportTab = function(tabName) {
     }
 };
 
-function generateReportData(properties) {
+/**
+ * Generate report data by fetching ACTUAL payment history from Firestore
+ * This ensures reports reflect real collected payments, not just prices
+ */
+async function generateReportDataAsync(properties) {
     const now = new Date();
     const data = {
         totalProperties: properties.length,
@@ -8149,8 +8188,39 @@ function generateReportData(properties) {
         totalPaymentAmount: 0,
         propertyStats: [],
         revenueByType: {},
+        revenueByFrequency: { daily: 0, weekly: 0, biweekly: 0, monthly: 0 },
+        frequencyCount: { daily: 0, weekly: 0, biweekly: 0, monthly: 0 },
+        renterEarnings: {}, // NEW: Track actual earnings per renter
+        tenureHistory: [],   // NEW: All completed tenures
         paymentHistory: []
     };
+    
+    // Fetch payment history for all properties in parallel
+    const paymentPromises = properties.map(async (p) => {
+        try {
+            const historyDoc = await db.collection('paymentHistory').doc(String(p.id)).get();
+            if (historyDoc.exists) {
+                const histData = historyDoc.data();
+                return {
+                    propertyId: p.id,
+                    payments: histData.payments || [],
+                    tenureHistory: histData.tenureHistory || [],
+                    vacancyPeriods: histData.vacancyPeriods || []
+                };
+            }
+        } catch (e) {
+            console.warn(`[EliteReports] Could not fetch history for property ${p.id}:`, e);
+        }
+        return { propertyId: p.id, payments: [], tenureHistory: [], vacancyPeriods: [] };
+    });
+    
+    const allPaymentData = await Promise.all(paymentPromises);
+    
+    // Create lookup for payment data
+    const paymentDataByProperty = {};
+    allPaymentData.forEach(pd => {
+        paymentDataByProperty[pd.propertyId] = pd;
+    });
     
     properties.forEach(p => {
         const isAvailable = state.availability[p.id] !== false;
@@ -8160,24 +8230,70 @@ function generateReportData(properties) {
         const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
         const weeklyPrice = p.weeklyPrice || 0;
         const monthlyPrice = p.monthlyPrice || 0;
-        const biweeklyPrice = weeklyPrice * 2;
+        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || weeklyPrice * 2);
         
-        // Determine actual rent based on frequency
+        // Get ACTUAL payment history from Firestore
+        const propertyPaymentData = paymentDataByProperty[p.id] || { payments: [], tenureHistory: [] };
+        const payments = propertyPaymentData.payments || [];
+        const tenures = propertyPaymentData.tenureHistory || [];
+        
+        // Calculate ACTUAL received amount
+        const totalReceived = payments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
+        
+        // Track payments by renter for "Renter Earnings" report
+        payments.forEach(pay => {
+            const rName = pay.renterName || 'Unknown';
+            if (!data.renterEarnings[rName]) {
+                data.renterEarnings[rName] = {
+                    name: rName,
+                    totalPaid: 0,
+                    paymentCount: 0,
+                    properties: new Set(),
+                    lastPayment: null
+                };
+            }
+            data.renterEarnings[rName].totalPaid += (pay.amount || 0);
+            data.renterEarnings[rName].paymentCount++;
+            data.renterEarnings[rName].properties.add(p.title || `Property #${p.id}`);
+            
+            const payDate = new Date(pay.paymentDate || pay.recordedAt);
+            if (!data.renterEarnings[rName].lastPayment || payDate > data.renterEarnings[rName].lastPayment) {
+                data.renterEarnings[rName].lastPayment = payDate;
+            }
+        });
+        
+        // Add tenure history
+        tenures.forEach(t => {
+            data.tenureHistory.push({
+                ...t,
+                propertyName: p.title || `Property #${p.id}`
+            });
+        });
+        
+        // Determine rent amount based on frequency (for projections, not actual)
         let rentAmount = 0;
         let monthlyEquivalent = 0;
         if (!isAvailable && renterName) {
             if (paymentFrequency === 'daily') {
                 rentAmount = dailyPrice;
                 monthlyEquivalent = dailyPrice * 30;
+                data.frequencyCount.daily++;
+                data.revenueByFrequency.daily += monthlyEquivalent;
             } else if (paymentFrequency === 'weekly') {
                 rentAmount = weeklyPrice;
                 monthlyEquivalent = weeklyPrice * 4;
+                data.frequencyCount.weekly++;
+                data.revenueByFrequency.weekly += monthlyEquivalent;
             } else if (paymentFrequency === 'biweekly') {
                 rentAmount = biweeklyPrice;
                 monthlyEquivalent = biweeklyPrice * 2;
-            } else {
+                data.frequencyCount.biweekly++;
+                data.revenueByFrequency.biweekly += monthlyEquivalent;
+            } else if (paymentFrequency === 'monthly') {
                 rentAmount = monthlyPrice;
                 monthlyEquivalent = monthlyPrice;
+                data.frequencyCount.monthly++;
+                data.revenueByFrequency.monthly += monthlyEquivalent;
             }
         }
         
@@ -8189,19 +8305,25 @@ function generateReportData(properties) {
             data.totalMonthlyRevenue += monthlyEquivalent;
         }
         
-        // Get payment history from ledger
-        const payments = state.paymentLedger?.filter(pay => String(pay.propertyId) === String(p.id)) || [];
-        const totalReceived = payments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
-        
         data.totalPaymentsReceived += payments.length;
         data.totalPaymentAmount += totalReceived;
+        
+        // Add all payments to history for timeline
+        payments.forEach(pay => {
+            data.paymentHistory.push({
+                ...pay,
+                propertyId: p.id,
+                propertyName: p.title || `Property #${p.id}`
+            });
+        });
         
         // Revenue by property type
         const propType = p.type || 'Other';
         if (!data.revenueByType[propType]) {
-            data.revenueByType[propType] = { count: 0, rented: 0, revenue: 0 };
+            data.revenueByType[propType] = { count: 0, rented: 0, revenue: 0, collected: 0 };
         }
         data.revenueByType[propType].count++;
+        data.revenueByType[propType].collected += totalReceived;
         if (!isAvailable) {
             data.revenueByType[propType].rented++;
             data.revenueByType[propType].revenue += monthlyEquivalent;
@@ -8219,13 +8341,24 @@ function generateReportData(properties) {
             rentAmount: rentAmount,
             monthlyEquivalent: monthlyEquivalent,
             paymentsReceived: payments.length,
-            totalReceived: totalReceived,
+            totalReceived: totalReceived,  // ACTUAL collected
             lastPaymentDate: lastPaymentDate
         });
     });
     
-    // Sort properties by revenue
-    data.propertyStats.sort((a, b) => b.monthlyEquivalent - a.monthlyEquivalent);
+    // Sort properties by ACTUAL revenue collected
+    data.propertyStats.sort((a, b) => b.totalReceived - a.totalReceived);
+    
+    // Convert renter earnings to array and sort
+    data.renterEarningsList = Object.values(data.renterEarnings)
+        .map(r => ({
+            ...r,
+            properties: Array.from(r.properties)
+        }))
+        .sort((a, b) => b.totalPaid - a.totalPaid);
+    
+    // Sort payment history by date
+    data.paymentHistory.sort((a, b) => new Date(b.paymentDate || b.recordedAt) - new Date(a.paymentDate || a.recordedAt));
     
     // Calculate occupancy rate
     data.occupancyRate = data.totalProperties > 0 
@@ -8482,18 +8615,22 @@ function renderRevenueReport(data) {
             <div class="bg-gradient-to-br from-green-600/20 to-emerald-700/20 rounded-xl p-4 border border-green-500/30">
                 <p class="text-green-300 text-xs mb-1">Projected Monthly</p>
                 <p class="text-2xl font-bold text-green-400">${formatPrice(data.totalMonthlyRevenue)}</p>
+                <p class="text-green-400/50 text-xs">Based on current rents</p>
             </div>
             <div class="bg-gradient-to-br from-blue-600/20 to-cyan-700/20 rounded-xl p-4 border border-blue-500/30">
                 <p class="text-blue-300 text-xs mb-1">Projected Yearly</p>
                 <p class="text-2xl font-bold text-blue-400">${formatPrice(data.totalMonthlyRevenue * 12)}</p>
+                <p class="text-blue-400/50 text-xs">Based on current rents</p>
             </div>
             <div class="bg-gradient-to-br from-purple-600/20 to-pink-700/20 rounded-xl p-4 border border-purple-500/30">
                 <p class="text-purple-300 text-xs mb-1">Payments Logged</p>
                 <p class="text-2xl font-bold text-purple-400">${data.totalPaymentsReceived}</p>
+                <p class="text-purple-400/50 text-xs">All-time</p>
             </div>
             <div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 rounded-xl p-4 border border-amber-500/30">
-                <p class="text-amber-300 text-xs mb-1">Total Collected</p>
+                <p class="text-amber-300 text-xs mb-1">💰 Actual Collected</p>
                 <p class="text-2xl font-bold text-amber-400">${formatPrice(data.totalPaymentAmount)}</p>
+                <p class="text-amber-400/50 text-xs">From payment ledger</p>
             </div>
         </div>
         
@@ -8519,25 +8656,27 @@ function renderRevenueReport(data) {
                             <th class="text-left py-2 px-3">Property</th>
                             <th class="text-left py-2 px-3">Type</th>
                             <th class="text-center py-2 px-3">Frequency</th>
-                            <th class="text-right py-2 px-3">Rent</th>
-                            <th class="text-right py-2 px-3">Monthly Eq.</th>
+                            <th class="text-right py-2 px-3">Current Rate</th>
+                            <th class="text-right py-2 px-3">Actual Collected</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.propertyStats.filter(p => p.isRented).map(p => `
+                        ${data.propertyStats.filter(p => p.isRented || p.totalReceived > 0).map(p => `
                             <tr class="border-b border-gray-800 hover:bg-gray-800/50">
                                 <td class="py-2 px-3 text-white">${p.name}</td>
                                 <td class="py-2 px-3 text-gray-400">${p.type}</td>
                                 <td class="py-2 px-3 text-center">
+                                    ${p.frequency ? `
                                     <span class="px-2 py-1 rounded text-xs ${
                                         p.frequency === 'daily' ? 'bg-cyan-900/50 text-cyan-300' :
                                         p.frequency === 'weekly' ? 'bg-blue-900/50 text-blue-300' :
                                         p.frequency === 'biweekly' ? 'bg-purple-900/50 text-purple-300' :
                                         'bg-green-900/50 text-green-300'
                                     }">${p.frequency}</span>
+                                    ` : '<span class="text-gray-500">-</span>'}
                                 </td>
-                                <td class="py-2 px-3 text-right text-white">${formatPrice(p.rentAmount)}</td>
-                                <td class="py-2 px-3 text-right text-green-400">${formatPrice(p.monthlyEquivalent)}</td>
+                                <td class="py-2 px-3 text-right text-white">${p.rentAmount > 0 ? formatPrice(p.rentAmount) : '-'}</td>
+                                <td class="py-2 px-3 text-right ${p.totalReceived > 0 ? 'text-green-400 font-bold' : 'text-gray-500'}">${p.totalReceived > 0 ? formatPrice(p.totalReceived) : '$0'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -8606,6 +8745,125 @@ function renderOccupancyReport(data) {
                 </div>
             ` : '<p class="text-green-400 text-center py-4">🎉 All properties are rented!</p>'}
         </div>
+    `;
+}
+
+/**
+ * Render Renter Earnings Report - Shows actual collected amounts per renter
+ */
+function renderRenterEarningsReport(data) {
+    const renterList = data.renterEarningsList || [];
+    const totalCollected = renterList.reduce((sum, r) => sum + r.totalPaid, 0);
+    const totalPayments = renterList.reduce((sum, r) => sum + r.paymentCount, 0);
+    
+    return `
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gradient-to-br from-green-600/20 to-emerald-700/20 rounded-xl p-4 border border-green-500/30">
+                <p class="text-green-300 text-xs mb-1">Total Collected</p>
+                <p class="text-2xl font-bold text-green-400">${formatPrice(totalCollected)}</p>
+            </div>
+            <div class="bg-gradient-to-br from-blue-600/20 to-cyan-700/20 rounded-xl p-4 border border-blue-500/30">
+                <p class="text-blue-300 text-xs mb-1">Total Payments</p>
+                <p class="text-2xl font-bold text-blue-400">${totalPayments}</p>
+            </div>
+            <div class="bg-gradient-to-br from-purple-600/20 to-pink-700/20 rounded-xl p-4 border border-purple-500/30">
+                <p class="text-purple-300 text-xs mb-1">Unique Renters</p>
+                <p class="text-2xl font-bold text-purple-400">${renterList.length}</p>
+            </div>
+            <div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 rounded-xl p-4 border border-amber-500/30">
+                <p class="text-amber-300 text-xs mb-1">Avg per Renter</p>
+                <p class="text-2xl font-bold text-amber-400">${renterList.length > 0 ? formatPrice(totalCollected / renterList.length) : '$0'}</p>
+            </div>
+        </div>
+        
+        <!-- Renter Earnings List -->
+        <div class="bg-gray-900 rounded-xl p-4 border border-gray-700">
+            <h4 class="text-white font-bold mb-4 flex items-center gap-2">
+                👥 Earnings by Renter
+                <span class="text-xs font-normal text-gray-400">(sorted by total paid)</span>
+            </h4>
+            
+            ${renterList.length > 0 ? `
+                <div class="space-y-3">
+                    ${renterList.map((r, i) => {
+                        const maxPaid = renterList[0]?.totalPaid || 1;
+                        const width = (r.totalPaid / maxPaid) * 100;
+                        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '💰';
+                        return `
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">${medal}</span>
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                                            ${r.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <p class="text-white font-bold">${r.name}</p>
+                                            <p class="text-gray-400 text-xs">${r.paymentCount} payment${r.paymentCount !== 1 ? 's' : ''}</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-2xl font-bold text-green-400">${formatPrice(r.totalPaid)}</p>
+                                        ${r.lastPayment ? `<p class="text-gray-500 text-xs">Last: ${r.lastPayment.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>` : ''}
+                                    </div>
+                                </div>
+                                
+                                <!-- Progress bar -->
+                                <div class="h-2 bg-gray-700 rounded-full overflow-hidden mb-2">
+                                    <div class="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all" style="width: ${width}%"></div>
+                                </div>
+                                
+                                <!-- Properties -->
+                                <div class="flex flex-wrap gap-1">
+                                    ${r.properties.map(prop => `
+                                        <span class="px-2 py-0.5 bg-gray-700 rounded text-xs text-gray-300">${prop}</span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            ` : `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-3">📭</div>
+                    <p class="text-gray-400">No payment history yet</p>
+                    <p class="text-gray-500 text-sm mt-1">Payments will appear here when renters pay</p>
+                </div>
+            `}
+        </div>
+        
+        ${data.tenureHistory && data.tenureHistory.length > 0 ? `
+        <!-- Completed Tenures -->
+        <div class="bg-gray-900 rounded-xl p-4 border border-gray-700 mt-6">
+            <h4 class="text-white font-bold mb-4 flex items-center gap-2">
+                📜 Completed Tenures
+                <span class="text-xs font-normal text-green-400">${data.tenureHistory.length} total</span>
+            </h4>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-gray-400 border-b border-gray-700">
+                            <th class="text-left py-2 px-3">Renter</th>
+                            <th class="text-left py-2 px-3">Property</th>
+                            <th class="text-center py-2 px-3">Duration</th>
+                            <th class="text-right py-2 px-3">Total Collected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.tenureHistory.slice(0, 10).map(t => `
+                            <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+                                <td class="py-2 px-3 text-white">${t.renterName || 'Unknown'}</td>
+                                <td class="py-2 px-3 text-gray-400">${t.propertyName || 'Unknown'}</td>
+                                <td class="py-2 px-3 text-center text-gray-400">${t.tenureDays || 0} days</td>
+                                <td class="py-2 px-3 text-right text-green-400 font-bold">${formatPrice(t.totalCollected || 0)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        ` : ''}
     `;
 }
 
