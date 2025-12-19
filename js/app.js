@@ -2124,7 +2124,10 @@ window.renderPropertyAnalytics = async function(propertyId) {
                                 </div>
                                 <div>
                                     <div class="text-white font-bold">${tenure.renterName}</div>
-                                    <div class="text-gray-400 text-sm capitalize">${tenure.paymentFrequency || 'Unknown'} payments</div>
+                                    <div class="text-gray-400 text-sm">
+                                        ${tenure.paymentCount || 0} × $${(tenure.avgPayment || tenure.totalCollected / (tenure.paymentCount || 1)).toLocaleString()} 
+                                        <span class="capitalize">${tenure.paymentFrequency || 'payment'}${tenure.paymentCount !== 1 ? 's' : ''}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
@@ -2138,16 +2141,17 @@ window.renderPropertyAnalytics = async function(propertyId) {
                                 <div class="text-green-400 font-bold">$${(tenure.totalCollected || 0).toLocaleString()}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs uppercase">Payments</div>
-                                <div class="text-white font-bold">${tenure.paymentCount || 0}</div>
+                                <div class="text-gray-400 text-xs uppercase">Tenure</div>
+                                <div class="text-white font-bold">${tenure.tenureDays || 0} days</div>
+                                <div class="text-gray-500 text-xs">${tenure.tenureWeeks || Math.round((tenure.tenureDays || 0) / 7 * 10) / 10} weeks</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs uppercase">Duration</div>
-                                <div class="text-white font-bold">${tenure.tenureDays || 0} days</div>
+                                <div class="text-gray-400 text-xs uppercase">Started</div>
+                                <div class="text-white font-bold text-sm">${tenure.startDate || 'N/A'}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs uppercase">Ended</div>
-                                <div class="text-white font-bold">${tenure.endDate || 'N/A'}</div>
+                                <div class="text-white font-bold text-sm">${tenure.endDate || 'N/A'}</div>
                             </div>
                         </div>
                         ${tenure.renterNotes ? `
@@ -2969,28 +2973,49 @@ window.showCompleteLeaseModal = async function(propertyId) {
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                             Tenure Summary
                         </h4>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <div class="text-gray-400 text-xs uppercase">Total Collected</div>
-                                <div class="text-2xl font-bold text-green-400">$${tenureSummary.totalCollected.toLocaleString()}</div>
+                        
+                        <!-- Payment breakdown - more prominent -->
+                        <div class="bg-gray-800/50 rounded-lg p-3 mb-3">
+                            <div class="flex items-center justify-between">
+                                <div class="text-gray-300">
+                                    <span class="text-2xl font-bold text-white">${tenureSummary.paymentCount}</span>
+                                    <span class="text-gray-400"> × </span>
+                                    <span class="text-xl font-bold text-green-400">$${tenureSummary.avgPayment.toLocaleString()}</span>
+                                    <span class="text-gray-400 capitalize"> ${tenureSummary.frequency}</span>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500 uppercase">Total</div>
+                                    <div class="text-xl font-bold text-green-400">$${tenureSummary.totalCollected.toLocaleString()}</div>
+                                </div>
                             </div>
-                            <div>
-                                <div class="text-gray-400 text-xs uppercase">Payments Made</div>
-                                <div class="text-2xl font-bold text-white">${tenureSummary.paymentCount}</div>
-                            </div>
-                            <div>
-                                <div class="text-gray-400 text-xs uppercase">First Payment</div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div class="bg-gray-800/30 rounded-lg p-2">
+                                <div class="text-gray-500 text-xs uppercase">First Payment</div>
                                 <div class="text-white font-semibold">${tenureSummary.firstPayment || 'N/A'}</div>
                             </div>
-                            <div>
-                                <div class="text-gray-400 text-xs uppercase">Last Payment</div>
+                            <div class="bg-gray-800/30 rounded-lg p-2">
+                                <div class="text-gray-500 text-xs uppercase">Last Payment</div>
                                 <div class="text-white font-semibold">${tenureSummary.lastPayment || 'N/A'}</div>
                             </div>
                         </div>
+                        
                         ${tenureSummary.tenureDays > 0 ? `
                         <div class="mt-3 pt-3 border-t border-green-500/30">
-                            <div class="text-gray-400 text-xs uppercase">Tenure Duration</div>
-                            <div class="text-white font-semibold">${tenureSummary.tenureDays} days (${Math.round(tenureSummary.tenureDays / 7)} weeks)</div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-gray-500 text-xs uppercase">Tenure Duration</div>
+                                    <div class="text-white font-semibold">${tenureSummary.tenureDays} days (${tenureSummary.tenureWeeks} weeks)</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-gray-500 text-xs uppercase">Coverage Through</div>
+                                    <div class="text-white font-semibold">${tenureSummary.coverageEnd || 'N/A'}</div>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2">
+                                Based on ${tenureSummary.paymentCount} ${tenureSummary.frequency} payment${tenureSummary.paymentCount !== 1 ? 's' : ''} (${tenureSummary.daysPerCycle} days each)
+                            </div>
                         </div>
                         ` : ''}
                     </div>
@@ -3052,13 +3077,18 @@ window.showCompleteLeaseModal = async function(propertyId) {
 
 /**
  * Calculate tenure summary from payment history
+ * Properly accounts for payment frequency to determine actual tenure duration
  */
 async function calculateTenureSummary(propertyId, renterName) {
     const payments = await getPaymentHistory(propertyId);
+    const p = properties.find(prop => prop.id === propertyId);
+    
+    // Get current payment frequency
+    const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || 'weekly');
     
     // Filter payments for this renter (case-insensitive match)
-    const renterPayments = payments.filter(p => 
-        p.renterName && p.renterName.toLowerCase() === renterName.toLowerCase()
+    const renterPayments = payments.filter(pay => 
+        pay.renterName && pay.renterName.toLowerCase() === renterName.toLowerCase()
     );
     
     if (renterPayments.length === 0) {
@@ -3067,24 +3097,51 @@ async function calculateTenureSummary(propertyId, renterName) {
             paymentCount: 0,
             firstPayment: null,
             lastPayment: null,
-            tenureDays: 0
+            tenureDays: 0,
+            tenureWeeks: 0,
+            frequency: paymentFrequency,
+            avgPayment: 0
         };
     }
     
-    // Sort by paymentDate (not 'date')
+    // Sort by paymentDate
     renterPayments.sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
     
-    const totalCollected = renterPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalCollected = renterPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
     const firstDate = new Date(renterPayments[0].paymentDate);
-    const lastDate = new Date(renterPayments[renterPayments.length - 1].paymentDate);
-    const tenureDays = Math.ceil((lastDate - firstDate) / (1000 * 60 * 60 * 24)) + 1;
+    const lastPaymentDate = new Date(renterPayments[renterPayments.length - 1].paymentDate);
+    
+    // Calculate days per payment cycle based on frequency
+    let daysPerCycle = 7; // default weekly
+    if (paymentFrequency === 'daily') daysPerCycle = 1;
+    else if (paymentFrequency === 'weekly') daysPerCycle = 7;
+    else if (paymentFrequency === 'biweekly') daysPerCycle = 14;
+    else if (paymentFrequency === 'monthly') daysPerCycle = 30;
+    
+    // Calculate actual tenure: from first payment through end of last payment period
+    // If they paid once biweekly, they stayed for 2 weeks (14 days)
+    // Tenure = (number of payments) × (days per payment cycle)
+    const tenureDays = renterPayments.length * daysPerCycle;
+    const tenureWeeks = Math.round(tenureDays / 7 * 10) / 10; // Round to 1 decimal
+    
+    // Calculate the coverage end date (when the last payment period ends)
+    const coverageEndDate = new Date(lastPaymentDate);
+    coverageEndDate.setDate(coverageEndDate.getDate() + daysPerCycle);
+    
+    // Average payment amount
+    const avgPayment = Math.round(totalCollected / renterPayments.length);
     
     return {
         totalCollected: totalCollected,
         paymentCount: renterPayments.length,
         firstPayment: firstDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        lastPayment: lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        lastPayment: lastPaymentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        coverageEnd: coverageEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         tenureDays: tenureDays,
+        tenureWeeks: tenureWeeks,
+        frequency: paymentFrequency,
+        daysPerCycle: daysPerCycle,
+        avgPayment: avgPayment,
         payments: renterPayments
     };
 }
@@ -3111,7 +3168,7 @@ window.completeLease = async function(propertyId) {
         // Get tenure summary
         const tenureSummary = await calculateTenureSummary(propertyId, renterName);
         
-        // Create tenure record
+        // Create tenure record with all details
         const tenureRecord = {
             id: Date.now().toString(),
             renterName: renterName,
@@ -3120,10 +3177,14 @@ window.completeLease = async function(propertyId) {
             renterNotes: renterNotes,
             startDate: tenureSummary.firstPayment,
             endDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            coverageEnd: tenureSummary.coverageEnd,
             completedAt: new Date().toISOString(),
             totalCollected: tenureSummary.totalCollected,
             paymentCount: tenureSummary.paymentCount,
+            avgPayment: tenureSummary.avgPayment,
             tenureDays: tenureSummary.tenureDays,
+            tenureWeeks: tenureSummary.tenureWeeks,
+            daysPerCycle: tenureSummary.daysPerCycle,
             status: 'completed'
         };
         
