@@ -696,12 +696,14 @@
                     <div id="navUserDisplay" class="hidden items-center gap-2">
                         <!-- Username area with dropdown -->
                         <div class="relative">
-                            <!-- Admin notification badges - positioned top-right of username -->
-                            <div id="adminNotificationBadges" class="hidden absolute -top-2 -right-2 flex items-center gap-1 z-10">
-                                <!-- Red badge for rent due (MOST IMPORTANT - REVENUE!) -->
-                                <span id="adminRentBadge" class="bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-500 transition" style="display: none;" onclick="showRentNotifications(event)" title="💰 Rent payments due!">
-                                    <span id="adminRentCount">0</span>
+                            <!-- Rent alert badge (for ALL property owners with rent due) -->
+                            <div id="ownerRentBadge" class="hidden absolute -top-2 -right-2 z-10">
+                                <span class="bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-500 transition" onclick="goToDashboard()" title="💰 Rent payments need attention!">
+                                    <span id="ownerRentCount">0</span>
                                 </span>
+                            </div>
+                            <!-- Admin notification badges - positioned top-right of username (admin only) -->
+                            <div id="adminNotificationBadges" class="hidden absolute -top-2 -right-2 flex items-center gap-1 z-10">
                                 <!-- Blue badge for new users -->
                                 <span id="adminNewUserBadge" class="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-blue-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
                                     <span id="adminNewUserCount">0</span>
@@ -786,7 +788,7 @@
                     <!-- Mobile Notification Badges -->
                     <div id="mobileNotificationBadges" class="flex items-center gap-2">
                         <!-- Rent badge (admin only) -->
-                        <span id="mobileRentBadge" class="hidden bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="showRentNotifications(event)" title="Rent due">
+                        <span id="mobileRentBadge" class="hidden bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Rent due">
                             <span id="mobileRentCount">0</span>
                         </span>
                         <!-- Combined notification badge -->
@@ -857,11 +859,6 @@
                     </button>
                 </div>
                 <!-- Persistent notifications will be inserted here by JS -->
-            </div>
-
-            <!-- Rent Due Notifications Panel (Admin Only) -->
-            <div id="rentNotificationsPanel" class="hidden mb-6">
-                <!-- Rent notifications will be rendered here by JS -->
             </div>
 
             <!-- Admin Section (Only visible to master admin) -->
@@ -1208,6 +1205,11 @@
                         <p class="text-gray-500 italic">Loading activity log...</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- Rent Due Notifications Panel (Owner's Properties Only) -->
+            <div id="rentNotificationsPanel" class="hidden mb-6">
+                <!-- Rent notifications will be rendered here by JS -->
             </div>
 
             <!-- Username Section -->

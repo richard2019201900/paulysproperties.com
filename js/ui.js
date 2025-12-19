@@ -476,7 +476,7 @@ function updateMobileAdminBadges() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
     // Check rent notifications
-    if (typeof checkRentDueNotifications === 'function') {
+   if (typeof checkRentDueNotifications === 'function') {
         checkRentDueNotifications();
     }
     
@@ -485,7 +485,7 @@ function updateMobileAdminBadges() {
     const mobileAdminBadge = $('mobileAdminBadge');
     const mobileAdminCount = $('mobileAdminCount');
     
-    // Update rent badge
+    // Update rent badge (shown for all users with rent due)
     if (mobileRentBadge && window.AdminNotifications?.rentNotifications) {
         const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
         const rentTotal = overdue.length + today.length + tomorrow.length;
@@ -498,8 +498,8 @@ function updateMobileAdminBadges() {
         }
     }
     
-    // Update combined admin badge (users + listings + premium)
-    if (mobileAdminBadge && window.AdminNotifications) {
+    // Update combined admin badge (users + listings + premium) - ADMIN ONLY
+    if (mobileAdminBadge && window.AdminNotifications && TierService.isMasterAdmin(auth.currentUser?.email)) {
         const userCount = AdminNotifications.visible ? 
             Array.from(AdminNotifications.visible.values()).filter(v => v.type === 'new-user-').length : 0;
         const listingCount = AdminNotifications.visible ? 
@@ -515,9 +515,31 @@ function updateMobileAdminBadges() {
         } else {
             mobileAdminBadge.className = 'hidden';
         }
+    } else if (mobileAdminBadge) {
+        // Hide admin badge for non-admins
+        mobileAdminBadge.className = 'hidden';
     }
 }
 
+// Separate function for updating mobile rent badge only (for non-admin users)
+function updateMobileRentBadge() {
+    const mobileRentBadge = $('mobileRentBadge');
+    const mobileRentCount = $('mobileRentCount');
+    
+    if (mobileRentBadge && window.AdminNotifications?.rentNotifications) {
+        const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
+        const rentTotal = overdue.length + today.length + tomorrow.length;
+        
+        if (rentTotal > 0) {
+            if (mobileRentCount) mobileRentCount.textContent = rentTotal;
+            mobileRentBadge.className = 'flex bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 items-center justify-center shadow-lg animate-pulse cursor-pointer';
+        } else {
+            mobileRentBadge.className = 'hidden';
+        }
+    }
+}
+
+window.updateMobileRentBadge = updateMobileRentBadge;
 window.updateMobileAdminBadges = updateMobileAdminBadges;
 
 window.updateNavUserDisplay = updateNavUserDisplay;
@@ -1854,14 +1876,20 @@ function renderOwnerDashboard() {
     // Load user notifications
     loadUserNotifications();
     
-    // Check rent due notifications (admin only)
+    // Check rent due notifications (for all property owners)
+    if (typeof checkRentDueNotifications === 'function') {
+        checkRentDueNotifications();
+    }
+    // Render the rent notifications panel
+    renderRentNotificationsPanel();
+    
+    // Update mobile rent badge for all users
+    if (typeof updateMobileRentBadge === 'function') {
+        updateMobileRentBadge();
+    }
+    
+    // Update admin-specific mobile badges
     if (TierService.isMasterAdmin(auth.currentUser?.email)) {
-        if (typeof checkRentDueNotifications === 'function') {
-            checkRentDueNotifications();
-        }
-        // Render the rent notifications panel
-        renderRentNotificationsPanel();
-        // Update mobile badges too
         if (typeof updateMobileAdminBadges === 'function') {
             updateMobileAdminBadges();
         }
@@ -7469,13 +7497,14 @@ window.copyDashboardReminder = function(propertyId, btn) {
 /**
  * Render the rent notifications panel in the dashboard
  * Shows overdue, due today, and due tomorrow in a prominent location
+ * Works for all property owners, showing only their own properties
  */
 window.renderRentNotificationsPanel = function() {
     const panel = $('rentNotificationsPanel');
     if (!panel) return;
     
-    // Only show for admin
-    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+    // Show for all logged-in users (they see only their own properties)
+    if (!auth.currentUser?.email) {
         panel.className = 'hidden';
         return;
     }

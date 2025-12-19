@@ -1033,13 +1033,13 @@ if (!document.getElementById('notification-flash-styles')) {
 // ============================================================================
 
 /**
- * Check all properties for rent due dates and create notifications
+ * Check user's own properties for rent due dates and create notifications
  * Call this when dashboard loads and periodically
+ * Works for all property owners, not just admin
  */
 window.checkRentDueNotifications = function() {
-    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
-        return;
-    }
+    const userEmail = auth.currentUser?.email;
+    if (!userEmail) return;
     
     // Reset rent notification arrays
     AdminNotifications.rentNotifications = {
@@ -1051,8 +1051,16 @@ window.checkRentDueNotifications = function() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Check all properties
-    properties.forEach(p => {
+    // Get ONLY the current user's owned properties using OwnershipService
+    const ownedProperties = typeof OwnershipService !== 'undefined' 
+        ? OwnershipService.getPropertiesForOwner(userEmail)
+        : properties.filter(p => {
+            const ownerEmail = (p.ownerEmail || propertyOwnerEmail[p.id] || '').toLowerCase();
+            return ownerEmail === userEmail.toLowerCase();
+        });
+    
+    // Check only owned properties
+    ownedProperties.forEach(p => {
         const isRented = state.availability[p.id] === false;
         if (!isRented) return; // Skip available properties
         
@@ -1123,31 +1131,41 @@ window.checkRentDueNotifications = function() {
 
 /**
  * Update the rent notification badge in the navbar
+ * Works for all property owners, not just admin
  */
 function updateRentBadge() {
-    const badge = document.getElementById('adminRentBadge');
-    const countEl = document.getElementById('adminRentCount');
+    const badge = document.getElementById('ownerRentBadge');
+    const countEl = document.getElementById('ownerRentCount');
     
     if (!badge || !countEl) return;
     
-    const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
+    const rentData = AdminNotifications.rentNotifications;
+    if (!rentData) {
+        badge.classList.add('hidden');
+        return;
+    }
+    
+    const { overdue, today, tomorrow } = rentData;
     const total = overdue.length + today.length + tomorrow.length;
     
     if (total > 0) {
         countEl.textContent = total;
-        badge.style.display = 'flex';
+        badge.classList.remove('hidden');
         
         // Change badge color based on urgency
-        badge.className = badge.className.replace(/bg-\w+-\d+/g, '');
-        if (overdue.length > 0) {
-            badge.classList.add('bg-red-600');
-        } else if (today.length > 0) {
-            badge.classList.add('bg-red-500');
-        } else {
-            badge.classList.add('bg-yellow-500');
+        const innerBadge = badge.querySelector('span');
+        if (innerBadge) {
+            innerBadge.className = innerBadge.className.replace(/bg-\w+-\d+/g, '');
+            if (overdue.length > 0) {
+                innerBadge.classList.add('bg-red-600');
+            } else if (today.length > 0) {
+                innerBadge.classList.add('bg-red-500');
+            } else {
+                innerBadge.classList.add('bg-yellow-500');
+            }
         }
     } else {
-        badge.style.display = 'none';
+        badge.classList.add('hidden');
     }
 }
 
