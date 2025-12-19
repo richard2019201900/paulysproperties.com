@@ -698,8 +698,12 @@
                         <div class="relative">
                             <!-- Admin notification badges - positioned top-right of username -->
                             <div id="adminNotificationBadges" class="hidden absolute -top-2 -right-2 flex items-center gap-1 z-10">
-                                <!-- Red badge for new users -->
-                                <span id="adminNewUserBadge" class="bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
+                                <!-- Red badge for rent due (MOST IMPORTANT - REVENUE!) -->
+                                <span id="adminRentBadge" class="bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-500 transition" style="display: none;" onclick="showRentNotifications(event)" title="💰 Rent payments due!">
+                                    <span id="adminRentCount">0</span>
+                                </span>
+                                <!-- Blue badge for new users -->
+                                <span id="adminNewUserBadge" class="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-blue-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
                                     <span id="adminNewUserCount">0</span>
                                 </span>
                                 <!-- Green badge for new listings -->
@@ -767,13 +771,59 @@
             </div>
         </div>
         <div id="mobileMenu" class="hidden lg:hidden bg-gray-900 border-t border-gray-700">
-            <a onclick="navigateTo('home')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Home</a>
-            <a onclick="navigateTo('properties')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Properties</a>
-            <a onclick="navigateTo('about')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">About</a>
-            <a onclick="navigateTo('contact')" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Contact</a>
-            <a id="mobileDashboardLink" onclick="goToDashboard()" class="hidden px-4 py-3 text-purple-400 hover:bg-gray-800 cursor-pointer font-semibold">Dashboard</a>
-            <a id="mobileCreateListingBtn" onclick="openCreateListingModal()" class="hidden">+ New Listing</a>
-            <button id="mobileAuthBtn" onclick="handleAuthClick()" class="block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold">Register / Sign In</button>
+            <!-- Mobile User Info Section (shown when logged in) -->
+            <div id="mobileUserSection" class="hidden border-b border-gray-700 p-4 bg-gray-800/50">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold">
+                            <span id="mobileUserInitial">?</span>
+                        </div>
+                        <div>
+                            <div id="mobileUserName" class="text-white font-semibold"></div>
+                            <div id="mobileUserTier" class="text-xs text-gray-400"></div>
+                        </div>
+                    </div>
+                    <!-- Mobile Notification Badges -->
+                    <div id="mobileNotificationBadges" class="flex items-center gap-2">
+                        <!-- Rent badge (admin only) -->
+                        <span id="mobileRentBadge" class="hidden bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="showRentNotifications(event)" title="Rent due">
+                            <span id="mobileRentCount">0</span>
+                        </span>
+                        <!-- Combined notification badge -->
+                        <span id="mobileAdminBadge" class="hidden bg-blue-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Notifications">
+                            <span id="mobileAdminCount">0</span>
+                        </span>
+                        <!-- User notification badge -->
+                        <span id="mobileUserNotifBadge" class="hidden bg-green-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Notifications">
+                            !
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation Links -->
+            <a onclick="navigateTo('home'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Home</a>
+            <a onclick="navigateTo('properties'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Properties</a>
+            <a onclick="navigateTo('about'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">About</a>
+            <a onclick="navigateTo('contact'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Contact</a>
+            <a id="mobileDashboardLink" onclick="goToDashboard(); hideMobileMenu();" class="hidden px-4 py-3 text-purple-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
+                <span>🏠</span> Dashboard
+            </a>
+            <a id="mobileCreateListingBtn" onclick="openCreateListingModal(); hideMobileMenu();" class="hidden px-4 py-3 text-green-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
+                <span>➕</span> New Listing
+            </a>
+            <a id="mobileBlogLink" onclick="goToBlog(); hideMobileMenu();" class="hidden px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer flex items-center gap-2">
+                <span>📰</span> Site Updates
+                <span id="mobileSiteUpdateBadge" class="hidden bg-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ml-auto">1</span>
+            </a>
+            
+            <!-- Auth/Logout buttons -->
+            <div class="border-t border-gray-700 mt-2 pt-2">
+                <button id="mobileAuthBtn" onclick="handleAuthClick(); hideMobileMenu();" class="block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold">Register / Sign In</button>
+                <button id="mobileLogoutBtn" onclick="logout(); hideMobileMenu();" class="hidden w-full text-left px-4 py-3 text-red-400 hover:bg-gray-800 font-semibold flex items-center gap-2">
+                    <span>🚪</span> Logout
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -807,6 +857,11 @@
                     </button>
                 </div>
                 <!-- Persistent notifications will be inserted here by JS -->
+            </div>
+
+            <!-- Rent Due Notifications Panel (Admin Only) -->
+            <div id="rentNotificationsPanel" class="hidden mb-6">
+                <!-- Rent notifications will be rendered here by JS -->
             </div>
 
             <!-- Admin Section (Only visible to master admin) -->

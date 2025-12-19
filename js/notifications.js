@@ -58,6 +58,36 @@ const NOTIFICATION_TYPES = {
         icon: '📸',
         title: '💰 Photo Service Inquiry!',
         storageKey: 'adminPendingPhotoRequests'
+    },
+    RENT_OVERDUE: {
+        prefix: 'rent-overdue-',
+        color: 'red',
+        bgGradient: 'from-red-600 to-red-700',
+        badgeColor: 'bg-red-600',
+        flashColor: 'red',
+        icon: '🚨',
+        title: 'Rent OVERDUE!',
+        storageKey: 'adminPendingRentOverdue'
+    },
+    RENT_TODAY: {
+        prefix: 'rent-today-',
+        color: 'red',
+        bgGradient: 'from-red-500 to-orange-500',
+        badgeColor: 'bg-red-500',
+        flashColor: 'red',
+        icon: '⏰',
+        title: 'Rent Due Today!',
+        storageKey: 'adminPendingRentToday'
+    },
+    RENT_TOMORROW: {
+        prefix: 'rent-tomorrow-',
+        color: 'yellow',
+        bgGradient: 'from-yellow-500 to-orange-400',
+        badgeColor: 'bg-yellow-500',
+        flashColor: 'yellow',
+        icon: '📅',
+        title: 'Rent Due Tomorrow',
+        storageKey: 'adminPendingRentTomorrow'
     }
 };
 
@@ -72,6 +102,7 @@ window.AdminNotifications = {
     seenListings: new Set(),
     seenPremium: new Set(),
     seenPhotoRequests: new Set(),
+    seenRentNotifications: new Set(), // Track acknowledged rent notifications
     
     // Currently visible notifications (keyed by full notification ID)
     visible: new Map(),
@@ -87,12 +118,20 @@ window.AdminNotifications = {
     listingsListenerActive: false,
     premiumListenerActive: false,
     photoRequestsListenerActive: false,
+    rentCheckActive: false,
     
     // First snapshot flags
     usersFirstSnapshot: true,
     listingsFirstSnapshot: true,
     premiumFirstSnapshot: true,
-    photoRequestsFirstSnapshot: true
+    photoRequestsFirstSnapshot: true,
+    
+    // Rent notification data
+    rentNotifications: {
+        overdue: [],   // Properties with overdue rent
+        today: [],     // Properties with rent due today
+        tomorrow: []   // Properties with rent due tomorrow
+    }
 };
 
 // ============================================================================
@@ -990,9 +1029,289 @@ if (!document.getElementById('notification-flash-styles')) {
 }
 
 // ============================================================================
+// RENT DUE NOTIFICATION SYSTEM
+// ============================================================================
+
+/**
+ * Check all properties for rent due dates and create notifications
+ * Call this when dashboard loads and periodically
+ */
+window.checkRentDueNotifications = function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        return;
+    }
+    
+    // Reset rent notification arrays
+    AdminNotifications.rentNotifications = {
+        overdue: [],
+        today: [],
+        tomorrow: []
+    };
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Check all properties
+    properties.forEach(p => {
+        const isRented = state.availability[p.id] === false;
+        if (!isRented) return; // Skip available properties
+        
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
+        const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
+        
+        if (!lastPaymentDate || !paymentFrequency || !renterName) return;
+        
+        // Calculate next due date
+        const lastDate = parseLocalDate(lastPaymentDate);
+        const nextDate = new Date(lastDate);
+        
+        if (paymentFrequency === 'daily') {
+            nextDate.setDate(nextDate.getDate() + 1);
+        } else if (paymentFrequency === 'weekly') {
+            nextDate.setDate(nextDate.getDate() + 7);
+        } else if (paymentFrequency === 'biweekly') {
+            nextDate.setDate(nextDate.getDate() + 14);
+        } else {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+        }
+        nextDate.setHours(0, 0, 0, 0);
+        
+        const daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        
+        // Get amount due
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+        
+        let amountDue = weeklyPrice;
+        if (paymentFrequency === 'daily' && dailyPrice > 0) {
+            amountDue = dailyPrice;
+        } else if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
+            amountDue = biweeklyPrice;
+        } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
+            amountDue = monthlyPrice;
+        }
+        
+        const rentInfo = {
+            propertyId: p.id,
+            propertyTitle: p.title,
+            renterName: renterName,
+            daysUntilDue: daysUntilDue,
+            dueDate: nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+            amount: amountDue,
+            frequency: paymentFrequency
+        };
+        
+        // Categorize by urgency
+        if (daysUntilDue < 0) {
+            AdminNotifications.rentNotifications.overdue.push(rentInfo);
+        } else if (daysUntilDue === 0) {
+            AdminNotifications.rentNotifications.today.push(rentInfo);
+        } else if (daysUntilDue === 1) {
+            AdminNotifications.rentNotifications.tomorrow.push(rentInfo);
+        }
+    });
+    
+    // Update the rent badge
+    updateRentBadge();
+    
+    // Return summary for display
+    return AdminNotifications.rentNotifications;
+};
+
+/**
+ * Update the rent notification badge in the navbar
+ */
+function updateRentBadge() {
+    const badge = document.getElementById('adminRentBadge');
+    const countEl = document.getElementById('adminRentCount');
+    
+    if (!badge || !countEl) return;
+    
+    const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
+    const total = overdue.length + today.length + tomorrow.length;
+    
+    if (total > 0) {
+        countEl.textContent = total;
+        badge.style.display = 'flex';
+        
+        // Change badge color based on urgency
+        badge.className = badge.className.replace(/bg-\w+-\d+/g, '');
+        if (overdue.length > 0) {
+            badge.classList.add('bg-red-600');
+        } else if (today.length > 0) {
+            badge.classList.add('bg-red-500');
+        } else {
+            badge.classList.add('bg-yellow-500');
+        }
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+/**
+ * Show rent notifications dropdown/modal
+ */
+window.showRentNotifications = function(event) {
+    if (event) event.stopPropagation();
+    
+    const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
+    
+    // Build notification content
+    let content = '';
+    
+    if (overdue.length > 0) {
+        content += `<div class="mb-4">
+            <h4 class="text-red-400 font-bold mb-2 flex items-center gap-2">
+                <span>🚨</span> OVERDUE (${overdue.length})
+            </h4>
+            ${overdue.map(r => createRentNotificationItem(r, 'overdue')).join('')}
+        </div>`;
+    }
+    
+    if (today.length > 0) {
+        content += `<div class="mb-4">
+            <h4 class="text-orange-400 font-bold mb-2 flex items-center gap-2">
+                <span>⏰</span> Due Today (${today.length})
+            </h4>
+            ${today.map(r => createRentNotificationItem(r, 'today')).join('')}
+        </div>`;
+    }
+    
+    if (tomorrow.length > 0) {
+        content += `<div class="mb-4">
+            <h4 class="text-yellow-400 font-bold mb-2 flex items-center gap-2">
+                <span>📅</span> Due Tomorrow (${tomorrow.length})
+            </h4>
+            ${tomorrow.map(r => createRentNotificationItem(r, 'tomorrow')).join('')}
+        </div>`;
+    }
+    
+    if (!content) {
+        content = '<div class="text-center py-8 text-gray-400">✅ No upcoming rent payments due!</div>';
+    }
+    
+    // Create/show dropdown
+    showNotificationDropdown('rentDropdown', '💰 Rent Notifications', content);
+};
+
+/**
+ * Create a single rent notification item
+ */
+function createRentNotificationItem(rent, urgency) {
+    const bgClass = urgency === 'overdue' ? 'bg-red-900/30 border-red-500/50' 
+                  : urgency === 'today' ? 'bg-orange-900/30 border-orange-500/50'
+                  : 'bg-yellow-900/30 border-yellow-500/50';
+    
+    const daysText = rent.daysUntilDue < 0 
+        ? `${Math.abs(rent.daysUntilDue)} days overdue`
+        : rent.daysUntilDue === 0 
+        ? 'Due TODAY'
+        : 'Due tomorrow';
+    
+    return `
+        <div class="p-3 rounded-lg border ${bgClass} mb-2 cursor-pointer hover:opacity-80 transition" 
+             onclick="viewPropertyStats(${rent.propertyId}); closeAllDropdowns();">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="font-bold text-white">${rent.propertyTitle}</div>
+                    <div class="text-sm text-gray-300">👤 ${rent.renterName}</div>
+                    <div class="text-sm text-gray-400">${rent.frequency} • $${rent.amount.toLocaleString()}</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs font-bold ${urgency === 'overdue' ? 'text-red-400' : urgency === 'today' ? 'text-orange-400' : 'text-yellow-400'}">${daysText}</div>
+                    <div class="text-xs text-gray-500">${rent.dueDate}</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Generic function to show notification dropdown
+ */
+function showNotificationDropdown(id, title, content) {
+    // Close any existing dropdowns first
+    closeAllDropdowns();
+    
+    // Create dropdown element
+    let dropdown = document.getElementById(id);
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = id;
+        dropdown.className = 'fixed z-[100] bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-80 max-h-96 overflow-y-auto';
+        document.body.appendChild(dropdown);
+    }
+    
+    dropdown.innerHTML = `
+        <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-3 flex justify-between items-center">
+            <h3 class="font-bold text-white">${title}</h3>
+            <button onclick="closeAllDropdowns()" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+        <div class="p-3">
+            ${content}
+        </div>
+    `;
+    
+    // Position near the badge
+    const badge = document.getElementById('adminRentBadge') || document.getElementById('adminNotificationBadges');
+    if (badge) {
+        const rect = badge.getBoundingClientRect();
+        dropdown.style.top = `${rect.bottom + 10}px`;
+        dropdown.style.right = `${window.innerWidth - rect.right}px`;
+    } else {
+        dropdown.style.top = '70px';
+        dropdown.style.right = '20px';
+    }
+    
+    dropdown.style.display = 'block';
+    
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', closeDropdownOnClickOutside);
+    }, 100);
+}
+
+function closeDropdownOnClickOutside(e) {
+    const dropdown = document.getElementById('rentDropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+        closeAllDropdowns();
+    }
+}
+
+window.closeAllDropdowns = function() {
+    const dropdowns = ['rentDropdown', 'userDropdown', 'listingDropdown', 'premiumDropdown', 'photoDropdown'];
+    dropdowns.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    document.removeEventListener('click', closeDropdownOnClickOutside);
+};
+
+/**
+ * Helper to parse local date strings consistently
+ */
+function parseLocalDate(dateStr) {
+    if (!dateStr) return null;
+    // Handle ISO format or simple date format
+    if (dateStr.includes('T')) {
+        return new Date(dateStr);
+    }
+    // Parse YYYY-MM-DD or similar formats
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+    return new Date(dateStr);
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
 // Make key functions available globally
 window.updateAllBadges = updateAllBadges;
 window.NOTIFICATION_TYPES = NOTIFICATION_TYPES;
+window.updateRentBadge = updateRentBadge;

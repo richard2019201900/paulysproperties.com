@@ -30,6 +30,7 @@ window.markSiteUpdateAsRead = function() {
 window.updateSiteUpdateBadge = function() {
     const navBadge = $('siteUpdateNavBadge');
     const dropdownBadge = $('siteUpdateBadge');
+    const mobileBadge = $('mobileSiteUpdateBadge');
     const dropdownMenu = $('userDropdownMenu');
     const isDropdownOpen = dropdownMenu && !dropdownMenu.classList.contains('hidden');
     
@@ -43,9 +44,12 @@ window.updateSiteUpdateBadge = function() {
             if (navBadge) navBadge.classList.remove('hidden');
             if (dropdownBadge) dropdownBadge.classList.add('hidden');
         }
+        // Always show mobile badge when there's an unread update
+        if (mobileBadge) mobileBadge.classList.remove('hidden');
     } else {
         if (navBadge) navBadge.classList.add('hidden');
         if (dropdownBadge) dropdownBadge.classList.add('hidden');
+        if (mobileBadge) mobileBadge.classList.add('hidden');
     }
 };
 
@@ -331,17 +335,26 @@ function updateAuthButton(isLoggedIn) {
     const navCreateBtn = $('navCreateListingBtn');
     const mobileCreateBtn = $('mobileCreateListingBtn');
     const navUserDisplay = $('navUserDisplay');
+    const mobileUserSection = $('mobileUserSection');
+    const mobileLogoutBtn = $('mobileLogoutBtn');
+    const mobileBlogLink = $('mobileBlogLink');
     
     if (isLoggedIn) {
+        // Desktop nav
         navBtn.textContent = 'Logout';
         navBtn.className = 'hidden md:block bg-gradient-to-r from-red-500 to-pink-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base';
-        mobileBtn.textContent = 'Logout';
-        mobileBtn.className = 'block w-full text-left px-4 py-3 text-red-400 hover:bg-gray-800 font-semibold';
+        
+        // Mobile nav - hide auth button, show logout button and user section
+        if (mobileBtn) mobileBtn.className = 'hidden';
+        if (mobileLogoutBtn) mobileLogoutBtn.className = 'flex w-full text-left px-4 py-3 text-red-400 hover:bg-gray-800 font-semibold items-center gap-2';
+        if (mobileUserSection) mobileUserSection.className = 'border-b border-gray-700 p-4 bg-gray-800/50';
+        if (mobileBlogLink) mobileBlogLink.className = 'flex px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer items-center gap-2';
+        
         showElement($('navDashboardLink'));
         showElement($('mobileDashboardLink'));
         // Show Create Listing buttons
         if (navCreateBtn) navCreateBtn.className = 'hidden md:block bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-3 lg:px-5 py-2 lg:py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg text-xs lg:text-sm';
-        if (mobileCreateBtn) mobileCreateBtn.className = 'block px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold';
+        if (mobileCreateBtn) mobileCreateBtn.className = 'flex px-4 py-3 text-green-400 hover:bg-gray-800 cursor-pointer font-semibold items-center gap-2';
         // Show user display
         if (navUserDisplay) {
             navUserDisplay.className = 'hidden md:flex items-center gap-2';
@@ -351,10 +364,19 @@ function updateAuthButton(isLoggedIn) {
         const myPropertiesFilter = $('myPropertiesFilter');
         if (myPropertiesFilter) myPropertiesFilter.className = 'flex items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition';
     } else {
+        // Desktop nav
         navBtn.textContent = 'Register / Sign In';
         navBtn.className = 'hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base';
-        mobileBtn.textContent = 'Register / Sign In';
-        mobileBtn.className = 'block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold';
+        
+        // Mobile nav - show auth button, hide logout button and user section
+        if (mobileBtn) {
+            mobileBtn.textContent = 'Register / Sign In';
+            mobileBtn.className = 'block w-full text-left px-4 py-3 text-purple-400 hover:bg-gray-800 font-semibold';
+        }
+        if (mobileLogoutBtn) mobileLogoutBtn.className = 'hidden';
+        if (mobileUserSection) mobileUserSection.className = 'hidden';
+        if (mobileBlogLink) mobileBlogLink.className = 'hidden';
+        
         hideElement($('navDashboardLink'));
         hideElement($('mobileDashboardLink'));
         // Hide Create Listing buttons completely (set className to hidden only, no md:block)
@@ -382,6 +404,11 @@ async function updateNavUserDisplay() {
     const navUserTier = $('navUserTier');
     const navUpgradeOption = $('navUpgradeOption');
     
+    // Mobile elements
+    const mobileUserName = $('mobileUserName');
+    const mobileUserTier = $('mobileUserTier');
+    const mobileUserInitial = $('mobileUserInitial');
+    
     if (!navUserName || !navUserTier) return;
     
     try {
@@ -396,6 +423,17 @@ async function updateNavUserDisplay() {
             navUserTier.className = 'text-xs text-red-400';
             // Hide upgrade option for Owner
             if (navUpgradeOption) navUpgradeOption.classList.add('hidden');
+            
+            // Update mobile elements
+            if (mobileUserName) mobileUserName.textContent = username;
+            if (mobileUserTier) {
+                mobileUserTier.innerHTML = '👑 Owner';
+                mobileUserTier.className = 'text-xs text-red-400';
+            }
+            if (mobileUserInitial) mobileUserInitial.textContent = username.charAt(0).toUpperCase();
+            
+            // Show admin notification badges on mobile
+            updateMobileAdminBadges();
         } else {
             const tier = data.tier || 'starter';
             const tierData = TIERS[tier] || TIERS.starter;
@@ -403,6 +441,14 @@ async function updateNavUserDisplay() {
             navUserName.textContent = username;
             navUserTier.innerHTML = `${tierData.icon} ${tierData.name}`;
             navUserTier.className = `text-xs ${tierData.color}`;
+            
+            // Update mobile elements
+            if (mobileUserName) mobileUserName.textContent = username;
+            if (mobileUserTier) {
+                mobileUserTier.innerHTML = `${tierData.icon} ${tierData.name}`;
+                mobileUserTier.className = `text-xs ${tierData.color}`;
+            }
+            if (mobileUserInitial) mobileUserInitial.textContent = username.charAt(0).toUpperCase();
             
             // Hide upgrade option for Elite users
             if (navUpgradeOption) {
@@ -417,8 +463,62 @@ async function updateNavUserDisplay() {
         console.error('Error updating nav user display:', error);
         navUserName.textContent = user.email.split('@')[0];
         navUserTier.textContent = '🌱 Starter';
+        
+        // Update mobile elements with fallback
+        if (mobileUserName) mobileUserName.textContent = user.email.split('@')[0];
+        if (mobileUserTier) mobileUserTier.textContent = '🌱 Starter';
+        if (mobileUserInitial) mobileUserInitial.textContent = user.email.charAt(0).toUpperCase();
     }
 }
+
+// Update mobile admin notification badges
+function updateMobileAdminBadges() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
+    
+    // Check rent notifications
+    if (typeof checkRentDueNotifications === 'function') {
+        checkRentDueNotifications();
+    }
+    
+    const mobileRentBadge = $('mobileRentBadge');
+    const mobileRentCount = $('mobileRentCount');
+    const mobileAdminBadge = $('mobileAdminBadge');
+    const mobileAdminCount = $('mobileAdminCount');
+    
+    // Update rent badge
+    if (mobileRentBadge && window.AdminNotifications?.rentNotifications) {
+        const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
+        const rentTotal = overdue.length + today.length + tomorrow.length;
+        
+        if (rentTotal > 0) {
+            if (mobileRentCount) mobileRentCount.textContent = rentTotal;
+            mobileRentBadge.className = 'flex bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 items-center justify-center shadow-lg animate-pulse cursor-pointer';
+        } else {
+            mobileRentBadge.className = 'hidden';
+        }
+    }
+    
+    // Update combined admin badge (users + listings + premium)
+    if (mobileAdminBadge && window.AdminNotifications) {
+        const userCount = AdminNotifications.visible ? 
+            Array.from(AdminNotifications.visible.values()).filter(v => v.type === 'new-user-').length : 0;
+        const listingCount = AdminNotifications.visible ? 
+            Array.from(AdminNotifications.visible.values()).filter(v => v.type === 'new-listing-').length : 0;
+        const premiumCount = AdminNotifications.visible ? 
+            Array.from(AdminNotifications.visible.values()).filter(v => v.type === 'new-premium-').length : 0;
+        
+        const total = userCount + listingCount + premiumCount;
+        
+        if (total > 0) {
+            if (mobileAdminCount) mobileAdminCount.textContent = total;
+            mobileAdminBadge.className = 'flex bg-blue-500 text-white text-xs font-bold rounded-full w-7 h-7 items-center justify-center shadow-lg animate-pulse cursor-pointer';
+        } else {
+            mobileAdminBadge.className = 'hidden';
+        }
+    }
+}
+
+window.updateMobileAdminBadges = updateMobileAdminBadges;
 
 window.updateNavUserDisplay = updateNavUserDisplay;
 
@@ -778,6 +878,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Hide mobile menu helper
+window.hideMobileMenu = function() {
+    hideElement($('mobileMenu'));
+};
 
 window.goToDashboard = function() {
     hideElement($('mobileMenu'));
@@ -1748,6 +1853,19 @@ function updateIncomeBreakdowns(details) {
 function renderOwnerDashboard() {
     // Load user notifications
     loadUserNotifications();
+    
+    // Check rent due notifications (admin only)
+    if (TierService.isMasterAdmin(auth.currentUser?.email)) {
+        if (typeof checkRentDueNotifications === 'function') {
+            checkRentDueNotifications();
+        }
+        // Render the rent notifications panel
+        renderRentNotificationsPanel();
+        // Update mobile badges too
+        if (typeof updateMobileAdminBadges === 'function') {
+            updateMobileAdminBadges();
+        }
+    }
     
     // Render site update notification if there's a new one
     const siteUpdateContainer = $('siteUpdateNotificationContainer');
@@ -7347,6 +7465,185 @@ window.copyDashboardReminder = function(propertyId, btn) {
     });
 };
 
+// ==================== RENT NOTIFICATIONS PANEL ====================
+/**
+ * Render the rent notifications panel in the dashboard
+ * Shows overdue, due today, and due tomorrow in a prominent location
+ */
+window.renderRentNotificationsPanel = function() {
+    const panel = $('rentNotificationsPanel');
+    if (!panel) return;
+    
+    // Only show for admin
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        panel.className = 'hidden';
+        return;
+    }
+    
+    const rentData = window.AdminNotifications?.rentNotifications;
+    if (!rentData) {
+        panel.className = 'hidden';
+        return;
+    }
+    
+    const { overdue, today, tomorrow } = rentData;
+    const total = overdue.length + today.length + tomorrow.length;
+    
+    if (total === 0) {
+        panel.className = 'hidden';
+        return;
+    }
+    
+    // Build the panel HTML
+    let html = `
+        <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 ${overdue.length > 0 ? 'border-red-500/70' : today.length > 0 ? 'border-orange-500/70' : 'border-yellow-500/70'}">
+            <div class="bg-gradient-to-r ${overdue.length > 0 ? 'from-red-600 to-red-700' : today.length > 0 ? 'from-orange-500 to-red-500' : 'from-yellow-500 to-orange-400'} px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${overdue.length > 0 ? '🚨' : today.length > 0 ? '⏰' : '📅'}</span>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Rent Collection Alert</h3>
+                            <p class="text-white/80 text-sm">${total} payment${total !== 1 ? 's' : ''} need${total === 1 ? 's' : ''} attention</p>
+                        </div>
+                    </div>
+                    <button onclick="toggleRentPanelExpand()" id="rentPanelToggle" class="text-white/80 hover:text-white transition">
+                        <svg class="w-6 h-6 transform transition-transform" id="rentPanelArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="rentPanelContent" class="p-4 space-y-4">
+    `;
+    
+    // Overdue section
+    if (overdue.length > 0) {
+        html += `
+            <div class="bg-red-900/30 rounded-xl p-4 border border-red-500/50">
+                <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                    <span>🚨</span> OVERDUE (${overdue.length})
+                    <span class="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">ACTION REQUIRED</span>
+                </h4>
+                <div class="space-y-2">
+                    ${overdue.map(r => renderRentItem(r, 'overdue')).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Due today section
+    if (today.length > 0) {
+        html += `
+            <div class="bg-orange-900/30 rounded-xl p-4 border border-orange-500/50">
+                <h4 class="text-orange-400 font-bold mb-3 flex items-center gap-2">
+                    <span>⏰</span> Due TODAY (${today.length})
+                </h4>
+                <div class="space-y-2">
+                    ${today.map(r => renderRentItem(r, 'today')).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Due tomorrow section
+    if (tomorrow.length > 0) {
+        html += `
+            <div class="bg-yellow-900/30 rounded-xl p-4 border border-yellow-500/50">
+                <h4 class="text-yellow-400 font-bold mb-3 flex items-center gap-2">
+                    <span>📅</span> Due Tomorrow (${tomorrow.length})
+                </h4>
+                <div class="space-y-2">
+                    ${tomorrow.map(r => renderRentItem(r, 'tomorrow')).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    panel.innerHTML = html;
+    panel.className = 'mb-6';
+};
+
+/**
+ * Render a single rent item in the panel
+ */
+function renderRentItem(rent, urgency) {
+    const statusColor = urgency === 'overdue' ? 'text-red-400' 
+                      : urgency === 'today' ? 'text-orange-400' 
+                      : 'text-yellow-400';
+    
+    const daysText = rent.daysUntilDue < 0 
+        ? `${Math.abs(rent.daysUntilDue)}d overdue`
+        : rent.daysUntilDue === 0 
+        ? 'TODAY'
+        : 'Tomorrow';
+    
+    // Generate reminder message
+    let reminderMsg = '';
+    if (rent.daysUntilDue === 1) {
+        reminderMsg = `Hey ${rent.renterName}! 👋 Just a friendly reminder that your ${rent.frequency} rent payment of $${rent.amount.toLocaleString()} is due tomorrow (${rent.dueDate}). Let me know if you have any questions!`;
+    } else if (rent.daysUntilDue === 0) {
+        reminderMsg = `Hey ${rent.renterName}! 👋 Just a friendly reminder that your ${rent.frequency} rent payment of $${rent.amount.toLocaleString()} is due today (${rent.dueDate}). Let me know if you have any questions!`;
+    } else if (rent.daysUntilDue < 0) {
+        reminderMsg = `Hey ${rent.renterName}, your ${rent.frequency} rent payment of $${rent.amount.toLocaleString()} was due on ${rent.dueDate} (${Math.abs(rent.daysUntilDue)} day${Math.abs(rent.daysUntilDue) > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+    }
+    
+    const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    
+    return `
+        <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 transition group">
+            <div class="flex-1 min-w-0 cursor-pointer" onclick="viewPropertyStats(${rent.propertyId})">
+                <div class="font-semibold text-white truncate">${rent.propertyTitle}</div>
+                <div class="text-sm text-gray-400 flex items-center gap-2 flex-wrap">
+                    <span>👤 ${rent.renterName}</span>
+                    <span class="text-gray-600">•</span>
+                    <span class="capitalize">${rent.frequency}</span>
+                    <span class="text-gray-600">•</span>
+                    <span class="text-green-400 font-semibold">$${rent.amount.toLocaleString()}</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 ml-2">
+                <span class="${statusColor} font-bold text-sm whitespace-nowrap">${daysText}</span>
+                ${reminderMsg ? `
+                    <button onclick="copyRentReminder('${escapedReminder}')" 
+                            class="opacity-0 group-hover:opacity-100 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs px-2 py-1 rounded-lg font-semibold hover:opacity-80 transition flex items-center gap-1"
+                            title="Copy reminder message">
+                        📋 Copy
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Toggle rent panel expand/collapse
+ */
+window.toggleRentPanelExpand = function() {
+    const content = $('rentPanelContent');
+    const arrow = $('rentPanelArrow');
+    if (content && arrow) {
+        content.classList.toggle('hidden');
+        arrow.classList.toggle('rotate-180');
+    }
+};
+
+/**
+ * Copy rent reminder to clipboard
+ */
+window.copyRentReminder = function(message) {
+    navigator.clipboard.writeText(message).then(() => {
+        showToast('📋 Reminder copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showToast('Failed to copy message', 'error');
+    });
+};
+
 // ==================== USER NOTIFICATIONS ====================
 // Store the listener unsubscribe function
 window.userNotificationUnsubscribe = null;
@@ -7381,12 +7678,15 @@ window.loadUserNotifications = async function() {
             .onSnapshot((snapshot) => {
                 const userBadge = $('userNotificationBadge');
                 const userCount = $('userNotificationCount');
+                const mobileUserBadge = $('mobileUserNotifBadge');
                 
                 if (snapshot.empty) {
                     hideElement(banner);
                     container.innerHTML = '';
                     // Hide header badge
                     if (userBadge) hideElement(userBadge);
+                    // Hide mobile badge
+                    if (mobileUserBadge) mobileUserBadge.classList.add('hidden');
                     return;
                 }
                 
@@ -7399,6 +7699,11 @@ window.loadUserNotifications = async function() {
                 if (userBadge && userCount) {
                     userCount.textContent = notifications.length > 9 ? '9+' : notifications.length;
                     showElement(userBadge);
+                }
+                
+                // Update mobile badge (for non-admin users)
+                if (mobileUserBadge && !TierService.isMasterAdmin(auth.currentUser?.email)) {
+                    mobileUserBadge.classList.remove('hidden');
                 }
                 
                 // Check for upgrade-related notifications to refresh pending status
