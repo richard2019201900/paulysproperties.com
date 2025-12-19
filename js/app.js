@@ -1412,6 +1412,8 @@ window.startEditPropertyType = function(propertyId) {
                 <option value="house" ${currentValue === 'house' ? 'selected' : ''}>House</option>
                 <option value="condo" ${currentValue === 'condo' ? 'selected' : ''}>Condo</option>
                 <option value="villa" ${currentValue === 'villa' ? 'selected' : ''}>Villa</option>
+                <option value="hotel" ${currentValue === 'hotel' ? 'selected' : ''}>Hotel</option>
+                <option value="office" ${currentValue === 'office' ? 'selected' : ''}>Office</option>
                 <option value="warehouse" ${currentValue === 'warehouse' ? 'selected' : ''}>Warehouse</option>
                 <option value="hideout" ${currentValue === 'hideout' ? 'selected' : ''}>Hideout</option>
             </select>

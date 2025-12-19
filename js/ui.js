@@ -4667,7 +4667,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         
         // Format property type breakdown for display (clickable)
         let propBreakdownHTML = '';
-        const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', hotel: '🏩', warehouse: '🏭', hideout: '🏚️' };
+        const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', hotel: '🏩', office: '🏢', warehouse: '🏭', hideout: '🏚️' };
         
         if (userProperties.length > 0) {
             const typeEntries = Object.entries(propTypeBreakdown)
@@ -5138,7 +5138,7 @@ window.filterUserPropertiesByType = function(userId, type) {
     });
     
     // Show toast with filter info
-    const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', hotel: '🏩', warehouse: '🏭', hideout: '🏚️' };
+    const typeIcons = { house: '🏠', apartment: '🏢', condo: '🏨', villa: '🏡', hotel: '🏩', office: '🏢', warehouse: '🏭', hideout: '🏚️' };
     showToast(`${typeIcons[type] || '🏠'} Showing ${visibleCount} ${type}${visibleCount !== 1 ? 's' : ''} - Click "Show All" to reset`, 'info');
     
     // Add a "Show All" button if not already present
@@ -6993,8 +6993,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const title = $('newListingTitle').value.trim();
             const type = $('newListingType').value;
             const location = $('newListingLocation').value.trim();
-            const bedrooms = parseInt($('newListingBedrooms').value);
-            const bathrooms = parseInt($('newListingBathrooms').value);
+            const bedrooms = parseInt($('newListingBedrooms').value) || 0;
+            const bathrooms = parseInt($('newListingBathrooms').value) || 0;
             const storage = parseInt($('newListingStorage').value) || 600;
             const interiorType = $('newListingInterior').value;
             const weeklyPrice = parseInt($('newListingWeekly').value);
@@ -7009,9 +7009,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? imagesText.split('\n').map(url => url.trim()).filter(url => url)
                 : [];
             
-            // Validate - only weekly price is required
-            if (!title || !type || !location || !bedrooms || !bathrooms || !weeklyPrice) {
-                errorDiv.textContent = 'Please fill in all required fields (Weekly Price is required).';
+            // Validate - bedrooms and bathrooms are now optional
+            if (!title || !type || !location || !weeklyPrice) {
+                errorDiv.textContent = 'Please fill in all required fields (Address, Type, Description, and Weekly Price).';
                 showElement(errorDiv);
                 return;
             }

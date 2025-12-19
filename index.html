@@ -321,6 +321,7 @@
                             <option value="condo">Condo</option>
                             <option value="villa">Villa</option>
                             <option value="hotel">Hotel</option>
+                            <option value="office">Office</option>
                             <option value="warehouse">Warehouse</option>
                             <option value="hideout">Hideout</option>
                         </select>
@@ -334,12 +335,12 @@
                 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                        <label class="block text-gray-300 font-semibold mb-2">Bedrooms *</label>
-                        <input type="number" id="newListingBedrooms" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                        <label class="block text-gray-300 font-semibold mb-2">Bedrooms</label>
+                        <input type="number" id="newListingBedrooms" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
                     </div>
                     <div>
-                        <label class="block text-gray-300 font-semibold mb-2">Bathrooms *</label>
-                        <input type="number" id="newListingBathrooms" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                        <label class="block text-gray-300 font-semibold mb-2">Bathrooms</label>
+                        <input type="number" id="newListingBathrooms" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Storage</label>
@@ -1500,6 +1501,7 @@
                             <option value="condo">Condo</option>
                             <option value="villa">Villa</option>
                             <option value="hotel">Hotel</option>
+                            <option value="office">Office</option>
                             <option value="warehouse">Warehouse</option>
                             <option value="hideout">Hideout</option>
                         </select>
@@ -1540,6 +1542,7 @@
                     <button onclick="filterProperties('condo', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Condos</button>
                     <button onclick="filterProperties('villa', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Villas</button>
                     <button onclick="filterProperties('hotel', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hotels</button>
+                    <button onclick="filterProperties('office', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Offices</button>
                     <button onclick="filterProperties('warehouse', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Warehouses</button>
                     <button onclick="filterProperties('hideout', this)" class="filter-btn px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hideouts</button>
                 </div>
