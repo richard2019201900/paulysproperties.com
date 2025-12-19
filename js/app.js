@@ -2924,15 +2924,24 @@ async function init() {
  * Displays tenure summary and confirmation before completing
  */
 window.showCompleteLeaseModal = async function(propertyId) {
+    // Prevent opening multiple modals
+    if (document.getElementById('completeLeaseModal')) {
+        console.warn('[CompleteLease] Modal already open');
+        return;
+    }
+    
     const p = properties.find(prop => prop.id === propertyId);
     if (!p) return;
     
+    // Get FRESH data from PropertyDataService
     const renterName = PropertyDataService.getValue(propertyId, 'renterName', p.renterName || '');
     const renterPhone = PropertyDataService.getValue(propertyId, 'renterPhone', p.renterPhone || '');
     const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p.paymentFrequency || '');
     
     if (!renterName) {
-        showToast('No renter assigned to this property', 'error');
+        showToast('No renter assigned to this property. The lease may have already been completed.', 'error');
+        // Refresh the page to show correct state
+        viewPropertyStats(propertyId);
         return;
     }
     
@@ -3191,7 +3200,7 @@ window.completeLease = async function(propertyId) {
         // Save tenure to history
         await saveTenureHistory(propertyId, tenureRecord);
         
-        // Clear renter data
+        // Clear renter data (this clears Firestore, property object, AND state cache)
         await clearRenterData(propertyId);
         
         // Mark property as available
@@ -3201,15 +3210,26 @@ window.completeLease = async function(propertyId) {
         // Log vacancy start
         await logVacancyStart(propertyId);
         
+        // Update button to show success (prevent double-click)
+        if (btn) {
+            btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Completed!';
+            btn.classList.remove('from-orange-500', 'to-red-500');
+            btn.classList.add('from-green-500', 'to-green-600');
+        }
+        
         // Close modal and show success
-        closeCompleteLeaseModal();
-        
-        showToast(`✅ Lease completed for ${renterName}. Total collected: $${tenureSummary.totalCollected.toLocaleString()}`, 'success');
-        
-        // Refresh the property stats page
         setTimeout(() => {
+            closeCompleteLeaseModal();
+            showToast(`✅ Lease completed for ${renterName}. Total collected: $${tenureSummary.totalCollected.toLocaleString()}`, 'success');
+            
+            // Force complete refresh of the property stats page
+            // First update all relevant UI components
+            renderProperties(state.filteredProperties);
+            if (state.currentUser === 'owner') renderOwnerDashboard();
+            
+            // Then re-render the stats page with fresh data
             viewPropertyStats(propertyId);
-        }, 500);
+        }, 800);
         
     } catch (error) {
         console.error('[CompleteLease] Error:', error);
@@ -3253,6 +3273,10 @@ async function saveTenureHistory(propertyId, tenureRecord) {
 
 /**
  * Clear all renter-related data from property
+ * CRITICAL: Must clear from ALL data sources to prevent stale data:
+ * 1. Firestore (via PropertyDataService.write)
+ * 2. Local property object (properties array)
+ * 3. State cache (state.propertyOverrides)
  */
 async function clearRenterData(propertyId) {
     const fieldsToClean = [
@@ -3263,12 +3287,23 @@ async function clearRenterData(propertyId) {
         'lastPaymentDate'
     ];
     
+    const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
+    
+    // Write empty values to Firestore for each field
     for (const field of fieldsToClean) {
         await PropertyDataService.write(propertyId, field, '');
     }
     
+    // CRITICAL: Also explicitly clear state.propertyOverrides to prevent stale data
+    // This is necessary because getValue() checks propertyOverrides FIRST
+    if (state.propertyOverrides[numericId]) {
+        for (const field of fieldsToClean) {
+            state.propertyOverrides[numericId][field] = '';
+        }
+    }
+    
     // Update local property object
-    const p = properties.find(prop => prop.id === propertyId);
+    const p = properties.find(prop => prop.id === numericId);
     if (p) {
         p.renterName = '';
         p.renterPhone = '';
@@ -3276,6 +3311,8 @@ async function clearRenterData(propertyId) {
         p.paymentFrequency = '';
         p.lastPaymentDate = '';
     }
+    
+    console.log('[ClearRenterData] Cleared all renter data for property:', numericId);
 }
 
 /**
