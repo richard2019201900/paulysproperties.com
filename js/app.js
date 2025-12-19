@@ -2116,7 +2116,7 @@ window.renderPropertyAnalytics = async function(propertyId) {
             </h4>
             <div class="space-y-3">
                 ${tenureHistory.slice().reverse().map(tenure => `
-                    <div class="bg-gray-900/70 rounded-xl p-4 border border-gray-700">
+                    <div class="bg-gray-900/70 rounded-xl p-4 border border-gray-700 group relative">
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                             <div class="flex items-center gap-3">
                                 <div class="w-12 h-12 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
@@ -2130,9 +2130,16 @@ window.renderPropertyAnalytics = async function(propertyId) {
                                     </div>
                                 </div>
                             </div>
-                            <div class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                Lease Completed
+                            <div class="flex items-center gap-2">
+                                <div class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    Lease Completed
+                                </div>
+                                <button onclick="deleteTenureRecord(${propertyId}, '${tenure.id}')" 
+                                    class="sm:opacity-0 sm:group-hover:opacity-100 p-2 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-400 hover:text-red-300 transition-all"
+                                    title="Delete this tenure record">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
@@ -3270,6 +3277,71 @@ async function saveTenureHistory(propertyId, tenureRecord) {
         throw error;
     }
 }
+
+/**
+ * Delete a tenure record from Firestore
+ * @param {number} propertyId - The property ID
+ * @param {string} tenureId - The tenure record ID to delete
+ */
+window.deleteTenureRecord = async function(propertyId, tenureId) {
+    // Confirm deletion
+    const confirmed = confirm('Are you sure you want to delete this tenure record?\n\nThis will remove the historical data for this renter\'s lease period.\n\nNote: This will also clear any associated vacancy tracking.\n\nThis action cannot be undone.');
+    
+    if (!confirmed) return;
+    
+    try {
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        if (!historyDoc.exists) {
+            showToast('Error: Payment history not found', 'error');
+            return;
+        }
+        
+        let data = historyDoc.data();
+        
+        if (!data.tenureHistory || data.tenureHistory.length === 0) {
+            showToast('Error: No tenure records found', 'error');
+            return;
+        }
+        
+        // Find the tenure record to get its completion date
+        const tenureToDelete = data.tenureHistory.find(t => t.id === tenureId);
+        
+        // Find and remove the tenure record
+        const originalLength = data.tenureHistory.length;
+        data.tenureHistory = data.tenureHistory.filter(t => t.id !== tenureId);
+        
+        if (data.tenureHistory.length === originalLength) {
+            showToast('Error: Tenure record not found', 'error');
+            return;
+        }
+        
+        // Also remove any ongoing vacancy period that was created when this lease completed
+        // This helps with testing and data consistency
+        if (data.vacancyPeriods && data.vacancyPeriods.length > 0) {
+            // Remove ongoing vacancy periods (usually there should only be one)
+            data.vacancyPeriods = data.vacancyPeriods.filter(v => v.status !== 'ongoing');
+        }
+        
+        // Save back to Firestore
+        await db.collection('paymentHistory').doc(String(propertyId)).set({
+            ...data,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('✅ Tenure record deleted successfully', 'success');
+        
+        // Refresh the analytics section
+        if (typeof renderPropertyAnalytics === 'function') {
+            renderPropertyAnalytics(propertyId);
+        }
+        
+        console.log('[TenureHistory] Deleted tenure:', tenureId, 'from property:', propertyId);
+        
+    } catch (error) {
+        console.error('[TenureHistory] Error deleting:', error);
+        showToast('Error deleting tenure record: ' + error.message, 'error');
+    }
+};
 
 /**
  * Clear all renter-related data from property
