@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaulysProperties.com - Premium Real Estate Rentals in Los Santos</title>
+    <meta name="description" content="Browse 14+ premium properties in Los Santos. Luxury apartments, houses, condos & villas. Instance and Walk-in interiors. Weekly & monthly rentals available. Find your dream home today!">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Canonical URL - Update with your actual domain -->
+    <link rel="canonical" href="https://yoursite.com/">
+    
+    <!-- Favicons and App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <meta name="theme-color" content="#667eea">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yoursite.com/">
+    <meta property="og:title" content="PaulysProperties.com - Premium Real Estate Rentals">
+    <meta property="og:description" content="Browse luxury properties in Los Santos. Apartments, houses, condos & villas available for rent. Instance and Walk-in interiors.">
+    <meta property="og:image" content="https://yoursite.com/images/og-image.jpg">
+    <meta property="og:site_name" content="PaulysProperties.com">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="PaulysProperties.com - Premium Real Estate Rentals">
+    <meta name="twitter:description" content="Browse luxury properties in Los Santos. Apartments, houses, condos & villas available for rent.">
+    <meta name="twitter:image" content="https://yoursite.com/images/twitter-card.jpg">
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://r2.fivemanage.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Preload critical first property image -->
+    <link rel="preload" as="image" href="images/eclipse-towers-1.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+    
+    <!-- Structured Data for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "RealEstateAgent",
+      "name": "PaulysProperties.com",
+      "description": "Premium property rentals in Los Santos. Apartments, houses, condos and villas available for weekly and monthly rent.",
+      "url": "https://yoursite.com",
+      "telephone": "2057028233",
+      "priceRange": "$$",
+      "areaServed": {
+        "@type": "City",
+        "name": "Los Santos"
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Los Santos"
+      }
+    }
+    </script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(-100%); opacity: 0; }
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes premiumPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3), 0 0 40px rgba(245, 158, 11, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.5), 0 0 60px rgba(245, 158, 11, 0.2); }
+        }
+        @keyframes flashFade {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes notificationPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .premium-glow {
+            animation: premiumPulse 2s ease-in-out infinite;
+        }
+        .admin-notification-new {
+            animation: notificationPulse 0.5s ease-out;
+        }
+        #globalAlertBar {
+            animation: slideDown 0.3s ease-out, gradientShift 2s ease infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-gray-100">
+    <!-- Image Lightbox -->
+    <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer">
+        <button onclick="closeLightbox()" class="lightbox-btn lightbox-close" aria-label="Close">✕</button>
+        <button onclick="changeImage(-1)" class="lightbox-btn lightbox-prev" aria-label="Previous image">‹</button>
+        <img id="lightboxImage" class="lightbox-content" src="" alt="Property Image">
+        <button onclick="changeImage(1)" class="lightbox-btn lightbox-next" aria-label="Next image">›</button>
+    </div>
+
+    <!-- Contact Modal (Universal) -->
+    <div id="contactModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-10 max-w-lg w-full mx-4 max-h-screen overflow-y-auto border border-gray-700">
+            <h2 id="modalTitle" class="text-3xl font-black bg-clip-text text-transparent mb-4 text-center"></h2>
+            <p id="modalPropertyName" class="text-xl font-bold text-gray-200 mb-4 text-center"></p>
+            <p class="text-gray-400 mb-6 text-center font-medium">Text us in city! Copy the number and message below.</p>
+            
+            <div class="mb-6">
+                <label class="block text-gray-300 font-bold mb-3">📱 Our Team's Number:</label>
+                <div class="flex items-center gap-3">
+                    <input type="text" id="modalPhone" value="2057028233" readonly class="flex-1 px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 font-bold text-lg text-white">
+                    <button onclick="copyToClipboard('modalPhone', this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg">Copy</button>
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <label class="block text-gray-300 font-bold mb-3">💬 Your Message (edit as needed):</label>
+                <textarea id="modalMessage" rows="4" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 font-medium text-white focus:ring-2 focus:ring-purple-500 transition"></textarea>
+                <button onclick="copyToClipboard('modalMessage', this)" class="w-full mt-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg">Copy Message</button>
+            </div>
+            
+            <div id="modalAccent" class="p-4 rounded-xl mb-6 text-center border">
+                <p class="font-bold">⚡ Text in city for the fastest response!</p>
+                <p class="text-sm mt-1">Our team typically responds within minutes.</p>
+                <p class="text-gray-400 text-xs mt-2">⏰ Please allow up to 24 hours for a response during busy periods.</p>
+            </div>
+            
+            <!-- Disclaimer (dynamically updated based on rent vs purchase) -->
+            <div id="modalDisclaimer" class="mb-4"></div>
+            
+            <button onclick="closeModal('contactModal')" class="w-full bg-gray-700 text-gray-200 px-8 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">Close</button>
+        </div>
+    </div>
+
+    <!-- Photo Services Modal -->
+    <div id="photoServicesModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-amber-500/50">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 class="text-3xl font-black bg-gradient-to-r from-amber-500 to-pink-600 bg-clip-text text-transparent">📸 Professional Photo Services</h2>
+                    <p class="text-gray-400 mt-2">Let Pauly capture your property in stunning HD</p>
+                </div>
+                <button onclick="closeModal('photoServicesModal')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- Why Photos Matter -->
+                <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 rounded-xl p-5 border border-amber-500/30">
+                    <h3 class="text-lg font-bold text-amber-400 mb-3">🌟 Why Quality Photos Matter</h3>
+                    <p class="text-gray-300 text-sm">Properties with professional photos rent <span class="text-green-400 font-bold">3x faster</span> and can command <span class="text-green-400 font-bold">higher prices</span>. Don't let a blurry screenshot cost you money!</p>
+                </div>
+                
+                <!-- Pricing -->
+                <div class="bg-gradient-to-r from-green-900/30 to-emerald-900/30 rounded-xl p-5 border border-green-500/30">
+                    <h3 class="text-lg font-bold text-green-400 mb-2">💰 Simple Pricing</h3>
+                    <p class="text-gray-400 text-xs mb-4">Select a package below, then click "Copy & Notify" to express interest</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Per Photo Option -->
+                        <div id="photoOptionSingle" 
+                            class="bg-gray-800/70 rounded-xl p-5 text-center border-2 border-gray-600 hover:border-green-500 transition cursor-pointer relative">
+                            <div id="photoSingleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
+                            <div class="text-green-400 text-xs font-bold mb-2">📷 PER PHOTO</div>
+                            <div class="text-3xl font-black text-white mb-2">$10,000</div>
+                            <div class="text-gray-400 text-sm mb-3">Per HD Photo</div>
+                            <ul class="text-left text-xs text-gray-300 space-y-1">
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Professional HD shot</li>
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Edited & optimized</li>
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Same-day delivery</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Premium Bundle -->
+                        <div id="photoOptionBundle"
+                            class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-xl p-5 text-center border-2 border-amber-500 relative cursor-pointer hover:border-amber-400 transition">
+                            <div id="photoBundleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
+                            <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full">⭐ BEST VALUE</div>
+                            <div class="text-amber-400 text-xs font-bold mb-2 mt-2">🎬 PREMIUM BUNDLE</div>
+                            <div class="text-3xl font-black text-amber-400 mb-2">$125,000</div>
+                            <div class="text-amber-300/80 text-sm mb-3">Complete Package</div>
+                            <ul class="text-left text-xs text-gray-200 space-y-1">
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> 6-7 HD Photos</li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> Professional Video Tour</li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> <span class="text-amber-400 font-bold">4 Weeks Premium Listing!</span></li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> Priority placement</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Coming Soon: Managed Services Teaser -->
+                <div class="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-5 border border-purple-500/30">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">COMING SOON</span>
+                        <h3 class="text-lg font-bold text-purple-400">🏠 Full Property Management</h3>
+                    </div>
+                    <p class="text-gray-300 text-sm mb-4">Too busy to manage your rentals? We're launching a complete managed services offering — from photography to tenant placement to key management. Be the first to know!</p>
+                    
+                    <!-- Opt-in Section -->
+                    <div id="managedServicesOptIn" class="bg-purple-900/30 rounded-lg p-4 border border-purple-500/50">
+                        <div id="optInContent">
+                            <!-- Will be populated by JS based on login status and opt-in status -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Contact CTA -->
+                <div class="text-center pt-4">
+                    <p class="text-gray-400 text-sm mb-4">Ready to showcase your property? Contact Pauly in-city!</p>
+                    <div class="flex gap-4 justify-center flex-wrap">
+                        <button id="photoServicesCopyBtn" onclick="copyAndNotifyPhotoServices()" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
+                            <span>📱</span> Copy & Notify: 2057028233
+                        </button>
+                        <button onclick="closeModal('photoServicesModal')" class="bg-gray-700 text-gray-200 px-6 py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Close
+                        </button>
+                    </div>
+                    <p class="text-gray-500 text-xs mt-3">Clicking "Copy & Notify" copies the phone number and alerts our team</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Completion Overlay (blocks navigation until complete) -->
+    <div id="profileCompletionOverlay" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 border-2 border-yellow-500/50">
+            <div class="text-center mb-6">
+                <div class="text-5xl mb-4">⚠️</div>
+                <h2 class="text-2xl font-black text-yellow-400 mb-2">Complete Your Profile</h2>
+                <p class="text-gray-300">Before you can browse the site, please complete your profile settings. This information is required so renters can contact you about your properties.</p>
+            </div>
+            
+            <div class="bg-gray-800/50 rounded-xl p-4 mb-6">
+                <div class="flex items-center gap-3 mb-3">
+                    <div id="profileCheckName" class="w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs">
+                        <span class="text-gray-500">✗</span>
+                    </div>
+                    <span class="text-gray-300">Display Name</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="profileCheckPhone" class="w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs">
+                        <span class="text-gray-500">✗</span>
+                    </div>
+                    <span class="text-gray-300">In-City Phone Number</span>
+                </div>
+            </div>
+            
+            <p class="text-sm text-gray-400 text-center mb-4">
+                👆 Scroll up to "Your Profile Settings" and fill in both fields, then click Save for each.
+            </p>
+            
+            <button onclick="scrollToProfileSettings()" class="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                ↑ Go to Profile Settings
+            </button>
+        </div>
+    </div>
+
+    <!-- Reassign Property Modal (Admin Only) -->
+    <div id="reassignModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-purple-700/50">
+            <h2 class="text-2xl font-black text-purple-400 mb-2 text-center">🔄 Reassign Property</h2>
+            <p id="reassignPropertyTitle" class="text-gray-400 text-center mb-6"></p>
+            
+            <div class="mb-6">
+                <label class="block text-gray-300 font-semibold mb-2">Select New Owner</label>
+                <select id="reassignOwnerSelect" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500">
+                    <option value="">-- Select Owner --</option>
+                    <option value="unassigned">🚫 Unassigned (No Owner)</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-2">Only registered users are shown</p>
+            </div>
+            
+            <div id="reassignError" class="hidden text-red-400 text-sm mb-4 text-center"></div>
+            <div id="reassignSuccess" class="hidden text-green-400 text-sm mb-4 text-center"></div>
+            
+            <button id="reassignBtn" onclick="confirmReassignProperty()" class="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg mb-3">
+                ✓ Reassign Property
+            </button>
+            <button onclick="closeModal('reassignModal')" class="w-full bg-gray-700 text-gray-200 px-6 py-3 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Create Listing Modal -->
+    <div id="createListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden overflow-y-auto py-8" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 border border-amber-700/50">
+            <h2 class="text-3xl font-black bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 text-center">✨ Create New Listing</h2>
+            
+            <form id="createListingForm" class="space-y-4" autocomplete="off">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Property Address *</label>
+                        <input type="text" id="newListingTitle" required autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. 1234 Eclipse Blvd, Apt 105">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Property Type *</label>
+                        <select id="newListingType" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition">
+                            <option value="">Select type...</option>
+                            <option value="apartment">Apartment</option>
+                            <option value="house">House</option>
+                            <option value="condo">Condo</option>
+                            <option value="villa">Villa</option>
+                            <option value="hotel">Hotel</option>
+                            <option value="office">Office</option>
+                            <option value="warehouse">Warehouse</option>
+                            <option value="hideout">Hideout</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Description *</label>
+                    <input type="text" id="newListingLocation" required autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Close to Benny's, garage included, ocean view">
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Bedrooms</label>
+                        <input type="number" id="newListingBedrooms" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Bathrooms</label>
+                        <input type="number" id="newListingBathrooms" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Storage</label>
+                        <input type="number" id="newListingStorage" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="600">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Interior</label>
+                        <select id="newListingInterior" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition">
+                            <option value="Instance">Instance</option>
+                            <option value="Walk-in">Walk-in</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Weekly Price *</label>
+                        <input type="number" id="newListingWeekly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000" oninput="checkPriceWarning()">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Biweekly Price</label>
+                        <input type="number" id="newListingBiweekly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="65000 (optional)" oninput="checkPriceWarning()">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 font-semibold mb-2">Monthly Price</label>
+                        <input type="number" id="newListingMonthly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="110000 (optional)" oninput="checkPriceWarning()">
+                    </div>
+                </div>
+                
+                <!-- Price Warning -->
+                <div id="priceWarning" class="hidden bg-gradient-to-r from-orange-900/50 to-red-900/50 border border-orange-500 rounded-xl p-4">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">⚠️</span>
+                        <div>
+                            <p class="text-orange-300 font-bold">Pricing Warning</p>
+                            <p id="priceWarningText" class="text-orange-200 text-sm">Your biweekly/monthly price is lower than expected. Usually longer terms cost more, not less.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Premium Listing Option -->
+                <div class="bg-gradient-to-r from-amber-900/30 to-yellow-900/30 border-2 border-amber-500/50 rounded-xl p-4">
+                    <label class="flex items-start gap-4 cursor-pointer">
+                        <input type="checkbox" id="newListingPremium" class="w-6 h-6 mt-1 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-2xl">👑</span>
+                                <span class="text-amber-300 font-bold text-lg">Premium Listing</span>
+                                <span class="bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-full">$10,000/week</span>
+                            </div>
+                            <p class="text-amber-200/70 text-sm mt-1">Feature your property at the TOP of all listings with an eye-catching gold border. Stand out from the crowd and rent faster!</p>
+                            <div class="flex gap-4 mt-2 text-xs text-amber-300/60">
+                                <span>✓ Top placement</span>
+                                <span>✓ Gold border</span>
+                                <span>✓ Premium badge</span>
+                            </div>
+                            <p class="text-orange-400 text-xs mt-2 font-semibold">⚠️ Weekly payment required - Pauly will contact you in-city to collect $10k payment</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Image URLs (one per line)</label>
+                    <textarea id="newListingImages" rows="3" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
+                    <p class="text-gray-500 text-xs mt-1">Add image URLs for your property photos</p>
+                </div>
+                
+                <div id="createListingError" class="hidden text-red-400 text-sm font-medium"></div>
+                <div id="createListingSuccess" class="hidden text-green-400 text-sm font-medium"></div>
+                
+                <div class="flex gap-4 pt-4">
+                    <button type="submit" id="createListingBtn" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                        🏠 Create Listing
+                    </button>
+                    <button type="button" id="cancelListingBtn" onclick="closeModal('createListingModal')" class="flex-1 bg-gray-700 text-gray-200 px-6 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-red-700/50">
+            <div class="text-center">
+                <div class="text-6xl mb-4">⚠️</div>
+                <h2 class="text-2xl font-black text-red-400 mb-4">Delete Property?</h2>
+                <p class="text-gray-300 mb-2">Are you sure you want to delete:</p>
+                <p id="deletePropertyName" class="text-white font-bold text-lg mb-6"></p>
+                <p class="text-gray-400 text-sm mb-6">This action cannot be undone. The property will be permanently removed from your inventory and all listings.</p>
+                
+                <div class="flex gap-4">
+                    <button onclick="cancelDelete()" class="flex-1 bg-gray-700 text-gray-200 px-6 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">
+                        Cancel
+                    </button>
+                    <button id="confirmDeleteBtn" onclick="executeDeleteProperty()" class="flex-1 bg-gradient-to-r from-red-500 to-red-700 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                        🗑️ Yes, Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upgrade Tier Modal -->
+    <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4 border border-purple-700/50 relative">
+            <!-- Close X button -->
+            <button onclick="closeModal('upgradeModal')" class="absolute top-4 right-4 text-gray-400 hover:text-white transition p-1" title="Close">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <div class="text-center mb-6">
+                <div class="text-6xl mb-4">🚀</div>
+                <h2 class="text-2xl font-black text-purple-400 mb-2">Upgrade Your Plan</h2>
+                <p id="upgradeReason" class="text-gray-300 mb-4"></p>
+            </div>
+            
+            <!-- Tier Comparison -->
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                <div id="tierStarter" class="p-4 rounded-xl border-2 border-gray-600 bg-gray-800/50 text-center">
+                    <div class="text-3xl mb-2">🌱</div>
+                    <div class="text-white font-bold">Starter</div>
+                    <div class="text-gray-400 text-sm">1 Listing</div>
+                    <div class="text-green-400 font-bold mt-2">Free</div>
+                </div>
+                <div id="tierPro" class="p-4 rounded-xl border-2 border-yellow-600 bg-yellow-900/20 text-center">
+                    <div class="text-3xl mb-2">⭐</div>
+                    <div class="text-white font-bold">Pro</div>
+                    <div class="text-gray-400 text-sm">3 Listings</div>
+                    <div class="text-yellow-400 font-bold mt-2">$25k/mo</div>
+                </div>
+                <div id="tierElite" class="p-4 rounded-xl border-2 border-purple-600 bg-purple-900/20 text-center">
+                    <div class="text-3xl mb-2">👑</div>
+                    <div class="text-white font-bold">Elite</div>
+                    <div class="text-gray-400 text-sm">Unlimited</div>
+                    <div class="text-purple-400 font-bold mt-2">$50k/mo</div>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <input type="hidden" id="upgradeCurrentTier" value="">
+                
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Select Desired Plan</label>
+                    <select id="upgradeRequestedTier" onchange="generateUpgradeMessage()" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500">
+                        <option value="">Choose a plan...</option>
+                        <option value="pro">⭐ Pro - 3 Listings ($25k/month)</option>
+                        <option value="elite">👑 Elite - Unlimited ($50k/month)</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Message to Send In-City</label>
+                    <textarea id="upgradeMessage" rows="4" readonly class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-800 text-white focus:ring-2 focus:ring-purple-500 resize-none"></textarea>
+                    <p class="text-gray-500 text-xs mt-1">This message will be auto-generated based on your selection</p>
+                </div>
+                
+                <p id="upgradeStatus" class="text-sm hidden"></p>
+                
+                <!-- Instructions -->
+                <div class="bg-blue-900/30 border border-blue-600/50 rounded-xl p-4">
+                    <p class="text-blue-300 text-sm font-medium">📱 <strong>How to upgrade:</strong> Copy the message below and send it to Pauly in-city. Your upgrade will be processed within 24 hours after payment.</p>
+                </div>
+                
+                <div class="flex gap-4 pt-2">
+                    <button type="button" onclick="closeModal('upgradeModal')" class="flex-1 bg-gray-700 text-gray-200 px-6 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">
+                        Maybe Later
+                    </button>
+                    <button type="button" id="upgradeSubmitBtn" onclick="copyUpgradeMessage()" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                        🔔 Notify & Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Image Modal -->
+    <div id="addImageModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-green-700/50">
+            <h2 class="text-2xl font-black bg-gradient-to-r from-green-500 to-emerald-500 bg-clip-text text-transparent mb-6 text-center">📸 Add New Image</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-2">Image URL</label>
+                    <input type="url" id="newImageUrl" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-green-500 transition" placeholder="https://example.com/image.jpg">
+                    <p class="text-gray-500 text-xs mt-1">Enter the full URL of the image</p>
+                </div>
+                
+                <div id="addImageError" class="hidden text-red-400 text-sm font-medium"></div>
+                
+                <div class="flex gap-4 pt-4">
+                    <button id="saveImageBtn" onclick="saveNewImage()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                        Add Image
+                    </button>
+                    <button onclick="closeAddImageModal()" class="flex-1 bg-gray-700 text-gray-200 px-6 py-4 rounded-xl font-bold hover:bg-gray-600 transition shadow-lg">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-10 max-w-md w-full mx-4 border border-gray-700">
+            <div id="loginOptions">
+                <h2 class="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-6 text-center">Welcome to PaulysProperties.com</h2>
+                <p class="text-gray-300 mb-8 text-center font-medium">Sign in or create your free account</p>
+                
+                <div class="space-y-4">
+                    <button onclick="showOwnerLoginForm()" class="w-full gradient-bg text-white px-6 py-4 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center space-x-3 shadow-lg">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                        <span>Sign In</span>
+                    </button>
+                    
+                    <button onclick="showCreateAccountForm()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-4 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center space-x-3 shadow-lg">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        <span>Create Free Account</span>
+                    </button>
+                    
+                    <button onclick="loginAsRenter()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-4 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center space-x-3 shadow-lg">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <span>Browse as Renter</span>
+                    </button>
+                </div>
+                
+                <!-- Free tier info -->
+                <div class="mt-6 p-4 bg-green-900/20 border border-green-600/30 rounded-xl">
+                    <p class="text-green-400 text-sm text-center font-medium">🌱 <strong>Free Starter Account:</strong> Create an account to list 1 property for free!</p>
+                </div>
+                
+                <button onclick="closeModal('loginModal')" class="w-full mt-6 text-gray-400 hover:text-gray-200 font-semibold transition">Close</button>
+            </div>
+            
+            <!-- Sign In Form -->
+            <div id="ownerLoginForm" class="hidden">
+                <h2 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-6 text-center">Sign In</h2>
+                <p class="text-gray-300 mb-6 text-center font-medium">Enter your credentials to access the dashboard</p>
+                <form id="firebaseLoginForm" class="space-y-4" autocomplete="off">
+                    <div>
+                        <label for="ownerEmail" class="block text-gray-300 font-semibold mb-2">Username</label>
+                        <div class="flex">
+                            <input type="text" id="ownerEmail" required autocomplete="off" class="flex-1 px-4 py-3 border-2 border-gray-600 rounded-l-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 transition" placeholder="yourname">
+                            <span class="px-4 py-3 bg-gray-600 border-2 border-l-0 border-gray-600 rounded-r-xl text-purple-400 font-semibold">@pma.network</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="ownerPassword" class="block text-gray-300 font-semibold mb-2">Password</label>
+                        <input type="password" id="ownerPassword" required autocomplete="current-password" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 transition" placeholder="••••••••">
+                    </div>
+                    <div id="loginError" class="hidden text-red-400 text-sm font-medium text-center p-3 bg-red-900/30 rounded-xl"></div>
+                    <button type="submit" id="loginSubmitBtn" class="w-full gradient-bg text-white px-6 py-4 rounded-xl font-semibold hover:opacity-90 transition shadow-lg">Sign In</button>
+                </form>
+                <button onclick="hideOwnerLoginForm()" class="w-full mt-4 text-gray-400 hover:text-gray-200 font-semibold transition">← Back</button>
+            </div>
+            
+            <!-- Create Account Form -->
+            <div id="createAccountForm" class="hidden">
+                <h2 class="text-3xl font-bold bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent mb-6 text-center">Create Free Account</h2>
+                <p class="text-gray-300 mb-6 text-center font-medium">Create your login credentials below</p>
+                
+                <!-- Important Note -->
+                <div class="bg-yellow-900/30 border border-yellow-600/50 rounded-xl p-4 mb-6">
+                    <p class="text-yellow-300 text-sm font-medium">⚠️ <strong>Important:</strong> This is NOT a real email - no verification needed. Just pick a username you'll remember. <strong>Save these credentials!</strong> You'll need them every time you log in.</p>
+                </div>
+                
+                <form id="createAccountFormEl" class="space-y-4" autocomplete="off">
+                    <div>
+                        <label for="newAccountEmail" class="block text-gray-300 font-semibold mb-2">Username</label>
+                        <div class="flex">
+                            <input type="text" id="newAccountEmail" required pattern="[a-zA-Z0-9_.]+" autocomplete="off" class="flex-1 px-4 py-3 border-2 border-gray-600 rounded-l-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="yourname">
+                            <span class="px-4 py-3 bg-gray-600 border-2 border-l-0 border-gray-600 rounded-r-xl text-cyan-400 font-semibold">@pma.network</span>
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">Letters, numbers, dots and underscores only</p>
+                    </div>
+                    <div>
+                        <label for="newAccountPassword" class="block text-gray-300 font-semibold mb-2">Password</label>
+                        <input type="password" id="newAccountPassword" required minlength="6" autocomplete="new-password" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="At least 6 characters">
+                        <p class="text-gray-500 text-xs mt-1">Pick something you'll remember!</p>
+                    </div>
+                    <div>
+                        <label for="newAccountDisplayName" class="block text-gray-300 font-semibold mb-2">Display Name (shown on listings)</label>
+                        <input type="text" id="newAccountDisplayName" required maxlength="30" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="Your in-city name">
+                    </div>
+                    <div id="createAccountError" class="hidden text-red-400 text-sm font-medium text-center p-3 bg-red-900/30 rounded-xl"></div>
+                    <button type="submit" id="createAccountBtn" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-6 py-4 rounded-xl font-semibold hover:opacity-90 transition shadow-lg">🌱 Create Starter Account</button>
+                </form>
+                <button onclick="hideCreateAccountForm()" class="w-full mt-4 text-gray-400 hover:text-gray-200 font-semibold transition">← Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <!-- Global Urgent Alert Bar (for admin notifications) -->
+    <div id="globalAlertBar" class="hidden fixed top-0 left-0 right-0 z-50 cursor-pointer shadow-2xl" onclick="handleGlobalAlertClick()" style="background: linear-gradient(90deg, #ea580c, #dc2626, #ea580c); background-size: 200% 200%; animation: gradientShift 2s ease infinite;">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl animate-bounce">💰</span>
+                <div>
+                    <span id="globalAlertTitle" class="font-black text-lg text-white">New Upgrade Request!</span>
+                    <span id="globalAlertMessage" class="ml-2 text-white/90 font-medium"></span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-bold text-white">Click to view →</span>
+                <button onclick="event.stopPropagation(); dismissGlobalAlert()" class="hover:bg-white/20 rounded-full p-2 transition text-white" title="Dismiss (will reappear if requests pending)">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <nav class="glass-effect shadow-xl sticky top-0 z-40 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16 md:h-20">
+                <!-- Logo -->
+                <div class="flex items-center space-x-2 cursor-pointer flex-shrink-0" onclick="goHome()" role="button" tabindex="0" aria-label="Go to home">
+                    <div class="relative w-10 h-10 md:w-14 md:h-14 lg:w-20 lg:h-20">
+                        <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-lg" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="logoGradientNav" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <!-- Rounded square base -->
+                            <rect x="10" y="10" width="100" height="100" rx="20" fill="url(#logoGradientNav)" />
+                            <!-- House icon in white -->
+                            <path d="M30 55 L60 25 L90 55 L90 100 L72 100 L72 75 L48 75 L48 100 L30 100 Z" fill="white" />
+                            <!-- Door -->
+                            <rect x="54" y="85" width="12" height="15" fill="url(#logoGradientNav)" />
+                            <!-- Window -->
+                            <rect x="68" y="60" width="12" height="12" rx="2" fill="url(#logoGradientNav)" />
+                        </svg>
+                    </div>
+                    <h1 class="hidden sm:block text-base md:text-lg lg:text-2xl font-black bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent tracking-tight whitespace-nowrap">PaulysProperties.com</h1>
+                </div>
+                
+                <!-- Center nav links (hidden on mobile) -->
+                <div class="hidden lg:flex space-x-6 xl:space-x-8">
+                    <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Home</a>
+                    <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Properties</a>
+                    <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">About</a>
+                    <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Contact</a>
+                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition" role="button" tabindex="0">Dashboard</a>
+                </div>
+                
+                <!-- Right side: buttons + user -->
+                <div class="flex items-center gap-2 md:gap-3">
+                    <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden">+ New Listing</button>
+                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base">Register / Sign In</button>
+                    
+                    <!-- Logged-in user display with dropdown -->
+                    <div id="navUserDisplay" class="hidden items-center gap-2">
+                        <!-- Username area with dropdown -->
+                        <div class="relative">
+                            <!-- Rent alert badge (for ALL property owners with rent due) -->
+                            <div id="ownerRentBadge" class="hidden absolute -top-2 -right-2 z-10">
+                                <span class="bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-500 transition" onclick="goToDashboard()" title="💰 Rent payments need attention!">
+                                    <span id="ownerRentCount">0</span>
+                                </span>
+                            </div>
+                            <!-- Admin notification badges - positioned top-right of username (admin only) -->
+                            <div id="adminNotificationBadges" class="hidden absolute -top-2 -right-2 flex items-center gap-1 z-10">
+                                <!-- Blue badge for new users -->
+                                <span id="adminNewUserBadge" class="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-blue-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
+                                    <span id="adminNewUserCount">0</span>
+                                </span>
+                                <!-- Green badge for new listings -->
+                                <span id="adminNewListingBadge" class="bg-green-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-green-400 transition" style="display: none;" onclick="showNewListingNotifications(event)" title="New listings">
+                                    <span id="adminNewListingCount">0</span>
+                                </span>
+                                <!-- Amber badge for premium activations -->
+                                <span id="adminNewPremiumBadge" class="bg-amber-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-amber-400 transition" style="display: none;" onclick="showNewPremiumNotifications(event)" title="Premium activations">
+                                    <span id="adminNewPremiumCount">0</span>
+                                </span>
+                                <!-- Orange badge for photo service requests (REVENUE!) -->
+                                <span id="adminNewPhotoBadge" class="bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" style="display: none;" onclick="showNewPhotoNotifications(event)" title="📸 Photo service inquiries - $$$">
+                                    <span id="adminNewPhotoCount">0</span>
+                                </span>
+                            </div>
+                            <!-- User notification badge (for non-admin users) -->
+                            <div id="userNotificationBadge" class="hidden absolute -top-2 -right-2 z-10">
+                                <span class="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="scrollToUserNotifications()" title="You have notifications!">
+                                    <span id="userNotificationCount">!</span>
+                                </span>
+                            </div>
+                            <!-- Site update badge (shows above username when new update available) -->
+                            <div id="siteUpdateNavBadge" class="hidden absolute -top-2 -left-2 z-10">
+                                <span class="bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="toggleUserDropdown()" title="New site update!">
+                                    1
+                                </span>
+                            </div>
+                            <div class="text-right cursor-pointer hover:bg-gray-700/50 px-3 py-2 rounded-xl transition" onclick="toggleUserDropdown()">
+                                <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
+                                <div id="navUserTier" class="text-xs text-gray-400"></div>
+                            </div>
+                            <!-- User dropdown menu - now inside the relative container -->
+                            <div id="userDropdownMenu" class="hidden absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                <a onclick="goToDashboard(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                    <span class="text-lg">🏠</span>
+                                    <span class="font-medium">Dashboard</span>
+                                </a>
+                                <a onclick="goToProfileSettings(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                    <span class="text-lg">⚙️</span>
+                                    <span class="font-medium">Profile Settings</span>
+                                </a>
+                                <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition relative">
+                                    <span class="text-lg">📰</span>
+                                    <span class="font-medium">Site Updates</span>
+                                    <span id="siteUpdateBadge" class="hidden absolute right-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse">1</span>
+                                </a>
+                                <a id="navUpgradeOption" onclick="openUpgradeModal('Upgrade your account', state.userTier || 'starter'); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-purple-400 hover:bg-gray-700 cursor-pointer transition">
+                                    <span class="text-lg">⭐</span>
+                                    <span class="font-medium">Upgrade Plan</span>
+                                </a>
+                                <div class="border-t border-gray-700"></div>
+                                <a onclick="logout(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-gray-700 cursor-pointer transition">
+                                    <span class="text-lg">🚪</span>
+                                    <span class="font-medium">Logout</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile menu button -->
+                    <button id="menuBtn" class="lg:hidden text-gray-300 p-2" aria-label="Toggle menu">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden lg:hidden bg-gray-900 border-t border-gray-700">
+            <!-- Mobile User Info Section (shown when logged in) -->
+            <div id="mobileUserSection" class="hidden border-b border-gray-700 p-4 bg-gray-800/50">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold">
+                            <span id="mobileUserInitial">?</span>
+                        </div>
+                        <div>
+                            <div id="mobileUserName" class="text-white font-semibold"></div>
+                            <div id="mobileUserTier" class="text-xs text-gray-400"></div>
+                        </div>
+                    </div>
+                    <!-- Mobile Notification Badges -->
+                    <div id="mobileNotificationBadges" class="flex items-center gap-2">
+                        <!-- Rent badge (admin only) -->
+                        <span id="mobileRentBadge" class="hidden bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Rent due">
+                            <span id="mobileRentCount">0</span>
+                        </span>
+                        <!-- Combined notification badge -->
+                        <span id="mobileAdminBadge" class="hidden bg-blue-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Notifications">
+                            <span id="mobileAdminCount">0</span>
+                        </span>
+                        <!-- User notification badge -->
+                        <span id="mobileUserNotifBadge" class="hidden bg-green-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Notifications">
+                            !
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation Links -->
+            <a onclick="navigateTo('home'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Home</a>
+            <a onclick="navigateTo('properties'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Properties</a>
+            <a

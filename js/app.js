@@ -547,10 +547,10 @@ function renderPropertyStatsContent(id) {
             <span>👑</span> PREMIUM LISTING <span>👑</span>
            </div>` 
         : '';
-    
+
     $('propertyStatsContent').innerHTML = `
         ${premiumBanner}
-        <!-- View Toggle Tabs -->
+        <!-- View Toggle Tabs - full width, no padding needed -->
         <div class="flex border-b border-gray-700">
             <button onclick="viewProperty(${id})" class="flex-1 py-4 px-6 text-center font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
                 <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
@@ -1015,10 +1015,13 @@ function renderPropertyStatsContent(id) {
             </div>
         </div>
         
-        </div><!-- End of padding wrapper for sections -->
+        </div><!-- End of padding wrapper for Pricing & Quick Actions sections -->
+        
+        <!-- Analytics and Reviews - continue within main card -->
+        <div class="px-6 md:px-8 pb-8">
         
         <!-- Property Analytics & Payment Ledger -->
-        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+        <div class="bg-gray-800/50 rounded-2xl p-6 mb-8 border border-gray-700">
             <div class="flex items-center justify-between mb-6">
                 <h3 class="text-2xl font-bold text-gray-200 flex items-center gap-3">
                     <span>📊</span> Property Analytics & Ledger
@@ -1037,7 +1040,7 @@ function renderPropertyStatsContent(id) {
         </div>
         
         <!-- Reviews Section -->
-        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
+        <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
             <h3 class="text-2xl font-bold text-gray-200 mb-6">⭐ Property Reviews (${propertyReviews.length})</h3>
             <div class="space-y-4">
                 ${propertyReviews.length > 0 ? propertyReviews.map(r => `
@@ -1054,6 +1057,8 @@ function renderPropertyStatsContent(id) {
                 `).join('') : '<p class="text-gray-500 text-center font-semibold py-8">No reviews yet for this property.</p>'}
             </div>
         </div>
+        
+        </div><!-- End of Analytics and Reviews section -->
     `;
 }
 
