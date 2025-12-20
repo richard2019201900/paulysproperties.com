@@ -578,8 +578,15 @@ const PropertyDataService = {
     
     /**
      * Get the effective value for a property field
-     * For static properties: Checks overrides first, then falls back to base property data
-     * For user-created properties: Uses property data directly (no overrides)
+     * 
+     * CRITICAL: This MUST use the same routing logic as write() to ensure
+     * we read from the same source we wrote to.
+     * 
+     * Routing Logic:
+     * - Premium fields (isPremium, etc.): ALWAYS from propertyOverrides
+     * - User-created properties: from properties array (synced from settings/properties)
+     * - Static properties: from propertyOverrides first, then base property data
+     * 
      * @param {number} propertyId - The property ID
      * @param {string} field - The field name
      * @param {any} defaultValue - Default value if not found
@@ -588,20 +595,45 @@ const PropertyDataService = {
         // Ensure propertyId is numeric for consistent lookup
         const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
         const prop = properties.find(p => p.id === numericId);
+        const isUserCreated = prop && prop.ownerEmail;
         
-        // PRIORITY 1: Check propertyOverrides first (explicit customizations)
-        // This catches premium status for static properties and any manual overrides
+        // Premium fields ALWAYS come from propertyOverrides (single source of truth)
+        const premiumFields = ['isPremium', 'isPremiumTrial', 'premiumStartDate', 'premiumLastPayment', 'premiumUpdatedAt'];
+        if (premiumFields.includes(field)) {
+            const override = state.propertyOverrides[numericId]?.[field];
+            if (override !== undefined) {
+                return override;
+            }
+            // Fall back to property object (for initial load before Firestore sync)
+            if (prop?.[field] !== undefined) {
+                return prop[field];
+            }
+            return defaultValue;
+        }
+        
+        // For user-created properties: property object is source of truth
+        // (synced from settings/properties via real-time listener)
+        if (isUserCreated) {
+            // Check property object FIRST (this is where write() sends data)
+            if (prop?.[field] !== undefined) {
+                return prop[field];
+            }
+            // DO NOT check propertyOverrides - that would return stale data
+            return defaultValue;
+        }
+        
+        // For static properties: propertyOverrides is source of truth
+        // (this is where write() sends data for static properties)
         const override = state.propertyOverrides[numericId]?.[field];
         if (override !== undefined) {
             return override;
         }
         
-        // PRIORITY 2: Check property object (base data or synced from Firestore)
+        // Fall back to base property data (hardcoded in code)
         if (prop?.[field] !== undefined) {
             return prop[field];
         }
         
-        // PRIORITY 3: Return default
         return defaultValue;
     },
     
@@ -612,6 +644,243 @@ const PropertyDataService = {
         if (this.unsubscribeListener) {
             this.unsubscribeListener();
             this.unsubscribeListener = null;
+        }
+    }
+};
+
+// ==================== DATA ARCHITECTURE DIAGNOSTIC TOOLS ====================
+/**
+ * Diagnose and report on data stored in Firestore
+ * Use this to identify stale/duplicate data issues
+ * 
+ * Call from console: await diagnoseDataArchitecture()
+ */
+window.diagnoseDataArchitecture = async function() {
+    console.log('========== DATA ARCHITECTURE DIAGNOSIS ==========');
+    
+    try {
+        // Fetch both documents
+        const [overridesDoc, propertiesDoc] = await Promise.all([
+            db.collection('settings').doc('propertyOverrides').get(),
+            db.collection('settings').doc('properties').get()
+        ]);
+        
+        const overridesData = overridesDoc.exists ? overridesDoc.data() : {};
+        const propertiesData = propertiesDoc.exists ? propertiesDoc.data() : {};
+        
+        // Parse property IDs from each document
+        const overridePropertyIds = new Set();
+        const propertiesPropertyIds = new Set();
+        
+        Object.keys(overridesData).forEach(key => {
+            const parts = key.split('.');
+            if (parts.length === 2) {
+                overridePropertyIds.add(parseInt(parts[0]));
+            }
+        });
+        
+        Object.keys(propertiesData).forEach(key => {
+            const propId = parseInt(key);
+            if (!isNaN(propId)) {
+                propertiesPropertyIds.add(propId);
+            }
+        });
+        
+        console.log('\n📁 DOCUMENT: settings/propertyOverrides');
+        console.log('   Purpose: Overrides for STATIC properties (IDs 1-6) + premium fields for ALL');
+        console.log('   Property IDs found:', Array.from(overridePropertyIds).sort((a,b) => a-b));
+        
+        console.log('\n📁 DOCUMENT: settings/properties');
+        console.log('   Purpose: ALL data for USER-CREATED properties (ID 7+)');
+        console.log('   Property IDs found:', Array.from(propertiesPropertyIds).sort((a,b) => a-b));
+        
+        // Identify issues
+        console.log('\n⚠️  POTENTIAL ISSUES:');
+        
+        // Check for user-created properties with data in propertyOverrides (stale data)
+        const staleInOverrides = [];
+        const premiumFields = ['isPremium', 'isPremiumTrial', 'premiumStartDate', 'premiumLastPayment', 'premiumUpdatedAt', 'updatedAt', 'updatedBy', 'clearedBy'];
+        
+        overridePropertyIds.forEach(propId => {
+            const prop = properties.find(p => p.id === propId);
+            if (prop && prop.ownerEmail) {
+                // This is a user-created property - check what fields are in overrides
+                const fieldsInOverrides = [];
+                Object.keys(overridesData).forEach(key => {
+                    const parts = key.split('.');
+                    if (parts.length === 2 && parseInt(parts[0]) === propId) {
+                        const field = parts[1];
+                        if (!premiumFields.includes(field)) {
+                            fieldsInOverrides.push(field);
+                        }
+                    }
+                });
+                if (fieldsInOverrides.length > 0) {
+                    staleInOverrides.push({
+                        propertyId: propId,
+                        propertyTitle: prop.title,
+                        staleFields: fieldsInOverrides
+                    });
+                }
+            }
+        });
+        
+        if (staleInOverrides.length > 0) {
+            console.log('\n🔴 STALE DATA FOUND in propertyOverrides for user-created properties:');
+            staleInOverrides.forEach(item => {
+                console.log(`   Property ${item.propertyId} (${item.propertyTitle}):`);
+                console.log(`      Stale fields: ${item.staleFields.join(', ')}`);
+            });
+            console.log('\n   To clean up, run: await cleanupStaleData()');
+        } else {
+            console.log('\n✅ No stale data found in propertyOverrides');
+        }
+        
+        // Show summary
+        console.log('\n📊 SUMMARY:');
+        console.log(`   Static properties (1-6): ${properties.filter(p => !p.ownerEmail).length}`);
+        console.log(`   User-created properties: ${properties.filter(p => p.ownerEmail).length}`);
+        console.log(`   Total properties: ${properties.length}`);
+        
+        return {
+            overridesData,
+            propertiesData,
+            staleInOverrides,
+            overridePropertyIds: Array.from(overridePropertyIds),
+            propertiesPropertyIds: Array.from(propertiesPropertyIds)
+        };
+        
+    } catch (error) {
+        console.error('Diagnosis error:', error);
+        return null;
+    }
+};
+
+/**
+ * Clean up stale data from propertyOverrides for user-created properties
+ * This removes non-premium fields that shouldn't be in propertyOverrides
+ * 
+ * Call from console: await cleanupStaleData()
+ */
+window.cleanupStaleData = async function() {
+    console.log('========== CLEANING UP STALE DATA ==========');
+    
+    const premiumFields = ['isPremium', 'isPremiumTrial', 'premiumStartDate', 'premiumLastPayment', 'premiumUpdatedAt', 'updatedAt', 'updatedBy', 'clearedBy'];
+    
+    try {
+        const overridesDoc = await db.collection('settings').doc('propertyOverrides').get();
+        if (!overridesDoc.exists) {
+            console.log('No propertyOverrides document found');
+            return;
+        }
+        
+        const overridesData = overridesDoc.data();
+        const fieldsToDelete = {};
+        
+        // Find fields to delete
+        Object.keys(overridesData).forEach(key => {
+            const parts = key.split('.');
+            if (parts.length === 2) {
+                const propId = parseInt(parts[0]);
+                const field = parts[1];
+                const prop = properties.find(p => p.id === propId);
+                
+                // If this is a user-created property AND the field is not a premium field
+                if (prop && prop.ownerEmail && !premiumFields.includes(field)) {
+                    fieldsToDelete[key] = firebase.firestore.FieldValue.delete();
+                    console.log(`   Will delete: ${key} (value was: ${overridesData[key]})`);
+                }
+            }
+        });
+        
+        if (Object.keys(fieldsToDelete).length === 0) {
+            console.log('✅ No stale data to clean up');
+            return;
+        }
+        
+        // Confirm before deleting
+        const confirmDelete = confirm(`Found ${Object.keys(fieldsToDelete).length} stale fields to delete. Proceed?`);
+        if (!confirmDelete) {
+            console.log('Cleanup cancelled');
+            return;
+        }
+        
+        // Delete the fields
+        await db.collection('settings').doc('propertyOverrides').update(fieldsToDelete);
+        
+        // Also clear from local state
+        Object.keys(fieldsToDelete).forEach(key => {
+            const parts = key.split('.');
+            if (parts.length === 2) {
+                const propId = parseInt(parts[0]);
+                const field = parts[1];
+                if (state.propertyOverrides[propId]) {
+                    delete state.propertyOverrides[propId][field];
+                }
+            }
+        });
+        
+        console.log(`✅ Cleaned up ${Object.keys(fieldsToDelete).length} stale fields`);
+        console.log('Refresh the page to see updated data');
+        
+    } catch (error) {
+        console.error('Cleanup error:', error);
+    }
+};
+
+/**
+ * Show all data for a specific property across all sources
+ * 
+ * Call from console: await showPropertyData(7)
+ */
+window.showPropertyData = async function(propertyId) {
+    const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
+    
+    console.log(`========== PROPERTY ${numericId} DATA ==========`);
+    
+    const prop = properties.find(p => p.id === numericId);
+    console.log('\n📦 Local properties array:');
+    console.log(prop ? JSON.stringify(prop, null, 2) : 'Not found');
+    
+    console.log('\n💾 Local state.propertyOverrides:');
+    console.log(state.propertyOverrides[numericId] ? JSON.stringify(state.propertyOverrides[numericId], null, 2) : 'None');
+    
+    // Fetch from Firestore
+    const [overridesDoc, propertiesDoc] = await Promise.all([
+        db.collection('settings').doc('propertyOverrides').get(),
+        db.collection('settings').doc('properties').get()
+    ]);
+    
+    const overridesData = overridesDoc.exists ? overridesDoc.data() : {};
+    const propertiesData = propertiesDoc.exists ? propertiesDoc.data() : {};
+    
+    // Extract this property's data from overrides
+    const overrideFields = {};
+    Object.keys(overridesData).forEach(key => {
+        const parts = key.split('.');
+        if (parts.length === 2 && parseInt(parts[0]) === numericId) {
+            overrideFields[parts[1]] = overridesData[key];
+        }
+    });
+    
+    console.log('\n☁️  Firestore settings/propertyOverrides:');
+    console.log(Object.keys(overrideFields).length > 0 ? JSON.stringify(overrideFields, null, 2) : 'None');
+    
+    console.log('\n☁️  Firestore settings/properties:');
+    console.log(propertiesData[numericId] ? JSON.stringify(propertiesData[numericId], null, 2) : 'None');
+    
+    // Determine source of truth
+    const isUserCreated = prop && prop.ownerEmail;
+    console.log('\n📌 Source of Truth:');
+    console.log(`   Property type: ${isUserCreated ? 'User-created' : 'Static'}`);
+    console.log(`   Primary data source: ${isUserCreated ? 'settings/properties' : 'settings/propertyOverrides'}`);
+    
+    // Check for stale data
+    if (isUserCreated && Object.keys(overrideFields).length > 0) {
+        const premiumFields = ['isPremium', 'isPremiumTrial', 'premiumStartDate', 'premiumLastPayment', 'premiumUpdatedAt', 'updatedAt', 'updatedBy', 'clearedBy'];
+        const staleFields = Object.keys(overrideFields).filter(f => !premiumFields.includes(f));
+        if (staleFields.length > 0) {
+            console.log(`\n⚠️  STALE DATA in propertyOverrides: ${staleFields.join(', ')}`);
         }
     }
 };
