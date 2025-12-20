@@ -343,17 +343,18 @@ window.viewPropertyStats = async function(id) {
     state.currentPropertyId = id;
     state.currentImages = p.images;
     
-    // Fetch fresh data from Firestore
+    // Fetch fresh data from Firestore and sync to local properties array
     try {
         const freshData = await PropertyDataService.read(id);
         if (freshData.exists) {
-            state.propertyOverrides[id] = freshData.data;
+            // Data is automatically synced to properties array by PropertyDataService.read()
+            console.log('[ViewPropertyStats] Fresh data loaded for property', id);
         }
     } catch (error) {
         console.error('Error fetching property data:', error);
     }
     
-    // Set up real-time listener for all property overrides
+    // Set up real-time listener for all properties
     PropertyDataService.subscribeAll((data) => {
         // Re-render when data changes from another source
         if (state.currentPropertyId === id) {
@@ -3237,16 +3238,8 @@ window.completeLease = async function(propertyId) {
             closeCompleteLeaseModal();
             showToast(`✅ Lease completed for ${renterName}. Total collected: $${tenureSummary.totalCollected.toLocaleString()}`, 'success');
             
-            // Force refresh ALL data from Firestore to ensure consistency
-            // First, manually re-clear local state to ensure no stale data
+            // Force refresh ALL data - clear local property object
             const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
-            if (state.propertyOverrides[numericId]) {
-                state.propertyOverrides[numericId].renterName = '';
-                state.propertyOverrides[numericId].renterPhone = '';
-                state.propertyOverrides[numericId].renterNotes = '';
-                state.propertyOverrides[numericId].paymentFrequency = '';
-                state.propertyOverrides[numericId].lastPaymentDate = '';
-            }
             const prop = properties.find(p => p.id === numericId);
             if (prop) {
                 prop.renterName = '';
@@ -3373,16 +3366,7 @@ window.deleteTenureRecord = async function(propertyId, tenureId) {
 
 /**
  * Clear all renter-related data from property
- * CRITICAL: Must clear from ALL data sources to prevent stale data:
- * 1. Firestore settings/properties doc (for user-created properties)
- * 2. Firestore settings/propertyOverrides doc (DELETE stale data if user-created)
- * 3. Local property object (properties array)
- * 4. State cache (state.propertyOverrides)
- * 
- * ARCHITECTURE NOTE:
- * - User-created properties: Primary data in settings/properties
- * - Static properties: Primary data in settings/propertyOverrides
- * - We DELETE (not just clear) stale data from the wrong document
+ * UNIFIED ARCHITECTURE: All data writes to settings/properties
  */
 async function clearRenterData(propertyId) {
     const fieldsToClean = [
@@ -3395,18 +3379,10 @@ async function clearRenterData(propertyId) {
     
     const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
     const prop = properties.find(p => p.id === numericId);
-    const isUserCreated = prop && prop.ownerEmail;
     
-    console.log('[ClearRenterData] Starting clear for property:', numericId, 'isUserCreated:', isUserCreated);
+    console.log('[ClearRenterData] Starting clear for property:', numericId);
     
-    // STEP 1: Clear local state FIRST to prevent any UI from showing old data
-    if (state.propertyOverrides[numericId]) {
-        fieldsToClean.forEach(field => {
-            delete state.propertyOverrides[numericId][field];
-        });
-    }
-    
-    // Update local property object immediately
+    // STEP 1: Clear local property object immediately
     if (prop) {
         prop.renterName = '';
         prop.renterPhone = '';
@@ -3418,47 +3394,17 @@ async function clearRenterData(propertyId) {
     console.log('[ClearRenterData] Local state cleared');
     
     try {
-        if (isUserCreated) {
-            // USER-CREATED PROPERTY: Write to settings/properties, DELETE from propertyOverrides
-            
-            // Clear from primary source (settings/properties)
-            const propsUpdateData = {};
-            fieldsToClean.forEach(field => {
-                propsUpdateData[`${numericId}.${field}`] = '';
-            });
-            propsUpdateData[`${numericId}.updatedAt`] = firebase.firestore.FieldValue.serverTimestamp();
-            propsUpdateData[`${numericId}.clearedBy`] = auth.currentUser?.email || 'system-clear';
-            
-            await db.collection('settings').doc('properties').update(propsUpdateData);
-            console.log('[ClearRenterData] Cleared from settings/properties (primary)');
-            
-            // DELETE from propertyOverrides to prevent stale data issues
-            const deleteData = {};
-            fieldsToClean.forEach(field => {
-                deleteData[`${numericId}.${field}`] = firebase.firestore.FieldValue.delete();
-            });
-            
-            await db.collection('settings').doc('propertyOverrides').update(deleteData).catch(e => {
-                // It's okay if fields don't exist
-                console.log('[ClearRenterData] No stale data to delete from propertyOverrides');
-            });
-            console.log('[ClearRenterData] Deleted stale data from propertyOverrides');
-            
-        } else {
-            // STATIC PROPERTY: Write to settings/propertyOverrides (primary)
-            const overridesUpdateData = {};
-            fieldsToClean.forEach(field => {
-                overridesUpdateData[`${numericId}.${field}`] = '';
-            });
-            overridesUpdateData[`${numericId}.updatedAt`] = firebase.firestore.FieldValue.serverTimestamp();
-            overridesUpdateData[`${numericId}.clearedBy`] = auth.currentUser?.email || 'system-clear';
-            
-            await db.collection('settings').doc('propertyOverrides').set(overridesUpdateData, { merge: true });
-            console.log('[ClearRenterData] Cleared from propertyOverrides (primary for static)');
-        }
+        // UNIFIED: All properties write to settings/properties
+        const updateData = {};
+        fieldsToClean.forEach(field => {
+            updateData[`${numericId}.${field}`] = '';
+        });
+        updateData[`${numericId}.updatedAt`] = firebase.firestore.FieldValue.serverTimestamp();
+        updateData[`${numericId}.clearedBy`] = auth.currentUser?.email || 'system-clear';
+        
+        await db.collection('settings').doc('properties').update(updateData);
         
         console.log('[ClearRenterData] Successfully cleared all renter data for property:', numericId);
-        console.log('[ClearRenterData] state.propertyOverrides:', state.propertyOverrides[numericId]);
         console.log('[ClearRenterData] property object:', prop ? { renterName: prop.renterName, paymentFrequency: prop.paymentFrequency } : 'not found');
         
     } catch (error) {

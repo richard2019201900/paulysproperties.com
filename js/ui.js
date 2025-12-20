@@ -7200,24 +7200,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     createdAtTimestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
-                // CRITICAL: Clear any stale property overrides for this ID FIRST
-                // This must happen BEFORE adding to local state or saving to Firestore
-                delete state.propertyOverrides[newId];
-                
-                // Get all fields that need to be deleted (all possible override fields)
-                const overrideFields = ['bedrooms', 'bathrooms', 'storage', 'weeklyPrice', 'biweeklyPrice', 'monthlyPrice', 
-                                       'interiorType', 'renterName', 'renterPhone', 'renterNotes',
-                                       'lastPaymentDate', 'paymentFrequency', 'title', 'location', 
-                                       'type', 'customReminderScript', 'ownerName', 'ownerPhone',
-                                       'updatedAt', 'updatedBy'];
-                const deleteUpdates = {};
-                overrideFields.forEach(field => {
-                    deleteUpdates[`${newId}.${field}`] = firebase.firestore.FieldValue.delete();
-                });
-                await db.collection('settings').doc('propertyOverrides').update(deleteUpdates).catch(err => {
-                    // Ignore if fields don't exist
-                });
-                // NOW add to local properties array (after cleanup)
+                // Add to local properties array
                 properties.push(newProperty);
                 
                 // Add to owner map
@@ -7361,10 +7344,7 @@ window.executeDeleteProperty = async function() {
         // Remove from availability
         delete state.availability[propertyId];
         
-        // Remove from local propertyOverrides
-        delete state.propertyOverrides[propertyId];
-        
-        // Remove from Firestore - properties doc (this removes the ownerEmail source of truth)
+        // Remove from Firestore - properties doc (single source of truth)
         await db.collection('settings').doc('properties').update({
             [propertyId]: firebase.firestore.FieldValue.delete()
         });
@@ -7372,22 +7352,6 @@ window.executeDeleteProperty = async function() {
         // Remove availability
         await db.collection('settings').doc('propertyAvailability').update({
             [propertyId]: firebase.firestore.FieldValue.delete()
-        });
-        
-        // CRITICAL: Remove propertyOverrides for this property
-        // The overrides are stored in flat format: "15.bedrooms", "15.storage", etc.
-        const overrideFields = ['bedrooms', 'bathrooms', 'storage', 'weeklyPrice', 'monthlyPrice', 
-                               'interiorType', 'renterName', 'renterPhone', 'renterNotes',
-                               'lastPaymentDate', 'paymentFrequency', 'title', 'location',
-                               'type', 'customReminderScript', 'ownerName', 'ownerPhone',
-                               'updatedAt', 'updatedBy'];
-        const deleteUpdates = {};
-        overrideFields.forEach(field => {
-            deleteUpdates[`${propertyId}.${field}`] = firebase.firestore.FieldValue.delete();
-        });
-        
-        await db.collection('settings').doc('propertyOverrides').update(deleteUpdates).catch(err => {
-            // Ignore if fields don't exist
         });
         
         // CREATE DELETION NOTIFICATION for the property owner (if admin is deleting someone else's property)
@@ -7917,9 +7881,8 @@ window.startUserTierListener = function() {
                         );
                     }
                     
-                    // Remove from state
+                    // Remove from availability state
                     delete state.availability[deletedProp.propertyId];
-                    delete state.propertyOverrides[deletedProp.propertyId];
                     
                     // Show notification modal
                     showPropertyDeletedModal(deletedProp.propertyTitle || 'Your property');
