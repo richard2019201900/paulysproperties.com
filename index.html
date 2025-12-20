@@ -696,36 +696,39 @@
                     <div id="navUserDisplay" class="hidden items-center gap-2">
                         <!-- Username area with dropdown -->
                         <div class="relative">
-                            <!-- Rent alert badge (for ALL property owners with rent due) -->
-                            <div id="ownerRentBadge" class="hidden absolute -top-2 -right-2 z-10">
-                                <span class="bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-500 transition" onclick="goToDashboard()" title="💰 Rent payments need attention!">
-                                    <span id="ownerRentCount">0</span>
-                                </span>
-                            </div>
-                            <!-- Admin notification badges - positioned top-right of username (admin only) -->
-                            <div id="adminNotificationBadges" class="hidden absolute -top-2 -right-2 flex items-center gap-1 z-10">
-                                <!-- Blue badge for new users -->
-                                <span id="adminNewUserBadge" class="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-blue-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
-                                    <span id="adminNewUserCount">0</span>
-                                </span>
-                                <!-- Green badge for new listings -->
-                                <span id="adminNewListingBadge" class="bg-green-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-green-400 transition" style="display: none;" onclick="showNewListingNotifications(event)" title="New listings">
-                                    <span id="adminNewListingCount">0</span>
-                                </span>
-                                <!-- Amber badge for premium activations -->
-                                <span id="adminNewPremiumBadge" class="bg-amber-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-amber-400 transition" style="display: none;" onclick="showNewPremiumNotifications(event)" title="Premium activations">
-                                    <span id="adminNewPremiumCount">0</span>
-                                </span>
-                                <!-- Orange badge for photo service requests (REVENUE!) -->
-                                <span id="adminNewPhotoBadge" class="bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" style="display: none;" onclick="showNewPhotoNotifications(event)" title="📸 Photo service inquiries - $$$">
-                                    <span id="adminNewPhotoCount">0</span>
-                                </span>
-                            </div>
-                            <!-- User notification badge (for non-admin users) -->
-                            <div id="userNotificationBadge" class="hidden absolute -top-2 -right-2 z-10">
-                                <span class="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="scrollToUserNotifications()" title="You have notifications!">
-                                    <span id="userNotificationCount">!</span>
-                                </span>
+                            <!-- All notification badges container - positioned top-right, flex row -->
+                            <div id="allNavBadges" class="absolute -top-2 -right-2 z-10 flex items-center gap-1">
+                                <!-- Rent alert badge (for ALL property owners with rent due) -->
+                                <div id="ownerRentBadge" class="hidden">
+                                    <span class="bg-red-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-red-500 transition" onclick="goToDashboard()" title="💰 Rent payments need attention!">
+                                        <span id="ownerRentCount">0</span>
+                                    </span>
+                                </div>
+                                <!-- Admin notification badges (admin only) -->
+                                <div id="adminNotificationBadges" class="hidden flex items-center gap-1">
+                                    <!-- Blue badge for new users -->
+                                    <span id="adminNewUserBadge" class="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-blue-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
+                                        <span id="adminNewUserCount">0</span>
+                                    </span>
+                                    <!-- Green badge for new listings -->
+                                    <span id="adminNewListingBadge" class="bg-green-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-green-400 transition" style="display: none;" onclick="showNewListingNotifications(event)" title="New listings">
+                                        <span id="adminNewListingCount">0</span>
+                                    </span>
+                                    <!-- Amber badge for premium activations -->
+                                    <span id="adminNewPremiumBadge" class="bg-amber-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:bg-amber-400 transition" style="display: none;" onclick="showNewPremiumNotifications(event)" title="Premium activations">
+                                        <span id="adminNewPremiumCount">0</span>
+                                    </span>
+                                    <!-- Orange badge for photo service requests (REVENUE!) -->
+                                    <span id="adminNewPhotoBadge" class="bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" style="display: none;" onclick="showNewPhotoNotifications(event)" title="📸 Photo service inquiries - $$$">
+                                        <span id="adminNewPhotoCount">0</span>
+                                    </span>
+                                </div>
+                                <!-- User notification badge (for non-admin users) -->
+                                <div id="userNotificationBadge" class="hidden">
+                                    <span class="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="scrollToUserNotifications()" title="You have notifications!">
+                                        <span id="userNotificationCount">!</span>
+                                    </span>
+                                </div>
                             </div>
                             <!-- Site update badge (shows above username when new update available) -->
                             <div id="siteUpdateNavBadge" class="hidden absolute -top-2 -left-2 z-10">
