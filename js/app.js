@@ -1930,8 +1930,11 @@ window.calculatePropertyAnalytics = function(payments, property) {
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
     
+    // Filter out premium_fee payments - these are fees the owner PAYS, not income they receive
+    const rentPayments = payments.filter(p => p.type !== 'premium_fee');
+    
     // Sort payments by date
-    const sortedPayments = [...payments].sort((a, b) => 
+    const sortedPayments = [...rentPayments].sort((a, b) => 
         new Date(a.paymentDate) - new Date(b.paymentDate)
     );
     
@@ -1947,7 +1950,7 @@ window.calculatePropertyAnalytics = function(payments, property) {
     // Average rent calculation
     const avgRent = totalPayments > 0 ? Math.round(totalEarnings / totalPayments) : 0;
     
-    // Renter breakdown
+    // Renter breakdown - also filter out premium_fee entries
     const renterStats = {};
     sortedPayments.forEach(p => {
         const name = p.renterName || 'Unknown';

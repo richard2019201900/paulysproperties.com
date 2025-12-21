@@ -668,9 +668,13 @@ document.addEventListener('click', function(e) {
 // Navigate to profile settings section
 window.goToProfileSettings = function() {
     goToDashboard();
+    // Switch to My Properties tab (where profile settings lives) if admin
+    if (TierService.isMasterAdmin(auth.currentUser?.email)) {
+        switchDashboardTab('myProperties');
+    }
     // Scroll to profile settings after a short delay
     setTimeout(() => {
-        const profileSection = document.querySelector('#ownerDashboard .glass-effect:has(#ownerUsername)');
+        const profileSection = document.querySelector('#profileSettingsSection');
         if (profileSection) {
             profileSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
             // Flash highlight effect
@@ -4549,6 +4553,8 @@ window.updateAdminStats = async function(users) {
     });
     
     // Calculate Premium Ad Fees (weekly fees from premium listings)
+    // NOTE: This shows CURRENT WEEKLY revenue, not projected monthly
+    // For actual collected amounts, we would need to query paymentHistory
     let premiumFeeTotal = 0;
     let premiumListingsCount = 0;
     let premiumPaidCount = 0;
@@ -4570,11 +4576,12 @@ window.updateAdminStats = async function(users) {
         }
     });
     
-    // Calculate monthly premium revenue (weekly * 4)
-    const premiumMonthlyRevenue = premiumFeeTotal * 4;
+    // Show actual weekly premium revenue (not multiplied - actuals only)
+    const premiumWeeklyRevenue = premiumFeeTotal;
     
-    // Total revenue
-    const totalRevenue = proRevenue + eliteRevenue + premiumMonthlyRevenue;
+    // Total revenue is monthly subscriptions + weekly premium (not multiplied)
+    // This represents: confirmed recurring revenue from subs + current weekly premium fees
+    const totalRevenue = proRevenue + eliteRevenue + premiumWeeklyRevenue;
     
     // Helper function to get user listing count - uses OwnershipService for consistency
     const getUserListings = (user) => {
@@ -4708,7 +4715,7 @@ window.updateAdminStats = async function(users) {
     // Premium Fees Tile
     const statPremium = $('adminStatPremium');
     const statPremiumSub = $('adminStatPremiumSub');
-    if (statPremium) statPremium.textContent = `$${(premiumMonthlyRevenue / 1000).toFixed(0)}k`;
+    if (statPremium) statPremium.textContent = `$${(premiumWeeklyRevenue / 1000).toFixed(0)}k`;
     if (statPremiumSub) {
         if (premiumListingsCount > 0) {
             statPremiumSub.textContent = `${premiumPaidCount} paid, ${premiumTrialCount} trial`;
@@ -4729,8 +4736,8 @@ window.updateAdminStats = async function(users) {
             return `<div class="truncate">${icon} ${p.title}</div>`;
         }).join('');
         premiumDetail.innerHTML = `
-            <div class="mb-1 text-amber-400 font-bold">$${premiumMonthlyRevenue.toLocaleString()}/mo</div>
-            <div class="text-gray-400 text-xs mb-1">${premiumPaidCount} × $10k/wk × 4</div>
+            <div class="mb-1 text-amber-400 font-bold">$${premiumWeeklyRevenue.toLocaleString()}/wk</div>
+            <div class="text-gray-400 text-xs mb-1">${premiumPaidCount} × $10k/wk (actual)</div>
             ${premiumList || '<div class="text-gray-500">No premium listings</div>'}
             ${premiumListings.length > 4 ? `<div class="text-gray-500">+${premiumListings.length - 4} more...</div>` : ''}
             ${premiumTrialCount > 0 ? `<div class="text-cyan-400 mt-1">🎁 ${premiumTrialCount} on free trial</div>` : ''}
@@ -4743,18 +4750,18 @@ window.updateAdminStats = async function(users) {
     if (statTotalRevenue) statTotalRevenue.textContent = `$${(totalRevenue / 1000).toFixed(0)}k`;
     if (statTotalRevenueSub) {
         const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
-        statTotalRevenueSub.textContent = totalTrials > 0 ? `${totalTrials} on free trial` : 'Monthly income';
+        statTotalRevenueSub.textContent = totalTrials > 0 ? `${totalTrials} on free trial` : 'Current revenue';
     }
     
     const totalRevenueDetail = $('adminStatTotalRevenueDetail');
     if (totalRevenueDetail) {
         const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
         totalRevenueDetail.innerHTML = `
-            <div class="text-green-400 font-bold mb-2">$${totalRevenue.toLocaleString()}/mo</div>
+            <div class="text-green-400 font-bold mb-2">$${totalRevenue.toLocaleString()}</div>
             <div class="space-y-1 text-xs">
-                <div>⭐ Pro: $${proRevenue.toLocaleString()}</div>
-                <div>👑 Elite: $${eliteRevenue.toLocaleString()}</div>
-                <div>🏆 Premium: $${premiumMonthlyRevenue.toLocaleString()}</div>
+                <div>⭐ Pro: $${proRevenue.toLocaleString()}/mo</div>
+                <div>👑 Elite: $${eliteRevenue.toLocaleString()}/mo</div>
+                <div>🏆 Premium: $${premiumWeeklyRevenue.toLocaleString()}/wk</div>
             </div>
             ${totalTrials > 0 ? `<div class="text-cyan-400 text-xs mt-2 border-t border-gray-600 pt-1">🎁 ${totalTrials} trial (not counted)</div>` : ''}
         `;
