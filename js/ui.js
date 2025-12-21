@@ -83,6 +83,96 @@ window.dismissSiteUpdateNotification = function() {
     markSiteUpdateAsRead();
 };
 
+// ==================== DASHBOARD TAB SWITCHING ====================
+// Track current dashboard tab
+window.currentDashboardTab = 'myProperties';
+
+// Switch between My Properties and Admin Panel tabs
+window.switchDashboardTab = function(tabName) {
+    const myPropertiesContent = $('myPropertiesTabContent');
+    const adminContent = $('adminTabContent');
+    const myPropertiesTab = $('dashboardTab-myProperties');
+    const adminTab = $('dashboardTab-admin');
+    
+    if (!myPropertiesContent || !adminContent) return;
+    
+    // Update current tab
+    window.currentDashboardTab = tabName;
+    
+    // Save preference to localStorage
+    localStorage.setItem('dashboardTab', tabName);
+    
+    if (tabName === 'myProperties') {
+        // Show My Properties, hide Admin
+        myPropertiesContent.classList.remove('hidden');
+        adminContent.classList.add('hidden');
+        
+        // Update tab styles
+        if (myPropertiesTab) {
+            myPropertiesTab.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+            myPropertiesTab.classList.add('bg-gradient-to-r', 'from-purple-600', 'to-blue-600', 'text-white');
+        }
+        if (adminTab) {
+            adminTab.classList.remove('bg-gradient-to-r', 'from-red-600', 'to-orange-600', 'text-white');
+            adminTab.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+        }
+    } else if (tabName === 'admin') {
+        // Show Admin, hide My Properties
+        myPropertiesContent.classList.add('hidden');
+        adminContent.classList.remove('hidden');
+        
+        // Update tab styles
+        if (adminTab) {
+            adminTab.classList.remove('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+            adminTab.classList.add('bg-gradient-to-r', 'from-red-600', 'to-orange-600', 'text-white');
+        }
+        if (myPropertiesTab) {
+            myPropertiesTab.classList.remove('bg-gradient-to-r', 'from-purple-600', 'to-blue-600', 'text-white');
+            myPropertiesTab.classList.add('bg-gray-700', 'text-gray-300', 'hover:bg-gray-600');
+        }
+    }
+};
+
+// Initialize dashboard tabs (call when dashboard loads)
+window.initDashboardTabs = function() {
+    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
+    const dashboardTabs = $('dashboardTabs');
+    const adminTabContent = $('adminTabContent');
+    const myPropertiesTabContent = $('myPropertiesTabContent');
+    
+    if (isAdmin && dashboardTabs) {
+        // Show tabs for admin
+        dashboardTabs.classList.remove('hidden');
+        
+        // Restore last used tab from localStorage, default to myProperties
+        const savedTab = localStorage.getItem('dashboardTab') || 'myProperties';
+        switchDashboardTab(savedTab);
+        
+        // Show admin content container (the inner adminSection visibility is handled separately)
+        if (adminTabContent) {
+            // Don't show yet - switchDashboardTab handles visibility
+        }
+    } else {
+        // Not admin - hide tabs and admin content
+        if (dashboardTabs) dashboardTabs.classList.add('hidden');
+        if (adminTabContent) adminTabContent.classList.add('hidden');
+        if (myPropertiesTabContent) myPropertiesTabContent.classList.remove('hidden');
+    }
+};
+
+// Update admin tab badge count (for notifications)
+window.updateAdminTabBadge = function(count) {
+    const badge = $('adminTabBadge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+};
+
 // ==================== TOAST NOTIFICATIONS ====================
 window.showToast = function(message, type = 'info') {
     const bgColors = {
@@ -1893,6 +1983,11 @@ function renderOwnerDashboard() {
         if (typeof updateMobileAdminBadges === 'function') {
             updateMobileAdminBadges();
         }
+    }
+    
+    // Initialize dashboard tabs (shows tabs for admin, handles tab switching)
+    if (typeof initDashboardTabs === 'function') {
+        initDashboardTabs();
     }
     
     // Render site update notification if there's a new one
@@ -4845,12 +4940,16 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 const isAvailable = state.availability[p.id] !== false;
                 const typeIcon = typeIcons[p.type] || '🏠';
                 const interiorIcon = p.interiorType === 'Walk-in' ? '🚶' : '🌀';
+                // Check premium status from property data (real-time synced from Firestore)
+                const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+                const premiumIndicator = isPremium ? '<span class="text-amber-400" title="Premium Listing - $10k/week">👑</span>' : '';
                 return `
                     <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0 user-property-item" data-type="${p.type || ''}" data-interior="${p.interiorType || ''}">
                         <span class="text-gray-300 text-xs flex items-center gap-1">
                             <span class="text-gray-500">${index + 1}.</span>
                             <span title="${(p.type || 'unknown').charAt(0).toUpperCase() + (p.type || 'unknown').slice(1)}">${typeIcon}</span>
                             <span title="${p.interiorType || 'Unknown'}" class="text-gray-600">${interiorIcon}</span>
+                            ${premiumIndicator}
                             <a onclick="viewPropertyStats(${p.id})" class="hover:text-cyan-400 cursor-pointer hover:underline transition">${title}</a>
                         </span>
                         <span class="text-xs ${isAvailable ? 'text-green-400' : 'text-red-400'}">${isAvailable ? '🟢' : '🔴'}</span>

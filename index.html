@@ -864,8 +864,25 @@
                 <!-- Persistent notifications will be inserted here by JS -->
             </div>
 
-            <!-- Admin Section (Only visible to master admin) -->
-            <div id="adminSection" class="hidden glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8 border-2 border-red-600/50">
+            <!-- Dashboard Tabs (Admin Only) -->
+            <div id="dashboardTabs" class="hidden mb-6">
+                <div class="flex gap-2 bg-gray-800/50 p-1 rounded-xl inline-flex">
+                    <button onclick="switchDashboardTab('myProperties')" id="dashboardTab-myProperties" 
+                            class="dashboard-tab px-6 py-3 rounded-lg font-bold text-sm transition flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                        <span>🏠</span> My Properties
+                    </button>
+                    <button onclick="switchDashboardTab('admin')" id="dashboardTab-admin" 
+                            class="dashboard-tab px-6 py-3 rounded-lg font-bold text-sm transition flex items-center gap-2 bg-gray-700 text-gray-300 hover:bg-gray-600">
+                        <span>🔐</span> Admin Panel
+                        <span id="adminTabBadge" class="hidden bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ==================== ADMIN TAB CONTENT ==================== -->
+            <div id="adminTabContent" class="hidden">
+                <!-- Admin Section (Only visible to master admin) -->
+                <div id="adminSection" class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8 border-2 border-red-600/50">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
                         <span class="text-3xl">🔐</span>
@@ -1209,7 +1226,11 @@
                     </div>
                 </div>
             </div>
+            </div>
+            <!-- ==================== END ADMIN TAB CONTENT ==================== -->
 
+            <!-- ==================== MY PROPERTIES TAB CONTENT ==================== -->
+            <div id="myPropertiesTabContent">
             <!-- Rent Due Notifications Panel (Owner's Properties Only) -->
             <div id="rentNotificationsPanel" class="hidden mb-6">
                 <!-- Rent notifications will be rendered here by JS -->
@@ -1381,6 +1402,8 @@
                     </table>
                 </div>
             </div>
+            </div>
+            <!-- ==================== END MY PROPERTIES TAB CONTENT ==================== -->
         </div>
     </section>
 

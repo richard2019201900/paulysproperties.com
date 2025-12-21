@@ -104,6 +104,9 @@ window.AdminNotifications = {
     seenPhotoRequests: new Set(),
     seenRentNotifications: new Set(), // Track acknowledged rent notifications
     
+    // Track previous premium states for detecting changes (propId -> boolean)
+    previousPremiumStates: new Map(),
+    
     // Currently visible notifications (keyed by full notification ID)
     visible: new Map(),
     
@@ -338,7 +341,7 @@ function startUserListener() {
 }
 
 // ============================================================================
-// LISTING LISTENER
+// LISTING LISTENER (Also handles PREMIUM detection - single source of truth)
 // ============================================================================
 
 function startListingListener() {
@@ -355,6 +358,7 @@ function startListingListener() {
         const isFirst = AdminNotifications.listingsFirstSnapshot;
         const propsData = doc.data();
         const newListings = [];
+        const newPremiumActivations = []; // Track premium activations separately
         const currentListingIds = new Set();
         
         Object.keys(propsData).forEach(key => {
@@ -364,76 +368,105 @@ function startListingListener() {
             if (!prop || !prop.title) return;
             
             const notifId = NOTIFICATION_TYPES.LISTING.prefix + propId;
+            const premiumNotifId = NOTIFICATION_TYPES.PREMIUM.prefix + propId;
             currentListingIds.add(propId);
+            
+            // Get owner info
+            let ownerName = prop.ownerName;
+            if (!ownerName && prop.ownerEmail) {
+                ownerName = prop.ownerEmail.split('@')[0];
+            }
+            if (!ownerName) {
+                ownerName = 'Unknown Owner';
+            }
+            
+            // Determine if this is an admin listing (should be skipped for notifications)
+            const isBaseProperty = propId >= 1 && propId <= 14;
+            const hasAdminEmail = prop.ownerEmail && TierService.isMasterAdmin(prop.ownerEmail);
+            const isAdminListing = hasAdminEmail || isBaseProperty;
+            
+            // Track premium state for detecting changes
+            const currentPremiumState = prop.isPremium === true;
+            const previousPremiumState = AdminNotifications.previousPremiumStates.get(propId);
             
             // Check if this notification is pending (loaded from storage but needs content)
             const isPending = AdminNotifications.visible.has(notifId) && 
                               AdminNotifications.visible.get(notifId).pending === true;
             
-            // Check if new to us
+            // === NEW LISTING DETECTION ===
             if (!AdminNotifications.seenListings.has(propId)) {
                 AdminNotifications.seenListings.add(propId);
                 
-                // Determine if this is an admin listing (should be skipped)
-                // 1. ownerEmail matches admin email
-                // 2. Property ID 1-14 (base properties owned by admin)
-                // 3. No owner set AND it's a base property (1-14)
-                const isBaseProperty = propId >= 1 && propId <= 14;
-                const hasAdminEmail = prop.ownerEmail && TierService.isMasterAdmin(prop.ownerEmail);
-                const noOwnerSet = !prop.ownerEmail;
-                // Skip if admin email OR it's a base property (admin's default properties)
-                const isAdminListing = hasAdminEmail || isBaseProperty;
+                // Store initial premium state
+                AdminNotifications.previousPremiumStates.set(propId, currentPremiumState);
                 
                 if (!isFirst && !isAdminListing && !AdminNotifications.dismissed.has(notifId)) {
-                    // Get owner name with proper fallback
-                    let ownerName = prop.ownerName;
-                    if (!ownerName && prop.ownerEmail) {
-                        ownerName = prop.ownerEmail.split('@')[0];
-                    }
-                    if (!ownerName) {
-                        ownerName = 'Unknown Owner';
-                    }
-                    
+                    // New listing notification
                     newListings.push({
                         id: propId,
                         notifId: notifId,
                         title: prop.title,
                         ownerEmail: prop.ownerEmail,
                         ownerName: ownerName,
-                        isPremium: prop.isPremium || false,
+                        isPremium: currentPremiumState,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     });
+                    
+                    // If new listing is premium, also create a PREMIUM notification
+                    if (currentPremiumState && !AdminNotifications.dismissed.has(premiumNotifId)) {
+                        newPremiumActivations.push({
+                            id: propId,
+                            notifId: premiumNotifId,
+                            title: prop.title,
+                            ownerEmail: prop.ownerEmail,
+                            ownerName: ownerName,
+                            isNewListing: true, // Flag to indicate this came with a new listing
+                            createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
+                        });
+                    }
                 }
                 
                 // If this was a pending notification, populate its content
                 if (isPending && !isAdminListing) {
-                    let ownerName = prop.ownerName;
-                    if (!ownerName && prop.ownerEmail) {
-                        ownerName = prop.ownerEmail.split('@')[0];
-                    }
-                    if (!ownerName) {
-                        ownerName = 'Unknown Owner';
-                    }
-                    
                     const listingData = {
                         id: propId,
                         notifId: notifId,
                         title: prop.title,
                         ownerEmail: prop.ownerEmail,
                         ownerName: ownerName,
-                        isPremium: prop.isPremium || false,
+                        isPremium: currentPremiumState,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     };
                     AdminNotifications.visible.set(notifId, {
                         type: 'listing',
                         content: {
-                            title: prop.isPremium ? 'New Premium Listing!' : NOTIFICATION_TYPES.LISTING.title,
-                            message: `${prop.title} by ${listingData.ownerName}`,
+                            title: NOTIFICATION_TYPES.LISTING.title,
+                            message: `${prop.title} by ${ownerName}`,
                             timestamp: listingData.createdAt,
                             data: listingData
                         }
                     });
                 }
+            } else {
+                // === EXISTING PROPERTY - CHECK FOR PREMIUM STATE CHANGE ===
+                // Only detect changes after first snapshot (real-time changes)
+                if (!isFirst && previousPremiumState === false && currentPremiumState === true) {
+                    // Premium was just activated on an existing property!
+                    if (!isAdminListing && !AdminNotifications.dismissed.has(premiumNotifId)) {
+                        newPremiumActivations.push({
+                            id: propId,
+                            notifId: premiumNotifId,
+                            title: prop.title,
+                            ownerEmail: prop.ownerEmail,
+                            ownerName: ownerName,
+                            isNewListing: false, // Existing property, just enabled premium
+                            createdAt: new Date() // Use current time for the notification
+                        });
+                    }
+                }
+                
+                // Update stored premium state
+                AdminNotifications.previousPremiumStates.set(propId, currentPremiumState);
             }
         });
         
@@ -452,6 +485,15 @@ function startListingListener() {
                 AdminNotifications.visible.delete(id);
                 AdminNotifications.dismissed.add(id);
             });
+            
+            // Initialize premium states for all properties on first load
+            Object.keys(propsData).forEach(key => {
+                const propId = parseInt(key);
+                const prop = propsData[key];
+                if (prop && prop.title) {
+                    AdminNotifications.previousPremiumStates.set(propId, prop.isPremium === true);
+                }
+            });
         }
         
         // Mark first snapshot complete
@@ -463,17 +505,43 @@ function startListingListener() {
         
         // Handle new listings
         if (newListings.length > 0) {
-            // Flash screen
+            // Flash screen green for new listings
             flashScreen(NOTIFICATION_TYPES.LISTING.flashColor);
             
-            // Create notifications
+            // Create listing notifications
             newListings.forEach(listing => {
                 createNotification(NOTIFICATION_TYPES.LISTING, listing.notifId, {
-                    title: listing.isPremium ? 'New Premium Listing!' : NOTIFICATION_TYPES.LISTING.title,
+                    title: NOTIFICATION_TYPES.LISTING.title,
                     message: `${listing.title} by ${listing.ownerName}`,
                     timestamp: listing.createdAt,
                     data: listing
                 });
+            });
+        }
+        
+        // Handle premium activations (separate prominent notifications)
+        if (newPremiumActivations.length > 0) {
+            // Flash screen gold for premium activations - this is money!
+            flashScreen(NOTIFICATION_TYPES.PREMIUM.flashColor);
+            
+            // Create premium notifications
+            newPremiumActivations.forEach(premium => {
+                const titleText = premium.isNewListing 
+                    ? '👑 New Premium Listing!' 
+                    : '👑 Premium Activated!';
+                const messageText = premium.isNewListing
+                    ? `${premium.title} by ${premium.ownerName} - COLLECT $10k`
+                    : `${premium.title} enabled premium - COLLECT $10k`;
+                    
+                createNotification(NOTIFICATION_TYPES.PREMIUM, premium.notifId, {
+                    title: titleText,
+                    message: messageText,
+                    timestamp: premium.createdAt,
+                    data: premium
+                });
+                
+                // Mark as seen to prevent duplicate from old premium listener
+                AdminNotifications.seenPremium.add(premium.id);
             });
         }
         
@@ -487,7 +555,9 @@ function startListingListener() {
 }
 
 // ============================================================================
-// PREMIUM LISTENER (Firestore-based)
+// PREMIUM LISTENER (BACKUP - for manually written adminNotifications)
+// Primary premium detection is now in the LISTING listener (single source of truth)
+// This listener catches notifications written by the old togglePremium flow
 // ============================================================================
 
 function startPremiumListener() {
@@ -513,6 +583,13 @@ function startPremiumListener() {
                 }
                 
                 const notifId = NOTIFICATION_TYPES.PREMIUM.prefix + doc.id;
+                
+                // Skip if we already have a notification for this property from the listing listener
+                const propertyId = data.propertyId;
+                if (propertyId && AdminNotifications.seenPremium.has(propertyId)) {
+                    // Already notified via listing listener - skip duplicate
+                    return;
+                }
                 
                 // Check if new to us
                 if (!AdminNotifications.seenPremium.has(doc.id)) {
