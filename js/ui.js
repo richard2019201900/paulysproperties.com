@@ -4817,11 +4817,6 @@ window.loadAllUsers = async function() {
         if (!window.knownUserIds) window.knownUserIds = new Set();
         users.forEach(u => window.knownUserIds.add(u.id));
         
-        // Ensure base properties (1-14) are synced to admin
-        if (typeof ensureBasePropertiesSynced === 'function') {
-            ensureBasePropertiesSynced();
-        }
-        
         await updateAdminStats(users);
         
         if (users.length === 0) {
@@ -6928,157 +6923,6 @@ window.adminDowngradeUser = async function(email, currentTier, targetTier = 'sta
     }
 };
 
-// Admin Tools Functions
-window.syncBasePropertiesToAdmin = async function() {
-    const adminEmail = 'richard2019201900@gmail.com';
-    const adminEmailLower = adminEmail.toLowerCase();
-    
-    // Base property IDs from data.js (1-14)
-    const basePropertyIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-    
-    let added = 0;
-    basePropertyIds.forEach(propId => {
-        // Update local mapping only (ownerPropertyMap is now a local cache)
-        if (!ownerPropertyMap[adminEmailLower]) {
-            ownerPropertyMap[adminEmailLower] = [];
-        }
-        if (!ownerPropertyMap[adminEmailLower].includes(propId)) {
-            ownerPropertyMap[adminEmailLower].push(propId);
-            added++;
-        }
-        propertyOwnerEmail[propId] = adminEmailLower;
-    });
-    
-    if (added > 0) {
-        // Refresh the admin panel
-        if (window.adminUsersData && window.adminUsersData.length > 0) {
-            renderAdminUsersList(window.adminUsersData);
-            updateAdminStats(window.adminUsersData);
-        }
-        
-        showToast(`✓ Synced ${added} properties to admin`, 'success');
-    } else {
-        showToast('All base properties already synced', 'info');
-    }
-    
-    return added;
-};
-
-// Auto-sync base properties on admin panel load
-window.ensureBasePropertiesSynced = function() {
-    const adminEmail = 'richard2019201900@gmail.com'.toLowerCase();
-    const currentMapping = ownerPropertyMap[adminEmail] || [];
-    
-    // Check if property 13 (Villa) is missing
-    if (!currentMapping.includes(13)) {
-        syncBasePropertiesToAdmin();
-    }
-};
-
-// Show subscription amount fixer tool
-window.showSubscriptionAmountFixer = async function() {
-    const container = $('subscriptionFixerResult');
-    if (!container) return;
-    
-    container.innerHTML = '<p class="text-gray-400 animate-pulse">Loading paid users...</p>';
-    
-    try {
-        // Get all users with Pro or Elite tier who are NOT on trial
-        const paidUsers = (window.adminUsersData || []).filter(u => 
-            (u.tier === 'pro' || u.tier === 'elite') && 
-            !u.isFreeTrial &&
-            !TierService.isMasterAdmin(u.email)
-        );
-        
-        if (paidUsers.length === 0) {
-            container.innerHTML = '<p class="text-green-400">✓ No paid subscription users found that need fixing.</p>';
-            return;
-        }
-        
-        // Show each user with their current subscription amount
-        let html = '<div class="space-y-2">';
-        
-        for (const user of paidUsers) {
-            const defaultAmount = user.tier === 'pro' ? 25000 : 50000;
-            const currentAmount = user.subscriptionAmount !== undefined ? user.subscriptionAmount : defaultAmount;
-            const isUsingDefault = user.subscriptionAmount === undefined;
-            const isProratedFlag = user.isProratedUpgrade === true;
-            
-            const userId = user.id;
-            const email = user.email;
-            const displayName = user.displayName || user.username || email.split('@')[0];
-            
-            const warningClass = isUsingDefault ? 'border-amber-500 bg-amber-900/20' : 'border-gray-600 bg-gray-800/50';
-            const warningLabel = isUsingDefault ? '<span class="text-amber-400 text-xs">(using default)</span>' : '<span class="text-green-400 text-xs">(set)</span>';
-            
-            html += `
-                <div class="p-2 rounded border ${warningClass}">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <span class="${user.tier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${user.tier === 'pro' ? '⭐' : '👑'}</span>
-                            <span class="text-white text-sm">${displayName}</span>
-                            ${isProratedFlag ? '<span class="text-amber-400 text-xs ml-1">(prorated)</span>' : ''}
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-gray-300 text-sm">$${(currentAmount/1000).toFixed(0)}k</span>
-                            ${warningLabel}
-                            <button onclick="quickFixAmount('${userId}', '${email}', 25000)" 
-                                class="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs">$25k</button>
-                            <button onclick="quickFixAmount('${userId}', '${email}', 50000)" 
-                                class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs">$50k</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        html += '</div>';
-        html += `<p class="text-gray-500 text-xs mt-2">Users with "(using default)" need their amounts set manually. Click $25k or $50k to set.</p>`;
-        
-        container.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error loading subscription fixer:', error);
-        container.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
-    }
-};
-
-// Quick fix subscription amount
-window.quickFixAmount = async function(userId, email, amount) {
-    try {
-        await db.collection('users').doc(userId).update({
-            subscriptionAmount: amount,
-            isProratedUpgrade: amount < 50000,
-            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Log to activity
-        logAdminActivity('payment_adjustment', {
-            email: email,
-            previousAmount: 'unknown (default)',
-            newAmount: amount,
-            adjustedBy: auth.currentUser?.email
-        });
-        
-        showToast(`✓ Set ${email.split('@')[0]} to $${(amount/1000).toFixed(0)}k`, 'success');
-        
-        // Refresh the fixer and user list
-        await loadAllUsers();
-        showSubscriptionAmountFixer();
-        
-    } catch (error) {
-        console.error('Error fixing amount:', error);
-        alert('Error: ' + error.message);
-    }
-};
-
-window.copyBulkEmailList = function() {
-    const emails = window.adminUsersData.map(u => u.email).join(', ');
-    navigator.clipboard.writeText(emails).then(() => {
-        alert(`Copied ${window.adminUsersData.length} emails to clipboard!`);
-    });
-};
-
 // Copy phone number (digits only, no formatting)
 window.copyPhoneNumber = function(phone) {
     // Strip all non-numeric characters
@@ -7148,24 +6992,6 @@ window.findUserByProperty = function() {
         resultDiv.innerHTML = `<span class="text-green-400">Found: <strong>${found.title}</strong><br>Owner: ${ownerDisplay}</span>`;
     } else {
         resultDiv.innerHTML = '<span class="text-red-400">No property found matching that search.</span>';
-    }
-};
-
-window.cleanupOrphanedListings = async function() {
-    if (!confirm('This will identify listings with invalid or missing owners. Continue?')) return;
-    
-    const orphaned = properties.filter(p => {
-        const ownerEmail = p.ownerEmail || getPropertyOwnerEmail(p.id);
-        if (!ownerEmail) return true;
-        const user = window.adminUsersData.find(u => u.email.toLowerCase() === ownerEmail.toLowerCase());
-        return !user;
-    });
-    
-    if (orphaned.length === 0) {
-        alert('No orphaned listings found. All properties have valid owners.');
-    } else {
-        const list = orphaned.map(p => `• ${p.title} (owner: ${p.ownerEmail || getPropertyOwnerEmail(p.id) || 'none'})`).join('\n');
-        alert(`Found ${orphaned.length} orphaned listings:\n\n${list}\n\nYou can manually reassign these from the property pages.`);
     }
 };
 
