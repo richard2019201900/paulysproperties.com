@@ -885,9 +885,16 @@ function updateAllBadges() {
         }
     });
     
-    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount });
+    // Get rent notification count
+    let rentCount = 0;
+    if (AdminNotifications.rentNotifications) {
+        const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
+        rentCount = (overdue?.length || 0) + (today?.length || 0) + (tomorrow?.length || 0);
+    }
     
-    const total = userCount + listingCount + premiumCount + photoCount;
+    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount, rentCount });
+    
+    const total = userCount + listingCount + premiumCount + photoCount + rentCount;
     
     // Update notification dot on username (shows when any notifications exist)
     const notifDot = document.getElementById('navNotificationDot');
@@ -896,6 +903,7 @@ function updateAllBadges() {
     }
     
     // Update DROPDOWN badges (new location - inside the menu)
+    updateDropdownBadge('dropdownRentBadge', 'dropdownRentCount', rentCount);
     updateDropdownBadge('dropdownUserBadge', 'dropdownUserCount', userCount);
     updateDropdownBadge('dropdownListingBadge', 'dropdownListingCount', listingCount);
     updateDropdownBadge('dropdownPremiumBadge', 'dropdownPremiumCount', premiumCount);

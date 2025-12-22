@@ -723,9 +723,9 @@
     <nav class="glass-effect shadow-xl sticky top-0 z-40 border-b border-gray-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16 md:h-20">
-                <!-- Logo -->
-                <div class="flex items-center space-x-2 cursor-pointer flex-shrink-0" onclick="goHome()" role="button" tabindex="0" aria-label="Go to home">
-                    <div class="relative w-10 h-10 md:w-14 md:h-14 lg:w-20 lg:h-20">
+                <!-- Logo - constrained width -->
+                <div class="flex items-center space-x-2 cursor-pointer flex-shrink-0 mr-4" onclick="goHome()" role="button" tabindex="0" aria-label="Go to home">
+                    <div class="relative w-10 h-10 md:w-12 md:h-12 flex-shrink-0">
                         <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-lg" xmlns="http://www.w3.org/2000/svg">
                             <defs>
                                 <linearGradient id="logoGradientNav" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -743,21 +743,21 @@
                             <rect x="68" y="60" width="12" height="12" rx="2" fill="url(#logoGradientNav)" />
                         </svg>
                     </div>
-                    <h1 class="hidden sm:block text-base md:text-lg lg:text-2xl font-black bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent tracking-tight whitespace-nowrap">PaulysProperties.com</h1>
+                    <h1 class="hidden xl:block text-lg font-black bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent tracking-tight whitespace-nowrap">PaulysProperties.com</h1>
                 </div>
                 
-                <!-- Center nav links (hidden on mobile) -->
-                <div class="hidden lg:flex space-x-6 xl:space-x-8">
-                    <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Home</a>
-                    <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Properties</a>
-                    <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">About</a>
-                    <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Contact</a>
-                    <a onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Leaderboard</a>
-                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition" role="button" tabindex="0">Dashboard</a>
+                <!-- Center nav links (hidden on mobile, shown on lg+) -->
+                <div class="hidden lg:flex items-center space-x-4 xl:space-x-6 flex-shrink-0">
+                    <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Home</a>
+                    <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Properties</a>
+                    <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">About</a>
+                    <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Contact</a>
+                    <a onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Leaderboard</a>
+                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Dashboard</a>
                 </div>
                 
-                <!-- Right side: buttons + user -->
-                <div class="flex items-center gap-2 md:gap-3">
+                <!-- Right side: buttons + user - with proper spacing -->
+                <div class="flex items-center gap-2 flex-shrink-0 ml-4">
                     <!-- New Listing button - compact, only shown when logged in -->
                     <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-2 rounded-lg hover:opacity-90 transition font-semibold shadow-lg text-xs whitespace-nowrap">
                         <span class="hidden sm:inline">+ New</span>
