@@ -7280,22 +7280,87 @@ window.copyPremiumReminder = function(title, weeklyFee, nextDue) {
     });
 };
 
-// Record premium listing payment - stores via PropertyDataService (settings/properties)
-window.recordPremiumPayment = async function(propertyId, ownerEmail) {
+// Record premium listing payment - shows date picker modal
+window.recordPremiumPayment = function(propertyId, ownerEmail) {
+    // Check if admin
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Only admins can record premium payments', 'error');
+        return;
+    }
+    
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Get property title for display
+    const prop = properties.find(p => p.id === propertyId);
+    const propertyTitle = prop?.title || `Property #${propertyId}`;
+    
+    const modalHTML = `
+        <div id="premiumPaymentModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'premiumPaymentModal') closePremiumPaymentModal()">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-green-600/50" onclick="event.stopPropagation()">
+                <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">💰 Record Premium Payment</h3>
+                
+                <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 text-sm"><strong>Property:</strong> ${propertyTitle}</p>
+                    <p class="text-gray-300 text-sm"><strong>Fee:</strong> <span class="text-amber-400">$10,000/week</span></p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">Payment Date</label>
+                    <input type="date" id="premiumPaymentDate" value="${today}" max="${today}"
+                           class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none">
+                    <p class="text-gray-500 text-xs mt-1">Select the date payment was received</p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="confirmPremiumPayment(${propertyId})" 
+                            class="flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        ✓ Record Payment
+                    </button>
+                    <button onclick="closePremiumPaymentModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closePremiumPaymentModal = function() {
+    const modal = $('premiumPaymentModal');
+    if (modal) modal.remove();
+};
+
+window.confirmPremiumPayment = async function(propertyId) {
+    const dateInput = $('premiumPaymentDate');
+    const dateStr = dateInput?.value;
+    
+    if (!dateStr) {
+        showToast('Please select a payment date', 'error');
+        return;
+    }
+    
+    // Validate date isn't in future
+    const selectedDate = new Date(dateStr);
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate > today) {
+        showToast('Payment date cannot be in the future', 'error');
+        return;
+    }
     
     try {
-        // Check if admin
-        if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
-            showToast('Only admins can record premium payments', 'error');
-            return;
-        }
-        
         // Use PropertyDataService to write to the correct location (settings/properties)
         await PropertyDataService.write(propertyId, 'premiumLastPayment', dateStr);
         
-        showToast(`💰 Premium payment recorded for property #${propertyId}! Next due in 7 days.`, 'success');
+        closePremiumPaymentModal();
+        
+        // Format date for display
+        const displayDate = selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        showToast(`💰 Premium payment recorded: ${displayDate}. Next due in 7 days.`, 'success');
         
         // Re-render admin users list to update the display
         if (window.adminUsersData && typeof renderAdminUsersList === 'function') {
