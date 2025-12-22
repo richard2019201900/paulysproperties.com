@@ -4289,9 +4289,41 @@ window.showNewUserNotification = function(user, isMissed = false) {
     stack.insertAdjacentHTML('afterbegin', notificationHTML);
 };
 
-// Handle click on new user notification
+// Handle click on new user notification - navigate and highlight user
 window.handleNewUserNotificationClick = function(userId) {
-    switchAdminTab('users');
+    // Make sure we're on the dashboard
+    if (!$('ownerDashboard') || $('ownerDashboard').classList.contains('hidden')) {
+        goToDashboard();
+    }
+    
+    // Switch to Admin Panel tab
+    setTimeout(() => {
+        if (typeof switchDashboardTab === 'function') {
+            switchDashboardTab('admin');
+        }
+        
+        // Find and highlight the user card
+        setTimeout(() => {
+            // Try to find user card by data-userid attribute
+            const userCard = document.querySelector(`.admin-user-card[data-userid="${userId}"]`);
+            
+            if (userCard) {
+                // Scroll to the user card
+                userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add highlight effect
+                userCard.style.boxShadow = '0 0 0 4px rgba(251, 146, 60, 0.8), 0 0 30px rgba(251, 146, 60, 0.5)';
+                userCard.style.transition = 'box-shadow 0.3s ease';
+                
+                // Remove highlight after 4 seconds
+                setTimeout(() => {
+                    userCard.style.boxShadow = '';
+                }, 4000);
+            } else {
+                console.log('[Notification] User card not found for userId:', userId);
+            }
+        }, 400);
+    }, 200);
 };
 
 // Dismiss new user notification
