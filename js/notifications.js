@@ -140,13 +140,10 @@ window.checkRentDueNotifications = function() {
         return;
     }
     
-    // Filter to user's properties only (unless admin seeing all)
-    const isAdmin = typeof TierService !== 'undefined' && TierService.isMasterAdmin(currentUserEmail);
-    
     properties.forEach(p => {
-        // Check ownership - only show user's own properties (or all for admin)
+        // Check ownership - EVERYONE only sees their own properties (including admin)
         const ownerEmail = window.propertyOwnerEmail?.[p.id] || p.ownerEmail;
-        if (!isAdmin && ownerEmail?.toLowerCase() !== currentUserEmail.toLowerCase()) {
+        if (!ownerEmail || ownerEmail.toLowerCase() !== currentUserEmail.toLowerCase()) {
             return;
         }
         
