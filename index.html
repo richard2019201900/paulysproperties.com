@@ -112,6 +112,19 @@
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-gray-100">
+    <!-- Celebration Banner Container (site-wide notifications for achievements) -->
+    <div id="celebrationBannerContainer" class="hidden fixed top-0 left-0 right-0 z-50">
+        <div id="celebrationBanner" class="bg-gradient-to-r from-amber-600 to-yellow-500 text-white py-3 px-4 shadow-lg">
+            <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+                <div id="celebrationMessage" class="flex items-center gap-2 font-semibold text-sm sm:text-base">
+                    <span id="celebrationIcon">🎉</span>
+                    <span id="celebrationText">Someone just achieved something amazing!</span>
+                </div>
+                <button onclick="dismissCelebration()" class="text-white/80 hover:text-white text-xl font-bold px-2" aria-label="Dismiss">×</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Lightbox -->
     <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer">
         <button onclick="closeLightbox()" class="lightbox-btn lightbox-close" aria-label="Close">✕</button>
@@ -516,6 +529,61 @@
         </div>
     </div>
 
+    <!-- Level Up Modal -->
+    <div id="levelUpModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-amber-500/50 text-center relative overflow-hidden">
+            <!-- Confetti effect background -->
+            <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                <div class="absolute -top-4 left-1/4 text-4xl animate-bounce" style="animation-delay: 0s;">🎉</div>
+                <div class="absolute -top-4 right-1/4 text-4xl animate-bounce" style="animation-delay: 0.2s;">🎊</div>
+                <div class="absolute top-1/2 -left-4 text-3xl animate-pulse">✨</div>
+                <div class="absolute top-1/2 -right-4 text-3xl animate-pulse" style="animation-delay: 0.3s;">✨</div>
+            </div>
+            
+            <div class="relative z-10">
+                <div id="levelUpIcon" class="text-7xl mb-4 animate-bounce">🏆</div>
+                <h2 class="text-3xl font-black bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent mb-2">LEVEL UP!</h2>
+                <p class="text-gray-300 mb-4">You've reached</p>
+                <div id="levelUpNewLevel" class="text-5xl font-black text-white mb-2">Level 5</div>
+                <div id="levelUpNewTitle" class="text-xl text-amber-400 font-bold mb-6">Real Estate Tycoon</div>
+                
+                <div id="levelUpReward" class="hidden bg-purple-600/30 rounded-xl p-4 mb-6 border border-purple-500/50">
+                    <div class="flex items-center justify-center gap-2 text-white font-bold">
+                        <span class="text-2xl">🎁</span>
+                        <span>You unlocked a Free Premium Week!</span>
+                    </div>
+                </div>
+                
+                <button onclick="closeLevelUpModal()" class="bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg">
+                    Awesome!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievements Modal -->
+    <div id="achievementsModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 max-w-lg w-full mx-4 border border-amber-500/50 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-black bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">🏆 Achievements</h2>
+                <button onclick="closeModal('achievementsModal')" class="text-gray-400 hover:text-white transition p-1">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div id="achievementsList" class="grid grid-cols-2 gap-4">
+                <!-- Achievements rendered by JS -->
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-400">Achievements Unlocked</span>
+                    <span id="achievementsCount" class="text-amber-400 font-bold">0 / 9</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Image Modal -->
     <div id="addImageModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
         <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-green-700/50">
@@ -684,6 +752,7 @@
                     <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Properties</a>
                     <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">About</a>
                     <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition" role="button" tabindex="0">Contact</a>
+                    <a onclick="navigateTo('leaderboard')" class="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer transition flex items-center gap-1" role="button" tabindex="0">🏆 Leaderboard</a>
                     <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition" role="button" tabindex="0">Dashboard</a>
                 </div>
                 
@@ -811,6 +880,9 @@
             <a onclick="navigateTo('properties'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Properties</a>
             <a onclick="navigateTo('about'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">About</a>
             <a onclick="navigateTo('contact'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Contact</a>
+            <a onclick="navigateTo('leaderboard'); hideMobileMenu();" class="block px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
+                <span>🏆</span> Leaderboard
+            </a>
             <a id="mobileDashboardLink" onclick="goToDashboard(); hideMobileMenu();" class="hidden px-4 py-3 text-purple-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
                 <span>🏠</span> Dashboard
             </a>
@@ -1281,6 +1353,53 @@
                 <p id="phoneStatus" class="text-sm mt-3 hidden"></p>
             </div>
 
+            <!-- Gamification XP Widget -->
+            <div id="gamificationWidget" class="hidden glass-effect rounded-2xl shadow-2xl p-6 mb-8 border border-amber-500/30 bg-gradient-to-r from-amber-900/20 to-yellow-900/20">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div id="xpLevelIcon" class="text-4xl">🌱</div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span id="xpLevelTitle" class="text-xl font-bold text-white">Newcomer</span>
+                                <span id="xpLevelBadge" class="text-sm text-amber-400 font-medium">(Level 1)</span>
+                            </div>
+                            <div id="xpUserRank" class="text-gray-400 text-sm">Rank #--</div>
+                        </div>
+                    </div>
+                    <div class="w-full sm:w-auto flex items-center gap-3">
+                        <button onclick="showAchievementsModal()" class="text-amber-400 hover:text-amber-300 text-sm font-bold flex items-center gap-1 transition">
+                            <span>🏆</span> Achievements
+                        </button>
+                        <button onclick="navigateTo('leaderboard')" class="text-purple-400 hover:text-purple-300 text-sm font-bold flex items-center gap-1 transition">
+                            <span>📊</span> Leaderboard
+                        </button>
+                    </div>
+                </div>
+                <!-- XP Progress Bar -->
+                <div class="mt-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span id="xpCurrentDisplay" class="text-amber-400 font-bold">0 XP</span>
+                        <span id="xpNextLevel" class="text-gray-400 text-sm">300 XP to Level 2</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div id="xpProgressBar" class="bg-gradient-to-r from-amber-500 to-yellow-400 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+                <!-- Free Premium Week Reward (shown when earned and unused) -->
+                <div id="freePremiumReward" class="hidden mt-4 bg-gradient-to-r from-purple-600/30 to-blue-600/30 rounded-xl p-4 border border-purple-500/50">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🎁</span>
+                            <div>
+                                <h4 class="text-white font-bold">Free Premium Week!</h4>
+                                <p class="text-gray-300 text-sm">Use on any listing to boost visibility</p>
+                            </div>
+                        </div>
+                        <span class="bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full">UNUSED</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-12">
                 <!-- Weekly Income Flip Card -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
@@ -1389,6 +1508,80 @@
     <section id="blogPage" class="hidden min-h-screen py-12 px-4 sm:px-6 bg-gray-900">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Content rendered by renderBlogPage() in ui.js -->
+        </div>
+    </section>
+
+    <!-- Leaderboard Page -->
+    <section id="leaderboardPage" class="hidden min-h-screen py-12 px-4 sm:px-6 bg-gray-900">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-8">
+                <h2 class="text-4xl md:text-5xl font-black bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">🏆 Leaderboard</h2>
+                <p class="text-gray-400 mt-2">Top property owners in Los Santos</p>
+            </div>
+            
+            <!-- User's Rank Card (shown when logged in) -->
+            <div id="userRankCard" class="hidden mb-8 bg-gradient-to-r from-purple-900/50 to-blue-900/50 rounded-2xl p-6 border border-purple-500/30">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div id="userRankPosition" class="text-4xl font-black text-purple-400">#-</div>
+                        <div>
+                            <div id="userRankName" class="text-xl font-bold text-white">Your Name</div>
+                            <div id="userRankTitle" class="text-gray-400 flex items-center gap-2">
+                                <span id="userRankIcon">🌱</span>
+                                <span id="userRankTitleText">Newcomer</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="userRankXP" class="text-2xl font-bold text-amber-400">0 XP</div>
+                        <div id="userRankLevel" class="text-gray-400">Level 1</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Login Prompt (shown when logged out) -->
+            <div id="leaderboardLoginPrompt" class="hidden mb-8 bg-gray-800/50 rounded-2xl p-6 border border-gray-700 text-center">
+                <p class="text-gray-300 mb-4">Sign in to see your rank and compete!</p>
+                <button onclick="handleAuthClick()" class="gradient-bg text-white px-6 py-3 rounded-xl hover:opacity-90 transition font-semibold">
+                    Register / Sign In
+                </button>
+            </div>
+            
+            <!-- Top 10 Leaderboard -->
+            <div class="bg-gray-800/50 rounded-2xl border border-gray-700 overflow-hidden">
+                <div class="bg-gradient-to-r from-amber-600/20 to-yellow-600/20 px-6 py-4 border-b border-gray-700">
+                    <h3 class="text-xl font-bold text-white">Top 10 Property Owners</h3>
+                </div>
+                <div id="leaderboardList" class="divide-y divide-gray-700">
+                    <div class="p-8 text-center text-gray-400">
+                        <div class="animate-pulse">Loading leaderboard...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- XP Info -->
+            <div class="mt-8 bg-gray-800/30 rounded-xl p-6 border border-gray-700">
+                <h4 class="text-lg font-bold text-white mb-4">How to Earn XP</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div class="flex items-center justify-between text-gray-300">
+                        <span>📝 Complete profile</span>
+                        <span class="text-amber-400 font-bold">+300 XP</span>
+                    </div>
+                    <div class="flex items-center justify-between text-gray-300">
+                        <span>🏠 Post a listing</span>
+                        <span class="text-amber-400 font-bold">+250-500 XP</span>
+                    </div>
+                    <div class="flex items-center justify-between text-gray-300">
+                        <span>🤝 Complete a rental</span>
+                        <span class="text-amber-400 font-bold">+500-1000 XP</span>
+                    </div>
+                    <div class="flex items-center justify-between text-gray-300">
+                        <span>👑 Enable premium</span>
+                        <span class="text-amber-400 font-bold">+200 XP</span>
+                    </div>
+                </div>
+                <p class="text-gray-500 text-xs mt-4">Reach Level 5 to unlock a free premium week!</p>
+            </div>
         </div>
     </section>
 
@@ -1761,6 +1954,7 @@
     <script src="js/data.js"></script>
     <script src="js/state.js"></script>
     <script src="js/services.js"></script>
+    <script src="js/gamification.js"></script>
     <script src="js/notifications.js"></script>
     <script src="js/components.js"></script>
     <script src="js/ui.js"></script>

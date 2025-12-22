@@ -1060,12 +1060,22 @@ window.navigateTo = function(section) {
     hideElement($('propertyDetailPage'));
     hideElement($('propertyStatsPage'));
     hideElement($('blogPage'));
+    hideElement($('leaderboardPage'));
     
     // Handle blog page specially
     if (section === 'blog') {
         hideElement($('renterSection'));
         showElement($('blogPage'));
         renderBlogPage();
+        window.scrollTo(0, 0);
+        return;
+    }
+    
+    // Handle leaderboard page
+    if (section === 'leaderboard') {
+        hideElement($('renterSection'));
+        showElement($('leaderboardPage'));
+        renderLeaderboardPage();
         window.scrollTo(0, 0);
         return;
     }
@@ -1516,6 +1526,19 @@ window.saveUsername = async function() {
         const phone = $('ownerPhone')?.value?.replace(/\D/g, '') || '';
         checkProfileCompletion(username, phone);
         
+        // Award XP for adding display name (gamification)
+        if (typeof GamificationService !== 'undefined') {
+            GamificationService.awardAchievement(user.uid, 'display_name', 50).then(result => {
+                if (result && !result.alreadyEarned) {
+                    console.log('[Gamification] Awarded 50 XP for display name');
+                    // Check if profile is now complete
+                    if (phone && phone.length === 10) {
+                        GamificationService.awardAchievement(user.uid, 'profile_complete', 100);
+                    }
+                }
+            }).catch(err => console.error('[Gamification] Error:', err));
+        }
+        
         setTimeout(() => hideElement(status), 3000);
     } catch (error) {
         console.error('Error saving username:', error);
@@ -1563,6 +1586,19 @@ window.saveOwnerPhone = async function() {
         // Re-check profile completion
         const username = $('ownerUsername')?.value?.trim() || '';
         checkProfileCompletion(username, phone);
+        
+        // Award XP for adding phone number (gamification)
+        if (typeof GamificationService !== 'undefined') {
+            GamificationService.awardAchievement(user.uid, 'phone_added', 150).then(result => {
+                if (result && !result.alreadyEarned) {
+                    console.log('[Gamification] Awarded 150 XP for phone number');
+                    // Check if profile is now complete
+                    if (username) {
+                        GamificationService.awardAchievement(user.uid, 'profile_complete', 100);
+                    }
+                }
+            }).catch(err => console.error('[Gamification] Error:', err));
+        }
         
         setTimeout(() => hideElement(status), 3000);
     } catch (error) {
@@ -2001,6 +2037,11 @@ function renderOwnerDashboard() {
     }
     updateSiteUpdateBadge();
     
+    // Render gamification XP widget
+    if (typeof renderGamificationWidget === 'function' && window.currentUserData) {
+        renderGamificationWidget(window.currentUserData);
+    }
+    
     // Show Elite Reports button if user is Elite tier
     updateEliteReportsButton();
     
@@ -2394,9 +2435,62 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
         // Auto-flip to "rented" when setting renter name, phone, or payment date
         if ((field === 'renterName' || field === 'renterPhone' || field === 'lastPaymentDate') && newValue) {
             if (state.availability[propertyId] !== false) {
-                // Property is currently available, flip to rented
+                // Property is currently available, flip to rented - this is a NEW rental!
                 state.availability[propertyId] = false;
                 await saveAvailability(propertyId, false);
+                
+                // Award XP for new rental (gamification)
+                if (typeof GamificationService !== 'undefined' && field === 'renterName') {
+                    const user = auth.currentUser;
+                    if (user) {
+                        // Get current rental count
+                        const userData = window.currentUserData || {};
+                        const totalRentals = userData.gamification?.stats?.totalRentals || 0;
+                        
+                        if (totalRentals === 0) {
+                            // First rental ever - award 1000 XP and create celebration
+                            GamificationService.awardAchievement(user.uid, 'first_rental', 1000, {
+                                statUpdate: { totalRentals: 1 }
+                            }).then(async (result) => {
+                                if (result && !result.alreadyEarned) {
+                                    console.log('[Gamification] Awarded 1000 XP for first rental');
+                                    // Create celebration
+                                    const userName = userData.username || user.email.split('@')[0];
+                                    const propTitle = p?.title || 'a property';
+                                    await GamificationService.createCelebration({
+                                        type: 'rental',
+                                        userId: user.uid,
+                                        userName: userName,
+                                        propertyTitle: propTitle,
+                                        icon: '🤝',
+                                        message: `just leased ${propTitle}!`
+                                    });
+                                }
+                            }).catch(err => console.error('[Gamification] Error:', err));
+                        } else {
+                            // Additional rental - award 500 XP and create celebration
+                            GamificationService.awardXP(user.uid, 500, 'additional_rental').then(async () => {
+                                console.log('[Gamification] Awarded 500 XP for additional rental');
+                                // Update stats
+                                await db.collection('users').doc(user.uid).update({
+                                    'gamification.stats.totalRentals': firebase.firestore.FieldValue.increment(1)
+                                }).catch(e => console.warn('[Gamification] Could not update stats:', e));
+                                
+                                // Create celebration
+                                const userName = userData.username || user.email.split('@')[0];
+                                const propTitle = p?.title || 'a property';
+                                await GamificationService.createCelebration({
+                                    type: 'rental',
+                                    userId: user.uid,
+                                    userName: userName,
+                                    propertyTitle: propTitle,
+                                    icon: '🤝',
+                                    message: `just leased ${propTitle}!`
+                                });
+                            }).catch(err => console.error('[Gamification] Error:', err));
+                        }
+                    }
+                }
             }
         }
         
@@ -4817,6 +4911,22 @@ window.loadAllUsers = async function() {
         if (!window.knownUserIds) window.knownUserIds = new Set();
         users.forEach(u => window.knownUserIds.add(u.id));
         
+        // Auto-trigger gamification migration if any user lacks gamification data
+        if (typeof GamificationService !== 'undefined') {
+            const needsMigration = users.some(u => !u.gamification?.migrated);
+            if (needsMigration) {
+                console.log('[Gamification] Users need migration, triggering Cloud Function...');
+                try {
+                    await GamificationService.triggerMigration();
+                    // Reload users after migration to get updated data
+                    const updatedUsers = await TierService.getAllUsers();
+                    window.adminUsersData = updatedUsers;
+                } catch (migrationError) {
+                    console.error('[Gamification] Migration failed:', migrationError);
+                }
+            }
+        }
+        
         await updateAdminStats(users);
         
         if (users.length === 0) {
@@ -7194,6 +7304,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 successDiv.textContent = '✓ Listing created successfully!';
                 showElement(successDiv);
                 
+                // Award XP for new listing (gamification)
+                if (typeof GamificationService !== 'undefined') {
+                    const user = auth.currentUser;
+                    if (user) {
+                        // Check if this is their first listing
+                        const currentListingCount = OwnershipService.getListingCount(ownerEmail);
+                        if (currentListingCount === 1) {
+                            // First listing - award 500 XP
+                            GamificationService.awardAchievement(user.uid, 'first_listing', 500, {
+                                statUpdate: { propertiesPosted: 1 }
+                            }).then(result => {
+                                if (result && !result.alreadyEarned) {
+                                    console.log('[Gamification] Awarded 500 XP for first listing');
+                                }
+                            }).catch(err => console.error('[Gamification] Error:', err));
+                        } else {
+                            // Additional listing - award 250 XP
+                            GamificationService.awardXP(user.uid, 250, 'additional_listing').then(() => {
+                                console.log('[Gamification] Awarded 250 XP for additional listing');
+                                // Update stats
+                                db.collection('users').doc(user.uid).update({
+                                    'gamification.stats.propertiesPosted': firebase.firestore.FieldValue.increment(1)
+                                }).catch(e => console.warn('[Gamification] Could not update stats:', e));
+                            }).catch(err => console.error('[Gamification] Error:', err));
+                        }
+                        
+                        // If premium was selected, award premium XP
+                        if (isPremium) {
+                            GamificationService.awardAchievement(user.uid, 'premium_listing', 200).then(result => {
+                                if (result && !result.alreadyEarned) {
+                                    console.log('[Gamification] Awarded 200 XP for premium listing');
+                                }
+                            }).catch(err => console.error('[Gamification] Error:', err));
+                        }
+                    }
+                }
+                
                 // Change button to show success
                 btn.textContent = '✓ Created!';
                 btn.classList.remove('from-amber-500', 'to-yellow-500');
@@ -9450,3 +9597,285 @@ function formatLargeNumber(num) {
 
 // Call this when dashboard loads to show/hide reports button
 // Will be called from renderOwnerDashboard
+
+// ============================================================
+// GAMIFICATION UI FUNCTIONS
+// ============================================================
+
+// Render the leaderboard page
+window.renderLeaderboardPage = async function() {
+    const listContainer = $('leaderboardList');
+    const userRankCard = $('userRankCard');
+    const loginPrompt = $('leaderboardLoginPrompt');
+    
+    if (!listContainer) return;
+    
+    // Show loading
+    listContainer.innerHTML = '<div class="p-8 text-center text-gray-400"><div class="animate-pulse">Loading leaderboard...</div></div>';
+    
+    try {
+        // Fetch top 10
+        const leaderboard = await GamificationService.getLeaderboard(10);
+        
+        if (leaderboard.length === 0) {
+            listContainer.innerHTML = '<div class="p-8 text-center text-gray-400">No rankings yet. Be the first to compete!</div>';
+            return;
+        }
+        
+        // Render leaderboard
+        listContainer.innerHTML = leaderboard.map((entry, index) => {
+            const isTop3 = index < 3;
+            const medalIcons = ['🥇', '🥈', '🥉'];
+            const medal = isTop3 ? medalIcons[index] : '';
+            const bgClass = isTop3 ? 'bg-gradient-to-r from-amber-900/20 to-yellow-900/20' : '';
+            
+            return `
+                <div class="flex items-center justify-between p-4 ${bgClass} hover:bg-gray-700/30 transition">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 text-center">
+                            ${medal ? `<span class="text-2xl">${medal}</span>` : `<span class="text-gray-500 font-bold">#${entry.rank}</span>`}
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">${entry.icon}</span>
+                            <div>
+                                <div class="text-white font-bold">${escapeHtml(entry.username)}</div>
+                                <div class="text-gray-400 text-sm">${entry.title}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-amber-400 font-bold">${entry.xp.toLocaleString()} XP</div>
+                        <div class="text-gray-500 text-sm">Level ${entry.level}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Handle logged-in user rank card
+        const user = auth.currentUser;
+        if (user && window.currentUserData?.gamification) {
+            const gam = window.currentUserData.gamification;
+            const userRank = await GamificationService.getUserRank(gam.xp || 0);
+            const levelInfo = GamificationService.getLevelFromXP(gam.xp || 0);
+            
+            $('userRankPosition').textContent = `#${userRank || '--'}`;
+            $('userRankName').textContent = window.currentUserData.username || user.email.split('@')[0];
+            $('userRankIcon').textContent = levelInfo.icon;
+            $('userRankTitleText').textContent = levelInfo.title;
+            $('userRankXP').textContent = `${(gam.xp || 0).toLocaleString()} XP`;
+            $('userRankLevel').textContent = `Level ${gam.level || 1}`;
+            
+            showElement(userRankCard);
+            hideElement(loginPrompt);
+        } else if (!user) {
+            hideElement(userRankCard);
+            showElement(loginPrompt);
+        } else {
+            hideElement(userRankCard);
+            hideElement(loginPrompt);
+        }
+        
+    } catch (error) {
+        console.error('[Leaderboard] Error:', error);
+        listContainer.innerHTML = '<div class="p-8 text-center text-red-400">Error loading leaderboard</div>';
+    }
+};
+
+// Render the XP widget in dashboard
+window.renderGamificationWidget = function(userData) {
+    const widget = $('gamificationWidget');
+    if (!widget || !userData) return;
+    
+    const gam = userData.gamification;
+    
+    // If no gamification data, hide widget
+    if (!gam) {
+        hideElement(widget);
+        return;
+    }
+    
+    const levelInfo = GamificationService.getLevelFromXP(gam.xp || 0);
+    const nextLevelXP = GamificationService.getNextLevelXP(levelInfo.level);
+    const progressPercent = GamificationService.getProgressPercent(gam.xp || 0, levelInfo.level);
+    
+    // Update widget elements
+    $('xpLevelIcon').textContent = levelInfo.icon;
+    $('xpLevelTitle').textContent = levelInfo.title;
+    $('xpLevelBadge').textContent = `(Level ${levelInfo.level})`;
+    $('xpCurrentDisplay').textContent = `${(gam.xp || 0).toLocaleString()} XP`;
+    
+    if (nextLevelXP) {
+        const xpNeeded = nextLevelXP - (gam.xp || 0);
+        $('xpNextLevel').textContent = `${xpNeeded.toLocaleString()} XP to Level ${levelInfo.level + 1}`;
+    } else {
+        $('xpNextLevel').textContent = 'Max Level Reached!';
+    }
+    
+    $('xpProgressBar').style.width = `${progressPercent}%`;
+    
+    // Get user rank (async)
+    GamificationService.getUserRank(gam.xp || 0).then(rank => {
+        if (rank) {
+            $('xpUserRank').textContent = `Rank #${rank}`;
+        }
+    });
+    
+    // Show/hide free premium reward
+    const rewardEl = $('freePremiumReward');
+    if (rewardEl) {
+        if (GamificationService.hasUnusedReward(userData, 'free_premium_week')) {
+            showElement(rewardEl);
+        } else {
+            hideElement(rewardEl);
+        }
+    }
+    
+    showElement(widget);
+};
+
+// Show achievements modal
+window.showAchievementsModal = function() {
+    const modal = $('achievementsModal');
+    const list = $('achievementsList');
+    const countEl = $('achievementsCount');
+    
+    if (!modal || !list) return;
+    
+    const userData = window.currentUserData;
+    const userAchievements = userData?.gamification?.achievements || {};
+    
+    const allAchievements = GamificationService.achievements;
+    let earnedCount = 0;
+    
+    list.innerHTML = Object.entries(allAchievements).map(([id, achievement]) => {
+        const earned = !!userAchievements[id];
+        if (earned) earnedCount++;
+        
+        const earnedClass = earned ? 'border-amber-500/50 bg-amber-900/20' : 'border-gray-700 bg-gray-800/30 opacity-50';
+        const checkmark = earned ? '<span class="absolute top-2 right-2 text-green-400">✓</span>' : '';
+        
+        return `
+            <div class="relative rounded-xl p-4 border ${earnedClass}">
+                ${checkmark}
+                <div class="text-3xl mb-2">${achievement.icon}</div>
+                <div class="text-white font-bold text-sm">${achievement.name}</div>
+                <div class="text-gray-400 text-xs">${achievement.description}</div>
+            </div>
+        `;
+    }).join('');
+    
+    if (countEl) {
+        countEl.textContent = `${earnedCount} / ${Object.keys(allAchievements).length}`;
+    }
+    
+    showElement(modal);
+};
+
+// Show level up modal
+window.showLevelUpModal = function(levelInfo) {
+    const modal = $('levelUpModal');
+    if (!modal) return;
+    
+    $('levelUpIcon').textContent = levelInfo.icon;
+    $('levelUpNewLevel').textContent = `Level ${levelInfo.level}`;
+    $('levelUpNewTitle').textContent = levelInfo.title;
+    
+    // Show reward notification for level 5
+    const rewardEl = $('levelUpReward');
+    if (rewardEl) {
+        if (levelInfo.level === 5) {
+            showElement(rewardEl);
+        } else {
+            hideElement(rewardEl);
+        }
+    }
+    
+    showElement(modal);
+};
+
+// Close level up modal
+window.closeLevelUpModal = function() {
+    hideElement($('levelUpModal'));
+};
+
+// Setup celebration listener
+window.setupCelebrationListener = function() {
+    db.collection('settings').doc('celebrations').onSnapshot(doc => {
+        if (!doc.exists) return;
+        
+        const data = doc.data();
+        const active = data.active || [];
+        
+        // Filter to non-expired, non-dismissed celebrations
+        const now = new Date();
+        const validCelebrations = active.filter(cel => {
+            if (!cel.expiresAt) return false;
+            if (new Date(cel.expiresAt) < now) return false;
+            
+            // Check if user dismissed this one
+            const dismissedKey = `dismissed_${cel.id}`;
+            if (localStorage.getItem(dismissedKey)) return false;
+            
+            return true;
+        });
+        
+        if (validCelebrations.length > 0) {
+            // Show most recent celebration
+            const latest = validCelebrations[validCelebrations.length - 1];
+            showCelebrationBanner(latest);
+        } else {
+            hideCelebrationBanner();
+        }
+    }, error => {
+        console.log('[Celebrations] Listener error (may not have doc yet):', error.message);
+    });
+};
+
+// Show celebration banner
+window.showCelebrationBanner = function(celebration) {
+    const container = $('celebrationBannerContainer');
+    const iconEl = $('celebrationIcon');
+    const textEl = $('celebrationText');
+    
+    if (!container || !iconEl || !textEl) return;
+    
+    iconEl.textContent = celebration.icon || '🎉';
+    textEl.textContent = `${celebration.userName} ${celebration.message}`;
+    
+    // Store current celebration ID for dismissal
+    container.dataset.celebrationId = celebration.id;
+    
+    showElement(container);
+    
+    // Add padding to body to account for banner
+    document.body.style.paddingTop = '48px';
+};
+
+// Hide celebration banner
+window.hideCelebrationBanner = function() {
+    const container = $('celebrationBannerContainer');
+    if (container) {
+        hideElement(container);
+        document.body.style.paddingTop = '0';
+    }
+};
+
+// Dismiss celebration (user clicked X)
+window.dismissCelebration = function() {
+    const container = $('celebrationBannerContainer');
+    if (!container) return;
+    
+    const celebrationId = container.dataset.celebrationId;
+    if (celebrationId) {
+        localStorage.setItem(`dismissed_${celebrationId}`, 'true');
+    }
+    
+    hideCelebrationBanner();
+};
+
+// Escape HTML for safe rendering
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+}

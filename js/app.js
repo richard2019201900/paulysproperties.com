@@ -2914,6 +2914,11 @@ async function init() {
                 startPropertySyncListener();
             }
             
+            // Start real-time celebration listener (gamification banners)
+            if (typeof setupCelebrationListener === 'function') {
+                setupCelebrationListener();
+            }
+            
             // Start real-time listener for upgrade requests (admin only)
             if (typeof loadPendingUpgradeRequests === 'function') {
                 loadPendingUpgradeRequests();
