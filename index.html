@@ -758,71 +758,68 @@
                 
                 <!-- Right side: buttons + user -->
                 <div class="flex items-center gap-2 md:gap-3">
-                    <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden">+ New Listing</button>
-                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-4 lg:px-6 py-2 lg:py-3 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm lg:text-base">Register / Sign In</button>
+                    <!-- New Listing button - compact, only shown when logged in -->
+                    <button id="navCreateListingBtn" onclick="openCreateListingModal()" class="hidden bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-2 rounded-lg hover:opacity-90 transition font-semibold shadow-lg text-xs whitespace-nowrap">
+                        <span class="hidden sm:inline">+ New</span>
+                        <span class="sm:hidden">+</span>
+                    </button>
+                    
+                    <!-- Auth button - only shown when logged out -->
+                    <button id="navAuthBtn" onclick="handleAuthClick()" class="hidden md:block gradient-bg text-white px-4 py-2 rounded-xl hover:opacity-90 transition font-semibold shadow-lg text-sm">Register / Sign In</button>
                     
                     <!-- Logged-in user display with dropdown -->
-                    <div id="navUserDisplay" class="hidden items-center gap-2">
+                    <div id="navUserDisplay" class="hidden items-center">
                         <!-- Username area with dropdown -->
                         <div class="relative">
-                            <!-- All notification badges container - positioned ABOVE username -->
-                            <div id="allNavBadges" class="absolute -top-5 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5">
-                                <!-- Rent alert badge (for ALL property owners with rent due) -->
-                                <div id="ownerRentBadge" class="hidden">
-                                    <span class="bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border border-gray-900 cursor-pointer hover:bg-red-500 transition" onclick="goToDashboard()" title="💰 Rent payments need attention!">
-                                        <span id="ownerRentCount" class="text-[10px]">0</span>
-                                    </span>
-                                </div>
-                                <!-- Admin notification badges (admin only) -->
-                                <div id="adminNotificationBadges" class="hidden flex items-center gap-0.5">
-                                    <!-- Blue badge for new users -->
-                                    <span id="adminNewUserBadge" class="bg-blue-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border border-gray-900 cursor-pointer hover:bg-blue-400 transition" style="display: none;" onclick="showNewUserNotifications(event)" title="New users">
-                                        <span id="adminNewUserCount" class="text-[10px]">0</span>
-                                    </span>
-                                    <!-- Green badge for new listings -->
-                                    <span id="adminNewListingBadge" class="bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border border-gray-900 cursor-pointer hover:bg-green-400 transition" style="display: none;" onclick="showNewListingNotifications(event)" title="New listings">
-                                        <span id="adminNewListingCount" class="text-[10px]">0</span>
-                                    </span>
-                                    <!-- Amber badge for premium activations -->
-                                    <span id="adminNewPremiumBadge" class="bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border border-gray-900 cursor-pointer hover:bg-amber-400 transition" style="display: none;" onclick="showNewPremiumNotifications(event)" title="Premium activations">
-                                        <span id="adminNewPremiumCount" class="text-[10px]">0</span>
-                                    </span>
-                                    <!-- Orange badge for photo service requests (REVENUE!) -->
-                                    <span id="adminNewPhotoBadge" class="bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border border-gray-900 cursor-pointer hover:opacity-80 transition" style="display: none;" onclick="showNewPhotoNotifications(event)" title="📸 Photo service inquiries - $$$">
-                                        <span id="adminNewPhotoCount" class="text-[10px]">0</span>
-                                    </span>
-                                </div>
-                                <!-- User notification badge (for non-admin users) -->
-                                <div id="userNotificationBadge" class="hidden">
-                                    <span class="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="scrollToUserNotifications()" title="You have notifications!">
-                                        <span id="userNotificationCount" class="text-[10px]">!</span>
-                                    </span>
-                                </div>
+                            <!-- Notification indicator dot (shows when there are unread notifications) -->
+                            <div id="navNotificationDot" class="hidden absolute -top-1 -right-1 z-10">
+                                <span class="bg-red-500 w-3 h-3 rounded-full block animate-pulse shadow-lg"></span>
                             </div>
-                            <!-- Site update badge (shows above username when new update available) -->
-                            <div id="siteUpdateNavBadge" class="hidden absolute -top-2 -left-2 z-10">
-                                <span class="bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse border-2 border-gray-900 cursor-pointer hover:opacity-80 transition" onclick="toggleUserDropdown()" title="New site update!">
-                                    1
-                                </span>
+                            <div class="text-right cursor-pointer hover:bg-gray-700/50 px-3 py-2 rounded-xl transition flex items-center gap-2" onclick="toggleUserDropdown()">
+                                <div>
+                                    <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
+                                    <div id="navUserTier" class="text-xs text-gray-400"></div>
+                                </div>
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                             </div>
-                            <div class="text-right cursor-pointer hover:bg-gray-700/50 px-3 py-2 rounded-xl transition" onclick="toggleUserDropdown()">
-                                <div id="navUserName" class="text-white font-semibold text-xs lg:text-sm truncate max-w-[80px] lg:max-w-[120px]"></div>
-                                <div id="navUserTier" class="text-xs text-gray-400"></div>
-                            </div>
-                            <!-- User dropdown menu - now inside the relative container -->
-                            <div id="userDropdownMenu" class="hidden absolute right-0 top-full mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                                <a onclick="goToDashboard(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
-                                    <span class="text-lg">🏠</span>
-                                    <span class="font-medium">Dashboard</span>
+                            <!-- User dropdown menu -->
+                            <div id="userDropdownMenu" class="hidden absolute right-0 top-full mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                <!-- Dashboard with notification badges -->
+                                <a onclick="goToDashboard(); closeUserDropdown()" class="flex items-center justify-between px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-lg">🏠</span>
+                                        <span class="font-medium">Dashboard</span>
+                                    </div>
+                                    <!-- Notification badges inline -->
+                                    <div id="dropdownNotifBadges" class="flex items-center gap-1">
+                                        <span id="dropdownRentBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="Rent due">
+                                            <span id="dropdownRentCount">0</span>
+                                        </span>
+                                        <span id="dropdownUserBadge" class="hidden bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="New users">
+                                            <span id="dropdownUserCount">0</span>
+                                        </span>
+                                        <span id="dropdownListingBadge" class="hidden bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="New listings">
+                                            <span id="dropdownListingCount">0</span>
+                                        </span>
+                                        <span id="dropdownPremiumBadge" class="hidden bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="Premium">
+                                            <span id="dropdownPremiumCount">0</span>
+                                        </span>
+                                    </div>
                                 </a>
                                 <a onclick="goToProfileSettings(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
                                     <span class="text-lg">⚙️</span>
                                     <span class="font-medium">Profile Settings</span>
                                 </a>
-                                <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition relative">
-                                    <span class="text-lg">📰</span>
-                                    <span class="font-medium">Site Updates</span>
-                                    <span id="siteUpdateBadge" class="hidden absolute right-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg animate-pulse">1</span>
+                                <a onclick="navigateTo('leaderboard'); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                    <span class="text-lg">🏆</span>
+                                    <span class="font-medium">Leaderboard</span>
+                                </a>
+                                <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center justify-between px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-lg">📰</span>
+                                        <span class="font-medium">Site Updates</span>
+                                    </div>
+                                    <span id="siteUpdateBadge" class="hidden bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">1</span>
                                 </a>
                                 <a id="navUpgradeOption" onclick="openUpgradeModal('Upgrade your account', state.userTier || 'starter'); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-purple-400 hover:bg-gray-700 cursor-pointer transition">
                                     <span class="text-lg">⭐</span>

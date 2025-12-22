@@ -4911,19 +4911,26 @@ window.loadAllUsers = async function() {
         if (!window.knownUserIds) window.knownUserIds = new Set();
         users.forEach(u => window.knownUserIds.add(u.id));
         
-        // Auto-trigger gamification migration if any user lacks gamification data
-        if (typeof GamificationService !== 'undefined') {
+        // Auto-trigger gamification migration ONCE if any user lacks gamification data
+        // Only runs once per browser session to avoid repeated calls
+        if (typeof GamificationService !== 'undefined' && !window.gamificationMigrationTriggered) {
             const needsMigration = users.some(u => !u.gamification?.migrated);
             if (needsMigration) {
-                console.log('[Gamification] Users need migration, triggering Cloud Function...');
+                window.gamificationMigrationTriggered = true; // Prevent running again this session
+                console.log('[Gamification] First-time migration needed, triggering Cloud Function...');
                 try {
                     await GamificationService.triggerMigration();
                     // Reload users after migration to get updated data
                     const updatedUsers = await TierService.getAllUsers();
                     window.adminUsersData = updatedUsers;
+                    users = updatedUsers; // Use updated data for rendering
+                    console.log('[Gamification] Migration complete, users refreshed');
                 } catch (migrationError) {
                     console.error('[Gamification] Migration failed:', migrationError);
+                    window.gamificationMigrationTriggered = false; // Allow retry on error
                 }
+            } else {
+                console.log('[Gamification] All users already migrated');
             }
         }
         

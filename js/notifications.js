@@ -887,7 +887,20 @@ function updateAllBadges() {
     
     console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount });
     
-    // Update user badge
+    const total = userCount + listingCount + premiumCount + photoCount;
+    
+    // Update notification dot on username (shows when any notifications exist)
+    const notifDot = document.getElementById('navNotificationDot');
+    if (notifDot) {
+        notifDot.classList.toggle('hidden', total === 0);
+    }
+    
+    // Update DROPDOWN badges (new location - inside the menu)
+    updateDropdownBadge('dropdownUserBadge', 'dropdownUserCount', userCount);
+    updateDropdownBadge('dropdownListingBadge', 'dropdownListingCount', listingCount);
+    updateDropdownBadge('dropdownPremiumBadge', 'dropdownPremiumCount', premiumCount);
+    
+    // Legacy badge updates (keep for backward compatibility)
     const userBadge = document.getElementById('adminNewUserBadge');
     const userCountEl = document.getElementById('adminNewUserCount');
     if (userBadge && userCountEl) {
@@ -899,7 +912,6 @@ function updateAllBadges() {
         }
     }
     
-    // Update listing badge
     const listingBadge = document.getElementById('adminNewListingBadge');
     const listingCountEl = document.getElementById('adminNewListingCount');
     if (listingBadge && listingCountEl) {
@@ -911,7 +923,6 @@ function updateAllBadges() {
         }
     }
     
-    // Update premium badge
     const premiumBadge = document.getElementById('adminNewPremiumBadge');
     const premiumCountEl = document.getElementById('adminNewPremiumCount');
     if (premiumBadge && premiumCountEl) {
@@ -923,7 +934,6 @@ function updateAllBadges() {
         }
     }
     
-    // Update photo request badge (revenue generating - important!)
     const photoBadge = document.getElementById('adminNewPhotoBadge');
     const photoCountEl = document.getElementById('adminNewPhotoCount');
     if (photoBadge && photoCountEl) {
@@ -935,11 +945,23 @@ function updateAllBadges() {
         }
     }
     
-    // Update container visibility
     const badgesContainer = document.getElementById('adminNotificationBadges');
     if (badgesContainer) {
-        const total = userCount + listingCount + premiumCount + photoCount;
         badgesContainer.style.display = total > 0 ? 'flex' : 'none';
+    }
+}
+
+// Helper to update dropdown badges
+function updateDropdownBadge(badgeId, countId, count) {
+    const badge = document.getElementById(badgeId);
+    const countEl = document.getElementById(countId);
+    if (badge && countEl) {
+        if (count > 0) {
+            countEl.textContent = count > 9 ? '9+' : count;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
     }
 }
 
@@ -1002,104 +1024,116 @@ function formatNotificationTime(date) {
 }
 
 /**
- * Scroll to relevant section when notification clicked
- */
-/**
  * Navigate to the specific notification target (user, property, etc)
  * and highlight the relevant element
+ * 
+ * FLOW:
+ * 1. Navigate to dashboard page
+ * 2. Switch to Admin Panel tab
+ * 3. Refresh user data
+ * 4. Find and scroll to user card
+ * 5. If listing notification: expand properties and highlight the property
  */
 function navigateToNotificationTarget(type, data) {
-    console.log('[AdminNotify] Navigating to:', type.prefix, data);
+    console.log('[AdminNotify] Navigating to notification target:', type.prefix, data);
     
-    // First, switch to Admin Panel tab
-    const adminTabBtn = document.querySelector('[onclick*="showAdminPanel"]') || 
-                        document.querySelector('button:has-text("Admin Panel")');
+    // Step 1: Navigate to dashboard (this handles the page navigation)
+    if (typeof goToDashboard === 'function') {
+        goToDashboard();
+    } else {
+        // Fallback - set hash directly
+        window.location.hash = '#dashboard';
+    }
     
-    // Find and click Admin Panel tab/button
-    const tabs = document.querySelectorAll('#adminTab, [data-tab="admin"]');
-    tabs.forEach(tab => {
-        if (tab.textContent.includes('Admin Panel')) {
-            tab.click();
+    // Step 2: Wait for dashboard to load, then switch to admin tab
+    setTimeout(() => {
+        // Switch to Admin Panel tab
+        if (typeof switchDashboardTab === 'function') {
+            switchDashboardTab('admin');
+            console.log('[AdminNotify] Switched to admin tab');
+        }
+        
+        // Step 3: Refresh admin data if needed
+        if (typeof renderAdminUsersList === 'function' && window.adminUsersData) {
+            renderAdminUsersList(window.adminUsersData);
+        }
+        
+        // Step 4: Find and highlight the user/property
+        setTimeout(() => {
+            findAndHighlightTarget(type, data);
+        }, 500);
+        
+    }, 300);
+}
+
+/**
+ * Find the user card and highlight it, optionally expand and highlight property
+ */
+function findAndHighlightTarget(type, data) {
+    console.log('[AdminNotify] Finding target:', type.prefix, data);
+    
+    // Determine user email and property ID based on notification type
+    const userEmail = data?.email || data?.ownerEmail;
+    const propertyId = type === NOTIFICATION_TYPES.LISTING ? data?.id : null;
+    
+    if (!userEmail) {
+        console.warn('[AdminNotify] No user email found in notification data');
+        scrollToUsersSection();
+        return;
+    }
+    
+    // Find user card by email
+    let userCard = null;
+    const allUserCards = document.querySelectorAll('[data-userid]');
+    
+    allUserCards.forEach(card => {
+        const cardEmail = card.dataset.email?.toLowerCase();
+        if (cardEmail && userEmail && cardEmail === userEmail.toLowerCase()) {
+            userCard = card;
         }
     });
     
-    // Also try direct function call
-    if (typeof showAdminPanel === 'function') {
-        showAdminPanel();
+    if (!userCard) {
+        console.warn('[AdminNotify] User card not found for email:', userEmail);
+        scrollToUsersSection();
+        return;
     }
     
-    // Refresh admin panel data to ensure latest property counts are shown
-    if (typeof renderAdminUsersList === 'function' && window.adminUsersData) {
-        renderAdminUsersList(window.adminUsersData);
-    }
+    console.log('[AdminNotify] Found user card:', userCard.dataset.userid);
     
-    // Give DOM time to update
+    // Scroll to user card
+    userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Highlight the user card
+    userCard.style.boxShadow = '0 0 0 4px rgba(251, 191, 36, 0.75), 0 0 30px rgba(251, 191, 36, 0.3)';
+    userCard.style.transition = 'box-shadow 0.3s ease';
+    
     setTimeout(() => {
-        if (type === NOTIFICATION_TYPES.USER || type === NOTIFICATION_TYPES.LISTING || type === NOTIFICATION_TYPES.PREMIUM) {
-            // Find the user card
-            const userEmail = data?.email || data?.ownerEmail;
-            // For USER notifications, data.id is the userId
-            // For LISTING notifications, data.id is the propertyId and ownerEmail is the user
-            const userId = type === NOTIFICATION_TYPES.LISTING ? null : data?.id;
-            const propertyId = type === NOTIFICATION_TYPES.LISTING ? data?.id : null;
+        userCard.style.boxShadow = '';
+    }, 4000);
+    
+    // If this is a listing notification, expand and highlight the property
+    if (type === NOTIFICATION_TYPES.LISTING && propertyId) {
+        const userId = userCard.dataset.userid;
+        
+        setTimeout(() => {
+            // Find and expand the properties section
+            const propertiesSection = document.getElementById('userProperties_' + userId);
             
-            if (!userEmail && !userId) {
-                console.warn('[AdminNotify] No user identifier found in data');
-                scrollToUsersSection();
-                return;
+            if (propertiesSection && propertiesSection.classList.contains('hidden')) {
+                // Toggle the properties section open
+                if (typeof toggleUserProperties === 'function') {
+                    toggleUserProperties(userId);
+                    console.log('[AdminNotify] Expanded properties for user:', userId);
+                }
             }
             
-            // Find user card by email or ID
-            let userCard = null;
-            const allUserCards = document.querySelectorAll('[data-userid]');
-            
-            allUserCards.forEach(card => {
-                const cardEmail = card.dataset.email?.toLowerCase();
-                const cardUserId = card.dataset.userid;
-                
-                if ((userEmail && cardEmail === userEmail.toLowerCase()) || 
-                    (userId && cardUserId === userId)) {
-                    userCard = card;
-                }
-            });
-            
-            if (userCard) {
-                // Scroll to user card
-                userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Highlight the user card temporarily
-                userCard.classList.add('ring-4', 'ring-amber-400', 'ring-opacity-75');
-                setTimeout(() => {
-                    userCard.classList.remove('ring-4', 'ring-amber-400', 'ring-opacity-75');
-                }, 3000);
-                
-                // If this is a listing notification, expand properties and highlight the property
-                if (type === NOTIFICATION_TYPES.LISTING && propertyId) {
-                    setTimeout(() => {
-                        // Find the properties section for this user
-                        const userId = userCard.dataset.userid;
-                        const propertiesSection = document.getElementById('userProperties_' + userId);
-                        
-                        // If properties section is hidden, expand it
-                        if (propertiesSection && propertiesSection.classList.contains('hidden')) {
-                            // Use the toggleUserProperties function
-                            if (typeof toggleUserProperties === 'function') {
-                                toggleUserProperties(userId);
-                            }
-                        }
-                        
-                        // Highlight the specific property after expansion
-                        setTimeout(() => {
-                            highlightProperty(userCard, propertyId);
-                        }, 400);
-                    }, 500);
-                }
-            } else {
-                console.warn('[AdminNotify] User card not found for:', userEmail || userId);
-                scrollToUsersSection();
-            }
-        }
-    }, 300);
+            // Wait for expansion animation, then highlight the property
+            setTimeout(() => {
+                highlightProperty(userCard, propertyId);
+            }, 400);
+        }, 500);
+    }
 }
 
 /**
@@ -1124,8 +1158,9 @@ function highlightProperty(userCard, propertyId) {
         propertyEl.style.background = 'rgba(251, 191, 36, 0.3)';
         propertyEl.style.boxShadow = '0 0 20px rgba(251, 191, 36, 0.5)';
         propertyEl.style.borderRadius = '8px';
-        propertyEl.style.padding = '4px';
-        propertyEl.style.margin = '-4px';
+        propertyEl.style.padding = '8px';
+        propertyEl.style.margin = '-8px';
+        propertyEl.style.transition = 'all 0.3s ease';
         
         setTimeout(() => {
             propertyEl.style.background = '';
@@ -1133,7 +1168,7 @@ function highlightProperty(userCard, propertyId) {
             propertyEl.style.borderRadius = '';
             propertyEl.style.padding = '';
             propertyEl.style.margin = '';
-        }, 4000);
+        }, 5000);
     } else {
         console.warn('[AdminNotify] Property element not found for ID:', propertyId);
     }
