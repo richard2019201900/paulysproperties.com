@@ -5187,10 +5187,16 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                     nextDueDisplay = '<span class="text-red-400 font-bold">No payment recorded!</span>';
                 }
                 
-                // Build reminder message for clipboard
-                const reminderMsg = daysUntilDue !== null && daysUntilDue <= 1
-                    ? `Hey! Your premium listing for "${title}" is due${daysUntilDue < 0 ? ' (overdue)' : daysUntilDue === 0 ? ' today' : ' tomorrow'}! Premium keeps you at the top of search results & featured section. $${weeklyFee.toLocaleString()} to keep the spotlight on your property! 👑🏠`
-                    : `Hey! Your premium listing for "${title}" renewal is coming up on ${nextDueDisplay}. Keep the momentum going - premium listings get 3x more views! $${weeklyFee.toLocaleString()}/week to stay featured! 👑`;
+                // Plain text version of next due for reminder message
+                const nextDuePlainText = premiumLastPayment 
+                    ? (daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} days overdue` 
+                        : daysUntilDue === 0 ? 'today' 
+                        : daysUntilDue === 1 ? 'tomorrow'
+                        : `in ${daysUntilDue} days`)
+                    : 'not yet set';
+                
+                // Escape title for data attribute
+                const safeTitle = title.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                 
                 return `
                     <div class="flex flex-col gap-1 p-2 rounded-lg border ${urgencyClass}">
@@ -5209,7 +5215,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                                 class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1">
                                 💰 Record Payment
                             </button>
-                            <button onclick="copyPremiumReminder('${reminderMsg.replace(/'/g, "\\'")}')" 
+                            <button onclick="copyPremiumReminder('${safeTitle}', ${weeklyFee}, '${nextDuePlainText}')" 
                                 class="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
                                 title="Copy reminder message">
                                 📋 Copy Reminder
@@ -7215,8 +7221,20 @@ window.copyPhoneNumber = function(phone) {
     });
 };
 
-// Copy premium reminder message to clipboard
-window.copyPremiumReminder = function(message) {
+// Copy premium reminder message to clipboard - builds message from parameters
+window.copyPremiumReminder = function(title, weeklyFee, nextDue) {
+    // Decode HTML entities in title
+    const decodedTitle = title.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    
+    let message;
+    if (nextDue === 'today' || nextDue === 'tomorrow' || nextDue.includes('overdue')) {
+        message = `Hey! Your premium listing for "${decodedTitle}" is due ${nextDue}! Premium keeps you at the top of search results & featured section. $${weeklyFee.toLocaleString()} to keep the spotlight on your property! 👑🏠`;
+    } else if (nextDue === 'not yet set') {
+        message = `Hey! Just checking in on your premium listing for "${decodedTitle}". Premium listings get 3x more views and stay at the top! $${weeklyFee.toLocaleString()}/week to keep the momentum going! 👑`;
+    } else {
+        message = `Hey! Your premium listing for "${decodedTitle}" renewal is coming up ${nextDue}. Keep the momentum going - premium listings get 3x more views! $${weeklyFee.toLocaleString()}/week to stay featured! 👑`;
+    }
+    
     navigator.clipboard.writeText(message).then(() => {
         showToast('📋 Reminder copied! Send via in-city text.', 'success');
     }).catch(() => {
@@ -7230,23 +7248,20 @@ window.copyPremiumReminder = function(message) {
     });
 };
 
-// Record premium listing payment - stores in Firestore
+// Record premium listing payment - stores via PropertyDataService (settings/properties)
 window.recordPremiumPayment = async function(propertyId, ownerEmail) {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
     
     try {
-        // Update property in Firestore
-        await firebase.firestore().collection('properties').doc(String(propertyId)).update({
-            premiumLastPayment: dateStr,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Update local state
-        if (typeof PropertyDataService !== 'undefined') {
-            PropertyDataService.localData[propertyId] = PropertyDataService.localData[propertyId] || {};
-            PropertyDataService.localData[propertyId].premiumLastPayment = dateStr;
+        // Check if admin
+        if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+            showToast('Only admins can record premium payments', 'error');
+            return;
         }
+        
+        // Use PropertyDataService to write to the correct location (settings/properties)
+        await PropertyDataService.write(propertyId, 'premiumLastPayment', dateStr);
         
         showToast(`💰 Premium payment recorded for property #${propertyId}! Next due in 7 days.`, 'success');
         
