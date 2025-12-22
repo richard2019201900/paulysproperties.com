@@ -417,6 +417,19 @@ const GamificationService = {
             
             console.log('[Gamification] Migration result:', result.data);
             
+            // Store global migration completion flag in Firestore
+            // This prevents migration from ever running again
+            try {
+                await firebase.firestore().collection('settings').doc('gamification').set({
+                    migrationComplete: true,
+                    migrationDate: new Date().toISOString(),
+                    usersMigrated: result.data.migrated || 0
+                }, { merge: true });
+                console.log('[Gamification] Migration completion flag stored in Firestore');
+            } catch (flagError) {
+                console.warn('[Gamification] Could not store migration flag:', flagError);
+            }
+            
             if (typeof showToast === 'function') {
                 showToast(`Migration complete: ${result.data.migrated} users migrated`, 'success');
             }
@@ -432,14 +445,45 @@ const GamificationService = {
         }
     },
 
+    // Check if migration has already been completed (checks Firestore flag)
+    isMigrationComplete: async function() {
+        try {
+            const doc = await firebase.firestore().collection('settings').doc('gamification').get();
+            return doc.exists && doc.data()?.migrationComplete === true;
+        } catch (error) {
+            console.warn('[Gamification] Could not check migration status:', error);
+            return false;
+        }
+    },
+
     // Check and auto-trigger migration if needed (called from admin panel)
     checkAndTriggerMigration: async function(users) {
+        // First check the global flag - if migration is complete, never run again
+        const alreadyComplete = await this.isMigrationComplete();
+        if (alreadyComplete) {
+            console.log('[Gamification] Migration already complete (Firestore flag)');
+            return false;
+        }
+        
+        // Only check individual users if global flag not set
         const needsMigration = users.some(u => !u.gamification?.migrated);
         
         if (needsMigration) {
             console.log('[Gamification] Users need migration, triggering...');
             await this.triggerMigration();
             return true;
+        }
+        
+        // All users are migrated but flag wasn't set - set it now
+        console.log('[Gamification] All users migrated, setting completion flag');
+        try {
+            await firebase.firestore().collection('settings').doc('gamification').set({
+                migrationComplete: true,
+                migrationDate: new Date().toISOString(),
+                usersMigrated: users.length
+            }, { merge: true });
+        } catch (error) {
+            console.warn('[Gamification] Could not set migration flag:', error);
         }
         
         return false;

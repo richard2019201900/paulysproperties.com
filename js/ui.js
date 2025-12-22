@@ -4911,31 +4911,20 @@ window.loadAllUsers = async function() {
         if (!window.knownUserIds) window.knownUserIds = new Set();
         users.forEach(u => window.knownUserIds.add(u.id));
         
-        // Auto-trigger gamification migration ONCE per session if needed
-        // Uses sessionStorage to persist across page navigations
-        if (typeof GamificationService !== 'undefined') {
-            const migrationAttempted = sessionStorage.getItem('gamificationMigrationAttempted');
-            const needsMigration = users.some(u => !u.gamification?.migrated);
-            
-            if (needsMigration && !migrationAttempted) {
-                // Mark as attempted BEFORE calling to prevent re-triggers
-                sessionStorage.setItem('gamificationMigrationAttempted', 'true');
-                console.log('[Gamification] First-time migration needed, triggering Cloud Function...');
-                
-                try {
-                    await GamificationService.triggerMigration();
+        // Check if gamification migration is needed (checks Firestore flag first)
+        // This will only run once ever - the flag is stored in Firestore
+        if (typeof GamificationService !== 'undefined' && typeof GamificationService.checkAndTriggerMigration === 'function') {
+            try {
+                const migrationRan = await GamificationService.checkAndTriggerMigration(users);
+                if (migrationRan) {
                     // Reload users after migration to get updated data
                     const updatedUsers = await TierService.getAllUsers();
                     window.adminUsersData = updatedUsers;
-                    users = updatedUsers; // Use updated data for rendering
+                    users = updatedUsers;
                     console.log('[Gamification] Migration complete, users refreshed');
-                } catch (migrationError) {
-                    console.error('[Gamification] Migration failed:', migrationError);
-                    // Don't clear the flag - prevent spamming on error
                 }
-            } else if (!needsMigration) {
-                // All users migrated - ensure flag is set
-                sessionStorage.setItem('gamificationMigrationAttempted', 'true');
+            } catch (migrationError) {
+                console.error('[Gamification] Migration check failed:', migrationError);
             }
         }
         
