@@ -16,6 +16,7 @@ window.applyAllFilters = function() {
             'condos': 'condo', 
             'villas': 'villa',
             'hotels': 'hotel',
+            'offices': 'office',
             'warehouses': 'warehouse',
             'hideouts': 'hideout'
         };

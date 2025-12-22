@@ -1028,6 +1028,62 @@ window.goToDashboard = function() {
     }
 };
 
+// Go to Dashboard -> My Properties tab and highlight rent alerts
+window.goToRentAlerts = function() {
+    goToDashboard();
+    
+    setTimeout(() => {
+        // Switch to My Properties tab
+        if (typeof switchDashboardTab === 'function') {
+            switchDashboardTab('myProperties');
+        }
+        
+        // Scroll to rent notifications panel and highlight it
+        setTimeout(() => {
+            const rentPanel = $('rentNotificationsPanel');
+            if (rentPanel && !rentPanel.classList.contains('hidden')) {
+                rentPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add highlight effect
+                rentPanel.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.7), 0 0 30px rgba(239, 68, 68, 0.4)';
+                rentPanel.style.transition = 'box-shadow 0.3s ease';
+                
+                setTimeout(() => {
+                    rentPanel.style.boxShadow = '';
+                }, 4000);
+            }
+        }, 300);
+    }, 200);
+};
+
+// Go to Dashboard -> Admin Panel and scroll to notifications
+window.goToAdminNotifications = function(type) {
+    goToDashboard();
+    
+    setTimeout(() => {
+        // Switch to Admin Panel tab
+        if (typeof switchDashboardTab === 'function') {
+            switchDashboardTab('admin');
+        }
+        
+        // Scroll to notifications stack
+        setTimeout(() => {
+            const notifStack = $('adminNotificationsStack');
+            if (notifStack && !notifStack.classList.contains('hidden')) {
+                notifStack.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Highlight the stack
+                notifStack.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.7), 0 0 30px rgba(59, 130, 246, 0.4)';
+                notifStack.style.transition = 'box-shadow 0.3s ease';
+                
+                setTimeout(() => {
+                    notifStack.style.boxShadow = '';
+                }, 4000);
+            }
+        }, 300);
+    }, 200);
+};
+
 window.backToDashboard = function() {
     hideElement($('propertyStatsPage'));
     hideElement($('blogPage'));
@@ -5071,6 +5127,112 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             }).join('')
             : '<p class="text-gray-500 text-xs italic">No properties listed</p>';
         
+        // Build premium listings tracking section
+        let premiumTrackingHTML = '';
+        const premiumListings = userProperties.filter(p => {
+            const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+            const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
+            return isPremium && !isPremiumTrial;
+        });
+        
+        if (premiumListings.length > 0) {
+            const premiumItems = premiumListings.map(p => {
+                const title = p.title || p.name || 'Property';
+                const premiumLastPayment = PropertyDataService.getValue(p.id, 'premiumLastPayment', p.premiumLastPayment || '');
+                const weeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
+                
+                let lastPaidDisplay = 'Never';
+                let nextDueDisplay = 'Not set';
+                let daysUntilDue = null;
+                let statusColor = 'text-gray-400';
+                let statusIcon = '📅';
+                let urgencyClass = '';
+                
+                if (premiumLastPayment) {
+                    const [year, month, day] = premiumLastPayment.split('-').map(Number);
+                    const lastDate = new Date(year, month - 1, day);
+                    lastPaidDisplay = lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    
+                    const nextDate = new Date(lastDate);
+                    nextDate.setDate(nextDate.getDate() + 7); // Weekly premium
+                    nextDueDisplay = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    nextDate.setHours(0, 0, 0, 0);
+                    daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysUntilDue < 0) {
+                        statusColor = 'text-red-400';
+                        statusIcon = '🚨';
+                        urgencyClass = 'bg-red-900/40 border-red-500';
+                        nextDueDisplay = `<span class="font-bold text-red-400">${Math.abs(daysUntilDue)}d OVERDUE!</span>`;
+                    } else if (daysUntilDue === 0) {
+                        statusColor = 'text-orange-400';
+                        statusIcon = '⚠️';
+                        urgencyClass = 'bg-orange-900/40 border-orange-500';
+                        nextDueDisplay = `<span class="font-bold text-orange-400">DUE TODAY!</span>`;
+                    } else if (daysUntilDue <= 2) {
+                        statusColor = 'text-yellow-400';
+                        statusIcon = '📢';
+                        urgencyClass = 'bg-yellow-900/30 border-yellow-600';
+                    } else {
+                        statusColor = 'text-green-400';
+                        statusIcon = '✅';
+                        urgencyClass = 'bg-green-900/20 border-green-700';
+                    }
+                } else {
+                    urgencyClass = 'bg-red-900/40 border-red-500';
+                    statusIcon = '❓';
+                    nextDueDisplay = '<span class="text-red-400 font-bold">No payment recorded!</span>';
+                }
+                
+                // Build reminder message for clipboard
+                const reminderMsg = daysUntilDue !== null && daysUntilDue <= 1
+                    ? `Hey! Your premium listing for "${title}" is due${daysUntilDue < 0 ? ' (overdue)' : daysUntilDue === 0 ? ' today' : ' tomorrow'}! Premium keeps you at the top of search results & featured section. $${weeklyFee.toLocaleString()} to keep the spotlight on your property! 👑🏠`
+                    : `Hey! Your premium listing for "${title}" renewal is coming up on ${nextDueDisplay}. Keep the momentum going - premium listings get 3x more views! $${weeklyFee.toLocaleString()}/week to stay featured! 👑`;
+                
+                return `
+                    <div class="flex flex-col gap-1 p-2 rounded-lg border ${urgencyClass}">
+                        <div class="flex items-center justify-between">
+                            <span class="text-white font-medium text-xs flex items-center gap-1">
+                                ${statusIcon} 👑 ${title}
+                            </span>
+                            <span class="text-xs text-amber-400">$${weeklyFee.toLocaleString()}/wk</span>
+                        </div>
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-400">Last paid: <span class="${statusColor}">${lastPaidDisplay}</span></span>
+                            <span class="text-gray-400">Next due: ${nextDueDisplay}</span>
+                        </div>
+                        <div class="flex items-center justify-between mt-1">
+                            <button onclick="recordPremiumPayment(${p.id}, '${escapedEmail}')" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1">
+                                💰 Record Payment
+                            </button>
+                            <button onclick="copyPremiumReminder('${reminderMsg.replace(/'/g, "\\'")}')" 
+                                class="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
+                                title="Copy reminder message">
+                                📋 Copy Reminder
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            premiumTrackingHTML = `
+                <div class="mt-3 p-3 rounded-lg border border-amber-600/50 bg-amber-900/20">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lg">👑</span>
+                        <span class="text-amber-400 font-bold text-sm">Premium Listings (${premiumListings.length})</span>
+                        <span class="text-xs text-gray-400">Weekly fee tracking</span>
+                    </div>
+                    <div class="space-y-2">
+                        ${premiumItems}
+                    </div>
+                </div>
+            `;
+        }
+        
         const pendingBadge = hasPendingRequest ? `
             <span class="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse ml-2">
                 💰 WANTS ${(TIERS[pendingRequest?.requestedTier]?.name || 'Upgrade').toUpperCase()}
@@ -5327,6 +5489,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             ${propertiesHTML}
                         </div>
                         ${subscriptionHTML}
+                        ${premiumTrackingHTML}
                     </div>
                     ${actionButtons}
                 </div>
@@ -7050,6 +7213,52 @@ window.copyPhoneNumber = function(phone) {
         document.body.removeChild(textarea);
         showToast('📱 Phone copied: ' + digitsOnly, 'success');
     });
+};
+
+// Copy premium reminder message to clipboard
+window.copyPremiumReminder = function(message) {
+    navigator.clipboard.writeText(message).then(() => {
+        showToast('📋 Reminder copied! Send via in-city text.', 'success');
+    }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = message;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('📋 Reminder copied! Send via in-city text.', 'success');
+    });
+};
+
+// Record premium listing payment - stores in Firestore
+window.recordPremiumPayment = async function(propertyId, ownerEmail) {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    try {
+        // Update property in Firestore
+        await firebase.firestore().collection('properties').doc(String(propertyId)).update({
+            premiumLastPayment: dateStr,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update local state
+        if (typeof PropertyDataService !== 'undefined') {
+            PropertyDataService.localData[propertyId] = PropertyDataService.localData[propertyId] || {};
+            PropertyDataService.localData[propertyId].premiumLastPayment = dateStr;
+        }
+        
+        showToast(`💰 Premium payment recorded for property #${propertyId}! Next due in 7 days.`, 'success');
+        
+        // Re-render admin users list to update the display
+        if (window.adminUsersData && typeof renderAdminUsersList === 'function') {
+            renderAdminUsersList(window.adminUsersData);
+        }
+        
+    } catch (error) {
+        console.error('[Premium] Error recording payment:', error);
+        showToast('Error recording payment: ' + error.message, 'error');
+    }
 };
 
 window.exportUsersCSV = function() {

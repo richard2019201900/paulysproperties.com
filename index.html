@@ -790,18 +790,18 @@
                                         <span class="text-lg">🏠</span>
                                         <span class="font-medium">Dashboard</span>
                                     </div>
-                                    <!-- Notification badges inline -->
-                                    <div id="dropdownNotifBadges" class="flex items-center gap-1">
-                                        <span id="dropdownRentBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="Rent due">
+                                    <!-- Notification badges inline - each clickable separately -->
+                                    <div id="dropdownNotifBadges" class="flex items-center gap-1" onclick="event.stopPropagation()">
+                                        <span id="dropdownRentBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-red-500" title="Rent due - Click to view" onclick="goToRentAlerts(); closeUserDropdown()">
                                             <span id="dropdownRentCount">0</span>
                                         </span>
-                                        <span id="dropdownUserBadge" class="hidden bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="New users">
+                                        <span id="dropdownUserBadge" class="hidden bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-blue-400" title="New users" onclick="goToAdminNotifications('users'); closeUserDropdown()">
                                             <span id="dropdownUserCount">0</span>
                                         </span>
-                                        <span id="dropdownListingBadge" class="hidden bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="New listings">
+                                        <span id="dropdownListingBadge" class="hidden bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-green-400" title="New listings" onclick="goToAdminNotifications('listings'); closeUserDropdown()">
                                             <span id="dropdownListingCount">0</span>
                                         </span>
-                                        <span id="dropdownPremiumBadge" class="hidden bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse" title="Premium">
+                                        <span id="dropdownPremiumBadge" class="hidden bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-amber-400" title="Premium" onclick="goToAdminNotifications('premium'); closeUserDropdown()">
                                             <span id="dropdownPremiumCount">0</span>
                                         </span>
                                     </div>
