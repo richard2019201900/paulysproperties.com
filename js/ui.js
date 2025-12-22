@@ -5056,7 +5056,7 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
                 const premiumIndicator = isPremium ? '<span class="text-amber-400" title="Premium Listing - $10k/week">👑</span>' : '';
                 return `
-                    <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0 user-property-item" data-type="${p.type || ''}" data-interior="${p.interiorType || ''}">
+                    <div class="flex items-center justify-between py-1.5 border-b border-gray-700/50 last:border-0 user-property-item transition-all duration-300" data-type="${p.type || ''}" data-interior="${p.interiorType || ''}" data-propertyid="${p.id}">
                         <span class="text-gray-300 text-xs flex items-center gap-1">
                             <span class="text-gray-500">${index + 1}.</span>
                             <span title="${(p.type || 'unknown').charAt(0).toUpperCase() + (p.type || 'unknown').slice(1)}">${typeIcon}</span>

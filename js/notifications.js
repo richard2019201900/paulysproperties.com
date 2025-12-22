@@ -58,36 +58,6 @@ const NOTIFICATION_TYPES = {
         icon: '📸',
         title: '💰 Photo Service Inquiry!',
         storageKey: 'adminPendingPhotoRequests'
-    },
-    RENT_OVERDUE: {
-        prefix: 'rent-overdue-',
-        color: 'red',
-        bgGradient: 'from-red-600 to-red-700',
-        badgeColor: 'bg-red-600',
-        flashColor: 'red',
-        icon: '🚨',
-        title: 'Rent OVERDUE!',
-        storageKey: 'adminPendingRentOverdue'
-    },
-    RENT_TODAY: {
-        prefix: 'rent-today-',
-        color: 'red',
-        bgGradient: 'from-red-500 to-orange-500',
-        badgeColor: 'bg-red-500',
-        flashColor: 'red',
-        icon: '⏰',
-        title: 'Rent Due Today!',
-        storageKey: 'adminPendingRentToday'
-    },
-    RENT_TOMORROW: {
-        prefix: 'rent-tomorrow-',
-        color: 'yellow',
-        bgGradient: 'from-yellow-500 to-orange-400',
-        badgeColor: 'bg-yellow-500',
-        flashColor: 'yellow',
-        icon: '📅',
-        title: 'Rent Due Tomorrow',
-        storageKey: 'adminPendingRentTomorrow'
     }
 };
 
@@ -102,10 +72,6 @@ window.AdminNotifications = {
     seenListings: new Set(),
     seenPremium: new Set(),
     seenPhotoRequests: new Set(),
-    seenRentNotifications: new Set(), // Track acknowledged rent notifications
-    
-    // Track previous premium states for detecting changes (propId -> boolean)
-    previousPremiumStates: new Map(),
     
     // Currently visible notifications (keyed by full notification ID)
     visible: new Map(),
@@ -121,20 +87,12 @@ window.AdminNotifications = {
     listingsListenerActive: false,
     premiumListenerActive: false,
     photoRequestsListenerActive: false,
-    rentCheckActive: false,
     
     // First snapshot flags
     usersFirstSnapshot: true,
     listingsFirstSnapshot: true,
     premiumFirstSnapshot: true,
-    photoRequestsFirstSnapshot: true,
-    
-    // Rent notification data
-    rentNotifications: {
-        overdue: [],   // Properties with overdue rent
-        today: [],     // Properties with rent due today
-        tomorrow: []   // Properties with rent due tomorrow
-    }
+    photoRequestsFirstSnapshot: true
 };
 
 // ============================================================================
@@ -147,8 +105,12 @@ window.AdminNotifications = {
  */
 window.initAdminNotifications = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        console.log('[AdminNotify] Not admin, skipping initialization');
         return;
     }
+    
+    console.log('[AdminNotify] Initializing notification system...');
+    
     // Set session start time
     AdminNotifications.sessionStart = new Date();
     
@@ -157,6 +119,8 @@ window.initAdminNotifications = function() {
     for (let i = 1; i <= 14; i++) {
         AdminNotifications.seenListings.add(i);
     }
+    console.log('[AdminNotify] Pre-populated base property IDs 1-14 as seen');
+    
     // Load dismissed from localStorage
     try {
         const dismissed = localStorage.getItem('adminDismissedNotifications');
@@ -176,6 +140,8 @@ window.initAdminNotifications = function() {
     
     // Initial badge update
     updateAllBadges();
+    
+    console.log('[AdminNotify] Initialization complete');
 };
 
 /**
@@ -221,8 +187,11 @@ function savePendingToStorage() {
 
 function startUserListener() {
     if (AdminNotifications.usersListenerActive) {
+        console.log('[AdminNotify:Users] Listener already active');
         return;
     }
+    
+    console.log('[AdminNotify:Users] Starting listener...');
     AdminNotifications.usersListenerActive = true;
     
     db.collection('users').onSnapshot((snapshot) => {
@@ -248,6 +217,7 @@ function startUserListener() {
                 
                 if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
                     // Real-time new user!
+                    console.log('[AdminNotify:Users] NEW USER:', data.email);
                     newUsers.push({
                         id: doc.id,
                         notifId: notifId,
@@ -277,6 +247,7 @@ function startUserListener() {
                             data: userData
                         }
                     });
+                    console.log('[AdminNotify:Users] Populated pending notification:', notifId);
                 }
             }
         });
@@ -293,6 +264,7 @@ function startUserListener() {
                 }
             });
             toRemove.forEach(id => {
+                console.log('[AdminNotify:Users] Removing stale:', id);
                 AdminNotifications.visible.delete(id);
                 AdminNotifications.dismissed.add(id);
             });
@@ -301,6 +273,8 @@ function startUserListener() {
         // Mark first snapshot complete
         if (isFirst) {
             AdminNotifications.usersFirstSnapshot = false;
+            console.log('[AdminNotify:Users] Initial load complete, seen', AdminNotifications.seenUsers.size, 'users');
+            
             // Re-render any pending notifications that are valid
             renderPendingNotifications(NOTIFICATION_TYPES.USER);
         }
@@ -341,24 +315,27 @@ function startUserListener() {
 }
 
 // ============================================================================
-// LISTING LISTENER (Also handles PREMIUM detection - single source of truth)
+// LISTING LISTENER
 // ============================================================================
 
 function startListingListener() {
     if (AdminNotifications.listingsListenerActive) {
+        console.log('[AdminNotify:Listings] Listener already active');
         return;
     }
+    
+    console.log('[AdminNotify:Listings] Starting listener...');
     AdminNotifications.listingsListenerActive = true;
     
     db.collection('settings').doc('properties').onSnapshot((doc) => {
         if (!doc.exists) {
+            console.log('[AdminNotify:Listings] No properties document');
             return;
         }
         
         const isFirst = AdminNotifications.listingsFirstSnapshot;
         const propsData = doc.data();
         const newListings = [];
-        const newPremiumActivations = []; // Track premium activations separately
         const currentListingIds = new Set();
         
         Object.keys(propsData).forEach(key => {
@@ -368,105 +345,79 @@ function startListingListener() {
             if (!prop || !prop.title) return;
             
             const notifId = NOTIFICATION_TYPES.LISTING.prefix + propId;
-            const premiumNotifId = NOTIFICATION_TYPES.PREMIUM.prefix + propId;
             currentListingIds.add(propId);
-            
-            // Get owner info
-            let ownerName = prop.ownerName;
-            if (!ownerName && prop.ownerEmail) {
-                ownerName = prop.ownerEmail.split('@')[0];
-            }
-            if (!ownerName) {
-                ownerName = 'Unknown Owner';
-            }
-            
-            // Determine if this is an admin listing (should be skipped for notifications)
-            const isBaseProperty = propId >= 1 && propId <= 14;
-            const hasAdminEmail = prop.ownerEmail && TierService.isMasterAdmin(prop.ownerEmail);
-            const isAdminListing = hasAdminEmail || isBaseProperty;
-            
-            // Track premium state for detecting changes
-            const currentPremiumState = prop.isPremium === true;
-            const previousPremiumState = AdminNotifications.previousPremiumStates.get(propId);
             
             // Check if this notification is pending (loaded from storage but needs content)
             const isPending = AdminNotifications.visible.has(notifId) && 
                               AdminNotifications.visible.get(notifId).pending === true;
             
-            // === NEW LISTING DETECTION ===
+            // Check if new to us
             if (!AdminNotifications.seenListings.has(propId)) {
                 AdminNotifications.seenListings.add(propId);
                 
-                // Store initial premium state
-                AdminNotifications.previousPremiumStates.set(propId, currentPremiumState);
+                // Determine if this is an admin listing (should be skipped)
+                // 1. ownerEmail matches admin email
+                // 2. Property ID 1-14 (base properties owned by admin)
+                // 3. No owner set AND it's a base property (1-14)
+                const isBaseProperty = propId >= 1 && propId <= 14;
+                const hasAdminEmail = prop.ownerEmail && TierService.isMasterAdmin(prop.ownerEmail);
+                const noOwnerSet = !prop.ownerEmail;
+                // Skip if admin email OR it's a base property (admin's default properties)
+                const isAdminListing = hasAdminEmail || isBaseProperty;
                 
                 if (!isFirst && !isAdminListing && !AdminNotifications.dismissed.has(notifId)) {
-                    // New listing notification
+                    console.log('[AdminNotify:Listings] NEW LISTING:', prop.title, 'by', prop.ownerEmail);
+                    
+                    // Get owner name with proper fallback
+                    let ownerName = prop.ownerName;
+                    if (!ownerName && prop.ownerEmail) {
+                        ownerName = prop.ownerEmail.split('@')[0];
+                    }
+                    if (!ownerName) {
+                        ownerName = 'Unknown Owner';
+                    }
+                    
                     newListings.push({
                         id: propId,
                         notifId: notifId,
                         title: prop.title,
                         ownerEmail: prop.ownerEmail,
                         ownerName: ownerName,
-                        isPremium: currentPremiumState,
+                        isPremium: prop.isPremium || false,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     });
-                    
-                    // If new listing is premium, also create a PREMIUM notification
-                    if (currentPremiumState && !AdminNotifications.dismissed.has(premiumNotifId)) {
-                        newPremiumActivations.push({
-                            id: propId,
-                            notifId: premiumNotifId,
-                            title: prop.title,
-                            ownerEmail: prop.ownerEmail,
-                            ownerName: ownerName,
-                            isNewListing: true, // Flag to indicate this came with a new listing
-                            createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
-                        });
-                    }
                 }
                 
                 // If this was a pending notification, populate its content
                 if (isPending && !isAdminListing) {
+                    let ownerName = prop.ownerName;
+                    if (!ownerName && prop.ownerEmail) {
+                        ownerName = prop.ownerEmail.split('@')[0];
+                    }
+                    if (!ownerName) {
+                        ownerName = 'Unknown Owner';
+                    }
+                    
                     const listingData = {
                         id: propId,
                         notifId: notifId,
                         title: prop.title,
                         ownerEmail: prop.ownerEmail,
                         ownerName: ownerName,
-                        isPremium: currentPremiumState,
+                        isPremium: prop.isPremium || false,
                         createdAt: prop.createdAt ? new Date(prop.createdAt) : new Date()
                     };
                     AdminNotifications.visible.set(notifId, {
                         type: 'listing',
                         content: {
-                            title: NOTIFICATION_TYPES.LISTING.title,
-                            message: `${prop.title} by ${ownerName}`,
+                            title: prop.isPremium ? 'New Premium Listing!' : NOTIFICATION_TYPES.LISTING.title,
+                            message: `${prop.title} by ${listingData.ownerName}`,
                             timestamp: listingData.createdAt,
                             data: listingData
                         }
                     });
+                    console.log('[AdminNotify:Listings] Populated pending notification:', notifId);
                 }
-            } else {
-                // === EXISTING PROPERTY - CHECK FOR PREMIUM STATE CHANGE ===
-                // Only detect changes after first snapshot (real-time changes)
-                if (!isFirst && previousPremiumState === false && currentPremiumState === true) {
-                    // Premium was just activated on an existing property!
-                    if (!isAdminListing && !AdminNotifications.dismissed.has(premiumNotifId)) {
-                        newPremiumActivations.push({
-                            id: propId,
-                            notifId: premiumNotifId,
-                            title: prop.title,
-                            ownerEmail: prop.ownerEmail,
-                            ownerName: ownerName,
-                            isNewListing: false, // Existing property, just enabled premium
-                            createdAt: new Date() // Use current time for the notification
-                        });
-                    }
-                }
-                
-                // Update stored premium state
-                AdminNotifications.previousPremiumStates.set(propId, currentPremiumState);
             }
         });
         
@@ -482,66 +433,34 @@ function startListingListener() {
                 }
             });
             toRemove.forEach(id => {
+                console.log('[AdminNotify:Listings] Removing stale:', id);
                 AdminNotifications.visible.delete(id);
                 AdminNotifications.dismissed.add(id);
-            });
-            
-            // Initialize premium states for all properties on first load
-            Object.keys(propsData).forEach(key => {
-                const propId = parseInt(key);
-                const prop = propsData[key];
-                if (prop && prop.title) {
-                    AdminNotifications.previousPremiumStates.set(propId, prop.isPremium === true);
-                }
             });
         }
         
         // Mark first snapshot complete
         if (isFirst) {
             AdminNotifications.listingsFirstSnapshot = false;
+            console.log('[AdminNotify:Listings] Initial load complete, seen', AdminNotifications.seenListings.size, 'listings');
+            
             // Re-render any pending notifications that are valid
             renderPendingNotifications(NOTIFICATION_TYPES.LISTING);
         }
         
         // Handle new listings
         if (newListings.length > 0) {
-            // Flash screen green for new listings
+            // Flash screen
             flashScreen(NOTIFICATION_TYPES.LISTING.flashColor);
             
-            // Create listing notifications
+            // Create notifications
             newListings.forEach(listing => {
                 createNotification(NOTIFICATION_TYPES.LISTING, listing.notifId, {
-                    title: NOTIFICATION_TYPES.LISTING.title,
+                    title: listing.isPremium ? 'New Premium Listing!' : NOTIFICATION_TYPES.LISTING.title,
                     message: `${listing.title} by ${listing.ownerName}`,
                     timestamp: listing.createdAt,
                     data: listing
                 });
-            });
-        }
-        
-        // Handle premium activations (separate prominent notifications)
-        if (newPremiumActivations.length > 0) {
-            // Flash screen gold for premium activations - this is money!
-            flashScreen(NOTIFICATION_TYPES.PREMIUM.flashColor);
-            
-            // Create premium notifications
-            newPremiumActivations.forEach(premium => {
-                const titleText = premium.isNewListing 
-                    ? '👑 New Premium Listing!' 
-                    : '👑 Premium Activated!';
-                const messageText = premium.isNewListing
-                    ? `${premium.title} by ${premium.ownerName} - COLLECT $10k`
-                    : `${premium.title} enabled premium - COLLECT $10k`;
-                    
-                createNotification(NOTIFICATION_TYPES.PREMIUM, premium.notifId, {
-                    title: titleText,
-                    message: messageText,
-                    timestamp: premium.createdAt,
-                    data: premium
-                });
-                
-                // Mark as seen to prevent duplicate from old premium listener
-                AdminNotifications.seenPremium.add(premium.id);
             });
         }
         
@@ -555,15 +474,16 @@ function startListingListener() {
 }
 
 // ============================================================================
-// PREMIUM LISTENER (BACKUP - for manually written adminNotifications)
-// Primary premium detection is now in the LISTING listener (single source of truth)
-// This listener catches notifications written by the old togglePremium flow
+// PREMIUM LISTENER (Firestore-based)
 // ============================================================================
 
 function startPremiumListener() {
     if (AdminNotifications.premiumListenerActive) {
+        console.log('[AdminNotify:Premium] Listener already active');
         return;
     }
+    
+    console.log('[AdminNotify:Premium] Starting listener...');
     AdminNotifications.premiumListenerActive = true;
     
     // Query all undismissed notifications, then filter by type in JS
@@ -584,18 +504,12 @@ function startPremiumListener() {
                 
                 const notifId = NOTIFICATION_TYPES.PREMIUM.prefix + doc.id;
                 
-                // Skip if we already have a notification for this property from the listing listener
-                const propertyId = data.propertyId;
-                if (propertyId && AdminNotifications.seenPremium.has(propertyId)) {
-                    // Already notified via listing listener - skip duplicate
-                    return;
-                }
-                
                 // Check if new to us
                 if (!AdminNotifications.seenPremium.has(doc.id)) {
                     AdminNotifications.seenPremium.add(doc.id);
                     
                     if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
+                        console.log('[AdminNotify:Premium] NEW PREMIUM:', data.propertyTitle);
                         newPremium.push({
                             id: doc.id,
                             notifId: notifId,
@@ -622,6 +536,8 @@ function startPremiumListener() {
             // Mark first snapshot complete
             if (isFirst) {
                 AdminNotifications.premiumFirstSnapshot = false;
+                console.log('[AdminNotify:Premium] Initial load complete, seen', AdminNotifications.seenPremium.size, 'premium requests');
+                
                 // Render existing premium notifications
                 renderPendingNotifications(NOTIFICATION_TYPES.PREMIUM);
             }
@@ -658,8 +574,11 @@ function startPremiumListener() {
 
 function startPhotoRequestListener() {
     if (AdminNotifications.photoRequestsListenerActive) {
+        console.log('[AdminNotify:Photo] Listener already active');
         return;
     }
+    
+    console.log('[AdminNotify:Photo] Starting listener...');
     AdminNotifications.photoRequestsListenerActive = true;
     
     // Listen to photoServiceRequests collection
@@ -684,6 +603,7 @@ function startPhotoRequestListener() {
                     AdminNotifications.seenPhotoRequests.add(doc.id);
                     
                     if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
+                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail, 'Package:', data.packageType);
                         newRequests.push({
                             id: doc.id,
                             notifId: notifId,
@@ -710,6 +630,8 @@ function startPhotoRequestListener() {
             // Mark first snapshot complete
             if (isFirst) {
                 AdminNotifications.photoRequestsFirstSnapshot = false;
+                console.log('[AdminNotify:Photo] Initial load complete, seen', AdminNotifications.seenPhotoRequests.size, 'photo requests');
+                
                 // Render existing photo notifications
                 renderPendingNotifications(NOTIFICATION_TYPES.PHOTO);
             }
@@ -800,7 +722,11 @@ function renderNotificationCard(type, notifId, content) {
     const card = document.createElement('div');
     card.id = 'notification-' + notifId;
     card.className = `relative overflow-hidden rounded-xl shadow-lg cursor-pointer transform transition-all duration-300 hover:scale-[1.02] bg-gradient-to-r ${type.bgGradient}`;
-    card.onclick = () => scrollToRelevantSection(type);
+    
+    // Store data for navigation
+    card.dataset.notifType = type.prefix;
+    card.dataset.notifData = JSON.stringify(content.data || {});
+    card.onclick = () => navigateToNotificationTarget(type, content.data);
     
     card.innerHTML = `
         <div class="p-4">
@@ -857,6 +783,8 @@ function renderPendingNotifications(type) {
  * Dismiss a notification (admin notifications)
  */
 window.dismissAdminNotification = async function(notifId) {
+    console.log('[AdminNotify] Dismissing:', notifId);
+    
     // Add to dismissed set
     AdminNotifications.dismissed.add(notifId);
     
@@ -890,6 +818,7 @@ window.dismissAdminNotification = async function(notifId) {
                 dismissedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } catch (e) {
+            console.log('[AdminNotify] Firestore dismiss error (may be expected):', e.message);
         }
     }
     
@@ -902,6 +831,7 @@ window.dismissAdminNotification = async function(notifId) {
                 viewedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } catch (e) {
+            console.log('[AdminNotify] Photo request dismiss error:', e.message);
         }
     }
     
@@ -919,6 +849,8 @@ window.dismissAdminNotification = async function(notifId) {
  * Clear all notifications
  */
 window.clearAllAdminNotifications = async function() {
+    console.log('[AdminNotify] Clearing all notifications');
+    
     // Dismiss all visible
     const toRemove = Array.from(AdminNotifications.visible.keys());
     for (const notifId of toRemove) {
@@ -952,6 +884,9 @@ function updateAllBadges() {
             photoCount++;
         }
     });
+    
+    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount });
+    
     // Update user badge
     const userBadge = document.getElementById('adminNewUserBadge');
     const userCountEl = document.getElementById('adminNewUserCount');
@@ -1069,23 +1004,154 @@ function formatNotificationTime(date) {
 /**
  * Scroll to relevant section when notification clicked
  */
-function scrollToRelevantSection(type) {
-    if (type === NOTIFICATION_TYPES.USER) {
-        // Scroll to users section
-        const usersSection = document.getElementById('allUsersList');
-        if (usersSection) {
-            usersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+/**
+ * Navigate to the specific notification target (user, property, etc)
+ * and highlight the relevant element
+ */
+function navigateToNotificationTarget(type, data) {
+    console.log('[AdminNotify] Navigating to:', type.prefix, data);
+    
+    // First, switch to Admin Panel tab
+    const adminTabBtn = document.querySelector('[onclick*="showAdminPanel"]') || 
+                        document.querySelector('button:has-text("Admin Panel")');
+    
+    // Find and click Admin Panel tab/button
+    const tabs = document.querySelectorAll('#adminTab, [data-tab="admin"]');
+    tabs.forEach(tab => {
+        if (tab.textContent.includes('Admin Panel')) {
+            tab.click();
         }
-    } else if (type === NOTIFICATION_TYPES.LISTING) {
-        // Go to properties page
-        window.location.hash = 'properties';
-    } else if (type === NOTIFICATION_TYPES.PREMIUM) {
-        // Scroll to users section (premium info is there)
-        const usersSection = document.getElementById('allUsersList');
-        if (usersSection) {
-            usersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+    });
+    
+    // Also try direct function call
+    if (typeof showAdminPanel === 'function') {
+        showAdminPanel();
     }
+    
+    // Refresh admin panel data to ensure latest property counts are shown
+    if (typeof renderAdminUsersList === 'function' && window.adminUsersData) {
+        renderAdminUsersList(window.adminUsersData);
+    }
+    
+    // Give DOM time to update
+    setTimeout(() => {
+        if (type === NOTIFICATION_TYPES.USER || type === NOTIFICATION_TYPES.LISTING || type === NOTIFICATION_TYPES.PREMIUM) {
+            // Find the user card
+            const userEmail = data?.email || data?.ownerEmail;
+            // For USER notifications, data.id is the userId
+            // For LISTING notifications, data.id is the propertyId and ownerEmail is the user
+            const userId = type === NOTIFICATION_TYPES.LISTING ? null : data?.id;
+            const propertyId = type === NOTIFICATION_TYPES.LISTING ? data?.id : null;
+            
+            if (!userEmail && !userId) {
+                console.warn('[AdminNotify] No user identifier found in data');
+                scrollToUsersSection();
+                return;
+            }
+            
+            // Find user card by email or ID
+            let userCard = null;
+            const allUserCards = document.querySelectorAll('[data-userid]');
+            
+            allUserCards.forEach(card => {
+                const cardEmail = card.dataset.email?.toLowerCase();
+                const cardUserId = card.dataset.userid;
+                
+                if ((userEmail && cardEmail === userEmail.toLowerCase()) || 
+                    (userId && cardUserId === userId)) {
+                    userCard = card;
+                }
+            });
+            
+            if (userCard) {
+                // Scroll to user card
+                userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Highlight the user card temporarily
+                userCard.classList.add('ring-4', 'ring-amber-400', 'ring-opacity-75');
+                setTimeout(() => {
+                    userCard.classList.remove('ring-4', 'ring-amber-400', 'ring-opacity-75');
+                }, 3000);
+                
+                // If this is a listing notification, expand properties and highlight the property
+                if (type === NOTIFICATION_TYPES.LISTING && propertyId) {
+                    setTimeout(() => {
+                        // Find the properties section for this user
+                        const userId = userCard.dataset.userid;
+                        const propertiesSection = document.getElementById('userProperties_' + userId);
+                        
+                        // If properties section is hidden, expand it
+                        if (propertiesSection && propertiesSection.classList.contains('hidden')) {
+                            // Use the toggleUserProperties function
+                            if (typeof toggleUserProperties === 'function') {
+                                toggleUserProperties(userId);
+                            }
+                        }
+                        
+                        // Highlight the specific property after expansion
+                        setTimeout(() => {
+                            highlightProperty(userCard, propertyId);
+                        }, 400);
+                    }, 500);
+                }
+            } else {
+                console.warn('[AdminNotify] User card not found for:', userEmail || userId);
+                scrollToUsersSection();
+            }
+        }
+    }, 300);
+}
+
+/**
+ * Highlight a specific property in a user card
+ */
+function highlightProperty(userCard, propertyId) {
+    // Find properties section in this user card
+    const propertiesContainer = userCard.querySelector('[id^="userProperties_"]');
+    if (!propertiesContainer) {
+        console.warn('[AdminNotify] Properties container not found in user card');
+        return;
+    }
+    
+    // Find property element by data-propertyid attribute
+    const propertyEl = propertiesContainer.querySelector(`[data-propertyid="${propertyId}"]`);
+    
+    if (propertyEl) {
+        console.log('[AdminNotify] Found property element:', propertyId);
+        propertyEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Add highlight animation
+        propertyEl.style.background = 'rgba(251, 191, 36, 0.3)';
+        propertyEl.style.boxShadow = '0 0 20px rgba(251, 191, 36, 0.5)';
+        propertyEl.style.borderRadius = '8px';
+        propertyEl.style.padding = '4px';
+        propertyEl.style.margin = '-4px';
+        
+        setTimeout(() => {
+            propertyEl.style.background = '';
+            propertyEl.style.boxShadow = '';
+            propertyEl.style.borderRadius = '';
+            propertyEl.style.padding = '';
+            propertyEl.style.margin = '';
+        }, 4000);
+    } else {
+        console.warn('[AdminNotify] Property element not found for ID:', propertyId);
+    }
+}
+
+/**
+ * Fallback: scroll to users section
+ */
+function scrollToUsersSection() {
+    const usersSection = document.getElementById('allUsersList');
+    if (usersSection) {
+        usersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// Keep old function for backward compatibility
+function scrollToRelevantSection(type) {
+    navigateToNotificationTarget(type, {});
 }
 
 // ============================================================================
@@ -1106,307 +1172,11 @@ if (!document.getElementById('notification-flash-styles')) {
 }
 
 // ============================================================================
-// RENT DUE NOTIFICATION SYSTEM
-// ============================================================================
-
-/**
- * Check user's own properties for rent due dates and create notifications
- * Call this when dashboard loads and periodically
- * Works for all property owners, not just admin
- */
-window.checkRentDueNotifications = function() {
-    const userEmail = auth.currentUser?.email;
-    if (!userEmail) return;
-    
-    // Reset rent notification arrays
-    AdminNotifications.rentNotifications = {
-        overdue: [],
-        today: [],
-        tomorrow: []
-    };
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Get ONLY the current user's owned properties using OwnershipService
-    const ownedProperties = typeof OwnershipService !== 'undefined' 
-        ? OwnershipService.getPropertiesForOwner(userEmail)
-        : properties.filter(p => {
-            const ownerEmail = (p.ownerEmail || propertyOwnerEmail[p.id] || '').toLowerCase();
-            return ownerEmail === userEmail.toLowerCase();
-        });
-    
-    // Check only owned properties
-    ownedProperties.forEach(p => {
-        const isRented = state.availability[p.id] === false;
-        if (!isRented) return; // Skip available properties
-        
-        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
-        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
-        const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
-        
-        if (!lastPaymentDate || !paymentFrequency || !renterName) return;
-        
-        // Calculate next due date
-        const lastDate = parseLocalDate(lastPaymentDate);
-        const nextDate = new Date(lastDate);
-        
-        if (paymentFrequency === 'daily') {
-            nextDate.setDate(nextDate.getDate() + 1);
-        } else if (paymentFrequency === 'weekly') {
-            nextDate.setDate(nextDate.getDate() + 7);
-        } else if (paymentFrequency === 'biweekly') {
-            nextDate.setDate(nextDate.getDate() + 14);
-        } else {
-            nextDate.setMonth(nextDate.getMonth() + 1);
-        }
-        nextDate.setHours(0, 0, 0, 0);
-        
-        const daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
-        
-        // Get amount due
-        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
-        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
-        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
-        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
-        
-        let amountDue = weeklyPrice;
-        if (paymentFrequency === 'daily' && dailyPrice > 0) {
-            amountDue = dailyPrice;
-        } else if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
-            amountDue = biweeklyPrice;
-        } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
-            amountDue = monthlyPrice;
-        }
-        
-        const rentInfo = {
-            propertyId: p.id,
-            propertyTitle: p.title,
-            renterName: renterName,
-            daysUntilDue: daysUntilDue,
-            dueDate: nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-            amount: amountDue,
-            frequency: paymentFrequency
-        };
-        
-        // Categorize by urgency
-        if (daysUntilDue < 0) {
-            AdminNotifications.rentNotifications.overdue.push(rentInfo);
-        } else if (daysUntilDue === 0) {
-            AdminNotifications.rentNotifications.today.push(rentInfo);
-        } else if (daysUntilDue === 1) {
-            AdminNotifications.rentNotifications.tomorrow.push(rentInfo);
-        }
-    });
-    
-    // Update the rent badge
-    updateRentBadge();
-    
-    // Return summary for display
-    return AdminNotifications.rentNotifications;
-};
-
-/**
- * Update the rent notification badge in the navbar
- * Works for all property owners, not just admin
- */
-function updateRentBadge() {
-    const badge = document.getElementById('ownerRentBadge');
-    const countEl = document.getElementById('ownerRentCount');
-    
-    if (!badge || !countEl) return;
-    
-    const rentData = AdminNotifications.rentNotifications;
-    if (!rentData) {
-        badge.classList.add('hidden');
-        return;
-    }
-    
-    const { overdue, today, tomorrow } = rentData;
-    const total = overdue.length + today.length + tomorrow.length;
-    
-    if (total > 0) {
-        countEl.textContent = total;
-        badge.classList.remove('hidden');
-        
-        // Change badge color based on urgency
-        const innerBadge = badge.querySelector('span');
-        if (innerBadge) {
-            innerBadge.className = innerBadge.className.replace(/bg-\w+-\d+/g, '');
-            if (overdue.length > 0) {
-                innerBadge.classList.add('bg-red-600');
-            } else if (today.length > 0) {
-                innerBadge.classList.add('bg-red-500');
-            } else {
-                innerBadge.classList.add('bg-yellow-500');
-            }
-        }
-    } else {
-        badge.classList.add('hidden');
-    }
-}
-
-/**
- * Show rent notifications dropdown/modal
- */
-window.showRentNotifications = function(event) {
-    if (event) event.stopPropagation();
-    
-    const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
-    
-    // Build notification content
-    let content = '';
-    
-    if (overdue.length > 0) {
-        content += `<div class="mb-4">
-            <h4 class="text-red-400 font-bold mb-2 flex items-center gap-2">
-                <span>🚨</span> OVERDUE (${overdue.length})
-            </h4>
-            ${overdue.map(r => createRentNotificationItem(r, 'overdue')).join('')}
-        </div>`;
-    }
-    
-    if (today.length > 0) {
-        content += `<div class="mb-4">
-            <h4 class="text-orange-400 font-bold mb-2 flex items-center gap-2">
-                <span>⏰</span> Due Today (${today.length})
-            </h4>
-            ${today.map(r => createRentNotificationItem(r, 'today')).join('')}
-        </div>`;
-    }
-    
-    if (tomorrow.length > 0) {
-        content += `<div class="mb-4">
-            <h4 class="text-yellow-400 font-bold mb-2 flex items-center gap-2">
-                <span>📅</span> Due Tomorrow (${tomorrow.length})
-            </h4>
-            ${tomorrow.map(r => createRentNotificationItem(r, 'tomorrow')).join('')}
-        </div>`;
-    }
-    
-    if (!content) {
-        content = '<div class="text-center py-8 text-gray-400">✅ No upcoming rent payments due!</div>';
-    }
-    
-    // Create/show dropdown
-    showNotificationDropdown('rentDropdown', '💰 Rent Notifications', content);
-};
-
-/**
- * Create a single rent notification item
- */
-function createRentNotificationItem(rent, urgency) {
-    const bgClass = urgency === 'overdue' ? 'bg-red-900/30 border-red-500/50' 
-                  : urgency === 'today' ? 'bg-orange-900/30 border-orange-500/50'
-                  : 'bg-yellow-900/30 border-yellow-500/50';
-    
-    const daysText = rent.daysUntilDue < 0 
-        ? `${Math.abs(rent.daysUntilDue)} days overdue`
-        : rent.daysUntilDue === 0 
-        ? 'Due TODAY'
-        : 'Due tomorrow';
-    
-    return `
-        <div class="p-3 rounded-lg border ${bgClass} mb-2 cursor-pointer hover:opacity-80 transition" 
-             onclick="viewPropertyStats(${rent.propertyId}); closeAllDropdowns();">
-            <div class="flex justify-between items-start">
-                <div>
-                    <div class="font-bold text-white">${rent.propertyTitle}</div>
-                    <div class="text-sm text-gray-300">👤 ${rent.renterName}</div>
-                    <div class="text-sm text-gray-400">${rent.frequency} • $${rent.amount.toLocaleString()}</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-xs font-bold ${urgency === 'overdue' ? 'text-red-400' : urgency === 'today' ? 'text-orange-400' : 'text-yellow-400'}">${daysText}</div>
-                    <div class="text-xs text-gray-500">${rent.dueDate}</div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Generic function to show notification dropdown
- */
-function showNotificationDropdown(id, title, content) {
-    // Close any existing dropdowns first
-    closeAllDropdowns();
-    
-    // Create dropdown element
-    let dropdown = document.getElementById(id);
-    if (!dropdown) {
-        dropdown = document.createElement('div');
-        dropdown.id = id;
-        dropdown.className = 'fixed z-[100] bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-80 max-h-96 overflow-y-auto';
-        document.body.appendChild(dropdown);
-    }
-    
-    dropdown.innerHTML = `
-        <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-3 flex justify-between items-center">
-            <h3 class="font-bold text-white">${title}</h3>
-            <button onclick="closeAllDropdowns()" class="text-gray-400 hover:text-white">✕</button>
-        </div>
-        <div class="p-3">
-            ${content}
-        </div>
-    `;
-    
-    // Position near the badge
-    const badge = document.getElementById('adminRentBadge') || document.getElementById('adminNotificationBadges');
-    if (badge) {
-        const rect = badge.getBoundingClientRect();
-        dropdown.style.top = `${rect.bottom + 10}px`;
-        dropdown.style.right = `${window.innerWidth - rect.right}px`;
-    } else {
-        dropdown.style.top = '70px';
-        dropdown.style.right = '20px';
-    }
-    
-    dropdown.style.display = 'block';
-    
-    // Close on click outside
-    setTimeout(() => {
-        document.addEventListener('click', closeDropdownOnClickOutside);
-    }, 100);
-}
-
-function closeDropdownOnClickOutside(e) {
-    const dropdown = document.getElementById('rentDropdown');
-    if (dropdown && !dropdown.contains(e.target)) {
-        closeAllDropdowns();
-    }
-}
-
-window.closeAllDropdowns = function() {
-    const dropdowns = ['rentDropdown', 'userDropdown', 'listingDropdown', 'premiumDropdown', 'photoDropdown'];
-    dropdowns.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-    });
-    document.removeEventListener('click', closeDropdownOnClickOutside);
-};
-
-/**
- * Helper to parse local date strings consistently
- */
-function parseLocalDate(dateStr) {
-    if (!dateStr) return null;
-    // Handle ISO format or simple date format
-    if (dateStr.includes('T')) {
-        return new Date(dateStr);
-    }
-    // Parse YYYY-MM-DD or similar formats
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-        return new Date(parts[0], parts[1] - 1, parts[2]);
-    }
-    return new Date(dateStr);
-}
-
-// ============================================================================
 // EXPORTS
 // ============================================================================
 
 // Make key functions available globally
 window.updateAllBadges = updateAllBadges;
 window.NOTIFICATION_TYPES = NOTIFICATION_TYPES;
-window.updateRentBadge = updateRentBadge;
+
+console.log('[AdminNotify] Notification module loaded');
