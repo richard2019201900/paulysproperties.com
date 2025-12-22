@@ -92,7 +92,157 @@ window.AdminNotifications = {
     usersFirstSnapshot: true,
     listingsFirstSnapshot: true,
     premiumFirstSnapshot: true,
-    photoRequestsFirstSnapshot: true
+    photoRequestsFirstSnapshot: true,
+    
+    // Rent due notifications (populated by checkRentDueNotifications)
+    rentNotifications: {
+        overdue: [],
+        today: [],
+        tomorrow: []
+    }
+};
+
+// ============================================================================
+// RENT DUE NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Check all properties for rent due and populate rentNotifications
+ * This is called when dashboard loads to show rent alerts
+ */
+window.checkRentDueNotifications = function() {
+    console.log('[RentNotify] Checking rent due notifications...');
+    
+    // Reset the arrays
+    AdminNotifications.rentNotifications = {
+        overdue: [],
+        today: [],
+        tomorrow: []
+    };
+    
+    // Get current user email
+    const currentUserEmail = auth.currentUser?.email;
+    if (!currentUserEmail) {
+        console.log('[RentNotify] No user logged in');
+        return;
+    }
+    
+    // Get today's date (midnight)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Iterate through properties
+    if (typeof properties === 'undefined' || !properties.length) {
+        console.log('[RentNotify] No properties loaded');
+        return;
+    }
+    
+    // Filter to user's properties only (unless admin seeing all)
+    const isAdmin = typeof TierService !== 'undefined' && TierService.isMasterAdmin(currentUserEmail);
+    
+    properties.forEach(p => {
+        // Check ownership - only show user's own properties (or all for admin)
+        const ownerEmail = window.propertyOwnerEmail?.[p.id] || p.ownerEmail;
+        if (!isAdmin && ownerEmail?.toLowerCase() !== currentUserEmail.toLowerCase()) {
+            return;
+        }
+        
+        // Skip if property is available (not rented)
+        const isAvailable = window.state?.availability?.[p.id] !== false;
+        if (isAvailable) return;
+        
+        // Get payment data
+        const renterName = PropertyDataService?.getValue(p.id, 'renterName', p.renterName) || '';
+        if (!renterName) return; // No renter
+        
+        const lastPaymentDate = PropertyDataService?.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate) || '';
+        const paymentFrequency = PropertyDataService?.getValue(p.id, 'paymentFrequency', p.paymentFrequency) || 'weekly';
+        
+        if (!lastPaymentDate) return; // No payment date set
+        
+        // Calculate next due date
+        const lastDate = parseLocalDate(lastPaymentDate);
+        if (!lastDate) return;
+        
+        const nextDue = new Date(lastDate);
+        
+        switch (paymentFrequency) {
+            case 'daily':
+                nextDue.setDate(nextDue.getDate() + 1);
+                break;
+            case 'weekly':
+                nextDue.setDate(nextDue.getDate() + 7);
+                break;
+            case 'biweekly':
+                nextDue.setDate(nextDue.getDate() + 14);
+                break;
+            case 'monthly':
+                nextDue.setMonth(nextDue.getMonth() + 1);
+                break;
+            default:
+                nextDue.setDate(nextDue.getDate() + 7);
+        }
+        
+        nextDue.setHours(0, 0, 0, 0);
+        
+        // Get rent amount
+        const weeklyPrice = PropertyDataService?.getValue(p.id, 'weeklyPrice', p.weeklyPrice) || 0;
+        const biweeklyPrice = PropertyDataService?.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice) || 0;
+        const monthlyPrice = PropertyDataService?.getValue(p.id, 'monthlyPrice', p.monthlyPrice) || 0;
+        const dailyPrice = PropertyDataService?.getValue(p.id, 'dailyPrice', p.dailyPrice) || 0;
+        
+        let rentAmount = weeklyPrice;
+        if (paymentFrequency === 'daily') rentAmount = dailyPrice || Math.round(weeklyPrice / 7);
+        else if (paymentFrequency === 'biweekly') rentAmount = biweeklyPrice || weeklyPrice * 2;
+        else if (paymentFrequency === 'monthly') rentAmount = monthlyPrice || weeklyPrice * 4;
+        
+        // Create rent item
+        const rentItem = {
+            propertyId: p.id,
+            propertyTitle: p.title,
+            renterName: renterName,
+            nextDue: nextDue,
+            nextDueFormatted: nextDue.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+            amount: rentAmount,
+            frequency: paymentFrequency,
+            daysUntilDue: Math.ceil((nextDue - today) / (1000 * 60 * 60 * 24))
+        };
+        
+        // Categorize
+        if (nextDue < today) {
+            // Overdue
+            rentItem.daysOverdue = Math.ceil((today - nextDue) / (1000 * 60 * 60 * 24));
+            AdminNotifications.rentNotifications.overdue.push(rentItem);
+        } else if (nextDue.getTime() === today.getTime()) {
+            // Due today
+            AdminNotifications.rentNotifications.today.push(rentItem);
+        } else if (nextDue.getTime() === tomorrow.getTime()) {
+            // Due tomorrow
+            AdminNotifications.rentNotifications.tomorrow.push(rentItem);
+        }
+    });
+    
+    const { overdue, today: dueToday, tomorrow: dueTomorrow } = AdminNotifications.rentNotifications;
+    console.log('[RentNotify] Results:', {
+        overdue: overdue.length,
+        today: dueToday.length,
+        tomorrow: dueTomorrow.length
+    });
+    
+    // Update UI
+    if (typeof renderRentNotificationsPanel === 'function') {
+        renderRentNotificationsPanel();
+    }
+    
+    // Update badges
+    updateAllBadges();
+    
+    if (typeof updateMobileRentBadge === 'function') {
+        updateMobileRentBadge();
+    }
 };
 
 // ============================================================================
