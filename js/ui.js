@@ -1821,75 +1821,85 @@ function getAvailableCount() {
 }
 
 function calculateTotals() {
-    // Use owned properties for financial calculations, not all visible properties
+    // Use owned properties for financial calculations
     const ownedProps = getOwnedProperties();
-    const details = {
-        dailyPayers: [],    // Properties where renter pays daily
-        weeklyPayers: [],   // Properties where renter pays weekly
-        biweeklyPayers: [], // Properties where renter pays biweekly
-        monthlyPayers: [],  // Properties where renter pays monthly
-        available: []       // Available properties
-    };
     
-    // ACTUALS ONLY - no projections or conversions
-    // Weekly tile shows ONLY weekly payers' actual rates
-    // Monthly tile shows ONLY monthly payers' actual rates
-    let weeklyIncome = 0;   // Sum of weekly payers only
-    let monthlyIncome = 0;  // Sum of monthly payers only
+    // Categorize properties by payment frequency and status
+    const data = {
+        daily: { total: 0, properties: [] },
+        weekly: { total: 0, properties: [] },
+        biweekly: { total: 0, properties: [] },
+        monthly: { total: 0, properties: [] },
+        rented: [],
+        available: [],
+        premium: []
+    };
     
     ownedProps.forEach(p => {
         const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
-        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
         const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
-        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
         const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+        const premiumWeeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
         const isRented = state.availability[p.id] === false;
         
         const propInfo = {
             id: p.id,
             title: p.title,
+            renterName,
+            paymentFrequency,
             dailyPrice,
             weeklyPrice,
             biweeklyPrice,
             monthlyPrice,
-            renterName,
-            paymentFrequency
+            isPremium,
+            premiumWeeklyFee
         };
         
+        // Track premium listings
+        if (isPremium) {
+            data.premium.push(propInfo);
+        }
+        
         if (isRented) {
+            data.rented.push(propInfo);
+            
+            // ACTUALS ONLY - categorize by payment frequency
             if (paymentFrequency === 'daily') {
-                // Daily payer - use daily price, or calculate from weekly
-                const actualDaily = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
-                propInfo.effectivePrice = actualDaily;
-                details.dailyPayers.push(propInfo);
-                // NOT added to weeklyIncome - it's a daily rate, not weekly
+                const rate = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+                propInfo.rate = rate;
+                data.daily.total += rate;
+                data.daily.properties.push(propInfo);
             } else if (paymentFrequency === 'biweekly') {
-                // Biweekly payer - use biweekly price, or calculate from weekly
-                const actualBiweekly = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
-                propInfo.effectivePrice = actualBiweekly;
-                details.biweeklyPayers.push(propInfo);
-                // NOT added to weeklyIncome - it's a biweekly rate
+                const rate = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
+                propInfo.rate = rate;
+                data.biweekly.total += rate;
+                data.biweekly.properties.push(propInfo);
             } else if (paymentFrequency === 'monthly') {
-                // Monthly payer contributes to monthly total only
-                monthlyIncome += monthlyPrice;
-                propInfo.effectivePrice = monthlyPrice;
-                details.monthlyPayers.push(propInfo);
+                propInfo.rate = monthlyPrice;
+                data.monthly.total += monthlyPrice;
+                data.monthly.properties.push(propInfo);
             } else {
-                // Weekly payer (default) - adds to weekly total
-                weeklyIncome += weeklyPrice;
-                propInfo.effectivePrice = weeklyPrice;
-                details.weeklyPayers.push(propInfo);
+                // Default to weekly
+                propInfo.rate = weeklyPrice;
+                data.weekly.total += weeklyPrice;
+                data.weekly.properties.push(propInfo);
             }
         } else {
-            details.available.push(propInfo);
+            data.available.push(propInfo);
         }
     });
     
-    // Store details globally for the flip cards
-    window.incomeDetails = details;
+    // Store globally for breakdowns
+    window.dashboardData = data;
     
-    return { weekly: weeklyIncome, monthly: monthlyIncome, details };
+    return {
+        ownedCount: ownedProps.length,
+        data
+    };
 }
 
 // Flip card toggle
@@ -1897,177 +1907,132 @@ window.flipCard = function(card) {
     card.classList.toggle('flipped');
 };
 
-// Update breakdown panels - Shows ACTUAL rates per frequency, not projections
-function updateIncomeBreakdowns(details) {
-    const weeklyEl = $('weeklyBreakdown');
-    const monthlyEl = $('monthlyBreakdown');
-    const unitsEl = $('unitsBreakdown');
+// Update all 8 dashboard tiles
+function updateDashboardTiles(totals) {
+    const { ownedCount, data } = totals;
     
-    if (!weeklyEl || !monthlyEl || !unitsEl) return;
+    // === ROW 1: INCOME TILES ===
     
-    // Weekly breakdown - shows actual rates by frequency (no projections)
-    let weeklyHTML = '';
-    let itemNum = 1;
+    // Daily Income
+    $('dailyIncomeDisplay').textContent = formatPrice(data.daily.total);
+    $('dailyIncomeCount').textContent = `${data.daily.properties.length} renter${data.daily.properties.length !== 1 ? 's' : ''}`;
+    $('dailyBreakdown').innerHTML = renderPropertyList(data.daily.properties, 'daily');
     
-    // Daily renters - show actual daily rate
-    if (details.dailyPayers && details.dailyPayers.length > 0) {
-        weeklyHTML += `<div class="font-bold text-cyan-300 mb-1">Daily Renters (${details.dailyPayers.length}):</div>`;
-        let dailyTotal = 0;
-        details.dailyPayers.forEach(p => {
-            dailyTotal += p.effectivePrice;
-            weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
-                <span class="truncate mr-2"><span class="text-cyan-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-cyan-300">$${p.effectivePrice.toLocaleString()}<span class="text-cyan-400/60 text-xs">/day</span></span>
-            </div>`;
-            itemNum++;
-        });
-        weeklyHTML += `<div class="text-right text-cyan-200 font-bold text-xs mt-1 mb-2">Daily Total: $${dailyTotal.toLocaleString()}/day</div>`;
+    // Weekly Income
+    $('weeklyIncomeDisplay').textContent = formatPrice(data.weekly.total);
+    $('weeklyIncomeCount').textContent = `${data.weekly.properties.length} renter${data.weekly.properties.length !== 1 ? 's' : ''}`;
+    $('weeklyBreakdown').innerHTML = renderPropertyList(data.weekly.properties, 'weekly');
+    
+    // Biweekly Income
+    $('biweeklyIncomeDisplay').textContent = formatPrice(data.biweekly.total);
+    $('biweeklyIncomeCount').textContent = `${data.biweekly.properties.length} renter${data.biweekly.properties.length !== 1 ? 's' : ''}`;
+    $('biweeklyBreakdown').innerHTML = renderPropertyList(data.biweekly.properties, 'biweekly');
+    
+    // Monthly Income
+    $('monthlyIncomeDisplay').textContent = formatPrice(data.monthly.total);
+    $('monthlyIncomeCount').textContent = `${data.monthly.properties.length} renter${data.monthly.properties.length !== 1 ? 's' : ''}`;
+    $('monthlyBreakdown').innerHTML = renderPropertyList(data.monthly.properties, 'monthly');
+    
+    // === ROW 2: PROPERTY TILES ===
+    
+    // Total Listings
+    $('totalListingsDisplay').textContent = ownedCount;
+    $('totalListingsBreakdown').innerHTML = renderAllPropertiesList([...data.rented, ...data.available]);
+    
+    // Rented
+    const rentedCount = data.rented.length;
+    const rentedPercent = ownedCount > 0 ? Math.round((rentedCount / ownedCount) * 100) : 0;
+    $('rentedCountDisplay').textContent = rentedCount;
+    $('rentedPercentDisplay').textContent = `${rentedPercent}% occupied`;
+    $('rentedBreakdown').innerHTML = renderRentedList(data.rented);
+    
+    // Available
+    const availableCount = data.available.length;
+    const availablePercent = ownedCount > 0 ? Math.round((availableCount / ownedCount) * 100) : 0;
+    $('availableCountDisplay').textContent = availableCount;
+    $('availablePercentDisplay').textContent = `${availablePercent}% vacancy`;
+    $('availableBreakdown').innerHTML = renderAvailableList(data.available);
+    
+    // Premium
+    const premiumCount = data.premium.length;
+    const premiumIncome = data.premium.reduce((sum, p) => sum + (p.premiumWeeklyFee || 10000), 0);
+    $('premiumCountDisplay').textContent = premiumCount;
+    $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk fees`;
+    $('premiumBreakdown').innerHTML = renderPremiumList(data.premium);
+}
+
+// Render property list for income tiles
+function renderPropertyList(properties, frequency) {
+    if (properties.length === 0) {
+        return '<div class="opacity-70 italic">No renters at this frequency</div>';
     }
     
-    // Weekly renters - show actual weekly rate
-    if (details.weeklyPayers.length > 0) {
-        weeklyHTML += `<div class="font-bold text-blue-300 mb-1">Weekly Renters (${details.weeklyPayers.length}):</div>`;
-        let weeklyTotal = 0;
-        details.weeklyPayers.forEach(p => {
-            weeklyTotal += p.weeklyPrice;
-            weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
-                <span class="truncate mr-2"><span class="text-blue-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-green-300 font-bold">$${p.weeklyPrice.toLocaleString()}<span class="text-green-400/60 text-xs">/wk</span></span>
-            </div>`;
-            itemNum++;
-        });
-        weeklyHTML += `<div class="text-right text-green-200 font-bold text-xs mt-1 mb-2">Weekly Total: $${weeklyTotal.toLocaleString()}/wk</div>`;
+    const freqLabel = { daily: '/day', weekly: '/wk', biweekly: '/2wk', monthly: '/mo' };
+    
+    return properties.map((p, i) => `
+        <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+            <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+            <span class="font-bold whitespace-nowrap">$${p.rate.toLocaleString()}${freqLabel[frequency]}</span>
+        </div>
+    `).join('');
+}
+
+// Render all properties list (for Total Listings tile)
+function renderAllPropertiesList(properties) {
+    if (properties.length === 0) {
+        return '<div class="opacity-70 italic">No properties</div>';
     }
     
-    // Biweekly renters - show actual biweekly rate
-    if (details.biweeklyPayers && details.biweeklyPayers.length > 0) {
-        weeklyHTML += `<div class="font-bold text-purple-300 mb-1">Biweekly Renters (${details.biweeklyPayers.length}):</div>`;
-        let biweeklyTotal = 0;
-        details.biweeklyPayers.forEach(p => {
-            biweeklyTotal += p.effectivePrice;
-            weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
-                <span class="truncate mr-2"><span class="text-purple-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-purple-300">$${p.effectivePrice.toLocaleString()}<span class="text-purple-400/60 text-xs">/2wk</span></span>
-            </div>`;
-            itemNum++;
-        });
-        weeklyHTML += `<div class="text-right text-purple-200 font-bold text-xs mt-1 mb-2">Biweekly Total: $${biweeklyTotal.toLocaleString()}/2wk</div>`;
+    return properties.map((p, i) => {
+        const status = state.availability[p.id] === false ? '🔴' : '🟢';
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+                <span>${status}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render rented properties list
+function renderRentedList(properties) {
+    if (properties.length === 0) {
+        return '<div class="opacity-70 italic">No rented properties</div>';
     }
     
-    // Monthly renters - show actual monthly rate
-    if (details.monthlyPayers.length > 0) {
-        weeklyHTML += `<div class="font-bold text-yellow-300 mb-1">Monthly Renters (${details.monthlyPayers.length}):</div>`;
-        let monthlyTotal = 0;
-        details.monthlyPayers.forEach(p => {
-            monthlyTotal += p.monthlyPrice;
-            weeklyHTML += `<div class="flex justify-between py-0.5 border-b border-blue-700/30">
-                <span class="truncate mr-2"><span class="text-yellow-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-yellow-300">$${p.monthlyPrice.toLocaleString()}<span class="text-yellow-400/60 text-xs">/mo</span></span>
-            </div>`;
-            itemNum++;
-        });
-        weeklyHTML += `<div class="text-right text-yellow-200 font-bold text-xs mt-1">Monthly Total: $${monthlyTotal.toLocaleString()}/mo</div>`;
+    return properties.map((p, i) => `
+        <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+            <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+            <span class="text-sky-300 truncate max-w-[80px]">${p.renterName || 'Unknown'}</span>
+        </div>
+    `).join('');
+}
+
+// Render available properties list
+function renderAvailableList(properties) {
+    if (properties.length === 0) {
+        return '<div class="opacity-70 italic">All properties rented!</div>';
     }
     
-    if (!weeklyHTML) weeklyHTML = '<div class="opacity-70">No rented properties</div>';
-    weeklyEl.innerHTML = weeklyHTML;
-    
-    // Monthly breakdown - same as weekly, shows actual rates
-    // (Keep for now but with actual rates too)
-    let monthlyHTML = '';
-    itemNum = 1;
-    
-    // Monthly payers (direct)
-    if (details.monthlyPayers.length > 0) {
-        monthlyHTML += `<div class="font-bold text-green-300 mb-1">Monthly Renters (${details.monthlyPayers.length}):</div>`;
-        let monthlyTotal = 0;
-        details.monthlyPayers.forEach(p => {
-            monthlyTotal += p.monthlyPrice;
-            monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
-                <span class="truncate mr-2"><span class="text-green-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-green-300 font-bold">$${p.monthlyPrice.toLocaleString()}<span class="text-green-400/60 text-xs">/mo</span></span>
-            </div>`;
-            itemNum++;
-        });
-        monthlyHTML += `<div class="text-right text-green-200 font-bold text-xs mt-1 mb-2">Monthly Total: $${monthlyTotal.toLocaleString()}/mo</div>`;
+    return properties.map((p, i) => `
+        <div class="py-1 border-b border-white/10 last:border-0 truncate">
+            ${i + 1}. ${p.title}
+        </div>
+    `).join('');
+}
+
+// Render premium properties list
+function renderPremiumList(properties) {
+    if (properties.length === 0) {
+        return '<div class="opacity-70 italic">No premium listings</div>';
     }
     
-    // Biweekly payers
-    if (details.biweeklyPayers && details.biweeklyPayers.length > 0) {
-        monthlyHTML += `<div class="font-bold text-purple-300 mb-1">Biweekly Renters (${details.biweeklyPayers.length}):</div>`;
-        let biweeklyTotal = 0;
-        details.biweeklyPayers.forEach(p => {
-            biweeklyTotal += p.effectivePrice;
-            monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
-                <span class="truncate mr-2"><span class="text-purple-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-purple-300">$${p.effectivePrice.toLocaleString()}<span class="text-purple-400/60 text-xs">/2wk</span></span>
-            </div>`;
-            itemNum++;
-        });
-        monthlyHTML += `<div class="text-right text-purple-200 font-bold text-xs mt-1 mb-2">Biweekly Total: $${biweeklyTotal.toLocaleString()}/2wk</div>`;
-    }
-    
-    // Weekly renters - show actual weekly rate
-    if (details.weeklyPayers.length > 0) {
-        monthlyHTML += `<div class="font-bold text-blue-300 mb-1">Weekly Renters (${details.weeklyPayers.length}):</div>`;
-        let weeklyTotal = 0;
-        details.weeklyPayers.forEach(p => {
-            weeklyTotal += p.weeklyPrice;
-            monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
-                <span class="truncate mr-2"><span class="text-blue-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-blue-300">$${p.weeklyPrice.toLocaleString()}<span class="text-blue-400/60 text-xs">/wk</span></span>
-            </div>`;
-            itemNum++;
-        });
-        monthlyHTML += `<div class="text-right text-blue-200 font-bold text-xs mt-1 mb-2">Weekly Total: $${weeklyTotal.toLocaleString()}/wk</div>`;
-    }
-    
-    // Daily renters - show actual daily rate
-    if (details.dailyPayers && details.dailyPayers.length > 0) {
-        monthlyHTML += `<div class="font-bold text-cyan-300 mb-1">Daily Renters (${details.dailyPayers.length}):</div>`;
-        let dailyTotal = 0;
-        details.dailyPayers.forEach(p => {
-            dailyTotal += p.effectivePrice;
-            monthlyHTML += `<div class="flex justify-between py-0.5 border-b border-green-700/30">
-                <span class="truncate mr-2"><span class="text-cyan-400 mr-1">${itemNum}.</span>${p.title}</span>
-                <span class="text-cyan-300">$${p.effectivePrice.toLocaleString()}<span class="text-cyan-400/60 text-xs">/day</span></span>
-            </div>`;
-            itemNum++;
-        });
-        monthlyHTML += `<div class="text-right text-cyan-200 font-bold text-xs mt-1">Daily Total: $${dailyTotal.toLocaleString()}/day</div>`;
-    }
-    
-    if (!monthlyHTML) monthlyHTML = '<div class="opacity-70">No rented properties</div>';
-    monthlyEl.innerHTML = monthlyHTML;
-    
-    // Units breakdown
-    let unitsHTML = '';
-    let unitsNum = 1;
-    const rented = [
-        ...(details.dailyPayers || []), 
-        ...details.weeklyPayers, 
-        ...(details.biweeklyPayers || []),
-        ...details.monthlyPayers
-    ];
-    if (rented.length > 0) {
-        unitsHTML += '<div class="font-bold text-red-300 mb-1">🔴 Rented:</div>';
-        rented.forEach(p => {
-            unitsHTML += `<div class="flex justify-between py-0.5 border-b border-purple-700/30">
-                <span class="truncate mr-2"><span class="text-purple-400 mr-1">${unitsNum}.</span>${p.title}</span>
-                <span class="text-sky-300">${p.renterName || 'Unknown'}</span>
-            </div>`;
-            unitsNum++;
-        });
-    }
-    if (details.available.length > 0) {
-        unitsHTML += '<div class="font-bold text-green-300 mt-2 mb-1">🟢 Available:</div>';
-        details.available.forEach(p => {
-            unitsHTML += `<div class="py-0.5 border-b border-purple-700/30 truncate"><span class="text-purple-400 mr-1">${unitsNum}.</span>${p.title}</div>`;
-            unitsNum++;
-        });
-    }
-    if (!unitsHTML) unitsHTML = '<div class="opacity-70">No properties</div>';
-    unitsEl.innerHTML = unitsHTML;
+    return properties.map((p, i) => `
+        <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+            <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+            <span class="text-amber-300">$${(p.premiumWeeklyFee || 10000).toLocaleString()}/wk</span>
+        </div>
+    `).join('');
 }
 
 // ==================== RENDER FUNCTIONS ====================
@@ -2117,14 +2082,9 @@ function renderOwnerDashboard() {
     // Properties user actually OWNS (dashboard should only show your properties)
     const ownedProps = getOwnedProperties();
     
+    // Calculate and update all 8 dashboard tiles
     const totals = calculateTotals();
-    $('weeklyIncomeDisplay').textContent = formatPrice(totals.weekly);
-    $('monthlyIncomeDisplay').textContent = formatPrice(totals.monthly);
-    // Units Available uses OWNED properties count
-    $('unitsAvailableDisplay').textContent = `${getAvailableCount()}/${ownedProps.length}`;
-    
-    // Populate breakdown panels
-    updateIncomeBreakdowns(totals.details);
+    updateDashboardTiles(totals);
     
     if (ownedProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `

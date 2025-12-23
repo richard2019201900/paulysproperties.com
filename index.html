@@ -1397,66 +1397,175 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-12">
-                <!-- Weekly Income Flip Card -->
+            <!-- Row 1: Income Tiles (Actuals Only) -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-4">
+                <!-- Daily Income -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-2xl p-6 text-white border border-blue-500">
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-base md:text-lg font-bold opacity-90">Weekly Rental Income</h3>
-                                <svg class="w-7 h-7 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <p id="weeklyIncomeDisplay" class="text-3xl md:text-4xl font-black">$0</p>
-                            <p class="text-xs opacity-70 mt-2">Click for breakdown →</p>
-                        </div>
-                        <div class="flip-card-back bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl shadow-2xl p-4 text-white border border-blue-500 overflow-y-auto">
+                        <div class="flip-card-front bg-gradient-to-br from-cyan-600 to-cyan-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-cyan-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm font-bold">Rental Breakdown</h3>
-                                <span class="text-xs opacity-70">← Click to flip</span>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Daily Income</h3>
+                                <span class="text-xl">📅</span>
+                            </div>
+                            <p id="dailyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="dailyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-cyan-700 to-cyan-900 rounded-2xl shadow-2xl p-3 text-white border border-cyan-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Daily Renters</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="dailyBreakdown" class="text-xs space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weekly Income -->
+                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-blue-500">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Weekly Income</h3>
+                                <span class="text-xl">📆</span>
+                            </div>
+                            <p id="weeklyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="weeklyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl shadow-2xl p-3 text-white border border-blue-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Weekly Renters</h3>
+                                <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="weeklyBreakdown" class="text-xs space-y-1"></div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Monthly Income Flip Card -->
+
+                <!-- Biweekly Income -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-2xl p-6 text-white border border-green-500">
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-base md:text-lg font-bold opacity-90">Monthly Rental Income</h3>
-                                <svg class="w-7 h-7 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                            </div>
-                            <p id="monthlyIncomeDisplay" class="text-3xl md:text-4xl font-black">$0</p>
-                            <p class="text-xs opacity-70 mt-2">Click for breakdown →</p>
-                        </div>
-                        <div class="flip-card-back bg-gradient-to-br from-green-700 to-emerald-900 rounded-2xl shadow-2xl p-4 text-white border border-green-500 overflow-y-auto">
+                        <div class="flip-card-front bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-purple-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm font-bold">Rental Breakdown</h3>
-                                <span class="text-xs opacity-70">← Click to flip</span>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Biweekly Income</h3>
+                                <span class="text-xl">📊</span>
+                            </div>
+                            <p id="biweeklyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="biweeklyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-purple-700 to-purple-900 rounded-2xl shadow-2xl p-3 text-white border border-purple-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Biweekly Renters</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="biweeklyBreakdown" class="text-xs space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly Income -->
+                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-green-500">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Monthly Income</h3>
+                                <span class="text-xl">🗓️</span>
+                            </div>
+                            <p id="monthlyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="monthlyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-green-700 to-emerald-900 rounded-2xl shadow-2xl p-3 text-white border border-green-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Monthly Renters</h3>
+                                <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="monthlyBreakdown" class="text-xs space-y-1"></div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Units Available Flip Card -->
+            </div>
+
+            <!-- Row 2: Property Tiles -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
+                <!-- Total Listings -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl shadow-2xl p-6 text-white border border-purple-500">
-                            <div class="flex items-center justify-between mb-3">
-                                <h3 class="text-base md:text-lg font-bold opacity-90">Units Available</h3>
-                                <svg class="w-7 h-7 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-                            </div>
-                            <p id="unitsAvailableDisplay" class="text-3xl md:text-4xl font-black">0/0</p>
-                            <p class="text-xs opacity-70 mt-2">Click for breakdown →</p>
-                        </div>
-                        <div class="flip-card-back bg-gradient-to-br from-purple-700 to-purple-900 rounded-2xl shadow-2xl p-4 text-white border border-purple-500 overflow-y-auto">
+                        <div class="flip-card-front bg-gradient-to-br from-slate-600 to-slate-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-slate-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm font-bold">Units Breakdown</h3>
-                                <span class="text-xs opacity-70">← Click to flip</span>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Total Listings</h3>
+                                <span class="text-xl">🏠</span>
                             </div>
-                            <div id="unitsBreakdown" class="text-xs space-y-1"></div>
+                            <p id="totalListingsDisplay" class="text-2xl md:text-3xl font-black">0</p>
+                            <p class="text-xs opacity-70 mt-1">All properties</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl shadow-2xl p-3 text-white border border-slate-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">All Properties</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="totalListingsBreakdown" class="text-xs space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rented -->
+                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front bg-gradient-to-br from-red-600 to-red-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-red-500">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Rented</h3>
+                                <span class="text-xl">🔴</span>
+                            </div>
+                            <p id="rentedCountDisplay" class="text-2xl md:text-3xl font-black">0</p>
+                            <p id="rentedPercentDisplay" class="text-xs opacity-70 mt-1">0% occupied</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-red-700 to-red-900 rounded-2xl shadow-2xl p-3 text-white border border-red-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Rented Properties</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="rentedBreakdown" class="text-xs space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Available -->
+                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-emerald-500">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Available</h3>
+                                <span class="text-xl">🟢</span>
+                            </div>
+                            <p id="availableCountDisplay" class="text-2xl md:text-3xl font-black">0</p>
+                            <p id="availablePercentDisplay" class="text-xs opacity-70 mt-1">0% vacancy</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-emerald-700 to-emerald-900 rounded-2xl shadow-2xl p-3 text-white border border-emerald-500 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Available Properties</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="availableBreakdown" class="text-xs space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Premium -->
+                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front bg-gradient-to-br from-amber-500 to-yellow-600 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-amber-400">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Premium</h3>
+                                <span class="text-xl">👑</span>
+                            </div>
+                            <p id="premiumCountDisplay" class="text-2xl md:text-3xl font-black">0</p>
+                            <p id="premiumIncomeDisplay" class="text-xs opacity-70 mt-1">$0/wk fees</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-amber-600 to-yellow-700 rounded-2xl shadow-2xl p-3 text-white border border-amber-400 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Premium Listings</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="premiumBreakdown" class="text-xs space-y-1"></div>
                         </div>
                     </div>
                 </div>
