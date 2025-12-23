@@ -784,7 +784,12 @@ function setupRealtimeListener() {
                 
                 if (hasChanges) {
                     state.filteredProperties = [...properties];
-                    renderProperties(state.filteredProperties);
+                    // Apply filters including hideUnavailable if checked
+                    if (typeof applyAllFilters === 'function') {
+                        applyAllFilters();
+                    } else {
+                        renderProperties(state.filteredProperties);
+                    }
                     if (state.currentUser === 'owner') renderOwnerDashboard();
                 }
             }
@@ -1081,7 +1086,10 @@ window.startPropertySyncListener = function() {
             state.filteredProperties = [...properties];
             
             if (hasChanges && !isFirstSnapshot) {
-                if (typeof renderProperties === 'function') {
+                // Apply filters including hideUnavailable if checked
+                if (typeof applyAllFilters === 'function') {
+                    applyAllFilters();
+                } else if (typeof renderProperties === 'function') {
                     renderProperties(state.filteredProperties);
                 }
                 

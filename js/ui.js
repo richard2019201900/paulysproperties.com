@@ -1826,10 +1826,12 @@ function calculateTotals() {
     
     // Categorize properties by payment frequency and status
     const data = {
+        // Income tiles - will include trickle-down conversions
         daily: { total: 0, properties: [] },
         weekly: { total: 0, properties: [] },
         biweekly: { total: 0, properties: [] },
         monthly: { total: 0, properties: [] },
+        // Property tiles
         rented: [],
         available: [],
         premium: []
@@ -1843,6 +1845,7 @@ function calculateTotals() {
         const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+        const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
         const premiumWeeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
         const isRented = state.availability[p.id] === false;
         
@@ -1856,6 +1859,7 @@ function calculateTotals() {
             biweeklyPrice,
             monthlyPrice,
             isPremium,
+            isPremiumTrial,
             premiumWeeklyFee
         };
         
@@ -1867,26 +1871,73 @@ function calculateTotals() {
         if (isRented) {
             data.rented.push(propInfo);
             
-            // ACTUALS ONLY - categorize by payment frequency
-            if (paymentFrequency === 'daily') {
-                const rate = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
-                propInfo.rate = rate;
-                data.daily.total += rate;
-                data.daily.properties.push(propInfo);
+            // TRICKLE DOWN LOGIC:
+            // - Monthly trickles down to biweekly, weekly, daily
+            // - Biweekly trickles down to weekly, daily
+            // - Weekly trickles down to daily
+            // - Daily does NOT trickle up
+            
+            if (paymentFrequency === 'monthly') {
+                // Monthly: show actual
+                propInfo.rate = monthlyPrice;
+                propInfo.isConverted = false;
+                data.monthly.total += monthlyPrice;
+                data.monthly.properties.push({ ...propInfo });
+                
+                // Trickle down to biweekly (~monthly/2)
+                const biweeklyEquiv = Math.round(monthlyPrice / 2);
+                data.biweekly.total += biweeklyEquiv;
+                data.biweekly.properties.push({ ...propInfo, rate: biweeklyEquiv, isConverted: true, originalFreq: 'monthly' });
+                
+                // Trickle down to weekly (~monthly/4)
+                const weeklyEquiv = Math.round(monthlyPrice / 4);
+                data.weekly.total += weeklyEquiv;
+                data.weekly.properties.push({ ...propInfo, rate: weeklyEquiv, isConverted: true, originalFreq: 'monthly' });
+                
+                // Trickle down to daily (~monthly/30)
+                const dailyEquiv = Math.round(monthlyPrice / 30);
+                data.daily.total += dailyEquiv;
+                data.daily.properties.push({ ...propInfo, rate: dailyEquiv, isConverted: true, originalFreq: 'monthly' });
+                
             } else if (paymentFrequency === 'biweekly') {
                 const rate = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
                 propInfo.rate = rate;
+                propInfo.isConverted = false;
+                
+                // Biweekly: show actual
                 data.biweekly.total += rate;
-                data.biweekly.properties.push(propInfo);
-            } else if (paymentFrequency === 'monthly') {
-                propInfo.rate = monthlyPrice;
-                data.monthly.total += monthlyPrice;
-                data.monthly.properties.push(propInfo);
-            } else {
-                // Default to weekly
+                data.biweekly.properties.push({ ...propInfo });
+                
+                // Trickle down to weekly (~biweekly/2)
+                const weeklyEquiv = Math.round(rate / 2);
+                data.weekly.total += weeklyEquiv;
+                data.weekly.properties.push({ ...propInfo, rate: weeklyEquiv, isConverted: true, originalFreq: 'biweekly' });
+                
+                // Trickle down to daily (~biweekly/14)
+                const dailyEquiv = Math.round(rate / 14);
+                data.daily.total += dailyEquiv;
+                data.daily.properties.push({ ...propInfo, rate: dailyEquiv, isConverted: true, originalFreq: 'biweekly' });
+                
+            } else if (paymentFrequency === 'weekly' || !paymentFrequency) {
+                // Weekly (default): show actual
                 propInfo.rate = weeklyPrice;
+                propInfo.isConverted = false;
                 data.weekly.total += weeklyPrice;
-                data.weekly.properties.push(propInfo);
+                data.weekly.properties.push({ ...propInfo });
+                
+                // Trickle down to daily (~weekly/7)
+                const dailyEquiv = Math.round(weeklyPrice / 7);
+                data.daily.total += dailyEquiv;
+                data.daily.properties.push({ ...propInfo, rate: dailyEquiv, isConverted: true, originalFreq: 'weekly' });
+                
+            } else if (paymentFrequency === 'daily') {
+                // Daily: show actual ONLY - no trickle up
+                const rate = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+                propInfo.rate = rate;
+                propInfo.isConverted = false;
+                data.daily.total += rate;
+                data.daily.properties.push({ ...propInfo });
+                // Does NOT add to weekly, biweekly, or monthly
             }
         } else {
             data.available.push(propInfo);
@@ -1913,24 +1964,39 @@ function updateDashboardTiles(totals) {
     
     // === ROW 1: INCOME TILES ===
     
+    // Count actual (non-converted) renters per frequency
+    const dailyActual = data.daily.properties.filter(p => !p.isConverted).length;
+    const weeklyActual = data.weekly.properties.filter(p => !p.isConverted).length;
+    const biweeklyActual = data.biweekly.properties.filter(p => !p.isConverted).length;
+    const monthlyActual = data.monthly.properties.filter(p => !p.isConverted).length;
+    
     // Daily Income
     $('dailyIncomeDisplay').textContent = formatPrice(data.daily.total);
-    $('dailyIncomeCount').textContent = `${data.daily.properties.length} renter${data.daily.properties.length !== 1 ? 's' : ''}`;
+    const dailyConverted = data.daily.properties.length - dailyActual;
+    $('dailyIncomeCount').textContent = dailyActual > 0 
+        ? `${dailyActual} daily${dailyConverted > 0 ? ` + ${dailyConverted} equiv` : ''}`
+        : `${dailyConverted} equiv`;
     $('dailyBreakdown').innerHTML = renderPropertyList(data.daily.properties, 'daily');
     
     // Weekly Income
     $('weeklyIncomeDisplay').textContent = formatPrice(data.weekly.total);
-    $('weeklyIncomeCount').textContent = `${data.weekly.properties.length} renter${data.weekly.properties.length !== 1 ? 's' : ''}`;
+    const weeklyConverted = data.weekly.properties.length - weeklyActual;
+    $('weeklyIncomeCount').textContent = weeklyActual > 0 
+        ? `${weeklyActual} weekly${weeklyConverted > 0 ? ` + ${weeklyConverted} equiv` : ''}`
+        : `${weeklyConverted} equiv`;
     $('weeklyBreakdown').innerHTML = renderPropertyList(data.weekly.properties, 'weekly');
     
     // Biweekly Income
     $('biweeklyIncomeDisplay').textContent = formatPrice(data.biweekly.total);
-    $('biweeklyIncomeCount').textContent = `${data.biweekly.properties.length} renter${data.biweekly.properties.length !== 1 ? 's' : ''}`;
+    const biweeklyConverted = data.biweekly.properties.length - biweeklyActual;
+    $('biweeklyIncomeCount').textContent = biweeklyActual > 0 
+        ? `${biweeklyActual} biweekly${biweeklyConverted > 0 ? ` + ${biweeklyConverted} equiv` : ''}`
+        : `${biweeklyConverted} equiv`;
     $('biweeklyBreakdown').innerHTML = renderPropertyList(data.biweekly.properties, 'biweekly');
     
     // Monthly Income
     $('monthlyIncomeDisplay').textContent = formatPrice(data.monthly.total);
-    $('monthlyIncomeCount').textContent = `${data.monthly.properties.length} renter${data.monthly.properties.length !== 1 ? 's' : ''}`;
+    $('monthlyIncomeCount').textContent = `${monthlyActual} monthly`;
     $('monthlyBreakdown').innerHTML = renderPropertyList(data.monthly.properties, 'monthly');
     
     // === ROW 2: PROPERTY TILES ===
@@ -1955,26 +2021,44 @@ function updateDashboardTiles(totals) {
     
     // Premium
     const premiumCount = data.premium.length;
-    const premiumIncome = data.premium.reduce((sum, p) => sum + (p.premiumWeeklyFee || 10000), 0);
+    // Only count non-trial premium fees
+    const paidPremiums = data.premium.filter(p => !p.isPremiumTrial);
+    const trialCount = data.premium.filter(p => p.isPremiumTrial).length;
+    const premiumIncome = paidPremiums.reduce((sum, p) => sum + (p.premiumWeeklyFee || 10000), 0);
     $('premiumCountDisplay').textContent = premiumCount;
-    $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk fees`;
+    // Show "Free" if all are trials, otherwise show fee total
+    if (premiumCount === 0) {
+        $('premiumIncomeDisplay').textContent = 'No premium';
+    } else if (trialCount === premiumCount) {
+        $('premiumIncomeDisplay').textContent = 'All on trial';
+    } else if (trialCount > 0) {
+        $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk + ${trialCount} trial`;
+    } else {
+        $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk fees`;
+    }
     $('premiumBreakdown').innerHTML = renderPremiumList(data.premium);
 }
 
 // Render property list for income tiles
 function renderPropertyList(properties, frequency) {
     if (properties.length === 0) {
-        return '<div class="opacity-70 italic">No renters at this frequency</div>';
+        return '<div class="opacity-70 italic">No income at this frequency</div>';
     }
     
     const freqLabel = { daily: '/day', weekly: '/wk', biweekly: '/2wk', monthly: '/mo' };
+    const freqNames = { daily: 'daily', weekly: 'weekly', biweekly: 'biweekly', monthly: 'monthly' };
     
-    return properties.map((p, i) => `
-        <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
-            <span class="truncate mr-2">${i + 1}. ${p.title}</span>
-            <span class="font-bold whitespace-nowrap">$${p.rate.toLocaleString()}${freqLabel[frequency]}</span>
-        </div>
-    `).join('');
+    return properties.map((p, i) => {
+        const convertedNote = p.isConverted ? 
+            `<span class="text-white/50 text-[10px]"> (from ${freqNames[p.originalFreq]})</span>` : '';
+        const rateClass = p.isConverted ? 'text-white/70' : 'font-bold';
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${i + 1}. ${p.title}${convertedNote}</span>
+                <span class="${rateClass} whitespace-nowrap">$${p.rate.toLocaleString()}${freqLabel[frequency]}</span>
+            </div>
+        `;
+    }).join('');
 }
 
 // Render all properties list (for Total Listings tile)
@@ -2021,18 +2105,23 @@ function renderAvailableList(properties) {
     `).join('');
 }
 
-// Render premium properties list
+// Render premium properties list (handles trials)
 function renderPremiumList(properties) {
     if (properties.length === 0) {
         return '<div class="opacity-70 italic">No premium listings</div>';
     }
     
-    return properties.map((p, i) => `
-        <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
-            <span class="truncate mr-2">${i + 1}. ${p.title}</span>
-            <span class="text-amber-300">$${(p.premiumWeeklyFee || 10000).toLocaleString()}/wk</span>
-        </div>
-    `).join('');
+    return properties.map((p, i) => {
+        const feeDisplay = p.isPremiumTrial ? 
+            '<span class="text-cyan-300">Free Trial</span>' : 
+            `<span class="text-amber-300">$${(p.premiumWeeklyFee || 10000).toLocaleString()}/wk</span>`;
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+                ${feeDisplay}
+            </div>
+        `;
+    }).join('');
 }
 
 // ==================== RENDER FUNCTIONS ====================
