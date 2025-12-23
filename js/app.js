@@ -2936,7 +2936,13 @@ async function init() {
         }
     });
     
-    renderProperties(properties);
+    // Apply all filters (including hideUnavailable which is checked by default)
+    // This ensures the initial render respects the default filter state
+    if (typeof applyAllFilters === 'function') {
+        applyAllFilters();
+    } else {
+        renderProperties(properties);
+    }
 }
 
 // ============================================================================
