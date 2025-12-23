@@ -1413,15 +1413,31 @@ window.showPremiumRequestsList = function() {
         } else {
             listEl.innerHTML = notifs.map(({ notifId, data }) => {
                 const prem = data.data || {};
-                const propertyTitle = prem.propertyTitle || prem.title || 'Unknown Property';
-                const userName = prem.userName || prem.userEmail || 'Unknown User';
+                
+                // Extract property title - try multiple sources
+                let propertyTitle = prem.propertyTitle || prem.title || '';
+                if (!propertyTitle && prem.message) {
+                    // Try to extract from message: "PropertyName enabled premium..."
+                    const match = prem.message.match(/^(.+?)\s+enabled premium/);
+                    if (match) propertyTitle = match[1];
+                }
+                propertyTitle = propertyTitle || 'Unknown Property';
+                
+                // Extract owner - try multiple sources
+                const ownerDisplay = prem.ownerDisplayName || 
+                                   (prem.ownerEmail ? prem.ownerEmail.split('@')[0] : '') ||
+                                   prem.userEmail?.split('@')[0] || 
+                                   prem.userName || 
+                                   'Unknown User';
+                
+                const isTrial = prem.isTrial ? ' (Trial)' : ' - $10k/wk';
                 const createdAt = prem.createdAt ? new Date(prem.createdAt.seconds ? prem.createdAt.seconds * 1000 : prem.createdAt).toLocaleDateString() : '';
                 
                 return `
                     <div class="bg-amber-900/20 rounded-lg p-3 flex items-center justify-between">
                         <div>
-                            <div class="text-amber-200 font-semibold">${propertyTitle}</div>
-                            <div class="text-amber-400/60 text-xs">by ${userName} ${createdAt ? '• ' + createdAt : ''}</div>
+                            <div class="text-amber-200 font-semibold">${propertyTitle}${isTrial}</div>
+                            <div class="text-amber-400/60 text-xs">by ${ownerDisplay} ${createdAt ? '• ' + createdAt : ''}</div>
                         </div>
                         <button onclick="dismissSinglePremiumNotification('${notifId}')" 
                                 class="text-amber-400 hover:text-amber-300 text-sm px-2 py-1 rounded hover:bg-amber-900/30 transition">

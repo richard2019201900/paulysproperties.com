@@ -1654,6 +1654,19 @@ window.confirmPremiumEnable = async function(propertyId) {
         const currentUserEmail = auth.currentUser?.email?.toLowerCase();
         const ownerEmail = (p.ownerEmail || propertyOwnerEmail[propertyId] || '').toLowerCase();
         
+        // Get owner display name if available
+        let ownerDisplayName = '';
+        try {
+            const userDoc = await db.collection('users').doc(currentUserEmail).get();
+            if (userDoc.exists) {
+                ownerDisplayName = userDoc.data().displayName || currentUserEmail.split('@')[0];
+            } else {
+                ownerDisplayName = currentUserEmail.split('@')[0];
+            }
+        } catch (e) {
+            ownerDisplayName = currentUserEmail.split('@')[0];
+        }
+        
         if (!TierService.isMasterAdmin(currentUserEmail)) {
             // Property owner enabled premium - notify admin
             try {
@@ -1662,6 +1675,7 @@ window.confirmPremiumEnable = async function(propertyId) {
                     propertyId: propertyId,
                     propertyTitle: p.title,
                     ownerEmail: ownerEmail,
+                    ownerDisplayName: ownerDisplayName,
                     isTrial: isTrial,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     dismissed: false,
