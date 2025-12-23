@@ -1826,11 +1826,13 @@ function calculateTotals() {
     
     // Categorize properties by payment frequency and status
     const data = {
-        // Income tiles - Daily/Weekly/Biweekly are ACTUALS, Monthly is ESTIMATED
+        // Income tiles:
+        // Daily/Weekly/Biweekly = ACTUALS only
+        // Monthly = Monthly actuals + (Biweekly × 2) ONLY
         daily: { total: 0, properties: [] },
         weekly: { total: 0, properties: [] },
         biweekly: { total: 0, properties: [] },
-        monthly: { total: 0, properties: [] },  // Will include estimates from other frequencies
+        monthly: { total: 0, properties: [] },
         // Property tiles
         rented: [],
         available: [],
@@ -1871,22 +1873,20 @@ function calculateTotals() {
         if (isRented) {
             data.rented.push(propInfo);
             
-            // ACTUALS for Daily/Weekly/Biweekly - each frequency only shows its own renters
-            // ESTIMATED for Monthly - sums up all frequencies converted to monthly
+            // ACTUALS for Daily/Weekly/Biweekly
+            // Monthly Est = Monthly actuals + (Biweekly × 2) ONLY
+            // NO weekly×4, NO daily×30
             
             if (paymentFrequency === 'daily') {
+                // Daily: actuals only, does NOT add to monthly
                 const rate = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
                 propInfo.rate = rate;
                 propInfo.isConverted = false;
                 data.daily.total += rate;
                 data.daily.properties.push({ ...propInfo });
                 
-                // Add to monthly estimate (daily × 30)
-                const monthlyEstimate = rate * 30;
-                data.monthly.total += monthlyEstimate;
-                data.monthly.properties.push({ ...propInfo, rate: monthlyEstimate, isConverted: true, originalFreq: 'daily' });
-                
             } else if (paymentFrequency === 'biweekly') {
+                // Biweekly: actuals, ALSO adds to monthly estimate (×2)
                 const rate = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
                 propInfo.rate = rate;
                 propInfo.isConverted = false;
@@ -1899,23 +1899,18 @@ function calculateTotals() {
                 data.monthly.properties.push({ ...propInfo, rate: monthlyEstimate, isConverted: true, originalFreq: 'biweekly' });
                 
             } else if (paymentFrequency === 'monthly') {
-                // Monthly actual
+                // Monthly: actuals
                 propInfo.rate = monthlyPrice;
                 propInfo.isConverted = false;
                 data.monthly.total += monthlyPrice;
                 data.monthly.properties.push({ ...propInfo });
                 
             } else {
-                // Weekly (default) - actual
+                // Weekly (default): actuals only, does NOT add to monthly
                 propInfo.rate = weeklyPrice;
                 propInfo.isConverted = false;
                 data.weekly.total += weeklyPrice;
                 data.weekly.properties.push({ ...propInfo });
-                
-                // Add to monthly estimate (weekly × 4)
-                const monthlyEstimate = weeklyPrice * 4;
-                data.monthly.total += monthlyEstimate;
-                data.monthly.properties.push({ ...propInfo, rate: monthlyEstimate, isConverted: true, originalFreq: 'weekly' });
             }
         } else {
             data.available.push(propInfo);

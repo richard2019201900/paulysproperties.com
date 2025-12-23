@@ -1362,6 +1362,129 @@ if (!document.getElementById('notification-flash-styles')) {
 }
 
 // ============================================================================
+// PREMIUM NOTIFICATIONS ALERT MANAGEMENT
+// ============================================================================
+
+/**
+ * Update the premium notifications alert in admin panel
+ */
+function updatePremiumAlert() {
+    const alert = document.getElementById('pendingPremiumAlert');
+    const countEl = document.getElementById('pendingPremiumCount');
+    
+    if (!alert) return;
+    
+    // Count premium notifications
+    let premiumCount = 0;
+    const premiumNotifs = [];
+    
+    AdminNotifications.visible.forEach((data, notifId) => {
+        if (notifId.startsWith(NOTIFICATION_TYPES.PREMIUM.prefix) && !AdminNotifications.dismissed.has(notifId)) {
+            premiumCount++;
+            premiumNotifs.push({ notifId, data });
+        }
+    });
+    
+    if (premiumCount > 0) {
+        alert.classList.remove('hidden');
+        countEl.textContent = `${premiumCount} propert${premiumCount === 1 ? 'y needs' : 'ies need'} payment setup`;
+        
+        // Store for list rendering
+        window.pendingPremiumNotifs = premiumNotifs;
+    } else {
+        alert.classList.add('hidden');
+        window.pendingPremiumNotifs = [];
+    }
+}
+
+/**
+ * Show the list of premium requests
+ */
+window.showPremiumRequestsList = function() {
+    const listEl = document.getElementById('premiumRequestsList');
+    if (!listEl) return;
+    
+    if (listEl.classList.contains('hidden')) {
+        // Show list
+        const notifs = window.pendingPremiumNotifs || [];
+        
+        if (notifs.length === 0) {
+            listEl.innerHTML = '<div class="text-amber-400/50 text-sm">No pending premium requests</div>';
+        } else {
+            listEl.innerHTML = notifs.map(({ notifId, data }) => {
+                const prem = data.data || {};
+                const propertyTitle = prem.propertyTitle || prem.title || 'Unknown Property';
+                const userName = prem.userName || prem.userEmail || 'Unknown User';
+                const createdAt = prem.createdAt ? new Date(prem.createdAt.seconds ? prem.createdAt.seconds * 1000 : prem.createdAt).toLocaleDateString() : '';
+                
+                return `
+                    <div class="bg-amber-900/20 rounded-lg p-3 flex items-center justify-between">
+                        <div>
+                            <div class="text-amber-200 font-semibold">${propertyTitle}</div>
+                            <div class="text-amber-400/60 text-xs">by ${userName} ${createdAt ? '• ' + createdAt : ''}</div>
+                        </div>
+                        <button onclick="dismissSinglePremiumNotification('${notifId}')" 
+                                class="text-amber-400 hover:text-amber-300 text-sm px-2 py-1 rounded hover:bg-amber-900/30 transition">
+                            ✓ Done
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        listEl.classList.remove('hidden');
+    } else {
+        // Hide list
+        listEl.classList.add('hidden');
+    }
+};
+
+/**
+ * Dismiss a single premium notification
+ */
+window.dismissSinglePremiumNotification = async function(notifId) {
+    await dismissAdminNotification(notifId);
+    
+    // Update the alert
+    updatePremiumAlert();
+    
+    // Refresh the list if visible
+    const listEl = document.getElementById('premiumRequestsList');
+    if (listEl && !listEl.classList.contains('hidden')) {
+        listEl.classList.add('hidden');
+        showPremiumRequestsList();
+    }
+};
+
+/**
+ * Dismiss all premium notifications
+ */
+window.dismissAllPremiumNotifications = async function() {
+    const notifs = window.pendingPremiumNotifs || [];
+    
+    for (const { notifId } of notifs) {
+        await dismissAdminNotification(notifId);
+    }
+    
+    // Hide the alert
+    const alert = document.getElementById('pendingPremiumAlert');
+    if (alert) alert.classList.add('hidden');
+    
+    // Hide the list
+    const listEl = document.getElementById('premiumRequestsList');
+    if (listEl) listEl.classList.add('hidden');
+    
+    showToast('All premium notifications dismissed', 'success');
+};
+
+// Hook into badge updates to also update premium alert
+const originalUpdateAllBadges = updateAllBadges;
+updateAllBadges = function() {
+    originalUpdateAllBadges();
+    updatePremiumAlert();
+};
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
