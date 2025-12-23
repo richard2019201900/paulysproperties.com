@@ -525,7 +525,12 @@ function renderPropertyStatsContent(id) {
                 reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
             } else {
                 const daysOverdue = Math.abs(daysUntilDue);
-                reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                if (daysOverdue >= 3) {
+                    // 3+ days overdue - eviction warning
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
+                } else {
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                }
             }
         }
     }
@@ -796,18 +801,38 @@ function renderPropertyStatsContent(id) {
                 <!-- Complete Lease Action (only shows when renter is assigned) -->
                 ${renterName ? `
                 <div class="bg-gradient-to-r from-gray-800/80 to-gray-900/80 border border-gray-600 rounded-xl p-4 mb-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                            <h4 class="text-gray-200 font-bold flex items-center gap-2">
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                Renter Moving Out?
-                            </h4>
-                            <p class="text-gray-400 text-sm mt-1">Complete the lease to finalize payment history, clear renter info, and mark available</p>
+                    <div class="flex flex-col gap-4">
+                        <!-- Complete Lease -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h4 class="text-gray-200 font-bold flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    Renter Moving Out?
+                                </h4>
+                                <p class="text-gray-400 text-sm mt-1">Complete the lease to finalize payment history, clear renter info, and mark available</p>
+                            </div>
+                            <button onclick="showCompleteLeaseModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 whitespace-nowrap shadow-lg">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                Complete Lease
+                            </button>
                         </div>
-                        <button onclick="showCompleteLeaseModal(${id})" class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 whitespace-nowrap shadow-lg">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            Complete Lease
-                        </button>
+                        
+                        <div class="border-t border-gray-700"></div>
+                        
+                        <!-- Eviction -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <h4 class="text-gray-200 font-bold flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                                    Evict Renter?
+                                </h4>
+                                <p class="text-gray-400 text-sm mt-1">Remove renter for non-payment, clear their info, and mark property available</p>
+                            </div>
+                            <button onclick="showEvictionModal(${id})" class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 whitespace-nowrap shadow-lg">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                                Evict Renter
+                            </button>
+                        </div>
                     </div>
                 </div>
                 ` : ''}
@@ -3075,9 +3100,18 @@ window.showCompleteLeaseModal = async function(propertyId) {
                         </div>
                     </div>
                     
+                    <!-- Remove Keys checkbox -->
+                    <label class="flex items-center gap-3 cursor-pointer mb-3 bg-gray-800 p-3 rounded-lg border border-gray-700">
+                        <input type="checkbox" id="confirmKeysRemoved" class="w-5 h-5 rounded border-gray-600 text-amber-500 focus:ring-amber-500 bg-gray-700">
+                        <div>
+                            <span class="text-amber-400 font-semibold">🔑 Keys Removed</span>
+                            <p class="text-gray-400 text-xs">Confirm renter has returned all keys/access</p>
+                        </div>
+                    </label>
+                    
                     <!-- Confirmation checkbox -->
                     <label class="flex items-center gap-3 cursor-pointer mb-4">
-                        <input type="checkbox" id="confirmLeaseComplete" class="w-5 h-5 rounded border-gray-600 text-orange-500 focus:ring-orange-500 bg-gray-700">
+                        <input type="checkbox" id="confirmLeaseComplete" class="w-5 h-5 rounded border-gray-600 text-green-500 focus:ring-green-500 bg-gray-700">
                         <span class="text-gray-300">I confirm ${renterName} is moving out and the lease is complete</span>
                     </label>
                     
@@ -3086,7 +3120,7 @@ window.showCompleteLeaseModal = async function(propertyId) {
                         <button onclick="closeCompleteLeaseModal()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition">
                             Cancel
                         </button>
-                        <button id="completeLeaseBtn" onclick="completeLease(${propertyId})" disabled class="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-4 rounded-xl font-bold transition opacity-50 cursor-not-allowed flex items-center justify-center gap-2">
+                        <button id="completeLeaseBtn" onclick="completeLease(${propertyId})" disabled class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold transition opacity-50 cursor-not-allowed flex items-center justify-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             Complete Lease
                         </button>
@@ -3098,20 +3132,230 @@ window.showCompleteLeaseModal = async function(propertyId) {
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
-    // Add checkbox listener to enable/disable button
-    const checkbox = document.getElementById('confirmLeaseComplete');
+    // Add checkbox listeners - both must be checked to enable button
+    const keysCheckbox = document.getElementById('confirmKeysRemoved');
+    const confirmCheckbox = document.getElementById('confirmLeaseComplete');
     const btn = document.getElementById('completeLeaseBtn');
-    checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
+    
+    const updateButtonState = () => {
+        if (keysCheckbox.checked && confirmCheckbox.checked) {
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
-            btn.classList.add('hover:from-orange-600', 'hover:to-red-600');
+            btn.classList.add('hover:from-green-600', 'hover:to-emerald-700');
         } else {
             btn.disabled = true;
             btn.classList.add('opacity-50', 'cursor-not-allowed');
-            btn.classList.remove('hover:from-orange-600', 'hover:to-red-600');
+            btn.classList.remove('hover:from-green-600', 'hover:to-emerald-700');
         }
-    });
+    };
+    
+    keysCheckbox.addEventListener('change', updateButtonState);
+    confirmCheckbox.addEventListener('change', updateButtonState);
+};
+
+/**
+ * Show the Eviction modal
+ * For non-payment evictions with final message to renter
+ */
+window.showEvictionModal = async function(propertyId) {
+    // Prevent opening multiple modals
+    if (document.getElementById('evictionModal')) {
+        console.warn('[Eviction] Modal already open');
+        return;
+    }
+    
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) return;
+    
+    const renterName = PropertyDataService.getValue(propertyId, 'renterName', p.renterName || '');
+    
+    if (!renterName) {
+        showToast('No renter assigned to this property.', 'error');
+        viewPropertyStats(propertyId);
+        return;
+    }
+    
+    // Generate eviction message
+    const evictionMessage = `Hey ${renterName}, thank you for renting with us. Unfortunately, due to non-payment your property has been cleaned out and placed back on the market for rent. If you have any questions or believe this was done in error, please contact me.`;
+    
+    const modalHTML = `
+        <div id="evictionModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeEvictionModal()">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-red-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                        Evict Renter
+                    </h3>
+                    <p class="text-red-100 text-sm mt-1">${p.title}</p>
+                </div>
+                
+                <!-- Content -->
+                <div class="p-6">
+                    <!-- Renter Info -->
+                    <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-r from-red-500 to-red-600 flex items-center justify-center text-white font-bold text-lg">
+                                ${renterName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div class="text-white font-bold">${renterName}</div>
+                                <div class="text-red-400 text-sm">Being evicted for non-payment</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Eviction Message -->
+                    <div class="bg-red-900/30 border border-red-500/30 rounded-xl p-4 mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-red-400 font-bold flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                Eviction Message
+                            </h4>
+                            <button onclick="copyEvictionMessage()" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <textarea id="evictionMessageText" class="w-full bg-gray-800 text-gray-200 rounded-lg p-3 text-sm resize-none" rows="4">${evictionMessage}</textarea>
+                    </div>
+                    
+                    <!-- Warning -->
+                    <div class="bg-yellow-900/30 border border-yellow-500/30 rounded-xl p-4 mb-4">
+                        <div class="flex items-start gap-3">
+                            <svg class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            <div>
+                                <div class="text-yellow-400 font-bold text-sm">This will:</div>
+                                <ul class="text-yellow-200/80 text-sm mt-1 space-y-1">
+                                    <li>• Record eviction in payment history</li>
+                                    <li>• Clear renter name, phone, notes, and payment schedule</li>
+                                    <li>• Mark property as <span class="text-green-400 font-semibold">Available</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Remove Keys checkbox -->
+                    <label class="flex items-center gap-3 cursor-pointer mb-3 bg-gray-800 p-3 rounded-lg border border-gray-700">
+                        <input type="checkbox" id="confirmEvictionKeysRemoved" class="w-5 h-5 rounded border-gray-600 text-amber-500 focus:ring-amber-500 bg-gray-700">
+                        <div>
+                            <span class="text-amber-400 font-semibold">🔑 Keys Removed / Changed Locks</span>
+                            <p class="text-gray-400 text-xs">Confirm renter no longer has access</p>
+                        </div>
+                    </label>
+                    
+                    <!-- Confirmation checkbox -->
+                    <label class="flex items-center gap-3 cursor-pointer mb-4">
+                        <input type="checkbox" id="confirmEviction" class="w-5 h-5 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-700">
+                        <span class="text-gray-300">I confirm ${renterName} is being evicted for non-payment</span>
+                    </label>
+                    
+                    <!-- Actions -->
+                    <div class="flex gap-3">
+                        <button onclick="closeEvictionModal()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition">
+                            Cancel
+                        </button>
+                        <button id="evictBtn" onclick="processEviction(${propertyId})" disabled class="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-4 rounded-xl font-bold transition opacity-50 cursor-not-allowed flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                            Evict Renter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add checkbox listeners - both must be checked to enable button
+    const keysCheckbox = document.getElementById('confirmEvictionKeysRemoved');
+    const confirmCheckbox = document.getElementById('confirmEviction');
+    const btn = document.getElementById('evictBtn');
+    
+    const updateButtonState = () => {
+        if (keysCheckbox.checked && confirmCheckbox.checked) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            btn.classList.add('hover:from-red-700', 'hover:to-red-800');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.classList.remove('hover:from-red-700', 'hover:to-red-800');
+        }
+    };
+    
+    keysCheckbox.addEventListener('change', updateButtonState);
+    confirmCheckbox.addEventListener('change', updateButtonState);
+};
+
+/**
+ * Close eviction modal
+ */
+window.closeEvictionModal = function() {
+    const modal = document.getElementById('evictionModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Copy eviction message to clipboard
+ */
+window.copyEvictionMessage = function() {
+    const textarea = document.getElementById('evictionMessageText');
+    if (textarea) {
+        navigator.clipboard.writeText(textarea.value).then(() => {
+            showToast('Eviction message copied!', 'success');
+        }).catch(() => {
+            textarea.select();
+            document.execCommand('copy');
+            showToast('Eviction message copied!', 'success');
+        });
+    }
+};
+
+/**
+ * Process eviction - same as completeLease but with eviction flag
+ */
+window.processEviction = async function(propertyId) {
+    const btn = document.getElementById('evictBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Processing...';
+    
+    try {
+        const p = properties.find(prop => prop.id === propertyId);
+        const renterName = PropertyDataService.getValue(propertyId, 'renterName', '');
+        
+        // Record eviction in payment history
+        await recordPaymentHistory(propertyId, {
+            renterName: renterName,
+            type: 'eviction',
+            amount: 0,
+            paymentDate: new Date().toISOString().split('T')[0],
+            note: 'Evicted for non-payment'
+        });
+        
+        // Clear renter info (same as completeLease)
+        await PropertyDataService.write(propertyId, 'renterName', '');
+        await PropertyDataService.write(propertyId, 'renterPhone', '');
+        await PropertyDataService.write(propertyId, 'renterNotes', '');
+        await PropertyDataService.write(propertyId, 'lastPaymentDate', '');
+        await PropertyDataService.write(propertyId, 'paymentFrequency', '');
+        
+        // Mark as available
+        state.availability[propertyId] = true;
+        await saveAvailability(propertyId, true);
+        
+        closeEvictionModal();
+        showToast(`${renterName} has been evicted. Property marked as available.`, 'success');
+        
+        // Refresh the page
+        viewPropertyStats(propertyId);
+        renderOwnerDashboard();
+        
+    } catch (error) {
+        console.error('[Eviction] Error:', error);
+        showToast('Error processing eviction. Please try again.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg> Evict Renter';
+    }
 };
 
 /**
