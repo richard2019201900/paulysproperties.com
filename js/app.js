@@ -481,6 +481,12 @@ function renderPropertyStatsContent(id) {
     let daysUntilDue = null;
     let reminderScript = '';
     
+    // Check for active RTO
+    const hasActiveRTO = PropertyDataService.getValue(id, 'hasActiveRTO', p.hasActiveRTO || false);
+    const rtoCurrentPayment = PropertyDataService.getValue(id, 'rtoCurrentPayment', p.rtoCurrentPayment || 0);
+    const rtoTotalPayments = PropertyDataService.getValue(id, 'rtoTotalPayments', p.rtoTotalPayments || 0);
+    const rtoPaymentInfo = hasActiveRTO ? ` (Payment ${rtoCurrentPayment + 1} of ${rtoTotalPayments} - Rent-to-Own)` : '';
+    
     if (lastPaymentDate) {
         const lastDate = parseLocalDate(lastPaymentDate);
         const nextDate = new Date(lastDate);
@@ -520,16 +526,16 @@ function renderPropertyStatsContent(id) {
         
         if (renterName && daysUntilDue <= 1) {
             if (daysUntilDue === 1) {
-                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
             } else if (daysUntilDue === 0) {
-                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${nextDueDate}). Let me know if you have any questions!`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} is due today (${nextDueDate}). Let me know if you have any questions!`;
             } else {
                 const daysOverdue = Math.abs(daysUntilDue);
                 if (daysOverdue >= 3) {
                     // 3+ days overdue - eviction warning
-                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
                 } else {
-                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
                 }
             }
         }
@@ -837,7 +843,48 @@ function renderPropertyStatsContent(id) {
                 </div>
                 ` : ''}
                 
-                <!-- Private Owner Tools (always shows) -->
+                <!-- Private Owner Tools / Active RTO Status -->
+                ${hasActiveRTO ? `
+                <div class="bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-2 border-green-500/50 rounded-xl p-4 mb-4">
+                    <div class="flex flex-col gap-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-green-300 font-bold flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                Active Rent-to-Own Contract
+                                <span class="text-[10px] bg-green-900/50 text-green-200 px-2 py-0.5 rounded-full animate-pulse">ACTIVE</span>
+                            </h4>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                            <div class="bg-gray-800/50 rounded-lg p-2">
+                                <div class="text-gray-400 text-xs">Buyer</div>
+                                <div class="text-white font-semibold">${PropertyDataService.getValue(id, 'rtoBuyer', p.rtoBuyer || 'Unknown')}</div>
+                            </div>
+                            <div class="bg-gray-800/50 rounded-lg p-2">
+                                <div class="text-gray-400 text-xs">Payment Progress</div>
+                                <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
+                            </div>
+                            <div class="bg-gray-800/50 rounded-lg p-2">
+                                <div class="text-gray-400 text-xs">Monthly Amount</div>
+                                <div class="text-amber-400 font-semibold">$${monthlyPrice.toLocaleString()}</div>
+                            </div>
+                            <div class="bg-gray-800/50 rounded-lg p-2">
+                                <div class="text-gray-400 text-xs">Contract ID</div>
+                                <div class="text-gray-300 font-mono text-xs">${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || 'N/A')}</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="viewRTOContract('${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                View Contract
+                            </button>
+                            <button onclick="showRentToOwnWizard(${id})" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                New Contract
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ` : `
                 <div class="bg-gradient-to-r from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
@@ -854,6 +901,7 @@ function renderPropertyStatsContent(id) {
                         </button>
                     </div>
                 </div>
+                `}
                 
                 <!-- Reminder Script (only shows when due soon) -->
                 ${showReminderSection ? `
@@ -1357,6 +1405,29 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 paymentAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
             }
             
+            // Check for RTO and increment payment counter
+            const hasActiveRTO = PropertyDataService.getValue(propertyId, 'hasActiveRTO', p?.hasActiveRTO || false);
+            if (hasActiveRTO) {
+                const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', p?.rtoCurrentPayment || 0);
+                const newPaymentNumber = rtoCurrentPayment + 1;
+                await PropertyDataService.write(propertyId, 'rtoCurrentPayment', newPaymentNumber);
+                
+                // Also update the RTO contract in Firestore
+                const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', p?.rtoContractId || '');
+                if (rtoContractId) {
+                    try {
+                        await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                            currentPaymentNumber: newPaymentNumber,
+                            lastPaymentDate: newValue,
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } catch (e) {
+                        console.warn('[RTO] Could not update contract payment number:', e);
+                    }
+                }
+                console.log(`[RTO] Payment ${newPaymentNumber} recorded for contract ${rtoContractId}`);
+            }
+            
             // Log payment to Firestore
             const logSuccess = await logPayment(propertyId, {
                 paymentDate: newValue,
@@ -1364,7 +1435,8 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 renterName: renterName,
                 frequency: paymentFrequency,
                 amount: paymentAmount,
-                recordedBy: auth.currentUser?.email || 'owner'
+                recordedBy: auth.currentUser?.email || 'owner',
+                isRTOPayment: hasActiveRTO
             });
             // Calculate next due date for thank you message
             const lastDate = parseLocalDate(newValue);
@@ -1380,9 +1452,11 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             }
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             
-            // Show thank you message popup with copy functionality
+            // Show thank you message popup with copy functionality (include RTO info)
             if (logSuccess) {
-                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount);
+                const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', 0);
+                const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', 0);
+                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, hasActiveRTO ? { current: rtoCurrentPayment, total: rtoTotalPayments } : null);
             }
         }
         
@@ -1802,12 +1876,15 @@ window.logPayment = async function(propertyId, paymentData) {
 };
 
 // Show payment confirmation modal with copyable thank you message
-window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount) {
+window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, rtoInfo = null) {
     // Get first name only for friendlier message
     const firstName = renterName.split(' ')[0];
     
+    // Build RTO payment info string if applicable
+    const rtoPaymentStr = rtoInfo ? ` (Payment ${rtoInfo.current} of ${rtoInfo.total} in your Rent-to-Own agreement)` : '';
+    
     // Create the thank you message
-    const thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+    const thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
     
     // Create modal HTML
     const modalHTML = `
@@ -1817,6 +1894,7 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount) 
                     <div class="text-5xl mb-3">✅</div>
                     <h3 class="text-2xl font-bold text-green-400">Payment Logged!</h3>
                     <p class="text-gray-400 mt-1">$${amount.toLocaleString()} from ${renterName}</p>
+                    ${rtoInfo ? `<p class="text-amber-400 text-sm mt-1">📋 RTO Payment ${rtoInfo.current} of ${rtoInfo.total}</p>` : ''}
                 </div>
                 
                 <div class="bg-gray-800 rounded-xl p-4 mb-4">
@@ -3795,9 +3873,12 @@ window.rtoWizardState = {
     seller: '',
     financial: {
         purchasePrice: 0,
+        downPaymentPercent: 5,
         downPayment: 0,
         termMonths: 24,
-        finalPayment: 1500000
+        finalPaymentBase: 1500000,
+        finalPaymentFee: 150000,
+        finalPaymentTotal: 1650000
     }
 };
 
@@ -3811,15 +3892,20 @@ window.showRentToOwnWizard = async function(propertyId) {
         return;
     }
     
-    // Get the property owner's display name (from the property's ownerEmail)
-    let sellerName = 'Property Owner';
+    // Get the property owner's display name - try multiple sources
+    let sellerName = '';
     try {
-        // First try to get the ownerName if it's stored on the property
-        const ownerName = PropertyDataService.getValue(propertyId, 'ownerName', p.ownerName || '');
-        if (ownerName) {
-            sellerName = ownerName;
-        } else {
-            // Fall back to looking up from the users collection using ownerEmail
+        // Try current user first (since only owner can access this)
+        if (auth.currentUser) {
+            const currentUserEmail = auth.currentUser.email.toLowerCase();
+            const currentUserDoc = await db.collection('users').doc(currentUserEmail).get();
+            if (currentUserDoc.exists && currentUserDoc.data().displayName) {
+                sellerName = currentUserDoc.data().displayName;
+            }
+        }
+        
+        // If still empty, try property's ownerEmail
+        if (!sellerName) {
             const ownerEmail = (p.ownerEmail || propertyOwnerEmail[propertyId] || '').toLowerCase();
             if (ownerEmail) {
                 const userDoc = await db.collection('users').doc(ownerEmail).get();
@@ -3828,12 +3914,34 @@ window.showRentToOwnWizard = async function(propertyId) {
                 }
             }
         }
+        
+        // Final fallback
+        if (!sellerName) {
+            sellerName = 'Pauly Amato'; // Default owner name
+        }
     } catch (e) {
         console.warn('Could not get seller name:', e);
+        sellerName = 'Pauly Amato';
     }
     
-    // Get property description
-    const propertyDescription = PropertyDataService.getValue(propertyId, 'description', p.description || '');
+    // Get property description from PropertyDataService or property
+    let propertyDescription = '';
+    try {
+        propertyDescription = PropertyDataService.getValue(propertyId, 'description', '') || p.description || '';
+    } catch (e) {
+        propertyDescription = p.description || '';
+    }
+    
+    // Get buy price from PropertyDataService or property
+    let buyPrice = 0;
+    try {
+        buyPrice = parseInt(PropertyDataService.getValue(propertyId, 'buyPrice', 0)) || parseInt(p.buyPrice) || 0;
+    } catch (e) {
+        buyPrice = parseInt(p.buyPrice) || 0;
+    }
+    
+    // Determine final payment based on property type
+    const finalPayment = determineRTOFinalPayment(p);
     
     // Initialize wizard state
     window.rtoWizardState = {
@@ -3846,15 +3954,83 @@ window.showRentToOwnWizard = async function(propertyId) {
         },
         seller: sellerName,
         financial: {
-            purchasePrice: 0,
-            downPayment: 0,
+            purchasePrice: buyPrice,
+            downPaymentPercent: 5, // Default 5%
+            downPayment: Math.round(buyPrice * 0.05),
             termMonths: 24,
-            finalPayment: 1500000
+            finalPaymentBase: finalPayment,
+            finalPaymentFee: Math.round(finalPayment * 0.10),
+            finalPaymentTotal: Math.round(finalPayment * 1.10)
         }
     };
     
+    console.log('[RTO] Wizard initialized:', {
+        seller: sellerName,
+        buyPrice: buyPrice,
+        description: propertyDescription ? 'Found' : 'Empty',
+        finalPayment: finalPayment
+    });
+    
     renderRTOWizardStep(1);
 };
+
+/**
+ * Determine final payment based on property type
+ * Apartments 600 storage - $700k
+ * Hotel 800 Storage - $750k
+ * Instance House 800-900 Storage - $800K
+ * Hotel 1050 Storage - $900k
+ * Instance House 1000+ - $1.2 Mil
+ * Walk In House - $1.5m
+ */
+function determineRTOFinalPayment(property) {
+    const title = (property.title || '').toLowerCase();
+    const type = (property.type || '').toLowerCase();
+    const description = (property.description || '').toLowerCase();
+    
+    // Check for walk-in house first (highest tier)
+    if (title.includes('walk in') || title.includes('walk-in') || 
+        description.includes('walk in') || description.includes('walk-in') ||
+        type === 'walk-in house') {
+        return 1500000; // $1.5M
+    }
+    
+    // Check for instance house with storage hints
+    if (type === 'instance house' || title.includes('instance')) {
+        // Try to find storage amount in description or title
+        const storageMatch = (title + ' ' + description).match(/(\d+)\s*storage/i);
+        if (storageMatch) {
+            const storage = parseInt(storageMatch[1]);
+            if (storage >= 1000) return 1200000; // $1.2M
+            if (storage >= 800) return 800000;   // $800K
+        }
+        return 1200000; // Default to higher tier for instance houses
+    }
+    
+    // Check for hotel
+    if (type === 'hotel' || title.includes('hotel')) {
+        const storageMatch = (title + ' ' + description).match(/(\d+)\s*storage/i);
+        if (storageMatch) {
+            const storage = parseInt(storageMatch[1]);
+            if (storage >= 1050) return 900000;  // $900K
+            if (storage >= 800) return 750000;   // $750K
+        }
+        return 750000; // Default hotel
+    }
+    
+    // Check for apartment
+    if (type === 'apartment' || title.includes('apartment') || title.includes('apt')) {
+        return 700000; // $700K
+    }
+    
+    // Default based on buy price (higher value = likely walk-in)
+    const buyPrice = parseInt(property.buyPrice) || 0;
+    if (buyPrice >= 15000000) return 1500000;      // $1.5M for expensive properties
+    if (buyPrice >= 8000000) return 1200000;       // $1.2M
+    if (buyPrice >= 3000000) return 800000;        // $800K
+    
+    return 1500000; // Default to walk-in house tier
+}
 
 /**
  * Render the current wizard step
@@ -3931,72 +4107,96 @@ function renderRTOWizardStep(step) {
             <div class="space-y-4">
                 <p class="text-gray-400 text-sm">Set the financial structure for this rent-to-own agreement.</p>
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-400 text-sm mb-2">Total Purchase Price</label>
-                        <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                            <input type="number" id="rtoPurchasePrice" value="${f.purchasePrice || ''}" 
-                                   class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                                   placeholder="17,000,000" oninput="updateRTOCalculations()">
-                        </div>
+                <!-- Purchase Price (auto-populated from Buy Price) -->
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Total Purchase Price</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                        <input type="number" id="rtoPurchasePrice" value="${f.purchasePrice || ''}" 
+                               class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
+                               placeholder="20,000,000" oninput="updateRTOCalculations()">
                     </div>
-                    <div>
-                        <label class="block text-gray-400 text-sm mb-2">Down Payment (Already Paid)</label>
-                        <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                            <input type="number" id="rtoDownPayment" value="${f.downPayment || ''}" 
-                                   class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                                   placeholder="700,000" oninput="updateRTOCalculations()">
-                        </div>
-                    </div>
+                    <p class="text-gray-500 text-xs mt-1">Auto-populated from Buy Price. Edit if needed.</p>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-gray-400 text-sm mb-2">Term Length (Months)</label>
-                        <input type="number" id="rtoTermMonths" value="${f.termMonths}" 
-                               class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                               placeholder="24" min="1" max="120" oninput="updateRTOCalculations()">
-                    </div>
-                    <div>
-                        <label class="block text-gray-400 text-sm mb-2">Final Payment (Base)</label>
-                        <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                            <input type="number" id="rtoFinalPayment" value="${f.finalPayment}" 
-                                   class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                                   placeholder="1,500,000" oninput="updateRTOCalculations()">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Realtor Fee - Fixed at 10% -->
+                <!-- Down Payment Slider -->
                 <div class="bg-gray-800/50 rounded-xl p-4">
-                    <div class="flex items-center justify-between">
-                        <span class="text-gray-400 text-sm">PaulysProperties.com Realtor Fee</span>
-                        <span class="text-amber-400 font-bold">10% of Final Payment</span>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-gray-400 text-sm">Down Payment (Already Paid)</label>
+                        <div class="text-right">
+                            <span id="rtoDownPaymentPercent" class="text-amber-400 font-bold">${f.downPaymentPercent || 5}%</span>
+                            <span class="text-gray-500 mx-1">=</span>
+                            <span id="rtoDownPaymentAmount" class="text-green-400 font-bold">$${(f.downPayment || 0).toLocaleString()}</span>
+                        </div>
                     </div>
+                    <input type="range" id="rtoDownPaymentSlider" value="${f.downPaymentPercent || 5}" min="1" max="99" step="1"
+                           class="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                           oninput="updateRTODownPayment(this.value)">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>1%</span>
+                        <span>50%</span>
+                        <span>99%</span>
+                    </div>
+                </div>
+                
+                <!-- Term Length -->
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">Term Length (Months)</label>
+                    <input type="number" id="rtoTermMonths" value="${f.termMonths}" 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
+                           placeholder="24" min="1" max="120" oninput="updateRTOCalculations()">
+                </div>
+                
+                <!-- Final Payment with Breakdown -->
+                <div class="bg-gradient-to-br from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4">
+                    <h4 class="text-amber-400 font-bold mb-3 flex items-center gap-2">
+                        💰 Final Payment (Month ${f.termMonths})
+                    </h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400 text-sm">Base Final Payment:</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-gray-500">$</span>
+                                <input type="number" id="rtoFinalPaymentBase" value="${f.finalPaymentBase || 1500000}" 
+                                       class="w-32 px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-right focus:ring-2 focus:ring-amber-500"
+                                       oninput="updateRTOFinalPayment()">
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">+ Realtor Fee (10%):</span>
+                            <span id="rtoFinalFee" class="text-amber-400 font-semibold">$${(f.finalPaymentFee || 150000).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between pt-2 border-t border-amber-500/30">
+                            <span class="text-white font-bold">Total Final Payment:</span>
+                            <span id="rtoFinalTotal" class="text-green-400 font-bold text-lg">$${(f.finalPaymentTotal || 1650000).toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <p class="text-gray-500 text-xs mt-2">Final payment based on property type. Adjust if needed.</p>
                 </div>
                 
                 <!-- Calculated Summary -->
-                <div id="rtoCalculationSummary" class="bg-gradient-to-br from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4 mt-4">
-                    <h4 class="text-amber-400 font-bold mb-3">Calculated Terms</h4>
-                    <div class="grid grid-cols-2 gap-3 text-sm">
+                <div id="rtoCalculationSummary" class="bg-gray-800 rounded-xl p-4">
+                    <h4 class="text-cyan-400 font-bold mb-3">📊 Monthly Payment Calculation</h4>
+                    <div class="space-y-2 text-sm">
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Remaining Balance:</span>
-                            <span id="rtoRemainingBalance" class="text-white font-semibold">$0</span>
+                            <span class="text-gray-400">Purchase Price:</span>
+                            <span id="rtoCalcPurchase" class="text-white">$${(f.purchasePrice || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Monthly Payment:</span>
-                            <span id="rtoMonthlyPayment" class="text-green-400 font-semibold">$0</span>
+                            <span class="text-gray-400">− Down Payment:</span>
+                            <span id="rtoCalcDown" class="text-red-400">−$${(f.downPayment || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Realtor Fee (10%):</span>
-                            <span id="rtoRealtorFeeAmount" class="text-amber-400 font-semibold">$0</span>
+                            <span class="text-gray-400">− Total Final Payment:</span>
+                            <span id="rtoCalcFinal" class="text-red-400">−$${(f.finalPaymentTotal || 0).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between pt-2 border-t border-gray-700">
+                            <span class="text-gray-400">= Amount to Finance:</span>
+                            <span id="rtoCalcFinance" class="text-white font-semibold">$0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Total Final Payment:</span>
-                            <span id="rtoTotalFinal" class="text-white font-bold">$0</span>
+                            <span class="text-gray-400">÷ ${f.termMonths - 1} months:</span>
+                            <span id="rtoMonthlyPayment" class="text-green-400 font-bold text-lg">$0/mo</span>
                         </div>
                     </div>
                 </div>
@@ -4046,7 +4246,7 @@ function renderRTOWizardStep(step) {
                             <span class="text-white font-bold">$${calc.purchasePrice.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Down Payment (Already Paid)</span>
+                            <span class="text-gray-400">Down Payment (${calc.downPaymentPercent}%)</span>
                             <span class="text-green-400 font-semibold">$${calc.downPayment.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between border-t border-gray-700 pt-2">
@@ -4063,15 +4263,15 @@ function renderRTOWizardStep(step) {
                         </div>
                         <div class="flex justify-between border-t border-gray-700 pt-2">
                             <span class="text-gray-400">Final Payment (Base)</span>
-                            <span class="text-white">$${calc.finalPayment.toLocaleString()}</span>
+                            <span class="text-white">$${calc.finalPaymentBase.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Realtor Fee (10%)</span>
-                            <span class="text-amber-400">$${calc.realtorFee.toLocaleString()}</span>
+                            <span class="text-gray-400">+ Realtor Fee (10%)</span>
+                            <span class="text-amber-400">$${calc.finalPaymentFee.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between bg-amber-900/30 p-2 rounded-lg">
-                            <span class="text-amber-300 font-bold">Total Final Payment Due</span>
-                            <span class="text-amber-300 font-bold">$${calc.totalFinalPayment.toLocaleString()}</span>
+                            <span class="text-amber-300 font-bold">= Total Final Payment</span>
+                            <span class="text-amber-300 font-bold">$${calc.finalPaymentTotal.toLocaleString()}</span>
                         </div>
                     </div>
                 </div>
@@ -4239,9 +4439,12 @@ window.nextRTOStep = function() {
     } else if (state.step === 2) {
         // Validate financial terms
         const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
-        const downPayment = parseInt(document.getElementById('rtoDownPayment')?.value) || 0;
-        const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 0;
-        const finalPayment = parseInt(document.getElementById('rtoFinalPayment')?.value) || 0;
+        const downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || 5;
+        const downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
+        const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 24;
+        const finalPaymentBase = parseInt(document.getElementById('rtoFinalPaymentBase')?.value) || 1500000;
+        const finalPaymentFee = Math.round(finalPaymentBase * 0.10);
+        const finalPaymentTotal = finalPaymentBase + finalPaymentFee;
         
         if (purchasePrice <= 0) {
             showToast('Please enter a valid purchase price', 'error');
@@ -4254,9 +4457,12 @@ window.nextRTOStep = function() {
         
         state.financial = {
             purchasePrice,
+            downPaymentPercent,
             downPayment,
             termMonths,
-            finalPayment
+            finalPaymentBase,
+            finalPaymentFee,
+            finalPaymentTotal
         };
     }
     
@@ -4264,35 +4470,106 @@ window.nextRTOStep = function() {
 };
 
 /**
+ * Update down payment when slider changes
+ */
+window.updateRTODownPayment = function(percent) {
+    const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
+    const downPayment = Math.round(purchasePrice * (percent / 100));
+    
+    const percentEl = document.getElementById('rtoDownPaymentPercent');
+    const amountEl = document.getElementById('rtoDownPaymentAmount');
+    
+    if (percentEl) percentEl.textContent = percent + '%';
+    if (amountEl) amountEl.textContent = '$' + downPayment.toLocaleString();
+    
+    // Update state
+    if (window.rtoWizardState) {
+        window.rtoWizardState.financial.downPaymentPercent = parseInt(percent);
+        window.rtoWizardState.financial.downPayment = downPayment;
+    }
+    
+    updateRTOCalculations();
+};
+
+/**
+ * Update final payment calculations
+ */
+window.updateRTOFinalPayment = function() {
+    const base = parseInt(document.getElementById('rtoFinalPaymentBase')?.value) || 0;
+    const fee = Math.round(base * 0.10);
+    const total = base + fee;
+    
+    const feeEl = document.getElementById('rtoFinalFee');
+    const totalEl = document.getElementById('rtoFinalTotal');
+    
+    if (feeEl) feeEl.textContent = '$' + fee.toLocaleString();
+    if (totalEl) totalEl.textContent = '$' + total.toLocaleString();
+    
+    // Update state
+    if (window.rtoWizardState) {
+        window.rtoWizardState.financial.finalPaymentBase = base;
+        window.rtoWizardState.financial.finalPaymentFee = fee;
+        window.rtoWizardState.financial.finalPaymentTotal = total;
+    }
+    
+    updateRTOCalculations();
+};
+
+/**
  * Update calculations in real-time
  */
 window.updateRTOCalculations = function() {
-    const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
-    const downPayment = parseInt(document.getElementById('rtoDownPayment')?.value) || 0;
-    const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 24;
-    const finalPayment = parseInt(document.getElementById('rtoFinalPayment')?.value) || 0;
-    const realtorFeePercent = 10; // Always 10%
+    const state = window.rtoWizardState;
+    if (!state) return;
     
-    const remainingBalance = purchasePrice - downPayment;
-    const realtorFee = Math.round(finalPayment * (realtorFeePercent / 100));
-    const totalFinalPayment = finalPayment + realtorFee;
+    const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || state.financial.purchasePrice || 0;
+    const downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || state.financial.downPaymentPercent || 5;
+    const downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
+    const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || state.financial.termMonths || 24;
+    const finalPaymentBase = parseInt(document.getElementById('rtoFinalPaymentBase')?.value) || state.financial.finalPaymentBase || 1500000;
+    const finalPaymentFee = Math.round(finalPaymentBase * 0.10);
+    const finalPaymentTotal = finalPaymentBase + finalPaymentFee;
     
-    // Calculate monthly payment
-    // Months 1 to (termMonths-1) pay monthly, then final payment covers the rest
-    const amountForMonthlyPayments = remainingBalance - totalFinalPayment;
+    // Calculate amount to finance (what monthly payments cover)
+    const amountToFinance = purchasePrice - downPayment - finalPaymentTotal;
     const monthlyPayments = termMonths - 1;
-    const monthlyPayment = monthlyPayments > 0 ? Math.round(amountForMonthlyPayments / monthlyPayments) : 0;
+    const monthlyPayment = monthlyPayments > 0 ? Math.round(amountToFinance / monthlyPayments) : 0;
     
-    // Update display
-    const remainingEl = document.getElementById('rtoRemainingBalance');
+    // Update down payment display
+    const percentEl = document.getElementById('rtoDownPaymentPercent');
+    const amountEl = document.getElementById('rtoDownPaymentAmount');
+    if (percentEl) percentEl.textContent = downPaymentPercent + '%';
+    if (amountEl) amountEl.textContent = '$' + downPayment.toLocaleString();
+    
+    // Update final payment display
+    const feeEl = document.getElementById('rtoFinalFee');
+    const totalEl = document.getElementById('rtoFinalTotal');
+    if (feeEl) feeEl.textContent = '$' + finalPaymentFee.toLocaleString();
+    if (totalEl) totalEl.textContent = '$' + finalPaymentTotal.toLocaleString();
+    
+    // Update calculation breakdown
+    const calcPurchase = document.getElementById('rtoCalcPurchase');
+    const calcDown = document.getElementById('rtoCalcDown');
+    const calcFinal = document.getElementById('rtoCalcFinal');
+    const calcFinance = document.getElementById('rtoCalcFinance');
     const monthlyEl = document.getElementById('rtoMonthlyPayment');
-    const feeEl = document.getElementById('rtoRealtorFeeAmount');
-    const totalEl = document.getElementById('rtoTotalFinal');
     
-    if (remainingEl) remainingEl.textContent = '$' + remainingBalance.toLocaleString();
-    if (monthlyEl) monthlyEl.textContent = '$' + monthlyPayment.toLocaleString();
-    if (feeEl) feeEl.textContent = '$' + realtorFee.toLocaleString();
-    if (totalEl) totalEl.textContent = '$' + totalFinalPayment.toLocaleString();
+    if (calcPurchase) calcPurchase.textContent = '$' + purchasePrice.toLocaleString();
+    if (calcDown) calcDown.textContent = '−$' + downPayment.toLocaleString();
+    if (calcFinal) calcFinal.textContent = '−$' + finalPaymentTotal.toLocaleString();
+    if (calcFinance) calcFinance.textContent = '$' + amountToFinance.toLocaleString();
+    if (monthlyEl) monthlyEl.textContent = '$' + monthlyPayment.toLocaleString() + '/mo';
+    
+    // Update state
+    state.financial = {
+        purchasePrice,
+        downPaymentPercent,
+        downPayment,
+        termMonths,
+        finalPaymentBase,
+        finalPaymentFee,
+        finalPaymentTotal
+    };
 };
 
 /**
@@ -4302,30 +4579,28 @@ function calculateRTOTerms() {
     const state = window.rtoWizardState;
     const f = state.financial;
     
-    const realtorFeePercent = 10; // Always 10%
     const remainingBalance = f.purchasePrice - f.downPayment;
-    const realtorFee = Math.round(f.finalPayment * (realtorFeePercent / 100));
-    const totalFinalPayment = f.finalPayment + realtorFee;
-    
-    const amountForMonthlyPayments = remainingBalance - totalFinalPayment;
+    const amountToFinance = f.purchasePrice - f.downPayment - f.finalPaymentTotal;
     const monthlyPayments = f.termMonths - 1;
-    const monthlyPayment = monthlyPayments > 0 ? Math.round(amountForMonthlyPayments / monthlyPayments) : 0;
+    const monthlyPayment = monthlyPayments > 0 ? Math.round(amountToFinance / monthlyPayments) : 0;
     
     // Adjust last monthly payment to account for rounding
     const totalMonthlyPaid = monthlyPayment * (monthlyPayments - 1);
-    const lastMonthlyPayment = amountForMonthlyPayments - totalMonthlyPaid;
+    const lastMonthlyPayment = amountToFinance - totalMonthlyPaid;
     
     return {
         purchasePrice: f.purchasePrice,
         downPayment: f.downPayment,
+        downPaymentPercent: f.downPaymentPercent,
         remainingBalance,
+        amountToFinance,
         termMonths: f.termMonths,
         monthlyPayment,
         lastMonthlyPayment,
-        finalPayment: f.finalPayment,
-        realtorFeePercent,
-        realtorFee,
-        totalFinalPayment
+        finalPaymentBase: f.finalPaymentBase,
+        finalPaymentFee: f.finalPaymentFee,
+        finalPaymentTotal: f.finalPaymentTotal,
+        realtorFeePercent: 10
     };
 }
 
@@ -4356,15 +4631,15 @@ function generateRTOContract() {
     
     // Generate payment schedule
     let schedule = [];
-    let runningBalance = calc.remainingBalance;
+    let runningBalance = calc.amountToFinance + calc.finalPaymentTotal; // Total to be paid after down payment
     
     // Down payment entry
     schedule.push({
         num: 'Down Payment',
         date: formatDateForContract(startDate),
         amount: calc.downPayment,
-        type: 'Down Payment',
-        balance: calc.remainingBalance
+        type: `Down Payment (${calc.downPaymentPercent}%)`,
+        balance: runningBalance
     });
     
     // Monthly payments
@@ -4380,7 +4655,7 @@ function generateRTOContract() {
             runningBalance -= amount;
         } else {
             // Final payment
-            amount = calc.totalFinalPayment;
+            amount = calc.finalPaymentTotal;
             type = 'Final + Realtor Fee';
             runningBalance = 0;
         }
@@ -4418,13 +4693,13 @@ FINANCIAL STRUCTURE
 Item                              Amount
 ─────────────────────────────────────────────────────
 Total Purchase Price              $${calc.purchasePrice.toLocaleString()}
-Down Payment (Already Paid)       $${calc.downPayment.toLocaleString()}
+Down Payment (${calc.downPaymentPercent}%)              $${calc.downPayment.toLocaleString()}
 Remaining Balance                 $${calc.remainingBalance.toLocaleString()}
 Term Length                       ${calc.termMonths} Months
 Monthly Payments (Months 1-${calc.termMonths - 1})     $${calc.monthlyPayment.toLocaleString()}
-Final Payment (Month ${calc.termMonths}) Base       $${calc.finalPayment.toLocaleString()}
-Realtor Fee (10% of Final)        $${calc.realtorFee.toLocaleString()}
-Total Final Payment Due           $${calc.totalFinalPayment.toLocaleString()}
+Final Payment (Month ${calc.termMonths}) Base       $${calc.finalPaymentBase.toLocaleString()}
++ Realtor Fee (10%)               $${calc.finalPaymentFee.toLocaleString()}
+= Total Final Payment             $${calc.finalPaymentTotal.toLocaleString()}
 
 COMPLETE PAYMENT SCHEDULE
 ────────────────────────────────────────────────────────────────
@@ -4436,15 +4711,15 @@ ${schedule.map(p =>
 
 FINAL PAYMENT BREAKDOWN
 ────────────────────────────────────────────────────────────────
-• Base Final Payment: $${calc.finalPayment.toLocaleString()}
-• Realtor Fee (10%): $${calc.realtorFee.toLocaleString()}
-• Total Final Payment: $${calc.totalFinalPayment.toLocaleString()}
+• Base Final Payment: $${calc.finalPaymentBase.toLocaleString()}
+• Realtor Fee (10%): $${calc.finalPaymentFee.toLocaleString()}
+• Total Final Payment: $${calc.finalPaymentTotal.toLocaleString()}
 
 CONTRACT TERMS
 ────────────────────────────────────────────────────────────────
 Payment Terms:
 • Monthly payments of $${calc.monthlyPayment.toLocaleString()} due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month
-• Final payment of $${calc.totalFinalPayment.toLocaleString()} due on ${formatDateForContract(new Date(startDate.setMonth(startDate.getMonth() + calc.termMonths)))}
+• Final payment of $${calc.finalPaymentTotal.toLocaleString()} due on ${formatDateForContract(new Date(startDate.setMonth(startDate.getMonth() + calc.termMonths)))}
 • 3-day grace period before late fees apply
 
 Late Payment:
@@ -4467,7 +4742,7 @@ Transfer of Ownership:
 
 Early Payoff:
 • Allowed without penalty
-• $${calc.realtorFee.toLocaleString()} Realtor Fee still applies upon transfer
+• $${calc.finalPaymentFee.toLocaleString()} Realtor Fee still applies upon transfer
 
 DOCUMENT IDENTIFIERS
 ────────────────────────────────────────────────────────────────
@@ -4556,8 +4831,9 @@ window.saveRTOContract = async function() {
     
     try {
         const state = window.rtoWizardState;
+        const calc = contract.data.calculations;
         
-        // Save to Firestore
+        // Save contract to Firestore
         await db.collection('rentToOwnContracts').doc(contract.documentId).set({
             documentId: contract.documentId,
             propertyId: state.propertyId,
@@ -4566,25 +4842,71 @@ window.saveRTOContract = async function() {
             seller: state.seller,
             buyer: state.buyer.name,
             financial: state.financial,
-            calculations: contract.data.calculations,
+            calculations: calc,
             schedule: contract.data.schedule,
             startDate: state.startDate,
-            status: 'pending_signatures',
+            currentPaymentNumber: 0, // Will be 1 after first payment
+            totalPayments: calc.termMonths,
+            status: 'active',
             createdBy: auth.currentUser?.email || 'unknown',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             contractText: contract.preview
         });
         
-        showToast('✅ Contract saved! You can view it in Firestore.', 'success');
+        // Update property with RTO info and clear daily/biweekly, set monthly to contract payment
+        const propertyUpdates = {
+            // Clear daily and biweekly
+            dailyPrice: 0,
+            biweeklyPrice: 0,
+            weeklyPrice: 0,
+            // Set monthly to the contract's monthly payment
+            monthlyPrice: calc.monthlyPayment,
+            // Mark RTO active
+            hasActiveRTO: true,
+            rtoContractId: contract.documentId,
+            rtoCurrentPayment: 0,
+            rtoTotalPayments: calc.termMonths,
+            rtoBuyer: state.buyer.name,
+            rtoStartDate: state.startDate,
+            // Set payment frequency to monthly
+            paymentFrequency: 'monthly'
+        };
+        
+        // Update via PropertyDataService
+        for (const [key, value] of Object.entries(propertyUpdates)) {
+            PropertyDataService.setValue(state.propertyId, key, value);
+        }
+        
+        // Also update Firestore directly for the property
+        await db.collection('properties').doc(String(state.propertyId)).update({
+            dailyPrice: 0,
+            biweeklyPrice: 0,
+            weeklyPrice: 0,
+            monthlyPrice: calc.monthlyPayment,
+            hasActiveRTO: true,
+            rtoContractId: contract.documentId,
+            rtoCurrentPayment: 0,
+            rtoTotalPayments: calc.termMonths,
+            rtoBuyer: state.buyer.name,
+            rtoStartDate: state.startDate,
+            paymentFrequency: 'monthly',
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('✅ Contract saved! Property updated to RTO monthly payments.', 'success');
         
         // Add XP if gamification is available
         if (typeof awardXP === 'function') {
-            await awardXP('contract_created', 100, `Created rent-to-own contract: ${contract.documentId}`);
+            await awardXP('contract_created', 150, `Created rent-to-own contract: ${contract.documentId}`);
         }
         
-        // Close the modal after a short delay
+        // Close the modal after a short delay and refresh the page
         setTimeout(() => {
             closeRTOWizard();
+            // Refresh the property stats page
+            if (typeof showPropertyStats === 'function') {
+                showPropertyStats(state.propertyId);
+            }
         }, 1500);
         
     } catch (error) {
@@ -4708,13 +5030,13 @@ window.downloadRTOContractImage = async function() {
     
     const financialItems = [
         ['Total Purchase Price', `$${calc.purchasePrice.toLocaleString()}`],
-        ['Down Payment (Already Paid)', `$${calc.downPayment.toLocaleString()}`],
+        [`Down Payment (${calc.downPaymentPercent || 5}%)`, `$${calc.downPayment.toLocaleString()}`],
         ['Remaining Balance', `$${calc.remainingBalance.toLocaleString()}`],
         ['Term Length', `${calc.termMonths} Months`],
         ['Monthly Payments', `$${calc.monthlyPayment.toLocaleString()}`],
-        ['Final Payment (Base)', `$${calc.finalPayment.toLocaleString()}`],
-        ['Realtor Fee (10%)', `$${calc.realtorFee.toLocaleString()}`],
-        ['Total Final Payment', `$${calc.totalFinalPayment.toLocaleString()}`]
+        ['Final Payment (Base)', `$${calc.finalPaymentBase.toLocaleString()}`],
+        ['+ Realtor Fee (10%)', `$${calc.finalPaymentFee.toLocaleString()}`],
+        ['= Total Final Payment', `$${calc.finalPaymentTotal.toLocaleString()}`]
     ];
     
     financialItems.forEach(([label, value]) => {
@@ -4823,6 +5145,94 @@ window.closeRTOWizard = function() {
     if (modal) modal.remove();
     window.rtoWizardState = null;
     window.rtoGeneratedContract = null;
+};
+
+/**
+ * View an existing RTO contract
+ */
+window.viewRTOContract = async function(contractId) {
+    if (!contractId) {
+        showToast('No contract ID provided', 'error');
+        return;
+    }
+    
+    try {
+        showToast('📄 Loading contract...', 'info');
+        
+        const doc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        if (!doc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = doc.data();
+        
+        // Show contract in a modal
+        const modalHTML = `
+            <div id="viewContractModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+                <div class="bg-gray-900 rounded-2xl max-w-3xl w-full border border-cyan-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Rent-to-Own Contract
+                        </h3>
+                        <p class="text-cyan-100 text-sm mt-1">${contract.propertyTitle}</p>
+                    </div>
+                    
+                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-xs mb-1">Document ID</div>
+                                <div class="text-white font-mono text-sm">${contract.documentId}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-xs mb-1">Status</div>
+                                <div class="text-green-400 font-bold">${contract.status || 'Active'}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-xs mb-1">Seller</div>
+                                <div class="text-white font-semibold">${contract.seller}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-xs mb-1">Buyer</div>
+                                <div class="text-white font-semibold">${contract.buyer}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-xs mb-1">Payment Progress</div>
+                                <div class="text-amber-400 font-bold">${contract.currentPaymentNumber || 0} of ${contract.totalPayments || contract.calculations?.termMonths || 24}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-xs mb-1">Monthly Payment</div>
+                                <div class="text-green-400 font-bold">$${(contract.calculations?.monthlyPayment || 0).toLocaleString()}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                            <h4 class="text-amber-400 font-bold mb-2">Full Contract Text</h4>
+                            <div class="bg-gray-900 rounded-lg p-4 max-h-60 overflow-y-auto">
+                                <pre class="text-xs text-gray-300 whitespace-pre-wrap font-mono">${contract.contractText || 'Contract text not available'}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                        <button onclick="navigator.clipboard.writeText(document.querySelector('#viewContractModal pre').textContent).then(() => showToast('📋 Contract copied!', 'success'))" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                            📋 Copy Contract
+                        </button>
+                        <button onclick="document.getElementById('viewContractModal').remove()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error loading contract:', error);
+        showToast('Failed to load contract: ' + error.message, 'error');
+    }
 };
 
 // Start the app
