@@ -837,6 +837,24 @@ function renderPropertyStatsContent(id) {
                 </div>
                 ` : ''}
                 
+                <!-- Private Owner Tools (always shows) -->
+                <div class="bg-gradient-to-r from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h4 class="text-amber-300 font-bold flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                Rent-to-Own Contract
+                                <span class="text-[10px] bg-amber-900/50 text-amber-200 px-2 py-0.5 rounded-full">PRIVATE TOOL</span>
+                            </h4>
+                            <p class="text-gray-400 text-sm mt-1">Generate a rent-to-own agreement for this property (not publicly advertised)</p>
+                        </div>
+                        <button onclick="showRentToOwnWizard(${id})" class="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-gray-900 px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 whitespace-nowrap shadow-lg">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Generate Contract
+                        </button>
+                    </div>
+                </div>
+                
                 <!-- Reminder Script (only shows when due soon) -->
                 ${showReminderSection ? `
                 <div class="bg-gradient-to-r from-red-900/50 to-orange-900/50 border border-red-500/50 rounded-xl p-4 mb-8">
@@ -3759,6 +3777,803 @@ window.endVacancyPeriod = endVacancyPeriod;
 window.closeCompleteLeaseModal = function() {
     const modal = document.getElementById('completeLeaseModal');
     if (modal) modal.remove();
+};
+
+// ============================================================================
+// RENT-TO-OWN CONTRACT WIZARD
+// ============================================================================
+
+// Store wizard state
+window.rtoWizardState = {
+    propertyId: null,
+    step: 1,
+    property: null,
+    buyer: {
+        name: '',
+        useExisting: false
+    },
+    seller: '',
+    financial: {
+        purchasePrice: 0,
+        downPayment: 0,
+        termMonths: 24,
+        finalPayment: 1500000,
+        realtorFeePercent: 10
+    }
+};
+
+/**
+ * Show the Rent-to-Own Wizard
+ */
+window.showRentToOwnWizard = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) {
+        showToast('Property not found', 'error');
+        return;
+    }
+    
+    // Get current user's display name for seller
+    let sellerName = 'Property Owner';
+    try {
+        const userEmail = auth.currentUser?.email?.toLowerCase();
+        if (userEmail) {
+            const userDoc = await db.collection('users').doc(userEmail).get();
+            if (userDoc.exists && userDoc.data().displayName) {
+                sellerName = userDoc.data().displayName;
+            }
+        }
+    } catch (e) {
+        console.warn('Could not get seller name:', e);
+    }
+    
+    // Initialize wizard state
+    window.rtoWizardState = {
+        propertyId: propertyId,
+        step: 1,
+        property: p,
+        buyer: {
+            name: PropertyDataService.getValue(propertyId, 'renterName', p.renterName || ''),
+            useExisting: false
+        },
+        seller: sellerName,
+        financial: {
+            purchasePrice: 0,
+            downPayment: 0,
+            termMonths: 24,
+            finalPayment: 1500000,
+            realtorFeePercent: 10
+        }
+    };
+    
+    renderRTOWizardStep(1);
+};
+
+/**
+ * Render the current wizard step
+ */
+function renderRTOWizardStep(step) {
+    const state = window.rtoWizardState;
+    state.step = step;
+    
+    // Remove existing modal
+    const existingModal = document.getElementById('rtoWizardModal');
+    if (existingModal) existingModal.remove();
+    
+    let content = '';
+    let title = '';
+    let stepIndicator = `
+        <div class="flex items-center justify-center gap-2 mb-6">
+            ${[1, 2, 3, 4].map(s => `
+                <div class="flex items-center">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${s === step ? 'bg-amber-500 text-gray-900' : s < step ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'}">
+                        ${s < step ? '✓' : s}
+                    </div>
+                    ${s < 4 ? '<div class="w-8 h-0.5 bg-gray-700"></div>' : ''}
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    if (step === 1) {
+        title = 'Step 1: Buyer Information';
+        const existingRenter = PropertyDataService.getValue(state.propertyId, 'renterName', state.property.renterName || '');
+        
+        content = `
+            <div class="space-y-4">
+                <p class="text-gray-400 text-sm">Who is the buyer for this rent-to-own agreement?</p>
+                
+                ${existingRenter ? `
+                <label class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl cursor-pointer border-2 border-transparent hover:border-amber-500 transition" onclick="selectRTOBuyerOption(true)">
+                    <input type="radio" name="buyerSource" id="useExisting" class="w-5 h-5 text-amber-500">
+                    <div>
+                        <div class="text-white font-semibold">Use Current Renter</div>
+                        <div class="text-gray-400 text-sm">👤 ${existingRenter}</div>
+                    </div>
+                </label>
+                ` : ''}
+                
+                <label class="flex items-center gap-3 p-4 bg-gray-800 rounded-xl cursor-pointer border-2 border-transparent hover:border-amber-500 transition" onclick="selectRTOBuyerOption(false)">
+                    <input type="radio" name="buyerSource" id="enterNew" class="w-5 h-5 text-amber-500" ${!existingRenter ? 'checked' : ''}>
+                    <div>
+                        <div class="text-white font-semibold">Enter Buyer Name</div>
+                        <div class="text-gray-400 text-sm">Manually enter the buyer's name</div>
+                    </div>
+                </label>
+                
+                <div id="manualBuyerInput" class="${existingRenter ? 'hidden' : ''}">
+                    <label class="block text-gray-400 text-sm mb-2">Buyer's Full Name</label>
+                    <input type="text" id="rtoBuyerName" value="${state.buyer.name}" 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                           placeholder="Enter buyer's name">
+                </div>
+                
+                <div class="bg-gray-800/50 rounded-xl p-4 mt-4">
+                    <div class="text-gray-400 text-sm mb-2">Seller/Landlord</div>
+                    <input type="text" id="rtoSellerName" value="${state.seller}" 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                           placeholder="Seller name">
+                </div>
+            </div>
+        `;
+    } else if (step === 2) {
+        title = 'Step 2: Financial Terms';
+        const f = state.financial;
+        
+        content = `
+            <div class="space-y-4">
+                <p class="text-gray-400 text-sm">Set the financial structure for this rent-to-own agreement.</p>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Total Purchase Price</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input type="number" id="rtoPurchasePrice" value="${f.purchasePrice || ''}" 
+                                   class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
+                                   placeholder="17,000,000" onchange="updateRTOCalculations()">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Down Payment (Already Paid)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input type="number" id="rtoDownPayment" value="${f.downPayment || ''}" 
+                                   class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
+                                   placeholder="700,000" onchange="updateRTOCalculations()">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Term Length (Months)</label>
+                        <input type="number" id="rtoTermMonths" value="${f.termMonths}" 
+                               class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
+                               placeholder="24" min="1" max="120" onchange="updateRTOCalculations()">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Final Payment (Base)</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input type="number" id="rtoFinalPayment" value="${f.finalPayment}" 
+                                   class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
+                                   placeholder="1,500,000" onchange="updateRTOCalculations()">
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-gray-400 text-sm mb-2">PMA Realtor Fee (% of Final Payment)</label>
+                    <div class="flex items-center gap-4">
+                        <input type="range" id="rtoRealtorFee" value="${f.realtorFeePercent}" min="0" max="20" step="1"
+                               class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                               onchange="updateRTOCalculations()">
+                        <span id="rtoRealtorFeeDisplay" class="text-amber-400 font-bold w-12">${f.realtorFeePercent}%</span>
+                    </div>
+                </div>
+                
+                <!-- Calculated Summary -->
+                <div id="rtoCalculationSummary" class="bg-gradient-to-br from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4 mt-4">
+                    <h4 class="text-amber-400 font-bold mb-3">Calculated Terms</h4>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Remaining Balance:</span>
+                            <span id="rtoRemainingBalance" class="text-white font-semibold">$0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Monthly Payment:</span>
+                            <span id="rtoMonthlyPayment" class="text-green-400 font-semibold">$0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Realtor Fee:</span>
+                            <span id="rtoRealtorFeeAmount" class="text-amber-400 font-semibold">$0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Final Payment:</span>
+                            <span id="rtoTotalFinal" class="text-white font-bold">$0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (step === 3) {
+        title = 'Step 3: Review Agreement';
+        const calc = calculateRTOTerms();
+        
+        content = `
+            <div class="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                <!-- Property Info -->
+                <div class="bg-gray-800 rounded-xl p-4">
+                    <h4 class="text-amber-400 font-bold mb-2 flex items-center gap-2">
+                        <span>🏠</span> Property
+                    </h4>
+                    <div class="text-white font-semibold">${state.property.title}</div>
+                    <div class="text-gray-400 text-sm mt-1">${state.property.description?.substring(0, 150) || 'No description'}...</div>
+                </div>
+                
+                <!-- Parties -->
+                <div class="bg-gray-800 rounded-xl p-4">
+                    <h4 class="text-amber-400 font-bold mb-2 flex items-center gap-2">
+                        <span>👥</span> Parties Involved
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-400">Seller/Landlord:</span>
+                            <div class="text-white font-semibold">${state.seller}</div>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Buyer/Tenant:</span>
+                            <div class="text-white font-semibold">${state.buyer.name}</div>
+                        </div>
+                    </div>
+                    <div class="text-gray-400 text-sm mt-2">Realtor/Brokerage: <span class="text-white">PMA Realty</span></div>
+                </div>
+                
+                <!-- Financial Structure -->
+                <div class="bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-xl p-4">
+                    <h4 class="text-green-400 font-bold mb-3 flex items-center gap-2">
+                        <span>💰</span> Financial Structure
+                    </h4>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Total Purchase Price</span>
+                            <span class="text-white font-bold">$${calc.purchasePrice.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Down Payment (Already Paid)</span>
+                            <span class="text-green-400 font-semibold">$${calc.downPayment.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between border-t border-gray-700 pt-2">
+                            <span class="text-gray-400">Remaining Balance</span>
+                            <span class="text-white font-bold">$${calc.remainingBalance.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Term Length</span>
+                            <span class="text-white">${calc.termMonths} Months</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Monthly Payments (Months 1-${calc.termMonths - 1})</span>
+                            <span class="text-green-400 font-semibold">$${calc.monthlyPayment.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between border-t border-gray-700 pt-2">
+                            <span class="text-gray-400">Final Payment (Base)</span>
+                            <span class="text-white">$${calc.finalPayment.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">PMA Realtor Fee (${calc.realtorFeePercent}%)</span>
+                            <span class="text-amber-400">$${calc.realtorFee.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between bg-amber-900/30 p-2 rounded-lg">
+                            <span class="text-amber-300 font-bold">Total Final Payment Due</span>
+                            <span class="text-amber-300 font-bold">$${calc.totalFinalPayment.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Agreement Date -->
+                <div class="bg-gray-800 rounded-xl p-4">
+                    <label class="block text-gray-400 text-sm mb-2">Agreement Start Date</label>
+                    <input type="date" id="rtoStartDate" value="${new Date().toISOString().split('T')[0]}" 
+                           class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500">
+                </div>
+            </div>
+        `;
+    } else if (step === 4) {
+        title = 'Contract Generated';
+        const contract = generateRTOContract();
+        
+        content = `
+            <div class="space-y-4">
+                <div class="flex items-center justify-center gap-3 text-green-400 mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span class="text-xl font-bold">Contract Ready!</span>
+                </div>
+                
+                <div class="bg-gray-800 rounded-xl p-4 max-h-[40vh] overflow-y-auto">
+                    <div id="rtoContractPreview" class="text-sm text-gray-300 whitespace-pre-wrap font-mono">
+                        ${contract.preview}
+                    </div>
+                </div>
+                
+                <div class="text-gray-400 text-xs text-center">
+                    Document ID: ${contract.documentId}
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="copyRTOContract()" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        Copy Contract
+                    </button>
+                    <button onclick="saveRTOContract()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        Save to Firestore
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    const modalHTML = `
+        <div id="rtoWizardModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeRTOWizard()">
+            <div class="bg-gray-900 rounded-2xl max-w-2xl w-full border border-amber-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-amber-600 to-yellow-600 px-6 py-4">
+                    <h3 class="text-xl font-bold text-gray-900 flex items-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Rent-to-Own Contract
+                    </h3>
+                    <p class="text-gray-900/70 text-sm mt-1">${state.property.title}</p>
+                </div>
+                
+                <!-- Content -->
+                <div class="p-6">
+                    ${stepIndicator}
+                    <h4 class="text-lg font-bold text-white mb-4">${title}</h4>
+                    ${content}
+                    
+                    <!-- Navigation -->
+                    <div class="flex gap-3 mt-6 pt-4 border-t border-gray-700">
+                        ${step > 1 && step < 4 ? `
+                            <button onclick="renderRTOWizardStep(${step - 1})" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition">
+                                ← Back
+                            </button>
+                        ` : ''}
+                        ${step < 3 ? `
+                            <button onclick="nextRTOStep()" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 py-3 px-4 rounded-xl font-bold transition hover:opacity-90">
+                                Next →
+                            </button>
+                        ` : step === 3 ? `
+                            <button onclick="generateAndShowContract()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                Generate Contract
+                            </button>
+                        ` : `
+                            <button onclick="closeRTOWizard()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition">
+                                Close
+                            </button>
+                        `}
+                        ${step === 1 ? `
+                            <button onclick="closeRTOWizard()" class="px-6 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-bold transition">
+                                Cancel
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Run calculations if on step 2
+    if (step === 2) {
+        setTimeout(updateRTOCalculations, 100);
+    }
+}
+
+/**
+ * Select buyer option (existing renter or manual entry)
+ */
+window.selectRTOBuyerOption = function(useExisting) {
+    const state = window.rtoWizardState;
+    state.buyer.useExisting = useExisting;
+    
+    const manualInput = document.getElementById('manualBuyerInput');
+    const useExistingRadio = document.getElementById('useExisting');
+    const enterNewRadio = document.getElementById('enterNew');
+    
+    if (useExisting) {
+        if (useExistingRadio) useExistingRadio.checked = true;
+        if (enterNewRadio) enterNewRadio.checked = false;
+        if (manualInput) manualInput.classList.add('hidden');
+        state.buyer.name = PropertyDataService.getValue(state.propertyId, 'renterName', state.property.renterName || '');
+    } else {
+        if (useExistingRadio) useExistingRadio.checked = false;
+        if (enterNewRadio) enterNewRadio.checked = true;
+        if (manualInput) manualInput.classList.remove('hidden');
+    }
+};
+
+/**
+ * Move to next step with validation
+ */
+window.nextRTOStep = function() {
+    const state = window.rtoWizardState;
+    
+    if (state.step === 1) {
+        // Validate buyer info
+        const buyerName = state.buyer.useExisting 
+            ? state.buyer.name 
+            : document.getElementById('rtoBuyerName')?.value?.trim();
+        const sellerName = document.getElementById('rtoSellerName')?.value?.trim();
+        
+        if (!buyerName) {
+            showToast('Please enter a buyer name', 'error');
+            return;
+        }
+        if (!sellerName) {
+            showToast('Please enter a seller name', 'error');
+            return;
+        }
+        
+        state.buyer.name = buyerName;
+        state.seller = sellerName;
+    } else if (state.step === 2) {
+        // Validate financial terms
+        const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
+        const downPayment = parseInt(document.getElementById('rtoDownPayment')?.value) || 0;
+        const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 0;
+        const finalPayment = parseInt(document.getElementById('rtoFinalPayment')?.value) || 0;
+        const realtorFeePercent = parseInt(document.getElementById('rtoRealtorFee')?.value) || 0;
+        
+        if (purchasePrice <= 0) {
+            showToast('Please enter a valid purchase price', 'error');
+            return;
+        }
+        if (termMonths < 1 || termMonths > 120) {
+            showToast('Term must be between 1 and 120 months', 'error');
+            return;
+        }
+        
+        state.financial = {
+            purchasePrice,
+            downPayment,
+            termMonths,
+            finalPayment,
+            realtorFeePercent
+        };
+    }
+    
+    renderRTOWizardStep(state.step + 1);
+};
+
+/**
+ * Update calculations in real-time
+ */
+window.updateRTOCalculations = function() {
+    const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
+    const downPayment = parseInt(document.getElementById('rtoDownPayment')?.value) || 0;
+    const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 24;
+    const finalPayment = parseInt(document.getElementById('rtoFinalPayment')?.value) || 0;
+    const realtorFeePercent = parseInt(document.getElementById('rtoRealtorFee')?.value) || 10;
+    
+    const remainingBalance = purchasePrice - downPayment;
+    const realtorFee = Math.round(finalPayment * (realtorFeePercent / 100));
+    const totalFinalPayment = finalPayment + realtorFee;
+    
+    // Calculate monthly payment
+    // Months 1 to (termMonths-1) pay monthly, then final payment covers the rest
+    const amountForMonthlyPayments = remainingBalance - totalFinalPayment;
+    const monthlyPayments = termMonths - 1;
+    const monthlyPayment = monthlyPayments > 0 ? Math.round(amountForMonthlyPayments / monthlyPayments) : 0;
+    
+    // Update display
+    document.getElementById('rtoRealtorFeeDisplay').textContent = realtorFeePercent + '%';
+    document.getElementById('rtoRemainingBalance').textContent = '$' + remainingBalance.toLocaleString();
+    document.getElementById('rtoMonthlyPayment').textContent = '$' + monthlyPayment.toLocaleString();
+    document.getElementById('rtoRealtorFeeAmount').textContent = '$' + realtorFee.toLocaleString();
+    document.getElementById('rtoTotalFinal').textContent = '$' + totalFinalPayment.toLocaleString();
+};
+
+/**
+ * Calculate RTO terms
+ */
+function calculateRTOTerms() {
+    const state = window.rtoWizardState;
+    const f = state.financial;
+    
+    const remainingBalance = f.purchasePrice - f.downPayment;
+    const realtorFee = Math.round(f.finalPayment * (f.realtorFeePercent / 100));
+    const totalFinalPayment = f.finalPayment + realtorFee;
+    
+    const amountForMonthlyPayments = remainingBalance - totalFinalPayment;
+    const monthlyPayments = f.termMonths - 1;
+    const monthlyPayment = monthlyPayments > 0 ? Math.round(amountForMonthlyPayments / monthlyPayments) : 0;
+    
+    // Adjust last monthly payment to account for rounding
+    const totalMonthlyPaid = monthlyPayment * (monthlyPayments - 1);
+    const lastMonthlyPayment = amountForMonthlyPayments - totalMonthlyPaid;
+    
+    return {
+        purchasePrice: f.purchasePrice,
+        downPayment: f.downPayment,
+        remainingBalance,
+        termMonths: f.termMonths,
+        monthlyPayment,
+        lastMonthlyPayment,
+        finalPayment: f.finalPayment,
+        realtorFeePercent: f.realtorFeePercent,
+        realtorFee,
+        totalFinalPayment
+    };
+}
+
+/**
+ * Generate the contract and show step 4
+ */
+window.generateAndShowContract = function() {
+    // Save the start date
+    const startDate = document.getElementById('rtoStartDate')?.value;
+    window.rtoWizardState.startDate = startDate || new Date().toISOString().split('T')[0];
+    
+    renderRTOWizardStep(4);
+};
+
+/**
+ * Generate the full RTO contract
+ */
+function generateRTOContract() {
+    const state = window.rtoWizardState;
+    const calc = calculateRTOTerms();
+    const startDate = new Date(state.startDate);
+    
+    // Generate document ID
+    const dateStr = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const sellerInitials = state.seller.split(' ').map(n => n[0]).join('').toUpperCase();
+    const buyerInitials = state.buyer.name.split(' ').map(n => n[0]).join('').toUpperCase();
+    const documentId = `SA-RTO-${dateStr.substring(0, 4)}-${dateStr.substring(4, 8)}-${sellerInitials}-${buyerInitials}`;
+    
+    // Generate payment schedule
+    let schedule = [];
+    let runningBalance = calc.remainingBalance;
+    
+    // Down payment entry
+    schedule.push({
+        num: 'Down Payment',
+        date: formatDateForContract(startDate),
+        amount: calc.downPayment,
+        type: 'Down Payment',
+        balance: calc.remainingBalance
+    });
+    
+    // Monthly payments
+    for (let i = 1; i <= calc.termMonths; i++) {
+        const paymentDate = new Date(startDate);
+        paymentDate.setMonth(paymentDate.getMonth() + i);
+        
+        let amount, type;
+        if (i < calc.termMonths) {
+            // Regular monthly payment (adjust last one for rounding)
+            amount = (i === calc.termMonths - 1) ? calc.lastMonthlyPayment : calc.monthlyPayment;
+            type = 'Monthly';
+            runningBalance -= amount;
+        } else {
+            // Final payment
+            amount = calc.totalFinalPayment;
+            type = 'Final + Realtor Fee';
+            runningBalance = 0;
+        }
+        
+        schedule.push({
+            num: i,
+            date: formatDateForContract(paymentDate),
+            amount: amount,
+            type: type,
+            balance: runningBalance
+        });
+    }
+    
+    // Build preview text
+    const preview = `
+═══════════════════════════════════════════════════════════════
+                    RENT-TO-OWN AGREEMENT
+                        PMA REALTY
+═══════════════════════════════════════════════════════════════
+
+PROPERTY INFORMATION
+────────────────────────────────────────────────────────────────
+Address: ${state.property.title}
+Property Description: ${state.property.description || 'N/A'}
+Listing Type: Rent-to-Own
+
+PARTIES INVOLVED
+────────────────────────────────────────────────────────────────
+Seller/Landlord: ${state.seller}
+Buyer/Tenant: ${state.buyer.name}
+Realtor/Brokerage: PMA Realty
+
+FINANCIAL STRUCTURE
+────────────────────────────────────────────────────────────────
+Item                              Amount
+─────────────────────────────────────────────────────
+Total Purchase Price              $${calc.purchasePrice.toLocaleString()}
+Down Payment (Already Paid)       $${calc.downPayment.toLocaleString()}
+Remaining Balance                 $${calc.remainingBalance.toLocaleString()}
+Term Length                       ${calc.termMonths} Months
+Monthly Payments (Months 1-${calc.termMonths - 1})     $${calc.monthlyPayment.toLocaleString()}
+Final Payment (Month ${calc.termMonths}) Base       $${calc.finalPayment.toLocaleString()}
+PMA Realtor Fee (${calc.realtorFeePercent}% of Final)    $${calc.realtorFee.toLocaleString()}
+Total Final Payment Due           $${calc.totalFinalPayment.toLocaleString()}
+
+COMPLETE PAYMENT SCHEDULE
+────────────────────────────────────────────────────────────────
+Agreement Start Date: ${formatDateForContract(startDate)}
+
+${schedule.map(p => 
+    `${String(p.num).padEnd(12)} ${p.date.padEnd(14)} $${p.amount.toLocaleString().padStart(12)} ${p.type.padEnd(20)} $${p.balance.toLocaleString()}`
+).join('\n')}
+
+FINAL PAYMENT BREAKDOWN
+────────────────────────────────────────────────────────────────
+• Base Final Payment: $${calc.finalPayment.toLocaleString()}
+• PMA Realtor Fee (${calc.realtorFeePercent}%): $${calc.realtorFee.toLocaleString()}
+• Total Final Payment: $${calc.totalFinalPayment.toLocaleString()}
+
+CONTRACT TERMS
+────────────────────────────────────────────────────────────────
+Payment Terms:
+• Monthly payments of $${calc.monthlyPayment.toLocaleString()} due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month
+• Final payment of $${calc.totalFinalPayment.toLocaleString()} due on ${formatDateForContract(new Date(startDate.setMonth(startDate.getMonth() + calc.termMonths)))}
+• 3-day grace period before late fees apply
+
+Late Payment:
+• $50,000 late fee after 3 days
+• Default possible after 14 days late
+
+Default:
+• Two consecutive missed payments = default
+• Seller retains all previous payments as liquidated damages
+• Buyer must vacate within 72 hours of default notice
+
+Property Maintenance:
+• Buyer responsible for all maintenance
+• No major modifications without seller consent
+
+Transfer of Ownership:
+• Full ownership transfers upon final payment completion
+• Title transfer within 7 days of final payment
+• PMA Realty facilitates transfer
+
+Early Payoff:
+• Allowed without penalty
+• $${calc.realtorFee.toLocaleString()} PMA Realtor Fee still applies upon transfer
+
+DOCUMENT IDENTIFIERS
+────────────────────────────────────────────────────────────────
+• Document ID: ${documentId}
+• Jurisdiction: State of San Andreas
+• Generated: ${new Date().toLocaleString()}
+
+═══════════════════════════════════════════════════════════════
+                    SIGNATURES REQUIRED
+═══════════════════════════════════════════════════════════════
+
+Seller/Landlord: _________________________ Date: ___________
+                 ${state.seller}
+
+Buyer/Tenant:    _________________________ Date: ___________
+                 ${state.buyer.name}
+
+PMA Realty:      _________________________ Date: ___________
+                 Authorized Representative
+
+═══════════════════════════════════════════════════════════════
+`;
+
+    // Store for later use
+    window.rtoGeneratedContract = {
+        documentId,
+        preview,
+        data: {
+            ...state,
+            calculations: calc,
+            schedule,
+            generatedAt: new Date().toISOString()
+        }
+    };
+    
+    return { documentId, preview };
+}
+
+/**
+ * Format date for contract display
+ */
+function formatDateForContract(date) {
+    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Get ordinal suffix for day
+ */
+function getOrdinalSuffix(day) {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+}
+
+/**
+ * Copy contract to clipboard
+ */
+window.copyRTOContract = function() {
+    const contract = window.rtoGeneratedContract;
+    if (!contract) {
+        showToast('No contract generated', 'error');
+        return;
+    }
+    
+    navigator.clipboard.writeText(contract.preview).then(() => {
+        showToast('📋 Contract copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Copy failed:', err);
+        showToast('Failed to copy', 'error');
+    });
+};
+
+/**
+ * Save contract to Firestore
+ */
+window.saveRTOContract = async function() {
+    const contract = window.rtoGeneratedContract;
+    if (!contract) {
+        showToast('No contract generated', 'error');
+        return;
+    }
+    
+    try {
+        const state = window.rtoWizardState;
+        
+        // Save to Firestore
+        await db.collection('rentToOwnContracts').doc(contract.documentId).set({
+            documentId: contract.documentId,
+            propertyId: state.propertyId,
+            propertyTitle: state.property.title,
+            seller: state.seller,
+            buyer: state.buyer.name,
+            financial: state.financial,
+            calculations: contract.data.calculations,
+            schedule: contract.data.schedule,
+            startDate: state.startDate,
+            status: 'draft',
+            createdBy: auth.currentUser?.email || 'unknown',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            contractText: contract.preview
+        });
+        
+        showToast('✅ Contract saved to Firestore!', 'success');
+        
+        // Add XP if gamification is available
+        if (typeof awardXP === 'function') {
+            await awardXP('contract_created', 100, `Created rent-to-own contract: ${contract.documentId}`);
+        }
+        
+    } catch (error) {
+        console.error('Error saving contract:', error);
+        showToast('Failed to save contract: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Close the RTO wizard
+ */
+window.closeRTOWizard = function() {
+    const modal = document.getElementById('rtoWizardModal');
+    if (modal) modal.remove();
+    window.rtoWizardState = null;
+    window.rtoGeneratedContract = null;
 };
 
 // Start the app

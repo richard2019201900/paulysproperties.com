@@ -1042,7 +1042,7 @@ window.goToRentAlerts = function() {
         setTimeout(() => {
             const rentPanel = $('rentNotificationsPanel');
             if (rentPanel && !rentPanel.classList.contains('hidden')) {
-                rentPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                rentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
                 // Add highlight effect
                 rentPanel.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.7), 0 0 30px rgba(239, 68, 68, 0.4)';
@@ -1066,18 +1066,37 @@ window.goToAdminNotifications = function(type) {
             switchDashboardTab('admin');
         }
         
-        // Scroll to notifications stack
+        // Scroll to appropriate section based on type
         setTimeout(() => {
-            const notifStack = $('adminNotificationsStack');
-            if (notifStack && !notifStack.classList.contains('hidden')) {
-                notifStack.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            let targetElement = null;
+            let highlightColor = 'rgba(59, 130, 246, 0.7)'; // default blue
+            
+            if (type === 'premium') {
+                // Scroll to premium alert
+                targetElement = $('pendingPremiumAlert');
+                highlightColor = 'rgba(245, 158, 11, 0.7)'; // amber
                 
-                // Highlight the stack
-                notifStack.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.7), 0 0 30px rgba(59, 130, 246, 0.4)';
-                notifStack.style.transition = 'box-shadow 0.3s ease';
+                // Also expand the details
+                if (targetElement && !targetElement.classList.contains('hidden')) {
+                    const listEl = $('premiumRequestsList');
+                    if (listEl && listEl.classList.contains('hidden')) {
+                        showPremiumRequestsList();
+                    }
+                }
+            } else {
+                // Default: scroll to notification stack
+                targetElement = $('adminNotificationsStack');
+            }
+            
+            if (targetElement && !targetElement.classList.contains('hidden')) {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Highlight the element
+                targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+                targetElement.style.transition = 'box-shadow 0.3s ease';
                 
                 setTimeout(() => {
-                    notifStack.style.boxShadow = '';
+                    targetElement.style.boxShadow = '';
                 }, 4000);
             }
         }, 300);
