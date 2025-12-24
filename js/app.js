@@ -3472,8 +3472,8 @@ window.processEviction = async function(propertyId) {
         const p = properties.find(prop => prop.id === propertyId);
         const renterName = PropertyDataService.getValue(propertyId, 'renterName', '');
         
-        // Record eviction in payment history
-        await recordPaymentHistory(propertyId, {
+        // Record eviction in payment history using logPayment
+        await logPayment(propertyId, {
             renterName: renterName,
             type: 'eviction',
             amount: 0,
