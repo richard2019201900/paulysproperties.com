@@ -3797,8 +3797,7 @@ window.rtoWizardState = {
         purchasePrice: 0,
         downPayment: 0,
         termMonths: 24,
-        finalPayment: 1500000,
-        realtorFeePercent: 10
+        finalPayment: 1500000
     }
 };
 
@@ -3812,25 +3811,35 @@ window.showRentToOwnWizard = async function(propertyId) {
         return;
     }
     
-    // Get current user's display name for seller
+    // Get the property owner's display name (from the property's ownerEmail)
     let sellerName = 'Property Owner';
     try {
-        const userEmail = auth.currentUser?.email?.toLowerCase();
-        if (userEmail) {
-            const userDoc = await db.collection('users').doc(userEmail).get();
-            if (userDoc.exists && userDoc.data().displayName) {
-                sellerName = userDoc.data().displayName;
+        // First try to get the ownerName if it's stored on the property
+        const ownerName = PropertyDataService.getValue(propertyId, 'ownerName', p.ownerName || '');
+        if (ownerName) {
+            sellerName = ownerName;
+        } else {
+            // Fall back to looking up from the users collection using ownerEmail
+            const ownerEmail = (p.ownerEmail || propertyOwnerEmail[propertyId] || '').toLowerCase();
+            if (ownerEmail) {
+                const userDoc = await db.collection('users').doc(ownerEmail).get();
+                if (userDoc.exists && userDoc.data().displayName) {
+                    sellerName = userDoc.data().displayName;
+                }
             }
         }
     } catch (e) {
         console.warn('Could not get seller name:', e);
     }
     
+    // Get property description
+    const propertyDescription = PropertyDataService.getValue(propertyId, 'description', p.description || '');
+    
     // Initialize wizard state
     window.rtoWizardState = {
         propertyId: propertyId,
         step: 1,
-        property: p,
+        property: { ...p, description: propertyDescription },
         buyer: {
             name: PropertyDataService.getValue(propertyId, 'renterName', p.renterName || ''),
             useExisting: false
@@ -3840,8 +3849,7 @@ window.showRentToOwnWizard = async function(propertyId) {
             purchasePrice: 0,
             downPayment: 0,
             termMonths: 24,
-            finalPayment: 1500000,
-            realtorFeePercent: 10
+            finalPayment: 1500000
         }
     };
     
@@ -3930,7 +3938,7 @@ function renderRTOWizardStep(step) {
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                             <input type="number" id="rtoPurchasePrice" value="${f.purchasePrice || ''}" 
                                    class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                                   placeholder="17,000,000" onchange="updateRTOCalculations()">
+                                   placeholder="17,000,000" oninput="updateRTOCalculations()">
                         </div>
                     </div>
                     <div>
@@ -3939,7 +3947,7 @@ function renderRTOWizardStep(step) {
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                             <input type="number" id="rtoDownPayment" value="${f.downPayment || ''}" 
                                    class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                                   placeholder="700,000" onchange="updateRTOCalculations()">
+                                   placeholder="700,000" oninput="updateRTOCalculations()">
                         </div>
                     </div>
                 </div>
@@ -3949,7 +3957,7 @@ function renderRTOWizardStep(step) {
                         <label class="block text-gray-400 text-sm mb-2">Term Length (Months)</label>
                         <input type="number" id="rtoTermMonths" value="${f.termMonths}" 
                                class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                               placeholder="24" min="1" max="120" onchange="updateRTOCalculations()">
+                               placeholder="24" min="1" max="120" oninput="updateRTOCalculations()">
                     </div>
                     <div>
                         <label class="block text-gray-400 text-sm mb-2">Final Payment (Base)</label>
@@ -3957,18 +3965,16 @@ function renderRTOWizardStep(step) {
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                             <input type="number" id="rtoFinalPayment" value="${f.finalPayment}" 
                                    class="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white focus:ring-2 focus:ring-amber-500"
-                                   placeholder="1,500,000" onchange="updateRTOCalculations()">
+                                   placeholder="1,500,000" oninput="updateRTOCalculations()">
                         </div>
                     </div>
                 </div>
                 
-                <div>
-                    <label class="block text-gray-400 text-sm mb-2">PMA Realtor Fee (% of Final Payment)</label>
-                    <div class="flex items-center gap-4">
-                        <input type="range" id="rtoRealtorFee" value="${f.realtorFeePercent}" min="0" max="20" step="1"
-                               class="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                               onchange="updateRTOCalculations()">
-                        <span id="rtoRealtorFeeDisplay" class="text-amber-400 font-bold w-12">${f.realtorFeePercent}%</span>
+                <!-- Realtor Fee - Fixed at 10% -->
+                <div class="bg-gray-800/50 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-400 text-sm">PaulysProperties.com Realtor Fee</span>
+                        <span class="text-amber-400 font-bold">10% of Final Payment</span>
                     </div>
                 </div>
                 
@@ -3985,7 +3991,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoMonthlyPayment" class="text-green-400 font-semibold">$0</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">Realtor Fee:</span>
+                            <span class="text-gray-400">Realtor Fee (10%):</span>
                             <span id="rtoRealtorFeeAmount" class="text-amber-400 font-semibold">$0</span>
                         </div>
                         <div class="flex justify-between">
@@ -4008,7 +4014,7 @@ function renderRTOWizardStep(step) {
                         <span>🏠</span> Property
                     </h4>
                     <div class="text-white font-semibold">${state.property.title}</div>
-                    <div class="text-gray-400 text-sm mt-1">${state.property.description?.substring(0, 150) || 'No description'}...</div>
+                    <div class="text-gray-400 text-sm mt-1">${state.property.description || 'No description available'}</div>
                 </div>
                 
                 <!-- Parties -->
@@ -4026,7 +4032,7 @@ function renderRTOWizardStep(step) {
                             <div class="text-white font-semibold">${state.buyer.name}</div>
                         </div>
                     </div>
-                    <div class="text-gray-400 text-sm mt-2">Realtor/Brokerage: <span class="text-white">PMA Realty</span></div>
+                    <div class="text-gray-400 text-sm mt-2">Realtor/Brokerage: <span class="text-white">${state.seller} / PaulysProperties.com</span></div>
                 </div>
                 
                 <!-- Financial Structure -->
@@ -4060,7 +4066,7 @@ function renderRTOWizardStep(step) {
                             <span class="text-white">$${calc.finalPayment.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">PMA Realtor Fee (${calc.realtorFeePercent}%)</span>
+                            <span class="text-gray-400">Realtor Fee (10%)</span>
                             <span class="text-amber-400">$${calc.realtorFee.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between bg-amber-900/30 p-2 rounded-lg">
@@ -4089,8 +4095,8 @@ function renderRTOWizardStep(step) {
                     <span class="text-xl font-bold">Contract Ready!</span>
                 </div>
                 
-                <div class="bg-gray-800 rounded-xl p-4 max-h-[40vh] overflow-y-auto">
-                    <div id="rtoContractPreview" class="text-sm text-gray-300 whitespace-pre-wrap font-mono">
+                <div class="bg-gray-800 rounded-xl p-4 max-h-[35vh] overflow-y-auto">
+                    <div id="rtoContractPreview" class="text-xs text-gray-300 whitespace-pre-wrap font-mono">
                         ${contract.preview}
                     </div>
                 </div>
@@ -4099,16 +4105,28 @@ function renderRTOWizardStep(step) {
                     Document ID: ${contract.documentId}
                 </div>
                 
-                <div class="flex gap-3">
-                    <button onclick="copyRTOContract()" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
+                <!-- Primary Actions -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="copyRTOContract()" class="bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                        Copy Contract
+                        Copy Text
                     </button>
-                    <button onclick="saveRTOContract()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                        Save to Firestore
+                    <button onclick="downloadRTOContractImage()" class="bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        Download Image
                     </button>
                 </div>
+                
+                <!-- Save Action -->
+                <button onclick="saveRTOContract()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold transition hover:opacity-90 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    Save to Firestore & Close
+                </button>
+                
+                <p class="text-gray-500 text-xs text-center">
+                    Saving stores the contract in your database for future reference.<br>
+                    The image includes cursive signatures for both parties.
+                </p>
             </div>
         `;
     }
@@ -4133,7 +4151,7 @@ function renderRTOWizardStep(step) {
                     
                     <!-- Navigation -->
                     <div class="flex gap-3 mt-6 pt-4 border-t border-gray-700">
-                        ${step > 1 && step < 4 ? `
+                        ${step > 1 ? `
                             <button onclick="renderRTOWizardStep(${step - 1})" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 px-4 rounded-xl font-bold transition">
                                 ← Back
                             </button>
@@ -4224,7 +4242,6 @@ window.nextRTOStep = function() {
         const downPayment = parseInt(document.getElementById('rtoDownPayment')?.value) || 0;
         const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 0;
         const finalPayment = parseInt(document.getElementById('rtoFinalPayment')?.value) || 0;
-        const realtorFeePercent = parseInt(document.getElementById('rtoRealtorFee')?.value) || 0;
         
         if (purchasePrice <= 0) {
             showToast('Please enter a valid purchase price', 'error');
@@ -4239,8 +4256,7 @@ window.nextRTOStep = function() {
             purchasePrice,
             downPayment,
             termMonths,
-            finalPayment,
-            realtorFeePercent
+            finalPayment
         };
     }
     
@@ -4255,7 +4271,7 @@ window.updateRTOCalculations = function() {
     const downPayment = parseInt(document.getElementById('rtoDownPayment')?.value) || 0;
     const termMonths = parseInt(document.getElementById('rtoTermMonths')?.value) || 24;
     const finalPayment = parseInt(document.getElementById('rtoFinalPayment')?.value) || 0;
-    const realtorFeePercent = parseInt(document.getElementById('rtoRealtorFee')?.value) || 10;
+    const realtorFeePercent = 10; // Always 10%
     
     const remainingBalance = purchasePrice - downPayment;
     const realtorFee = Math.round(finalPayment * (realtorFeePercent / 100));
@@ -4268,11 +4284,15 @@ window.updateRTOCalculations = function() {
     const monthlyPayment = monthlyPayments > 0 ? Math.round(amountForMonthlyPayments / monthlyPayments) : 0;
     
     // Update display
-    document.getElementById('rtoRealtorFeeDisplay').textContent = realtorFeePercent + '%';
-    document.getElementById('rtoRemainingBalance').textContent = '$' + remainingBalance.toLocaleString();
-    document.getElementById('rtoMonthlyPayment').textContent = '$' + monthlyPayment.toLocaleString();
-    document.getElementById('rtoRealtorFeeAmount').textContent = '$' + realtorFee.toLocaleString();
-    document.getElementById('rtoTotalFinal').textContent = '$' + totalFinalPayment.toLocaleString();
+    const remainingEl = document.getElementById('rtoRemainingBalance');
+    const monthlyEl = document.getElementById('rtoMonthlyPayment');
+    const feeEl = document.getElementById('rtoRealtorFeeAmount');
+    const totalEl = document.getElementById('rtoTotalFinal');
+    
+    if (remainingEl) remainingEl.textContent = '$' + remainingBalance.toLocaleString();
+    if (monthlyEl) monthlyEl.textContent = '$' + monthlyPayment.toLocaleString();
+    if (feeEl) feeEl.textContent = '$' + realtorFee.toLocaleString();
+    if (totalEl) totalEl.textContent = '$' + totalFinalPayment.toLocaleString();
 };
 
 /**
@@ -4282,8 +4302,9 @@ function calculateRTOTerms() {
     const state = window.rtoWizardState;
     const f = state.financial;
     
+    const realtorFeePercent = 10; // Always 10%
     const remainingBalance = f.purchasePrice - f.downPayment;
-    const realtorFee = Math.round(f.finalPayment * (f.realtorFeePercent / 100));
+    const realtorFee = Math.round(f.finalPayment * (realtorFeePercent / 100));
     const totalFinalPayment = f.finalPayment + realtorFee;
     
     const amountForMonthlyPayments = remainingBalance - totalFinalPayment;
@@ -4302,7 +4323,7 @@ function calculateRTOTerms() {
         monthlyPayment,
         lastMonthlyPayment,
         finalPayment: f.finalPayment,
-        realtorFeePercent: f.realtorFeePercent,
+        realtorFeePercent,
         realtorFee,
         totalFinalPayment
     };
@@ -4377,7 +4398,7 @@ function generateRTOContract() {
     const preview = `
 ═══════════════════════════════════════════════════════════════
                     RENT-TO-OWN AGREEMENT
-                        PMA REALTY
+                     PaulysProperties.com
 ═══════════════════════════════════════════════════════════════
 
 PROPERTY INFORMATION
@@ -4390,7 +4411,7 @@ PARTIES INVOLVED
 ────────────────────────────────────────────────────────────────
 Seller/Landlord: ${state.seller}
 Buyer/Tenant: ${state.buyer.name}
-Realtor/Brokerage: PMA Realty
+Realtor/Brokerage: ${state.seller} / PaulysProperties.com
 
 FINANCIAL STRUCTURE
 ────────────────────────────────────────────────────────────────
@@ -4402,7 +4423,7 @@ Remaining Balance                 $${calc.remainingBalance.toLocaleString()}
 Term Length                       ${calc.termMonths} Months
 Monthly Payments (Months 1-${calc.termMonths - 1})     $${calc.monthlyPayment.toLocaleString()}
 Final Payment (Month ${calc.termMonths}) Base       $${calc.finalPayment.toLocaleString()}
-PMA Realtor Fee (${calc.realtorFeePercent}% of Final)    $${calc.realtorFee.toLocaleString()}
+Realtor Fee (10% of Final)        $${calc.realtorFee.toLocaleString()}
 Total Final Payment Due           $${calc.totalFinalPayment.toLocaleString()}
 
 COMPLETE PAYMENT SCHEDULE
@@ -4416,7 +4437,7 @@ ${schedule.map(p =>
 FINAL PAYMENT BREAKDOWN
 ────────────────────────────────────────────────────────────────
 • Base Final Payment: $${calc.finalPayment.toLocaleString()}
-• PMA Realtor Fee (${calc.realtorFeePercent}%): $${calc.realtorFee.toLocaleString()}
+• Realtor Fee (10%): $${calc.realtorFee.toLocaleString()}
 • Total Final Payment: $${calc.totalFinalPayment.toLocaleString()}
 
 CONTRACT TERMS
@@ -4442,11 +4463,11 @@ Property Maintenance:
 Transfer of Ownership:
 • Full ownership transfers upon final payment completion
 • Title transfer within 7 days of final payment
-• PMA Realty facilitates transfer
+• PaulysProperties.com facilitates transfer
 
 Early Payoff:
 • Allowed without penalty
-• $${calc.realtorFee.toLocaleString()} PMA Realtor Fee still applies upon transfer
+• $${calc.realtorFee.toLocaleString()} Realtor Fee still applies upon transfer
 
 DOCUMENT IDENTIFIERS
 ────────────────────────────────────────────────────────────────
@@ -4464,8 +4485,8 @@ Seller/Landlord: _________________________ Date: ___________
 Buyer/Tenant:    _________________________ Date: ___________
                  ${state.buyer.name}
 
-PMA Realty:      _________________________ Date: ___________
-                 Authorized Representative
+PaulysProperties.com: ____________________ Date: ___________
+                      Authorized Representative
 
 ═══════════════════════════════════════════════════════════════
 `;
@@ -4541,29 +4562,257 @@ window.saveRTOContract = async function() {
             documentId: contract.documentId,
             propertyId: state.propertyId,
             propertyTitle: state.property.title,
+            propertyDescription: state.property.description,
             seller: state.seller,
             buyer: state.buyer.name,
             financial: state.financial,
             calculations: contract.data.calculations,
             schedule: contract.data.schedule,
             startDate: state.startDate,
-            status: 'draft',
+            status: 'pending_signatures',
             createdBy: auth.currentUser?.email || 'unknown',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             contractText: contract.preview
         });
         
-        showToast('✅ Contract saved to Firestore!', 'success');
+        showToast('✅ Contract saved! You can view it in Firestore.', 'success');
         
         // Add XP if gamification is available
         if (typeof awardXP === 'function') {
             await awardXP('contract_created', 100, `Created rent-to-own contract: ${contract.documentId}`);
         }
         
+        // Close the modal after a short delay
+        setTimeout(() => {
+            closeRTOWizard();
+        }, 1500);
+        
     } catch (error) {
         console.error('Error saving contract:', error);
         showToast('Failed to save contract: ' + error.message, 'error');
     }
+};
+
+/**
+ * Generate contract image with cursive signatures
+ */
+window.downloadRTOContractImage = async function() {
+    const contract = window.rtoGeneratedContract;
+    const state = window.rtoWizardState;
+    if (!contract || !state) {
+        showToast('No contract generated', 'error');
+        return;
+    }
+    
+    showToast('🖼️ Generating contract image...', 'info');
+    
+    const calc = contract.data.calculations;
+    const startDate = new Date(state.startDate);
+    
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Set canvas size (letter size at 96 DPI)
+    canvas.width = 816;  // 8.5 inches
+    canvas.height = 1400; // Extended for full content
+    
+    // Background
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Add subtle texture/gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(1, '#16213e');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    let y = 40;
+    const margin = 50;
+    const contentWidth = canvas.width - (margin * 2);
+    
+    // Helper functions
+    const drawText = (text, x, fontSize, color, font = 'Arial') => {
+        ctx.font = `${fontSize}px ${font}`;
+        ctx.fillStyle = color;
+        ctx.fillText(text, x, y);
+        y += fontSize + 8;
+    };
+    
+    const drawLine = () => {
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(margin, y);
+        ctx.lineTo(canvas.width - margin, y);
+        ctx.stroke();
+        y += 15;
+    };
+    
+    const drawCursiveSignature = (name, x, signatureY) => {
+        ctx.font = 'italic 28px Georgia, serif';
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillText(name, x, signatureY);
+    };
+    
+    // === HEADER ===
+    ctx.textAlign = 'center';
+    drawText('RENT-TO-OWN AGREEMENT', canvas.width / 2, 28, '#f59e0b', 'Arial Black');
+    drawText('PaulysProperties.com', canvas.width / 2, 20, '#fbbf24', 'Arial');
+    y += 10;
+    drawLine();
+    
+    // === PROPERTY INFORMATION ===
+    ctx.textAlign = 'left';
+    y += 10;
+    drawText('PROPERTY INFORMATION', margin, 18, '#f59e0b', 'Arial Black');
+    drawText(`Address: ${state.property.title}`, margin, 14, '#ffffff');
+    
+    // Wrap description text
+    const desc = state.property.description || 'N/A';
+    ctx.font = '12px Arial';
+    const words = desc.split(' ');
+    let line = 'Description: ';
+    for (let word of words) {
+        const testLine = line + word + ' ';
+        if (ctx.measureText(testLine).width > contentWidth) {
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillText(line, margin, y);
+            y += 16;
+            line = word + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    ctx.fillStyle = '#9ca3af';
+    ctx.fillText(line, margin, y);
+    y += 20;
+    
+    drawText('Listing Type: Rent-to-Own', margin, 14, '#ffffff');
+    y += 10;
+    
+    // === PARTIES INVOLVED ===
+    drawLine();
+    y += 5;
+    drawText('PARTIES INVOLVED', margin, 18, '#f59e0b', 'Arial Black');
+    drawText(`Seller/Landlord: ${state.seller}`, margin, 14, '#ffffff');
+    drawText(`Buyer/Tenant: ${state.buyer.name}`, margin, 14, '#ffffff');
+    drawText(`Realtor/Brokerage: ${state.seller} / PaulysProperties.com`, margin, 14, '#ffffff');
+    y += 10;
+    
+    // === FINANCIAL STRUCTURE ===
+    drawLine();
+    y += 5;
+    drawText('FINANCIAL STRUCTURE', margin, 18, '#f59e0b', 'Arial Black');
+    
+    const financialItems = [
+        ['Total Purchase Price', `$${calc.purchasePrice.toLocaleString()}`],
+        ['Down Payment (Already Paid)', `$${calc.downPayment.toLocaleString()}`],
+        ['Remaining Balance', `$${calc.remainingBalance.toLocaleString()}`],
+        ['Term Length', `${calc.termMonths} Months`],
+        ['Monthly Payments', `$${calc.monthlyPayment.toLocaleString()}`],
+        ['Final Payment (Base)', `$${calc.finalPayment.toLocaleString()}`],
+        ['Realtor Fee (10%)', `$${calc.realtorFee.toLocaleString()}`],
+        ['Total Final Payment', `$${calc.totalFinalPayment.toLocaleString()}`]
+    ];
+    
+    financialItems.forEach(([label, value]) => {
+        ctx.font = '13px Arial';
+        ctx.fillStyle = '#9ca3af';
+        ctx.fillText(label, margin, y);
+        ctx.fillStyle = '#10b981';
+        ctx.fillText(value, margin + 300, y);
+        y += 20;
+    });
+    
+    y += 10;
+    
+    // === CONTRACT TERMS SUMMARY ===
+    drawLine();
+    y += 5;
+    drawText('KEY CONTRACT TERMS', margin, 18, '#f59e0b', 'Arial Black');
+    drawText(`• Monthly payments due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month`, margin, 13, '#ffffff');
+    drawText('• 3-day grace period before $50,000 late fee', margin, 13, '#ffffff');
+    drawText('• Two consecutive missed payments = default', margin, 13, '#ffffff');
+    drawText('• Full ownership transfers upon final payment', margin, 13, '#ffffff');
+    y += 15;
+    
+    // === DOCUMENT ID ===
+    drawLine();
+    y += 5;
+    drawText(`Document ID: ${contract.documentId}`, margin, 14, '#9ca3af');
+    drawText(`Generated: ${new Date().toLocaleDateString()}`, margin, 12, '#6b7280');
+    y += 20;
+    
+    // === SIGNATURES SECTION ===
+    drawLine();
+    y += 10;
+    ctx.textAlign = 'center';
+    drawText('SIGNATURES', canvas.width / 2, 20, '#f59e0b', 'Arial Black');
+    ctx.textAlign = 'left';
+    y += 20;
+    
+    // Signature boxes
+    const sigBoxWidth = 300;
+    const sigBoxHeight = 80;
+    const sigSpacing = 30;
+    
+    // Seller signature
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(margin, y, sigBoxWidth, sigBoxHeight);
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(margin + 1, y + 1, sigBoxWidth - 2, sigBoxHeight - 2);
+    
+    // Draw cursive signature for seller
+    drawCursiveSignature(state.seller, margin + 20, y + 45);
+    
+    ctx.font = '11px Arial';
+    ctx.fillStyle = '#9ca3af';
+    ctx.fillText('Seller/Landlord', margin, y + sigBoxHeight + 15);
+    ctx.fillText(state.seller, margin, y + sigBoxHeight + 30);
+    ctx.fillStyle = '#6b7280';
+    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, margin + 200, y + sigBoxHeight + 15);
+    
+    // Buyer signature
+    const buyerX = margin + sigBoxWidth + sigSpacing;
+    ctx.strokeStyle = '#4b5563';
+    ctx.strokeRect(buyerX, y, sigBoxWidth, sigBoxHeight);
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(buyerX + 1, y + 1, sigBoxWidth - 2, sigBoxHeight - 2);
+    
+    // Draw cursive signature for buyer
+    drawCursiveSignature(state.buyer.name, buyerX + 20, y + 45);
+    
+    ctx.font = '11px Arial';
+    ctx.fillStyle = '#9ca3af';
+    ctx.fillText('Buyer/Tenant', buyerX, y + sigBoxHeight + 15);
+    ctx.fillText(state.buyer.name, buyerX, y + sigBoxHeight + 30);
+    ctx.fillStyle = '#6b7280';
+    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, buyerX + 200, y + sigBoxHeight + 15);
+    
+    y += sigBoxHeight + 60;
+    
+    // Footer
+    ctx.textAlign = 'center';
+    ctx.font = '10px Arial';
+    ctx.fillStyle = '#4b5563';
+    ctx.fillText('This document is a legally binding agreement in the State of San Andreas', canvas.width / 2, y);
+    ctx.fillText('© PaulysProperties.com - All Rights Reserved', canvas.width / 2, y + 15);
+    
+    // Convert to blob and download
+    canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${contract.documentId}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('📥 Contract image downloaded!', 'success');
+    }, 'image/png');
 };
 
 /**
