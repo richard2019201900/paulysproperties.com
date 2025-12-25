@@ -5849,8 +5849,13 @@ window.showRTOPaymentModal = function(propertyId) {
         : `Log RTO Payment - Month ${paymentNumber} of ${rtoTotalPayments - 1}`;
     
     const modalHTML = `
-        <div id="rtoPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeRTOPaymentModal()">
-            <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-amber-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+        <div id="rtoPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-amber-500/50 shadow-2xl overflow-hidden relative">
+                <!-- X Close Button -->
+                <button onclick="closeRTOPaymentModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
                 <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-4">
                     <h3 class="text-xl font-bold text-white flex items-center gap-3">
                         <span>💰</span>
@@ -6162,8 +6167,13 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     ` : '';
     
     const modalHTML = `
-        <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closePaymentConfirmModal()">
-            <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl" onclick="event.stopPropagation()">
+        <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl relative">
+                <!-- X Close Button -->
+                <button onclick="closePaymentConfirmModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
                 <div class="text-center mb-4">
                     <div class="text-5xl mb-3">✅</div>
                     <h3 class="text-2xl font-bold text-green-400">${headerText}</h3>
@@ -6282,8 +6292,13 @@ window.showRTOPaymentHistory = async function(propertyId) {
         }
         
         const modalHTML = `
-            <div id="rtoHistoryModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
-                <div class="bg-gray-900 rounded-2xl max-w-4xl w-full border border-cyan-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+            <div id="rtoHistoryModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-4xl w-full border border-cyan-500/50 shadow-2xl overflow-hidden relative">
+                    <!-- X Close Button -->
+                    <button onclick="document.getElementById('rtoHistoryModal').remove()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    
                     <div class="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4">
                         <h3 class="text-xl font-bold text-white flex items-center gap-3">
                             <span>📜</span>
@@ -6358,8 +6373,13 @@ window.editRTOPaymentEntry = async function(propertyId, contractId, paymentIndex
         }
         
         const modalHTML = `
-            <div id="editPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
-                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-blue-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+            <div id="editPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-blue-500/50 shadow-2xl overflow-hidden relative">
+                    <!-- X Close Button -->
+                    <button onclick="document.getElementById('editPaymentModal').remove()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    
                     <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
                         <h3 class="text-xl font-bold text-white">Edit Payment - Month ${payment.month}</h3>
                     </div>
@@ -6569,8 +6589,13 @@ window.editRTODeposit = async function(propertyId, contractId) {
         const contract = contractDoc.data();
         
         const modalHTML = `
-            <div id="editDepositModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
-                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-green-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+            <div id="editDepositModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-green-500/50 shadow-2xl overflow-hidden relative">
+                    <!-- X Close Button -->
+                    <button onclick="document.getElementById('editDepositModal').remove()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    
                     <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
                         <h3 class="text-xl font-bold text-white">Edit Deposit Payment</h3>
                     </div>
