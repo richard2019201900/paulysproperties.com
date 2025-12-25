@@ -4708,18 +4708,20 @@ window.updateRTODownPaymentManual = function(amount) {
     const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
     const downPayment = parseInt(amount) || 0;
     
-    // Calculate percentage
-    const percent = purchasePrice > 0 ? Math.round((downPayment / purchasePrice) * 100) : 0;
+    // Calculate percentage with decimals for accuracy
+    const exactPercent = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
+    const displayPercent = exactPercent % 1 === 0 ? exactPercent.toFixed(0) : exactPercent.toFixed(2);
+    const sliderPercent = Math.round(exactPercent);
     
     const percentEl = document.getElementById('rtoDownPaymentPercent');
     const slider = document.getElementById('rtoDownPaymentSlider');
     
-    if (percentEl) percentEl.textContent = percent + '%';
-    if (slider) slider.value = Math.min(99, Math.max(1, percent));
+    if (percentEl) percentEl.textContent = displayPercent + '%';
+    if (slider) slider.value = Math.min(99, Math.max(1, sliderPercent));
     
-    // Update state
+    // Update state with exact percentage
     if (window.rtoWizardState) {
-        window.rtoWizardState.financial.downPaymentPercent = percent;
+        window.rtoWizardState.financial.downPaymentPercent = exactPercent;
         window.rtoWizardState.financial.downPayment = downPayment;
     }
     
@@ -4761,14 +4763,19 @@ window.updateRTOCalculations = function() {
     
     // Get down payment from manual input field if available, else calculate from percentage
     const manualDownPayment = document.getElementById('rtoDownPaymentManual');
-    let downPayment, downPaymentPercent;
+    let downPayment, downPaymentPercent, displayPercent;
     
     if (manualDownPayment) {
         downPayment = parseInt(manualDownPayment.value) || 0;
-        downPaymentPercent = purchasePrice > 0 ? Math.round((downPayment / purchasePrice) * 100) : 0;
+        // Calculate exact percentage with decimals
+        const exactPercent = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
+        downPaymentPercent = exactPercent;
+        // Display with decimals if not a whole number
+        displayPercent = exactPercent % 1 === 0 ? exactPercent.toFixed(0) : exactPercent.toFixed(2);
     } else {
         downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || state.financial.downPaymentPercent || 10;
         downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
+        displayPercent = downPaymentPercent.toString();
     }
     
     const termMonths = parseInt(document.getElementById('rtoTermMonthsSlider')?.value) || state.financial.termMonths || 24;
@@ -4784,9 +4791,9 @@ window.updateRTOCalculations = function() {
     const monthlyPayments = termMonths - 1;
     const monthlyPayment = monthlyPayments > 0 ? Math.round(amountForMonthly / monthlyPayments) : 0;
     
-    // Update down payment display
+    // Update down payment display with decimal percentage
     const percentEl = document.getElementById('rtoDownPaymentPercent');
-    if (percentEl) percentEl.textContent = downPaymentPercent + '%';
+    if (percentEl) percentEl.textContent = displayPercent + '%';
     
     // Update final payment display (PMA Government minimum - fixed)
     const finalBaseEl = document.getElementById('rtoFinalPaymentBase');
@@ -4844,10 +4851,15 @@ function calculateRTOTerms() {
     const monthlyPayments = f.termMonths - 1;
     const monthlyPayment = f.monthlyPayment || (monthlyPayments > 0 ? Math.round(amountForMonthly / monthlyPayments) : 0);
     
+    // Format percentage for display (show decimals if not whole number)
+    const rawPercent = f.downPaymentPercent || 0;
+    const formattedPercent = rawPercent % 1 === 0 ? rawPercent.toFixed(0) : rawPercent.toFixed(2);
+    
     return {
         purchasePrice: f.purchasePrice,
         downPayment: f.downPayment,
-        downPaymentPercent: f.downPaymentPercent,
+        downPaymentPercent: formattedPercent,
+        downPaymentPercentRaw: rawPercent,
         remainingBalance,
         amountToFinance: remainingBalance,
         amountForMonthly,
