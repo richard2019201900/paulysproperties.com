@@ -5146,26 +5146,8 @@ window.saveRTOContract = async function() {
             paymentFrequency: 'monthly'
         };
         
-        // Update via PropertyDataService
-        for (const [key, value] of Object.entries(propertyUpdates)) {
-            PropertyDataService.setValue(state.propertyId, key, value);
-        }
-        
-        // Also update Firestore directly for the property
-        await db.collection('properties').doc(String(state.propertyId)).update({
-            dailyPrice: 0,
-            biweeklyPrice: 0,
-            weeklyPrice: 0,
-            monthlyPrice: calc.monthlyPayment,
-            hasActiveRTO: true,
-            rtoContractId: contract.documentId,
-            rtoCurrentPayment: 0,
-            rtoTotalPayments: calc.termMonths,
-            rtoBuyer: state.buyer.name,
-            rtoStartDate: state.startDate,
-            paymentFrequency: 'monthly',
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        // Update property via PropertyDataService (writes to settings/properties)
+        await PropertyDataService.writeMultiple(state.propertyId, propertyUpdates);
         
         showToast('✅ Contract saved! Property updated to RTO monthly payments.', 'success');
         
