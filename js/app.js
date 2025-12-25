@@ -886,6 +886,10 @@ function renderPropertyStatsContent(id) {
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 New Contract
                             </button>
+                            <button onclick="confirmDeleteRTOContract(${id}, '${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2" title="Delete this contract">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                Delete
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1438,27 +1442,77 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 paymentAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
             }
             
-            // Check for RTO and increment payment counter
+            // Check for RTO - handle deposit vs monthly payments
             const hasActiveRTO = PropertyDataService.getValue(propertyId, 'hasActiveRTO', p?.hasActiveRTO || false);
+            let isDepositPayment = false;
+            let rtoPaymentInfo = null;
+            
             if (hasActiveRTO) {
-                const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', p?.rtoCurrentPayment || 0);
-                const newPaymentNumber = rtoCurrentPayment + 1;
-                await PropertyDataService.write(propertyId, 'rtoCurrentPayment', newPaymentNumber);
-                
-                // Also update the RTO contract in Firestore
+                const rtoDepositPaid = PropertyDataService.getValue(propertyId, 'rtoDepositPaid', p?.rtoDepositPaid || false);
                 const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', p?.rtoContractId || '');
-                if (rtoContractId) {
-                    try {
-                        await db.collection('rentToOwnContracts').doc(rtoContractId).update({
-                            currentPaymentNumber: newPaymentNumber,
-                            lastPaymentDate: newValue,
-                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    } catch (e) {
-                        console.warn('[RTO] Could not update contract payment number:', e);
+                
+                if (!rtoDepositPaid) {
+                    // DEPOSIT NOT YET PAID - record deposit payment
+                    isDepositPayment = true;
+                    const rtoDepositAmount = PropertyDataService.getValue(propertyId, 'rtoDepositAmount', p?.rtoDepositAmount || 0);
+                    paymentAmount = rtoDepositAmount; // Override payment amount to deposit
+                    
+                    // Mark deposit as paid on property
+                    await PropertyDataService.writeMultiple(propertyId, {
+                        rtoDepositPaid: true,
+                        rtoDepositPaidDate: newValue
+                    });
+                    
+                    // Update the RTO contract in Firestore
+                    if (rtoContractId) {
+                        try {
+                            await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                                depositPaid: true,
+                                depositPaidDate: newValue,
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } catch (e) {
+                            console.warn('[RTO] Could not update contract deposit status:', e);
+                        }
                     }
+                    console.log(`[RTO] Deposit of $${rtoDepositAmount.toLocaleString()} recorded for contract ${rtoContractId}`);
+                    
+                    // Store info for confirmation modal
+                    const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p?.rtoTotalPayments || 0);
+                    rtoPaymentInfo = { 
+                        isDeposit: true, 
+                        depositAmount: rtoDepositAmount,
+                        monthlyAmount: monthlyPrice,
+                        totalPayments: rtoTotalPayments
+                    };
+                } else {
+                    // DEPOSIT ALREADY PAID - record monthly payment
+                    const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', p?.rtoCurrentPayment || 0);
+                    const newPaymentNumber = rtoCurrentPayment + 1;
+                    await PropertyDataService.write(propertyId, 'rtoCurrentPayment', newPaymentNumber);
+                    
+                    // Update the RTO contract in Firestore
+                    if (rtoContractId) {
+                        try {
+                            await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                                currentPaymentNumber: newPaymentNumber,
+                                lastPaymentDate: newValue,
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } catch (e) {
+                            console.warn('[RTO] Could not update contract payment number:', e);
+                        }
+                    }
+                    console.log(`[RTO] Monthly payment ${newPaymentNumber} recorded for contract ${rtoContractId}`);
+                    
+                    // Store info for confirmation modal
+                    const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p?.rtoTotalPayments || 0);
+                    rtoPaymentInfo = { 
+                        isDeposit: false, 
+                        current: newPaymentNumber, 
+                        total: rtoTotalPayments 
+                    };
                 }
-                console.log(`[RTO] Payment ${newPaymentNumber} recorded for contract ${rtoContractId}`);
             }
             
             // Log payment to Firestore
@@ -1466,11 +1520,13 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 paymentDate: newValue,
                 recordedAt: new Date().toISOString(),
                 renterName: renterName,
-                frequency: paymentFrequency,
+                frequency: isDepositPayment ? 'deposit' : paymentFrequency,
                 amount: paymentAmount,
                 recordedBy: auth.currentUser?.email || 'owner',
-                isRTOPayment: hasActiveRTO
+                isRTOPayment: hasActiveRTO,
+                isRTODeposit: isDepositPayment
             });
+            
             // Calculate next due date for thank you message
             const lastDate = parseLocalDate(newValue);
             const nextDate = new Date(lastDate);
@@ -1485,11 +1541,9 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             }
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             
-            // Show thank you message popup with copy functionality (include RTO info)
+            // Show thank you message popup with copy functionality
             if (logSuccess) {
-                const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', 0);
-                const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', 0);
-                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, hasActiveRTO ? { current: rtoCurrentPayment, total: rtoTotalPayments } : null);
+                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, rtoPaymentInfo);
             }
         }
         
@@ -1913,11 +1967,26 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
     // Get first name only for friendlier message
     const firstName = renterName.split(' ')[0];
     
-    // Build RTO payment info string if applicable
-    const rtoPaymentStr = rtoInfo ? ` (Payment ${rtoInfo.current} of ${rtoInfo.total} in your Rent-to-Own agreement)` : '';
+    let thankYouMessage;
+    let headerSubtext;
+    let rtoBadge = '';
     
-    // Create the thank you message
-    const thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+    if (rtoInfo && rtoInfo.isDeposit) {
+        // DEPOSIT PAYMENT MESSAGE
+        thankYouMessage = `Thanks ${firstName}! 🙏 Your deposit of $${amount.toLocaleString()} for your Rent-to-Own agreement has been received. Your first monthly payment of $${rtoInfo.monthlyAmount.toLocaleString()} will be due on ${nextDueDate}. Let me know if you have any questions!`;
+        headerSubtext = `$${amount.toLocaleString()} deposit from ${renterName}`;
+        rtoBadge = `<p class="text-emerald-400 text-sm mt-1">💰 RTO Deposit Received</p>`;
+    } else if (rtoInfo && !rtoInfo.isDeposit) {
+        // MONTHLY RTO PAYMENT MESSAGE
+        const rtoPaymentStr = ` (Payment ${rtoInfo.current} of ${rtoInfo.total} in your Rent-to-Own agreement)`;
+        thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+        headerSubtext = `$${amount.toLocaleString()} from ${renterName}`;
+        rtoBadge = `<p class="text-amber-400 text-sm mt-1">📋 RTO Payment ${rtoInfo.current} of ${rtoInfo.total}</p>`;
+    } else {
+        // REGULAR (NON-RTO) PAYMENT MESSAGE
+        thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+        headerSubtext = `$${amount.toLocaleString()} from ${renterName}`;
+    }
     
     // Create modal HTML
     const modalHTML = `
@@ -1925,9 +1994,9 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
             <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl" onclick="event.stopPropagation()">
                 <div class="text-center mb-4">
                     <div class="text-5xl mb-3">✅</div>
-                    <h3 class="text-2xl font-bold text-green-400">Payment Logged!</h3>
-                    <p class="text-gray-400 mt-1">$${amount.toLocaleString()} from ${renterName}</p>
-                    ${rtoInfo ? `<p class="text-amber-400 text-sm mt-1">📋 RTO Payment ${rtoInfo.current} of ${rtoInfo.total}</p>` : ''}
+                    <h3 class="text-2xl font-bold text-green-400">${rtoInfo && rtoInfo.isDeposit ? 'Deposit Received!' : 'Payment Logged!'}</h3>
+                    <p class="text-gray-400 mt-1">${headerSubtext}</p>
+                    ${rtoBadge}
                 </div>
                 
                 <div class="bg-gray-800 rounded-xl p-4 mb-4">
@@ -5119,8 +5188,12 @@ window.saveRTOContract = async function() {
             calculations: calc,
             schedule: contract.data.schedule,
             startDate: state.startDate,
-            currentPaymentNumber: 0, // Will be 1 after first payment
+            currentPaymentNumber: 0, // Will be 1 after first monthly payment
             totalPayments: calc.termMonths,
+            // Deposit tracking - deposit is due immediately when contract is signed
+            depositAmount: calc.downPayment,
+            depositPaid: false,
+            depositPaidDate: null,
             status: 'active',
             createdBy: auth.currentUser?.email || 'unknown',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5142,6 +5215,9 @@ window.saveRTOContract = async function() {
             rtoTotalPayments: calc.termMonths,
             rtoBuyer: state.buyer.name,
             rtoStartDate: state.startDate,
+            // Deposit tracking - deposit due immediately
+            rtoDepositAmount: calc.downPayment,
+            rtoDepositPaid: false,
             // Set payment frequency to monthly
             paymentFrequency: 'monthly'
         };
@@ -5494,6 +5570,115 @@ window.viewRTOContract = async function(contractId) {
     } catch (error) {
         console.error('Error loading contract:', error);
         showToast('Failed to load contract: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Show confirmation modal before deleting RTO contract
+ */
+window.confirmDeleteRTOContract = function(propertyId, contractId) {
+    if (!contractId) {
+        showToast('No contract ID provided', 'error');
+        return;
+    }
+    
+    const modalHTML = `
+        <div id="deleteRTOConfirmModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-red-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Delete RTO Contract?
+                    </h3>
+                </div>
+                
+                <div class="p-6">
+                    <p class="text-gray-300 mb-4">Are you sure you want to delete this Rent-to-Own contract? This will:</p>
+                    <ul class="text-gray-400 text-sm space-y-2 mb-6">
+                        <li class="flex items-start gap-2">
+                            <span class="text-red-400">✗</span>
+                            <span>Remove the contract from the database</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-red-400">✗</span>
+                            <span>Clear all RTO status from the property</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-red-400">✗</span>
+                            <span>Reset payment tracking to zero</span>
+                        </li>
+                    </ul>
+                    <p class="text-amber-400 text-sm font-medium">⚠️ This action cannot be undone!</p>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                    <button onclick="document.getElementById('deleteRTOConfirmModal').remove()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                    <button onclick="deleteRTOContract(${propertyId}, '${contractId}')" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        🗑️ Delete Contract
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove any existing modal
+    const existing = document.getElementById('deleteRTOConfirmModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+/**
+ * Delete RTO contract and clear all related property data
+ */
+window.deleteRTOContract = async function(propertyId, contractId) {
+    try {
+        showToast('🗑️ Deleting contract...', 'info');
+        
+        // Close the confirmation modal
+        const modal = document.getElementById('deleteRTOConfirmModal');
+        if (modal) modal.remove();
+        
+        // 1. Delete the contract document from Firestore
+        if (contractId) {
+            await db.collection('rentToOwnContracts').doc(contractId).delete();
+            console.log(`[RTO] Deleted contract document: ${contractId}`);
+        }
+        
+        // 2. Clear all RTO-related fields from the property
+        const rtoFieldsToClear = {
+            hasActiveRTO: false,
+            rtoContractId: '',
+            rtoCurrentPayment: 0,
+            rtoTotalPayments: 0,
+            rtoBuyer: '',
+            rtoStartDate: '',
+            rtoDepositAmount: 0,
+            rtoDepositPaid: false,
+            rtoDepositPaidDate: ''
+        };
+        
+        await PropertyDataService.writeMultiple(propertyId, rtoFieldsToClear);
+        console.log(`[RTO] Cleared RTO fields from property ${propertyId}`);
+        
+        // 3. Update local properties array
+        const prop = properties.find(p => p.id === propertyId);
+        if (prop) {
+            Object.assign(prop, rtoFieldsToClear);
+        }
+        
+        showToast('✅ Contract deleted successfully!', 'success');
+        
+        // 4. Refresh the property stats page
+        if (typeof renderPropertyStatsContent === 'function') {
+            renderPropertyStatsContent(propertyId);
+        }
+        
+    } catch (error) {
+        console.error('Error deleting RTO contract:', error);
+        showToast('Failed to delete contract: ' + error.message, 'error');
     }
 };
 
