@@ -3959,13 +3959,30 @@ window.showRentToOwnWizard = async function(propertyId) {
     // Get renter name
     const renterName = PropertyDataService.getValue(propertyId, 'renterName', p.renterName || '');
     
-    // Get property description
+    // Get property description - stored in 'location' field in the database
+    // Try multiple sources to find the description
     let propertyDescription = '';
     try {
-        propertyDescription = PropertyDataService.getValue(propertyId, 'description', '') || p.description || '';
+        // Try PropertyDataService first
+        propertyDescription = PropertyDataService.getValue(propertyId, 'location', '');
+        console.log('[RTO] Description from PropertyDataService:', propertyDescription);
+        
+        // Fallback to property object
+        if (!propertyDescription) {
+            propertyDescription = p.location || '';
+            console.log('[RTO] Description from p.location:', propertyDescription);
+        }
+        
+        // Last fallback - try description field
+        if (!propertyDescription) {
+            propertyDescription = PropertyDataService.getValue(propertyId, 'description', '') || p.description || '';
+            console.log('[RTO] Description from description field:', propertyDescription);
+        }
     } catch (e) {
-        propertyDescription = p.description || '';
+        propertyDescription = p.location || p.description || '';
+        console.log('[RTO] Description from fallback:', propertyDescription);
     }
+    console.log('[RTO] Final property description:', propertyDescription);
     
     // Get buy price
     let buyPrice = 0;
@@ -4252,14 +4269,17 @@ function renderRTOWizardStep(step) {
                     <p class="text-gray-500 text-xs mt-1">Auto-populated from Buy Price. Edit if needed.</p>
                 </div>
                 
-                <!-- Down Payment Slider -->
+                <!-- Down Payment Slider with Manual Input -->
                 <div class="bg-gray-800/50 rounded-xl p-4">
                     <div class="flex items-center justify-between mb-2">
                         <label class="text-gray-400 text-sm">Down Payment</label>
-                        <div class="text-right">
+                        <div class="text-right flex items-center gap-2">
                             <span id="rtoDownPaymentPercent" class="text-amber-400 font-bold">${f.downPaymentPercent || 10}%</span>
-                            <span class="text-gray-500 mx-1">=</span>
-                            <span id="rtoDownPaymentAmount" class="text-green-400 font-bold">$${(f.downPayment || 0).toLocaleString()}</span>
+                            <span class="text-gray-500">=</span>
+                            <span class="text-gray-400">$</span>
+                            <input type="number" id="rtoDownPaymentManual" value="${f.downPayment || 0}" 
+                                   class="w-28 px-2 py-1 bg-gray-700 border border-gray-600 rounded-lg text-green-400 font-bold text-right focus:ring-2 focus:ring-amber-500"
+                                   oninput="updateRTODownPaymentManual(this.value)">
                         </div>
                     </div>
                     <input type="range" id="rtoDownPaymentSlider" value="${f.downPaymentPercent || 10}" min="1" max="99" step="1"
@@ -4334,7 +4354,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoCalcFinalMin" class="text-red-400">−$${(f.finalPaymentBase || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between pt-2 border-t border-gray-700">
-                            <span class="text-gray-400">= Amount for Monthly:</span>
+                            <span class="text-gray-400">= Remaining Balance to Finance:</span>
                             <span id="rtoCalcFinance" class="text-white font-semibold">$0</span>
                         </div>
                         <div class="flex justify-between">
@@ -4667,11 +4687,39 @@ window.updateRTODownPayment = function(percent) {
     const amountEl = document.getElementById('rtoDownPaymentAmount');
     
     if (percentEl) percentEl.textContent = percent + '%';
-    if (amountEl) amountEl.textContent = '$' + downPayment.toLocaleString();
+    
+    // Update manual input field
+    const manualInput = document.getElementById('rtoDownPaymentManual');
+    if (manualInput) manualInput.value = downPayment;
     
     // Update state
     if (window.rtoWizardState) {
         window.rtoWizardState.financial.downPaymentPercent = parseInt(percent);
+        window.rtoWizardState.financial.downPayment = downPayment;
+    }
+    
+    updateRTOCalculations();
+};
+
+/**
+ * Update down payment when manual input changes
+ */
+window.updateRTODownPaymentManual = function(amount) {
+    const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
+    const downPayment = parseInt(amount) || 0;
+    
+    // Calculate percentage
+    const percent = purchasePrice > 0 ? Math.round((downPayment / purchasePrice) * 100) : 0;
+    
+    const percentEl = document.getElementById('rtoDownPaymentPercent');
+    const slider = document.getElementById('rtoDownPaymentSlider');
+    
+    if (percentEl) percentEl.textContent = percent + '%';
+    if (slider) slider.value = Math.min(99, Math.max(1, percent));
+    
+    // Update state
+    if (window.rtoWizardState) {
+        window.rtoWizardState.financial.downPaymentPercent = percent;
         window.rtoWizardState.financial.downPayment = downPayment;
     }
     
@@ -4710,8 +4758,19 @@ window.updateRTOCalculations = function() {
     if (!state) return;
     
     const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || state.financial.purchasePrice || 0;
-    const downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || state.financial.downPaymentPercent || 10;
-    const downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
+    
+    // Get down payment from manual input field if available, else calculate from percentage
+    const manualDownPayment = document.getElementById('rtoDownPaymentManual');
+    let downPayment, downPaymentPercent;
+    
+    if (manualDownPayment) {
+        downPayment = parseInt(manualDownPayment.value) || 0;
+        downPaymentPercent = purchasePrice > 0 ? Math.round((downPayment / purchasePrice) * 100) : 0;
+    } else {
+        downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || state.financial.downPaymentPercent || 10;
+        downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
+    }
+    
     const termMonths = parseInt(document.getElementById('rtoTermMonthsSlider')?.value) || state.financial.termMonths || 24;
     
     // Final payment uses PMA Government minimum (already stored in state)
@@ -4727,9 +4786,7 @@ window.updateRTOCalculations = function() {
     
     // Update down payment display
     const percentEl = document.getElementById('rtoDownPaymentPercent');
-    const amountEl = document.getElementById('rtoDownPaymentAmount');
     if (percentEl) percentEl.textContent = downPaymentPercent + '%';
-    if (amountEl) amountEl.textContent = '$' + downPayment.toLocaleString();
     
     // Update final payment display (PMA Government minimum - fixed)
     const finalBaseEl = document.getElementById('rtoFinalPaymentBase');
@@ -4871,7 +4928,8 @@ function generateRTOContract() {
         });
     }
     
-    // Build preview text
+    // Build preview text - use location as fallback for description
+    const propertyDesc = state.property.description || state.property.location || 'N/A';
     const preview = `
 ═══════════════════════════════════════════════════════════════
                     RENT-TO-OWN AGREEMENT
@@ -4881,7 +4939,7 @@ function generateRTOContract() {
 PROPERTY INFORMATION
 ────────────────────────────────────────────────────────────────
 Address: ${state.property.title}
-Property Description: ${state.property.description || 'N/A'}
+Property Description: ${propertyDesc}
 Listing Type: Rent-to-Own
 Property Category: ${calc.propertyCategory}
 
@@ -4897,7 +4955,7 @@ Item                              Amount
 ─────────────────────────────────────────────────────
 Total Purchase Price              $${calc.purchasePrice.toLocaleString()}
 Down Payment (${calc.downPaymentPercent}%)              $${calc.downPayment.toLocaleString()}
-Amount to Finance                 $${calc.remainingBalance.toLocaleString()}
+Remaining Balance to Finance      $${calc.remainingBalance.toLocaleString()}
 Term Length                       ${calc.termMonths} Months
 Monthly Payments (×${calc.termMonths - 1})         $${calc.monthlyPayment.toLocaleString()}
 Final Payment Base (PMA Min)      $${calc.finalPaymentBase.toLocaleString()}
@@ -5135,13 +5193,14 @@ window.downloadRTOContractImage = async function() {
     const calc = contract.data.calculations;
     const startDate = new Date(state.startDate);
     
-    // Create canvas
+    // Create canvas - SQUARE format
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
-    // Set canvas size (letter size at 96 DPI)
-    canvas.width = 816;  // 8.5 inches
-    canvas.height = 1400; // Extended for full content
+    // Set canvas size to square
+    const size = 1000;
+    canvas.width = size;
+    canvas.height = size;
     
     // Background
     ctx.fillStyle = '#1a1a2e';
@@ -5154,8 +5213,8 @@ window.downloadRTOContractImage = async function() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    let y = 40;
-    const margin = 50;
+    let y = 50;
+    const margin = 60;
     const contentWidth = canvas.width - (margin * 2);
     
     // Helper functions
@@ -5163,7 +5222,7 @@ window.downloadRTOContractImage = async function() {
         ctx.font = `${fontSize}px ${font}`;
         ctx.fillStyle = color;
         ctx.fillText(text, x, y);
-        y += fontSize + 8;
+        y += fontSize + 6;
     };
     
     const drawLine = () => {
@@ -5173,31 +5232,31 @@ window.downloadRTOContractImage = async function() {
         ctx.moveTo(margin, y);
         ctx.lineTo(canvas.width - margin, y);
         ctx.stroke();
-        y += 15;
+        y += 12;
     };
     
     const drawCursiveSignature = (name, x, signatureY) => {
-        ctx.font = 'italic 28px Georgia, serif';
+        ctx.font = 'italic 24px Georgia, serif';
         ctx.fillStyle = '#3b82f6';
         ctx.fillText(name, x, signatureY);
     };
     
     // === HEADER ===
     ctx.textAlign = 'center';
-    drawText('RENT-TO-OWN AGREEMENT', canvas.width / 2, 28, '#f59e0b', 'Arial Black');
-    drawText('PaulysProperties.com', canvas.width / 2, 20, '#fbbf24', 'Arial');
-    y += 10;
+    drawText('RENT-TO-OWN AGREEMENT', canvas.width / 2, 26, '#f59e0b', 'Arial Black');
+    drawText('PaulysProperties.com', canvas.width / 2, 18, '#fbbf24', 'Arial');
+    y += 8;
     drawLine();
     
     // === PROPERTY INFORMATION ===
     ctx.textAlign = 'left';
-    y += 10;
-    drawText('PROPERTY INFORMATION', margin, 18, '#f59e0b', 'Arial Black');
-    drawText(`Address: ${state.property.title}`, margin, 14, '#ffffff');
+    y += 8;
+    drawText('PROPERTY INFORMATION', margin, 16, '#f59e0b', 'Arial Black');
+    drawText(`Address: ${state.property.title}`, margin, 13, '#ffffff');
     
-    // Wrap description text
-    const desc = state.property.description || 'N/A';
-    ctx.font = '12px Arial';
+    // Description - use location field
+    const desc = state.property.description || state.property.location || 'N/A';
+    ctx.font = '11px Arial';
     const words = desc.split(' ');
     let line = 'Description: ';
     for (let word of words) {
@@ -5205,7 +5264,7 @@ window.downloadRTOContractImage = async function() {
         if (ctx.measureText(testLine).width > contentWidth) {
             ctx.fillStyle = '#9ca3af';
             ctx.fillText(line, margin, y);
-            y += 16;
+            y += 14;
             line = word + ' ';
         } else {
             line = testLine;
@@ -5213,30 +5272,30 @@ window.downloadRTOContractImage = async function() {
     }
     ctx.fillStyle = '#9ca3af';
     ctx.fillText(line, margin, y);
-    y += 20;
+    y += 16;
     
-    drawText('Listing Type: Rent-to-Own', margin, 14, '#ffffff');
-    drawText(`Property Category: ${calc.propertyCategory}`, margin, 12, '#fbbf24');
-    y += 10;
+    drawText('Listing Type: Rent-to-Own', margin, 12, '#ffffff');
+    drawText(`Property Category: ${calc.propertyCategory}`, margin, 11, '#fbbf24');
+    y += 6;
     
     // === PARTIES INVOLVED ===
     drawLine();
-    y += 5;
-    drawText('PARTIES INVOLVED', margin, 18, '#f59e0b', 'Arial Black');
-    drawText(`Seller/Landlord: ${state.seller}`, margin, 14, '#ffffff');
-    drawText(`Buyer/Tenant: ${state.buyer.name}`, margin, 14, '#ffffff');
-    drawText(`Realtor/Brokerage: ${state.seller} / PaulysProperties.com`, margin, 14, '#ffffff');
-    y += 10;
+    y += 4;
+    drawText('PARTIES INVOLVED', margin, 16, '#f59e0b', 'Arial Black');
+    drawText(`Seller/Landlord: 👑 ${state.seller}`, margin, 12, '#ffffff');
+    drawText(`Buyer/Tenant: ${state.buyer.name}`, margin, 12, '#ffffff');
+    drawText(`Realtor/Brokerage: 👑 ${state.seller} / PaulysProperties.com`, margin, 12, '#ffffff');
+    y += 6;
     
     // === FINANCIAL STRUCTURE ===
     drawLine();
-    y += 5;
-    drawText('FINANCIAL STRUCTURE', margin, 18, '#f59e0b', 'Arial Black');
+    y += 4;
+    drawText('FINANCIAL STRUCTURE', margin, 16, '#f59e0b', 'Arial Black');
     
     const financialItems = [
         ['Total Purchase Price', `$${calc.purchasePrice.toLocaleString()}`],
         [`Down Payment (${calc.downPaymentPercent || 10}%)`, `$${calc.downPayment.toLocaleString()}`],
-        ['Amount to Finance', `$${calc.remainingBalance.toLocaleString()}`],
+        ['Remaining Balance to Finance', `$${calc.remainingBalance.toLocaleString()}`],
         ['Term Length', `${calc.termMonths} Months`],
         [`Monthly Payments (×${calc.termMonths - 1})`, `$${calc.monthlyPayment.toLocaleString()}`],
         ['Final Payment Base (PMA Min)', `$${calc.finalPaymentBase.toLocaleString()}`],
@@ -5245,45 +5304,45 @@ window.downloadRTOContractImage = async function() {
     ];
     
     financialItems.forEach(([label, value]) => {
-        ctx.font = '13px Arial';
+        ctx.font = '12px Arial';
         ctx.fillStyle = '#9ca3af';
         ctx.fillText(label, margin, y);
         ctx.fillStyle = '#10b981';
-        ctx.fillText(value, margin + 300, y);
-        y += 20;
+        ctx.fillText(value, margin + 280, y);
+        y += 18;
     });
     
-    y += 10;
+    y += 6;
     
     // === CONTRACT TERMS SUMMARY ===
     drawLine();
-    y += 5;
-    drawText('KEY CONTRACT TERMS', margin, 18, '#f59e0b', 'Arial Black');
-    drawText(`• Monthly payments due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month`, margin, 13, '#ffffff');
-    drawText('• 3-day grace period before $50,000 late fee', margin, 13, '#ffffff');
-    drawText('• Two consecutive missed payments = default', margin, 13, '#ffffff');
-    drawText('• Full ownership transfers upon final payment', margin, 13, '#ffffff');
-    y += 15;
+    y += 4;
+    drawText('KEY CONTRACT TERMS', margin, 16, '#f59e0b', 'Arial Black');
+    drawText(`• Monthly payments due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month`, margin, 11, '#ffffff');
+    drawText('• 3-day grace period before $50,000 late fee', margin, 11, '#ffffff');
+    drawText('• Two consecutive missed payments = default', margin, 11, '#ffffff');
+    drawText('• Full ownership transfers upon final payment', margin, 11, '#ffffff');
+    y += 10;
     
     // === DOCUMENT ID ===
     drawLine();
-    y += 5;
-    drawText(`Document ID: ${contract.documentId}`, margin, 14, '#9ca3af');
-    drawText(`Generated: ${new Date().toLocaleDateString()}`, margin, 12, '#6b7280');
-    y += 20;
+    y += 4;
+    drawText(`Document ID: ${contract.documentId}`, margin, 12, '#9ca3af');
+    drawText(`Generated: ${new Date().toLocaleDateString()}`, margin, 10, '#6b7280');
+    y += 12;
     
     // === SIGNATURES SECTION ===
     drawLine();
-    y += 10;
+    y += 8;
     ctx.textAlign = 'center';
-    drawText('SIGNATURES', canvas.width / 2, 20, '#f59e0b', 'Arial Black');
+    drawText('SIGNATURES', canvas.width / 2, 18, '#f59e0b', 'Arial Black');
     ctx.textAlign = 'left';
-    y += 20;
+    y += 12;
     
-    // Signature boxes
-    const sigBoxWidth = 300;
-    const sigBoxHeight = 80;
-    const sigSpacing = 30;
+    // Signature boxes - side by side
+    const sigBoxWidth = 380;
+    const sigBoxHeight = 60;
+    const sigSpacing = 20;
     
     // Seller signature
     ctx.strokeStyle = '#4b5563';
@@ -5292,15 +5351,17 @@ window.downloadRTOContractImage = async function() {
     ctx.fillStyle = '#1f2937';
     ctx.fillRect(margin + 1, y + 1, sigBoxWidth - 2, sigBoxHeight - 2);
     
-    // Draw cursive signature for seller
-    drawCursiveSignature(state.seller, margin + 20, y + 45);
+    // Draw cursive signature for seller with crown
+    ctx.font = 'italic 22px Georgia, serif';
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('👑 ' + state.seller, margin + 15, y + 38);
     
-    ctx.font = '11px Arial';
+    ctx.font = '10px Arial';
     ctx.fillStyle = '#9ca3af';
-    ctx.fillText('Seller/Landlord', margin, y + sigBoxHeight + 15);
-    ctx.fillText(state.seller, margin, y + sigBoxHeight + 30);
+    ctx.fillText('Seller/Landlord', margin, y + sigBoxHeight + 12);
+    ctx.fillText('👑 ' + state.seller, margin, y + sigBoxHeight + 24);
     ctx.fillStyle = '#6b7280';
-    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, margin + 200, y + sigBoxHeight + 15);
+    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, margin + 180, y + sigBoxHeight + 12);
     
     // Buyer signature
     const buyerX = margin + sigBoxWidth + sigSpacing;
@@ -5310,23 +5371,25 @@ window.downloadRTOContractImage = async function() {
     ctx.fillRect(buyerX + 1, y + 1, sigBoxWidth - 2, sigBoxHeight - 2);
     
     // Draw cursive signature for buyer
-    drawCursiveSignature(state.buyer.name, buyerX + 20, y + 45);
+    ctx.font = 'italic 22px Georgia, serif';
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText(state.buyer.name, buyerX + 15, y + 38);
     
-    ctx.font = '11px Arial';
+    ctx.font = '10px Arial';
     ctx.fillStyle = '#9ca3af';
-    ctx.fillText('Buyer/Tenant', buyerX, y + sigBoxHeight + 15);
-    ctx.fillText(state.buyer.name, buyerX, y + sigBoxHeight + 30);
+    ctx.fillText('Buyer/Tenant', buyerX, y + sigBoxHeight + 12);
+    ctx.fillText(state.buyer.name, buyerX, y + sigBoxHeight + 24);
     ctx.fillStyle = '#6b7280';
-    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, buyerX + 200, y + sigBoxHeight + 15);
+    ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, buyerX + 180, y + sigBoxHeight + 12);
     
-    y += sigBoxHeight + 60;
+    y += sigBoxHeight + 45;
     
     // Footer
     ctx.textAlign = 'center';
-    ctx.font = '10px Arial';
+    ctx.font = '9px Arial';
     ctx.fillStyle = '#4b5563';
     ctx.fillText('This document is a legally binding agreement in the State of San Andreas', canvas.width / 2, y);
-    ctx.fillText('© PaulysProperties.com - All Rights Reserved', canvas.width / 2, y + 15);
+    ctx.fillText('© PaulysProperties.com - All Rights Reserved', canvas.width / 2, y + 12);
     
     // Convert to blob and download
     canvas.toBlob((blob) => {
