@@ -4847,7 +4847,7 @@ window.updateRTOCalculations = function() {
     
     const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || state.financial.purchasePrice || 0;
     
-    // Get down payment from manual input field if available, else calculate from percentage
+    // Get down payment from manual input field if available, else use stored values
     const manualDownPayment = document.getElementById('rtoDownPaymentManual');
     let downPayment, downPaymentPercent, displayPercent;
     
@@ -4859,9 +4859,11 @@ window.updateRTOCalculations = function() {
         // Display with decimals if not a whole number
         displayPercent = exactPercent % 1 === 0 ? exactPercent.toFixed(0) : exactPercent.toFixed(2);
     } else {
-        downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || state.financial.downPaymentPercent || 10;
-        downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
-        displayPercent = downPaymentPercent.toString();
+        // No manual input field (e.g., on Step 3) - use stored values from state
+        // IMPORTANT: Use dollar amount as source of truth, not percentage
+        downPayment = state.financial.downPayment || 0;
+        downPaymentPercent = state.financial.downPaymentPercent || 10;
+        displayPercent = downPaymentPercent % 1 === 0 ? downPaymentPercent.toFixed(0) : downPaymentPercent.toFixed(2);
     }
     
     const termMonths = parseInt(document.getElementById('rtoTermMonthsSlider')?.value) || state.financial.termMonths || 24;
