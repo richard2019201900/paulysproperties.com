@@ -4360,7 +4360,7 @@ function renderRTOWizardStep(step) {
                     <div class="flex items-center justify-between mb-2">
                         <label class="text-gray-400 text-sm">Down Payment</label>
                         <div class="text-right flex items-center gap-2">
-                            <span id="rtoDownPaymentPercent" class="text-amber-400 font-bold">${f.downPaymentPercent || 10}%</span>
+                            <span id="rtoDownPaymentPercent" class="text-amber-400 font-bold">${f.downPaymentPercent ?? 10}%</span>
                             <span class="text-gray-500">=</span>
                             <span class="text-gray-400">$</span>
                             <input type="number" id="rtoDownPaymentManual" value="${f.downPayment || 0}" 
@@ -4368,7 +4368,7 @@ function renderRTOWizardStep(step) {
                                    oninput="updateRTODownPaymentManual(this.value)">
                         </div>
                     </div>
-                    <input type="range" id="rtoDownPaymentSlider" value="${f.downPaymentPercent || 10}" min="1" max="99" step="1"
+                    <input type="range" id="rtoDownPaymentSlider" value="${f.downPaymentPercent ?? 10}" min="0" max="99" step="1"
                            class="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                            oninput="updateRTODownPayment(this.value)">
                     <div class="flex justify-between text-xs text-gray-500 mt-1">
@@ -4720,9 +4720,20 @@ window.nextRTOStep = function() {
     } else if (state.step === 2) {
         // Validate and save financial terms
         const purchasePrice = parseInt(document.getElementById('rtoPurchasePrice')?.value) || 0;
-        const downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) || 10;
-        const downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
         const termMonths = parseInt(document.getElementById('rtoTermMonthsSlider')?.value) || 24;
+        
+        // Use manual input as source of truth for down payment (preserves exact dollar amount)
+        const manualDownPayment = document.getElementById('rtoDownPaymentManual');
+        let downPayment, downPaymentPercent;
+        
+        if (manualDownPayment && manualDownPayment.value !== '') {
+            downPayment = parseInt(manualDownPayment.value) || 0;
+            downPaymentPercent = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
+        } else {
+            // Fallback to slider if manual input is empty
+            downPaymentPercent = parseInt(document.getElementById('rtoDownPaymentSlider')?.value) ?? 10;
+            downPayment = Math.round(purchasePrice * (downPaymentPercent / 100));
+        }
         
         if (purchasePrice <= 0) {
             showToast('Please enter a valid purchase price', 'error');
@@ -4803,7 +4814,7 @@ window.updateRTODownPaymentManual = function(amount) {
     const slider = document.getElementById('rtoDownPaymentSlider');
     
     if (percentEl) percentEl.textContent = displayPercent + '%';
-    if (slider) slider.value = Math.min(99, Math.max(1, sliderPercent));
+    if (slider) slider.value = Math.min(99, Math.max(0, sliderPercent));
     
     // Update state with exact percentage
     if (window.rtoWizardState) {
@@ -4861,8 +4872,9 @@ window.updateRTOCalculations = function() {
     } else {
         // No manual input field (e.g., on Step 3) - use stored values from state
         // IMPORTANT: Use dollar amount as source of truth, not percentage
-        downPayment = state.financial.downPayment || 0;
-        downPaymentPercent = state.financial.downPaymentPercent || 10;
+        // Use ?? instead of || because 0 is a valid value (0 || 10 = 10, but 0 ?? 10 = 0)
+        downPayment = state.financial.downPayment ?? 0;
+        downPaymentPercent = state.financial.downPaymentPercent ?? 10;
         displayPercent = downPaymentPercent % 1 === 0 ? downPaymentPercent.toFixed(0) : downPaymentPercent.toFixed(2);
     }
     
@@ -5383,7 +5395,7 @@ window.downloadRTOContractImage = async function() {
     
     const financialItems = [
         ['Total Purchase Price', `$${calc.purchasePrice.toLocaleString()}`],
-        [`Down Payment (${calc.downPaymentPercent || 10}%)`, `$${calc.downPayment.toLocaleString()}`],
+        [`Down Payment (${calc.downPaymentPercent ?? 10}%)`, `$${calc.downPayment.toLocaleString()}`],
         ['Remaining Balance to Finance', `$${calc.remainingBalance.toLocaleString()}`],
         ['Term Length', `${calc.termMonths} Months`],
         [`Monthly Payments (×${calc.termMonths - 1})`, `$${calc.monthlyPayment.toLocaleString()}`],
