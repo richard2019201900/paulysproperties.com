@@ -1839,104 +1839,220 @@ function getAvailableCount() {
     return ownedProps.filter(p => state.availability[p.id] !== false).length;
 }
 
-function calculateTotals() {
-    // Use owned properties for financial calculations
+/**
+ * Calculate dashboard totals from ACTUAL payment history (all-time collected)
+ * Shows frequency equivalents across all tiles
+ */
+async function calculateTotalsAsync() {
     const ownedProps = getOwnedProperties();
     
-    // Categorize properties by payment frequency and status
+    // Initialize data structure
     const data = {
-        // Income tiles:
-        // Daily/Weekly/Biweekly = ACTUALS only
-        // Monthly = Monthly actuals + (Biweekly × 2) ONLY
-        daily: { total: 0, properties: [] },
-        weekly: { total: 0, properties: [] },
-        biweekly: { total: 0, properties: [] },
-        monthly: { total: 0, properties: [] },
-        // Property tiles
+        // Monthly total from all actual payments
+        monthlyTotal: 0,
+        paymentsByProperty: [],
+        // Property info
         rented: [],
         available: [],
-        premium: []
+        premium: [],
+        // RTO Income
+        rtoTotal: 0,
+        rtoContracts: [],
+        // House Sales
+        houseSalesTotal: 0,
+        houseSales: []
     };
     
+    // Fetch payment history for all owned properties
+    const paymentPromises = ownedProps.map(async (p) => {
+        try {
+            const historyDoc = await db.collection('paymentHistory').doc(String(p.id)).get();
+            if (historyDoc.exists) {
+                const histData = historyDoc.data();
+                return {
+                    propertyId: p.id,
+                    propertyTitle: p.title,
+                    payments: histData.payments || []
+                };
+            }
+        } catch (e) {
+            console.warn(`[Dashboard] Could not fetch history for property ${p.id}:`, e);
+        }
+        return { propertyId: p.id, propertyTitle: p.title, payments: [] };
+    });
+    
+    const allPaymentData = await Promise.all(paymentPromises);
+    
+    // Fetch RTO contracts for this owner
+    let rtoContracts = [];
+    try {
+        const currentUserEmail = auth.currentUser?.email;
+        if (currentUserEmail) {
+            const rtoSnapshot = await db.collection('rentToOwnContracts')
+                .where('createdBy', '==', currentUserEmail)
+                .get();
+            rtoSnapshot.forEach(doc => {
+                rtoContracts.push({ id: doc.id, ...doc.data() });
+            });
+        }
+    } catch (e) {
+        console.warn('[Dashboard] Could not fetch RTO contracts:', e);
+    }
+    
+    // Fetch house sales for this owner
+    let houseSales = [];
+    try {
+        const currentUserEmail = auth.currentUser?.email;
+        if (currentUserEmail) {
+            const salesSnapshot = await db.collection('houseSales')
+                .where('sellerEmail', '==', currentUserEmail)
+                .get();
+            salesSnapshot.forEach(doc => {
+                houseSales.push({ id: doc.id, ...doc.data() });
+            });
+        }
+    } catch (e) {
+        console.warn('[Dashboard] Could not fetch house sales:', e);
+    }
+    
+    // Calculate totals from ACTUAL payments (excluding RTO payments - those go to RTO tile)
+    let totalCollected = 0;
+    allPaymentData.forEach(pd => {
+        const regularPayments = pd.payments.filter(pay => !pay.isRTOPayment && !pay.isRTODeposit);
+        const propertyTotal = regularPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
+        totalCollected += propertyTotal;
+        
+        if (propertyTotal > 0) {
+            data.paymentsByProperty.push({
+                id: pd.propertyId,
+                title: pd.propertyTitle,
+                total: propertyTotal,
+                paymentCount: regularPayments.length
+            });
+        }
+    });
+    
+    data.monthlyTotal = totalCollected;
+    
+    // Calculate RTO income (deposits + monthly payments)
+    rtoContracts.forEach(contract => {
+        const history = contract.rtoPaymentHistory || [];
+        const depositPaid = contract.depositPaid ? (contract.depositAmount || 0) : 0;
+        const monthlyPayments = history.reduce((sum, pay) => sum + (pay.actual || 0), 0);
+        const contractTotal = depositPaid + monthlyPayments;
+        
+        data.rtoTotal += contractTotal;
+        if (contractTotal > 0 || contract.status === 'active') {
+            data.rtoContracts.push({
+                id: contract.documentId,
+                propertyTitle: contract.propertyTitle,
+                buyer: contract.buyer,
+                total: contractTotal,
+                depositPaid: depositPaid,
+                monthlyPaid: monthlyPayments,
+                status: contract.status
+            });
+        }
+    });
+    
+    // Calculate house sales
+    houseSales.forEach(sale => {
+        data.houseSalesTotal += (sale.salePrice || 0);
+        data.houseSales.push({
+            id: sale.id,
+            propertyTitle: sale.propertyTitle,
+            salePrice: sale.salePrice,
+            saleDate: sale.saleDate,
+            buyerName: sale.buyerName,
+            saleType: sale.saleType
+        });
+    });
+    
+    // Track property status
     ownedProps.forEach(p => {
-        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
-        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
-        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
-        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
-        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
-        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
         const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
         const premiumWeeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
         const isRented = state.availability[p.id] === false;
         
         const propInfo = {
             id: p.id,
             title: p.title,
             renterName,
-            paymentFrequency,
-            dailyPrice,
-            weeklyPrice,
-            biweeklyPrice,
-            monthlyPrice,
             isPremium,
             isPremiumTrial,
-            premiumWeeklyFee
+            premiumWeeklyFee,
+            isSold
         };
         
-        // Track premium listings
         if (isPremium) {
             data.premium.push(propInfo);
         }
         
         if (isRented) {
             data.rented.push(propInfo);
-            
-            // ACTUALS for Daily/Weekly/Biweekly
-            // Monthly Est = Monthly actuals + (Biweekly × 2) ONLY
-            // NO weekly×4, NO daily×30
-            
-            if (paymentFrequency === 'daily') {
-                // Daily: actuals only, does NOT add to monthly
-                const rate = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
-                propInfo.rate = rate;
-                propInfo.isConverted = false;
-                data.daily.total += rate;
-                data.daily.properties.push({ ...propInfo });
-                
-            } else if (paymentFrequency === 'biweekly') {
-                // Biweekly: actuals, ALSO adds to monthly estimate (×2)
-                const rate = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
-                propInfo.rate = rate;
-                propInfo.isConverted = false;
-                data.biweekly.total += rate;
-                data.biweekly.properties.push({ ...propInfo });
-                
-                // Add to monthly estimate (biweekly × 2)
-                const monthlyEstimate = rate * 2;
-                data.monthly.total += monthlyEstimate;
-                data.monthly.properties.push({ ...propInfo, rate: monthlyEstimate, isConverted: true, originalFreq: 'biweekly' });
-                
-            } else if (paymentFrequency === 'monthly') {
-                // Monthly: actuals
-                propInfo.rate = monthlyPrice;
-                propInfo.isConverted = false;
-                data.monthly.total += monthlyPrice;
-                data.monthly.properties.push({ ...propInfo });
-                
-            } else {
-                // Weekly (default): actuals only, does NOT add to monthly
-                propInfo.rate = weeklyPrice;
-                propInfo.isConverted = false;
-                data.weekly.total += weeklyPrice;
-                data.weekly.properties.push({ ...propInfo });
-            }
         } else {
             data.available.push(propInfo);
         }
     });
     
-    // Store globally for breakdowns
+    // Store globally
+    window.dashboardData = data;
+    
+    return {
+        ownedCount: ownedProps.length,
+        data
+    };
+}
+
+// Synchronous version for backward compatibility (uses cached data or basic calculation)
+function calculateTotals() {
+    const ownedProps = getOwnedProperties();
+    
+    // Basic data structure for synchronous fallback
+    const data = {
+        monthlyTotal: 0,
+        paymentsByProperty: [],
+        rented: [],
+        available: [],
+        premium: [],
+        rtoTotal: 0,
+        rtoContracts: [],
+        houseSalesTotal: 0,
+        houseSales: []
+    };
+    
+    ownedProps.forEach(p => {
+        const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+        const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
+        const premiumWeeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
+        const isRented = state.availability[p.id] === false;
+        
+        const propInfo = {
+            id: p.id,
+            title: p.title,
+            renterName,
+            isPremium,
+            isPremiumTrial,
+            premiumWeeklyFee,
+            isSold
+        };
+        
+        if (isPremium) {
+            data.premium.push(propInfo);
+        }
+        
+        if (isRented) {
+            data.rented.push(propInfo);
+        } else {
+            data.available.push(propInfo);
+        }
+    });
+    
     window.dashboardData = data;
     
     return {
@@ -1950,78 +2066,91 @@ window.flipCard = function(card) {
     card.classList.toggle('flipped');
 };
 
-// Update all 8 dashboard tiles
+// Update all 8 dashboard tiles with frequency equivalents
 function updateDashboardTiles(totals) {
     const { ownedCount, data } = totals;
     
-    // === ROW 1: INCOME TILES ===
-    // Daily/Weekly/Biweekly = ACTUALS only
-    // Monthly = ESTIMATED (includes conversions from other frequencies)
+    // Calculate frequency equivalents from monthly total
+    const monthlyTotal = data.monthlyTotal || 0;
+    const dailyEquiv = Math.round(monthlyTotal / 30);
+    const weeklyEquiv = Math.round(monthlyTotal / 4);
+    const biweeklyEquiv = Math.round(monthlyTotal / 2);
     
-    // Daily Income (actuals only)
-    $('dailyIncomeDisplay').textContent = formatPrice(data.daily.total);
-    $('dailyIncomeCount').textContent = data.daily.properties.length > 0 
-        ? `${data.daily.properties.length} daily`
-        : 'No daily';
-    $('dailyBreakdown').innerHTML = renderPropertyList(data.daily.properties, 'daily');
+    // === ROW 1: INCOME TILES (Frequency Equivalents) ===
     
-    // Weekly Income (actuals only)
-    $('weeklyIncomeDisplay').textContent = formatPrice(data.weekly.total);
-    $('weeklyIncomeCount').textContent = data.weekly.properties.length > 0 
-        ? `${data.weekly.properties.length} weekly`
-        : 'No weekly';
-    $('weeklyBreakdown').innerHTML = renderPropertyList(data.weekly.properties, 'weekly');
+    // Daily Equivalent
+    $('dailyIncomeDisplay').textContent = formatPrice(dailyEquiv);
+    $('dailyIncomeCount').textContent = monthlyTotal > 0 ? 'Rental income' : 'No income yet';
+    $('dailyBreakdown').innerHTML = renderFrequencyBreakdown(data.paymentsByProperty, 30, '/day');
     
-    // Biweekly Income (actuals only)
-    $('biweeklyIncomeDisplay').textContent = formatPrice(data.biweekly.total);
-    $('biweeklyIncomeCount').textContent = data.biweekly.properties.length > 0 
-        ? `${data.biweekly.properties.length} biweekly`
-        : 'No biweekly';
-    $('biweeklyBreakdown').innerHTML = renderPropertyList(data.biweekly.properties, 'biweekly');
+    // Weekly Equivalent
+    $('weeklyIncomeDisplay').textContent = formatPrice(weeklyEquiv);
+    $('weeklyIncomeCount').textContent = monthlyTotal > 0 ? 'Rental income' : 'No income yet';
+    $('weeklyBreakdown').innerHTML = renderFrequencyBreakdown(data.paymentsByProperty, 4, '/wk');
     
-    // Monthly Income (ESTIMATED - includes conversions)
-    const monthlyActual = data.monthly.properties.filter(p => !p.isConverted).length;
-    const monthlyConverted = data.monthly.properties.filter(p => p.isConverted).length;
-    $('monthlyIncomeDisplay').textContent = formatPrice(data.monthly.total);
-    if (monthlyActual > 0 && monthlyConverted > 0) {
-        $('monthlyIncomeCount').textContent = `${monthlyActual} monthly + ${monthlyConverted} est`;
-    } else if (monthlyActual > 0) {
-        $('monthlyIncomeCount').textContent = `${monthlyActual} monthly`;
-    } else if (monthlyConverted > 0) {
-        $('monthlyIncomeCount').textContent = `${monthlyConverted} estimated`;
-    } else {
-        $('monthlyIncomeCount').textContent = 'No renters';
-    }
-    $('monthlyBreakdown').innerHTML = renderPropertyList(data.monthly.properties, 'monthly');
+    // Biweekly Equivalent
+    $('biweeklyIncomeDisplay').textContent = formatPrice(biweeklyEquiv);
+    $('biweeklyIncomeCount').textContent = monthlyTotal > 0 ? 'Rental income' : 'No income yet';
+    $('biweeklyBreakdown').innerHTML = renderFrequencyBreakdown(data.paymentsByProperty, 2, '/2wk');
     
-    // === ROW 2: PROPERTY TILES ===
+    // Monthly Total
+    $('monthlyIncomeDisplay').textContent = formatPrice(monthlyTotal);
+    const paymentCount = data.paymentsByProperty.reduce((sum, p) => sum + p.paymentCount, 0);
+    $('monthlyIncomeCount').textContent = paymentCount > 0 
+        ? `${paymentCount} payments collected` 
+        : 'All-time collected';
+    $('monthlyBreakdown').innerHTML = renderMonthlyBreakdown(data.paymentsByProperty);
     
-    // Total Listings
+    // === ROW 2: PROPERTY & SALES TILES ===
+    
+    // Properties (Combined)
+    const rentedCount = data.rented?.length || 0;
+    const availableCount = data.available?.length || 0;
+    const soldCount = [...(data.rented || []), ...(data.available || [])].filter(p => p.isSold).length;
     $('totalListingsDisplay').textContent = ownedCount;
-    $('totalListingsBreakdown').innerHTML = renderAllPropertiesList([...data.rented, ...data.available]);
+    $('propertiesSubtitle').textContent = `${rentedCount} rented • ${availableCount} available${soldCount > 0 ? ` • ${soldCount} sold` : ''}`;
+    $('totalListingsBreakdown').innerHTML = renderAllPropertiesListNew([...(data.rented || []), ...(data.available || [])]);
     
-    // Rented
-    const rentedCount = data.rented.length;
-    const rentedPercent = ownedCount > 0 ? Math.round((rentedCount / ownedCount) * 100) : 0;
-    $('rentedCountDisplay').textContent = rentedCount;
-    $('rentedPercentDisplay').textContent = `${rentedPercent}% occupied`;
-    $('rentedBreakdown').innerHTML = renderRentedList(data.rented);
+    // RTO Income
+    const rtoIncomeEl = $('rtoIncomeDisplay');
+    const rtoCountEl = $('rtoIncomeCount');
+    const rtoBreakdownEl = $('rtoIncomeBreakdown');
+    if (rtoIncomeEl) {
+        rtoIncomeEl.textContent = formatPrice(data.rtoTotal || 0);
+    }
+    if (rtoCountEl) {
+        const activeContracts = (data.rtoContracts || []).filter(c => c.status === 'active').length;
+        rtoCountEl.textContent = activeContracts > 0 
+            ? `${activeContracts} active contract${activeContracts > 1 ? 's' : ''}` 
+            : 'No active contracts';
+    }
+    if (rtoBreakdownEl) {
+        rtoBreakdownEl.innerHTML = renderRTOBreakdown(data.rtoContracts || []);
+    }
     
-    // Available
-    const availableCount = data.available.length;
-    const availablePercent = ownedCount > 0 ? Math.round((availableCount / ownedCount) * 100) : 0;
-    $('availableCountDisplay').textContent = availableCount;
-    $('availablePercentDisplay').textContent = `${availablePercent}% vacancy`;
-    $('availableBreakdown').innerHTML = renderAvailableList(data.available);
+    // House Sales
+    const houseSalesEl = $('houseSalesDisplay');
+    const houseSalesCountEl = $('houseSalesCount');
+    const houseSalesBreakdownEl = $('houseSalesBreakdown');
+    if (houseSalesEl) {
+        houseSalesEl.textContent = formatPrice(data.houseSalesTotal || 0);
+    }
+    if (houseSalesCountEl) {
+        const salesCount = (data.houseSales || []).length;
+        houseSalesCountEl.textContent = salesCount > 0 
+            ? `${salesCount} sale${salesCount > 1 ? 's' : ''} completed` 
+            : 'No sales yet';
+    }
+    if (houseSalesBreakdownEl) {
+        houseSalesBreakdownEl.innerHTML = renderHouseSalesBreakdown(data.houseSales || []);
+    }
     
     // Premium
-    const premiumCount = data.premium.length;
-    // Only count non-trial premium fees
-    const paidPremiums = data.premium.filter(p => !p.isPremiumTrial);
-    const trialCount = data.premium.filter(p => p.isPremiumTrial).length;
+    const premiumCount = data.premium?.length || 0;
+    const paidPremiums = (data.premium || []).filter(p => !p.isPremiumTrial);
+    const trialCount = (data.premium || []).filter(p => p.isPremiumTrial).length;
     const premiumIncome = paidPremiums.reduce((sum, p) => sum + (p.premiumWeeklyFee || 10000), 0);
     $('premiumCountDisplay').textContent = premiumCount;
-    // Show "Free" if all are trials, otherwise show fee total
     if (premiumCount === 0) {
         $('premiumIncomeDisplay').textContent = 'No premium';
     } else if (trialCount === premiumCount) {
@@ -2031,26 +2160,95 @@ function updateDashboardTiles(totals) {
     } else {
         $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk fees`;
     }
-    $('premiumBreakdown').innerHTML = renderPremiumList(data.premium);
+    $('premiumBreakdown').innerHTML = renderPremiumList(data.premium || []);
 }
 
-// Render property list for income tiles
-function renderPropertyList(properties, frequency) {
-    if (properties.length === 0) {
-        return '<div class="opacity-70 italic">No income at this frequency</div>';
+// Render frequency breakdown (converts monthly totals to other frequencies)
+function renderFrequencyBreakdown(properties, divisor, suffix) {
+    if (!properties || properties.length === 0) {
+        return '<div class="opacity-70 italic">No rental income collected yet</div>';
     }
     
-    const freqLabel = { daily: '/day', weekly: '/wk', biweekly: '/2wk', monthly: '/mo' };
-    const freqNames = { daily: 'daily', weekly: 'weekly', biweekly: 'biweekly', monthly: 'monthly' };
-    
     return properties.map((p, i) => {
-        const convertedNote = p.isConverted ? 
-            `<span class="text-white/50 text-[10px]"> (from ${freqNames[p.originalFreq]})</span>` : '';
-        const rateClass = p.isConverted ? 'text-white/70' : 'font-bold';
+        const equiv = Math.round(p.total / divisor);
         return `
             <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
-                <span class="truncate mr-2">${i + 1}. ${p.title}${convertedNote}</span>
-                <span class="${rateClass} whitespace-nowrap">$${p.rate.toLocaleString()}${freqLabel[frequency]}</span>
+                <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+                <span class="font-bold whitespace-nowrap">$${equiv.toLocaleString()}${suffix}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render monthly breakdown (shows actual totals)
+function renderMonthlyBreakdown(properties) {
+    if (!properties || properties.length === 0) {
+        return '<div class="opacity-70 italic">No rental income collected yet</div>';
+    }
+    
+    return properties.map((p, i) => {
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+                <span class="font-bold whitespace-nowrap">$${p.total.toLocaleString()}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render RTO income breakdown
+function renderRTOBreakdown(contracts) {
+    if (!contracts || contracts.length === 0) {
+        return '<div class="opacity-70 italic">No RTO contracts</div>';
+    }
+    
+    return contracts.map((c, i) => {
+        const statusBadge = c.status === 'active' 
+            ? '<span class="text-green-400 text-[10px]">●</span>' 
+            : '<span class="text-gray-400 text-[10px]">○</span>';
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${statusBadge} ${c.propertyTitle}</span>
+                <span class="font-bold whitespace-nowrap">$${c.total.toLocaleString()}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render house sales breakdown
+function renderHouseSalesBreakdown(sales) {
+    if (!sales || sales.length === 0) {
+        return '<div class="opacity-70 italic">No house sales yet</div>';
+    }
+    
+    return sales.map((s, i) => {
+        const typeIcon = s.saleType === 'rto_completion' ? '📋' : '🏡';
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${typeIcon} ${s.propertyTitle}</span>
+                <span class="font-bold whitespace-nowrap">$${s.salePrice.toLocaleString()}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render all properties list with status indicators (new version)
+function renderAllPropertiesListNew(properties) {
+    if (!properties || properties.length === 0) {
+        return '<div class="opacity-70 italic">No properties</div>';
+    }
+    
+    return properties.map((p, i) => {
+        let status = '🟢'; // available
+        if (p.isSold) {
+            status = '🏆'; // sold
+        } else if (state.availability[p.id] === false) {
+            status = '🔴'; // rented
+        }
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+                <span class="truncate mr-2">${i + 1}. ${p.title}</span>
+                <span>${status}</span>
             </div>
         `;
     }).join('');
@@ -2167,8 +2365,19 @@ function renderOwnerDashboard() {
     const ownedProps = getOwnedProperties();
     
     // Calculate and update all 8 dashboard tiles
-    const totals = calculateTotals();
-    updateDashboardTiles(totals);
+    // First show basic sync data, then fetch async data for accurate totals
+    const basicTotals = calculateTotals();
+    updateDashboardTiles(basicTotals);
+    
+    // Then fetch actual payment history asynchronously for accurate income totals
+    calculateTotalsAsync().then(asyncTotals => {
+        updateDashboardTiles(asyncTotals);
+    }).catch(err => {
+        console.warn('[Dashboard] Could not load payment history:', err);
+    });
+    
+    // Check for active celebration banners
+    checkCelebrationBanners();
     
     if (ownedProps.length === 0) {
         $('ownerPropertiesTable').innerHTML = `
@@ -2203,6 +2412,10 @@ function renderOwnerDashboard() {
         const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
         const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
         const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+        
+        // Check if property is sold
+        const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
+        const soldTo = PropertyDataService.getValue(p.id, 'soldTo', p.soldTo || '');
         
         // Calculate next due date
         let nextDueDate = '';
@@ -2298,6 +2511,7 @@ function renderOwnerDashboard() {
                 <td class="px-4 py-4"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
                 <td class="px-4 py-4">
                     <span class="property-name-link font-bold text-white text-base" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
+                    ${isSold ? `<span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg shadow-rose-500/30 animate-pulse">🏆 SOLD</span>` : ''}
                 </td>
                 <td class="px-4 py-4 text-gray-300 capitalize hidden md:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'type', this, 'propertyType')" title="Click to edit">
                     <span class="cell-value">${PropertyDataService.getValue(p.id, 'type', p.type)}</span>
@@ -10269,3 +10483,409 @@ function escapeHtml(text) {
     div.textContent = text || '';
     return div.innerHTML;
 }
+
+// ==================== CELEBRATION BANNERS ====================
+
+/**
+ * Check for active celebration banners on dashboard load
+ */
+async function checkCelebrationBanners() {
+    try {
+        const doc = await db.collection('settings').doc('celebrations').get();
+        if (!doc.exists) return;
+        
+        const data = doc.data();
+        const active = data.active || [];
+        
+        // Filter to non-expired, non-dismissed celebrations
+        const now = new Date();
+        const validCelebrations = active.filter(cel => {
+            if (!cel.expiresAt) return false;
+            if (new Date(cel.expiresAt) < now) return false;
+            
+            // Check if user dismissed this one
+            const dismissedKey = `dismissed_${cel.id}`;
+            if (localStorage.getItem(dismissedKey)) return false;
+            
+            return true;
+        });
+        
+        if (validCelebrations.length > 0) {
+            // Show most recent celebration
+            const latest = validCelebrations[validCelebrations.length - 1];
+            showCelebrationBanner(latest);
+        }
+    } catch (e) {
+        console.log('[Celebrations] Could not check banners:', e.message);
+    }
+}
+
+/**
+ * Create a house sale celebration banner (24 hours)
+ */
+window.createSaleCelebration = async function(sellerName, propertyTitle, salePrice, buyerName) {
+    try {
+        const celebrationId = `sale_${Date.now()}`;
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+        
+        const celebration = {
+            id: celebrationId,
+            type: 'house_sale',
+            icon: '🏆',
+            userName: sellerName,
+            message: `just sold ${propertyTitle} to ${buyerName} for $${salePrice.toLocaleString()}! 🎉`,
+            createdAt: new Date().toISOString(),
+            expiresAt: expiresAt
+        };
+        
+        // Get existing celebrations
+        const doc = await db.collection('settings').doc('celebrations').get();
+        let active = [];
+        if (doc.exists) {
+            active = doc.data().active || [];
+        }
+        
+        // Add new celebration
+        active.push(celebration);
+        
+        // Clean up expired ones
+        const now = new Date();
+        active = active.filter(c => new Date(c.expiresAt) > now);
+        
+        // Save
+        await db.collection('settings').doc('celebrations').set({ active }, { merge: true });
+        
+        console.log('[Celebrations] Created house sale celebration:', celebrationId);
+        return celebrationId;
+    } catch (e) {
+        console.error('[Celebrations] Error creating celebration:', e);
+    }
+};
+
+// ==================== HOUSE SALES SYSTEM ====================
+
+/**
+ * Show the Log House Sale modal
+ */
+window.showLogSaleModal = function(propertyId, rtoContractId = null) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) {
+        showToast('Property not found', 'error');
+        return;
+    }
+    
+    const buyPrice = PropertyDataService.getValue(propertyId, 'buyPrice', p.buyPrice || 0);
+    const renterName = PropertyDataService.getValue(propertyId, 'renterName', p.renterName || '');
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Determine if this is from RTO completion
+    const isRTOCompletion = !!rtoContractId;
+    const saleType = isRTOCompletion ? 'rto_completion' : 'direct_sale';
+    
+    const modalHTML = `
+        <div id="logSaleModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-rose-500/50 shadow-2xl overflow-hidden relative">
+                <!-- X Close Button -->
+                <button onclick="closeLogSaleModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
+                <div class="bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                        <span>🏡</span>
+                        Log House Sale
+                    </h3>
+                    <p class="text-rose-100 text-sm mt-1">${p.title}</p>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    ${isRTOCompletion ? `
+                    <div class="bg-indigo-900/50 border border-indigo-500/50 rounded-xl p-3">
+                        <div class="text-indigo-300 font-bold text-sm">📋 RTO Completion</div>
+                        <p class="text-indigo-200 text-xs mt-1">This sale is being logged from a completed Rent-to-Own contract.</p>
+                    </div>
+                    ` : ''}
+                    
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Sale Price:</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input type="number" id="salePriceInput" value="${buyPrice}" 
+                                class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 pl-8 text-white text-lg font-bold focus:border-rose-500 focus:outline-none">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Buyer Name:</label>
+                        <input type="text" id="saleBuyerInput" value="${renterName}" placeholder="Enter buyer's name"
+                            class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-rose-500 focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Sale Date:</label>
+                        <input type="date" id="saleDateInput" value="${today}"
+                            class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-rose-500 focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">PMA Realtor Fee (10%):</label>
+                        <div id="realtorFeeDisplay" class="bg-gray-800 rounded-xl py-3 px-4 text-amber-400 font-bold">
+                            $${Math.round(buyPrice * 0.10).toLocaleString()}
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">Auto-calculated from sale price</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Notes (optional):</label>
+                        <textarea id="saleNotesInput" rows="2" placeholder="Any additional notes..."
+                            class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-rose-500 focus:outline-none"></textarea>
+                    </div>
+                    
+                    <div class="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="transferOwnershipCheckbox" class="w-5 h-5 rounded accent-rose-500">
+                            <div>
+                                <label for="transferOwnershipCheckbox" class="text-white font-medium cursor-pointer">Request ownership transfer</label>
+                                <p class="text-gray-500 text-xs">Transfer this property to the buyer's account (requires admin approval)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                    <button onclick="closeLogSaleModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                    <button onclick="submitHouseSale(${propertyId}, '${saleType}', '${rtoContractId || ''}')" class="flex-1 bg-gradient-to-r from-rose-500 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        🏆 Complete Sale
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Update realtor fee on price change
+    const priceInput = document.getElementById('salePriceInput');
+    const feeDisplay = document.getElementById('realtorFeeDisplay');
+    if (priceInput && feeDisplay) {
+        priceInput.addEventListener('input', () => {
+            const price = parseInt(priceInput.value) || 0;
+            feeDisplay.textContent = `$${Math.round(price * 0.10).toLocaleString()}`;
+        });
+    }
+};
+
+window.closeLogSaleModal = function() {
+    const modal = document.getElementById('logSaleModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Submit house sale to Firestore
+ */
+window.submitHouseSale = async function(propertyId, saleType, rtoContractId) {
+    const priceInput = document.getElementById('salePriceInput');
+    const buyerInput = document.getElementById('saleBuyerInput');
+    const dateInput = document.getElementById('saleDateInput');
+    const notesInput = document.getElementById('saleNotesInput');
+    const transferCheckbox = document.getElementById('transferOwnershipCheckbox');
+    
+    const salePrice = parseInt(priceInput?.value) || 0;
+    const buyerName = buyerInput?.value?.trim() || '';
+    const saleDate = dateInput?.value || '';
+    const notes = notesInput?.value?.trim() || '';
+    const requestTransfer = transferCheckbox?.checked || false;
+    
+    if (salePrice <= 0) {
+        showToast('Please enter a valid sale price', 'error');
+        return;
+    }
+    if (!buyerName) {
+        showToast('Please enter the buyer name', 'error');
+        return;
+    }
+    if (!saleDate) {
+        showToast('Please select a sale date', 'error');
+        return;
+    }
+    
+    try {
+        showToast('🏡 Recording sale...', 'info');
+        closeLogSaleModal();
+        
+        const p = properties.find(prop => prop.id === propertyId);
+        const currentUserEmail = auth.currentUser?.email || '';
+        const sellerName = window.currentUserData?.displayName || currentUserEmail.split('@')[0];
+        
+        const realtorFee = Math.round(salePrice * 0.10);
+        const netProceeds = salePrice - realtorFee;
+        
+        // Create sale record
+        const saleDoc = {
+            propertyId: propertyId,
+            propertyTitle: p?.title || `Property #${propertyId}`,
+            salePrice: salePrice,
+            saleDate: saleDate,
+            buyerName: buyerName,
+            sellerName: sellerName,
+            sellerEmail: currentUserEmail,
+            saleType: saleType,
+            rtoContractId: rtoContractId || null,
+            realtorFee: realtorFee,
+            realtorFeePercent: 10,
+            netProceeds: netProceeds,
+            requestTransfer: requestTransfer,
+            transferStatus: requestTransfer ? 'pending' : null,
+            notes: notes,
+            recordedAt: new Date().toISOString()
+        };
+        
+        // Save to houseSales collection
+        const saleRef = await db.collection('houseSales').add(saleDoc);
+        console.log('[HouseSale] Created sale record:', saleRef.id);
+        
+        // Mark property as sold
+        await PropertyDataService.writeMultiple(propertyId, {
+            isSold: true,
+            soldDate: saleDate,
+            soldTo: buyerName,
+            soldPrice: salePrice,
+            saleId: saleRef.id
+        });
+        
+        // If RTO completion, update the contract status
+        if (rtoContractId) {
+            await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                status: 'completed',
+                completedDate: saleDate,
+                saleId: saleRef.id
+            });
+        }
+        
+        // Award XP for completing a sale
+        if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
+            const userId = auth.currentUser?.uid;
+            if (userId) {
+                await GamificationService.awardXP(userId, 1000, `Sold ${p?.title} to ${buyerName} for $${salePrice.toLocaleString()}`);
+            }
+        }
+        
+        // Create celebration banner (visible to all users for 24 hours)
+        await createSaleCelebration(sellerName, p?.title, salePrice, buyerName);
+        
+        // If transfer requested, create transfer request
+        if (requestTransfer) {
+            await createOwnershipTransferRequest(propertyId, buyerName, currentUserEmail, saleRef.id);
+        }
+        
+        showToast('🎉 Sale recorded! Congratulations!', 'success');
+        
+        // Refresh the property stats page
+        setTimeout(() => {
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+            if (typeof renderOwnerDashboard === 'function') {
+                renderOwnerDashboard();
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error recording sale:', error);
+        showToast('Failed to record sale: ' + error.message, 'error');
+    }
+};
+
+// ==================== OWNERSHIP TRANSFER SYSTEM ====================
+
+/**
+ * Create an ownership transfer request for admin approval
+ */
+async function createOwnershipTransferRequest(propertyId, newOwnerName, currentOwnerEmail, saleId) {
+    try {
+        const p = properties.find(prop => prop.id === propertyId);
+        
+        const transferRequest = {
+            propertyId: propertyId,
+            propertyTitle: p?.title || `Property #${propertyId}`,
+            currentOwnerEmail: currentOwnerEmail,
+            newOwnerName: newOwnerName,
+            newOwnerEmail: null, // To be filled by admin when approving
+            saleId: saleId,
+            status: 'pending',
+            requestedAt: new Date().toISOString(),
+            reviewedAt: null,
+            reviewedBy: null
+        };
+        
+        await db.collection('ownershipTransfers').add(transferRequest);
+        console.log('[OwnershipTransfer] Created transfer request for property', propertyId);
+        
+        showToast('📝 Ownership transfer request submitted for admin review', 'info');
+    } catch (e) {
+        console.error('[OwnershipTransfer] Error creating request:', e);
+    }
+}
+
+/**
+ * Admin function to approve ownership transfer
+ */
+window.approveOwnershipTransfer = async function(transferId, newOwnerEmail) {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Only admins can approve transfers', 'error');
+        return;
+    }
+    
+    try {
+        const transferDoc = await db.collection('ownershipTransfers').doc(transferId).get();
+        if (!transferDoc.exists) {
+            showToast('Transfer request not found', 'error');
+            return;
+        }
+        
+        const transfer = transferDoc.data();
+        const propertyId = transfer.propertyId;
+        
+        // Update property owner
+        await PropertyDataService.write(propertyId, 'owner', newOwnerEmail);
+        
+        // Update transfer status
+        await db.collection('ownershipTransfers').doc(transferId).update({
+            status: 'approved',
+            newOwnerEmail: newOwnerEmail,
+            reviewedAt: new Date().toISOString(),
+            reviewedBy: auth.currentUser?.email
+        });
+        
+        showToast('✅ Ownership transfer approved!', 'success');
+    } catch (e) {
+        console.error('[OwnershipTransfer] Error approving:', e);
+        showToast('Failed to approve transfer', 'error');
+    }
+};
+
+/**
+ * Admin function to reject ownership transfer
+ */
+window.rejectOwnershipTransfer = async function(transferId, reason) {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Only admins can reject transfers', 'error');
+        return;
+    }
+    
+    try {
+        await db.collection('ownershipTransfers').doc(transferId).update({
+            status: 'rejected',
+            rejectionReason: reason || 'No reason provided',
+            reviewedAt: new Date().toISOString(),
+            reviewedBy: auth.currentUser?.email
+        });
+        
+        showToast('Transfer request rejected', 'info');
+    } catch (e) {
+        console.error('[OwnershipTransfer] Error rejecting:', e);
+        showToast('Failed to reject transfer', 'error');
+    }
+};

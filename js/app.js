@@ -487,6 +487,12 @@ function renderPropertyStatsContent(id) {
     const rtoTotalPayments = PropertyDataService.getValue(id, 'rtoTotalPayments', p.rtoTotalPayments || 0);
     const rtoPaymentInfo = hasActiveRTO ? ` (Payment ${rtoCurrentPayment + 1} of ${rtoTotalPayments} - Rent-to-Own)` : '';
     
+    // Check if property is sold
+    const isSold = PropertyDataService.getValue(id, 'isSold', p.isSold || false);
+    const soldTo = PropertyDataService.getValue(id, 'soldTo', p.soldTo || '');
+    const soldDate = PropertyDataService.getValue(id, 'soldDate', p.soldDate || '');
+    const soldPrice = PropertyDataService.getValue(id, 'soldPrice', p.soldPrice || 0);
+    
     // Check if user can access RTO (Elite or Admin only)
     const isRTOAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
     const isRTOElite = state.userTier === 'elite';
@@ -564,8 +570,24 @@ function renderPropertyStatsContent(id) {
             <span>👑</span> PREMIUM LISTING <span>👑</span>
            </div>` 
         : '';
+    
+    // Sold banner - unique celebration style
+    const soldBanner = isSold 
+        ? `<div class="relative overflow-hidden bg-gradient-to-r from-rose-600 via-pink-500 to-rose-600 text-white text-center py-3 font-black text-sm tracking-wider">
+            <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23ffffff\" fill-opacity=\"0.1\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30"></div>
+            <div class="relative flex items-center justify-center gap-3">
+                <span class="text-2xl">🏆</span>
+                <span class="text-lg">SOLD</span>
+                <span class="text-2xl">🏆</span>
+            </div>
+            <div class="relative text-xs font-medium text-rose-100 mt-1">
+                Sold to ${soldTo || 'New Owner'} ${soldDate ? 'on ' + formatDate(soldDate) : ''} ${soldPrice ? 'for $' + soldPrice.toLocaleString() : ''}
+            </div>
+           </div>` 
+        : '';
 
     $('propertyStatsContent').innerHTML = `
+        ${soldBanner}
         ${premiumBanner}
         <!-- View Toggle Tabs - full width, no padding needed -->
         <div class="flex border-b border-gray-700">
@@ -808,6 +830,25 @@ function renderPropertyStatsContent(id) {
                         ${daysUntilDue !== null ? `<div class="text-xs ${daysUntilDue <= 1 ? 'text-red-200 font-bold' : 'text-gray-300'} mt-2">${daysUntilDue === 0 ? '⚠️ Due today!' : daysUntilDue === 1 ? '⚠️ Due tomorrow!' : daysUntilDue < 0 ? '🚨 ' + Math.abs(daysUntilDue) + ' day(s) overdue!' : daysUntilDue + ' days remaining'}</div>` : '<div class="text-xs text-gray-400 mt-2">Auto-calculated</div>'}
                     </div>
                 </div>
+                
+                <!-- Sell Property Action (shows for available properties or to log direct sales) -->
+                ${!hasActiveRTO ? `
+                <div class="bg-gradient-to-r from-rose-900/40 to-pink-900/40 border border-rose-500/50 rounded-xl p-4 mb-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h4 class="text-rose-300 font-bold flex items-center gap-2">
+                                <span class="text-xl">🏡</span>
+                                Sell This Property
+                            </h4>
+                            <p class="text-gray-400 text-sm mt-1">Log a direct sale, mark as sold, and optionally transfer ownership</p>
+                        </div>
+                        <button onclick="showLogSaleModal(${id})" class="bg-gradient-to-r from-rose-500 to-pink-600 hover:opacity-90 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 whitespace-nowrap shadow-lg">
+                            <span>🏆</span>
+                            Log Sale
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
                 
                 <!-- Complete Lease Action (only shows when renter is assigned) -->
                 ${renterName ? `
@@ -6126,6 +6167,14 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                 nextExpectedAmount: newExpectedMonthly,
                 remainingBalance: newRemainingBalance
             });
+            
+            // Check if RTO is complete (remaining balance is 0 or less)
+            if (newRemainingBalance <= 0) {
+                // Delay to let confirmation modal show first, then prompt for sale
+                setTimeout(() => {
+                    showRTOCompletionPrompt(propertyId, rtoContractId, renterName, p?.title);
+                }, 2000);
+            }
         }
         
         // Refresh the property stats page
@@ -6211,6 +6260,92 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     
     // Store message for copy function
     window.currentThankYouMessage = thankYouMessage;
+};
+
+/**
+ * Show RTO Completion prompt when contract is fully paid
+ */
+window.showRTOCompletionPrompt = function(propertyId, rtoContractId, buyerName, propertyTitle) {
+    const modalHTML = `
+        <div id="rtoCompletionModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[60] p-4">
+            <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl max-w-lg w-full border-2 border-amber-500 shadow-2xl shadow-amber-500/20 overflow-hidden relative">
+                <!-- Confetti effect -->
+                <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div class="absolute top-0 left-1/4 w-2 h-2 bg-amber-400 rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
+                    <div class="absolute top-0 left-1/2 w-3 h-3 bg-pink-400 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                    <div class="absolute top-0 left-3/4 w-2 h-2 bg-green-400 rounded-full animate-bounce" style="animation-delay: 0.3s;"></div>
+                </div>
+                
+                <!-- X Close Button -->
+                <button onclick="closeRTOCompletionModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
+                <div class="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 px-6 py-6 text-center">
+                    <div class="text-5xl mb-2">🎉🏆🎉</div>
+                    <h3 class="text-2xl font-black text-gray-900">RTO CONTRACT COMPLETE!</h3>
+                    <p class="text-gray-800 font-medium mt-1">${propertyTitle}</p>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <div class="bg-green-900/30 border border-green-500/50 rounded-xl p-4 text-center">
+                        <div class="text-green-400 font-bold text-lg">✅ All Payments Received!</div>
+                        <p class="text-gray-300 text-sm mt-2">
+                            Congratulations! <span class="text-white font-bold">${buyerName}</span> has completed all payments 
+                            for this Rent-to-Own agreement.
+                        </p>
+                    </div>
+                    
+                    <div class="text-gray-300 text-sm">
+                        <p class="mb-3">Would you like to finalize this as a house sale? This will:</p>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-start gap-2">
+                                <span class="text-amber-400">•</span>
+                                <span>Mark the property as <span class="text-rose-400 font-bold">SOLD</span></span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-amber-400">•</span>
+                                <span>Add to your House Sales records</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-amber-400">•</span>
+                                <span>Award you <span class="text-green-400 font-bold">+1000 XP</span> 🎮</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <span class="text-amber-400">•</span>
+                                <span>Display a celebration banner for 24 hours 🎊</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                    <button onclick="closeRTOCompletionModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Later
+                    </button>
+                    <button onclick="finalizeRTOSale(${propertyId}, '${rtoContractId}')" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 py-3 rounded-xl font-black hover:opacity-90 transition flex items-center justify-center gap-2">
+                        <span>🏆</span> Finalize Sale
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeRTOCompletionModal = function() {
+    const modal = document.getElementById('rtoCompletionModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Finalize RTO as a house sale
+ */
+window.finalizeRTOSale = function(propertyId, rtoContractId) {
+    closeRTOCompletionModal();
+    // Open the log sale modal pre-filled for RTO completion
+    showLogSaleModal(propertyId, rtoContractId);
 };
 
 // ==================== RTO PAYMENT HISTORY ====================

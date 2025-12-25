@@ -1419,22 +1419,22 @@
                 </div>
             </div>
 
-            <!-- Row 1: Income Tiles (Actuals Only) -->
+            <!-- Row 1: Rental Income Tiles (All-Time Collected with Frequency Equivalents) -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-4">
-                <!-- Daily Income -->
+                <!-- Daily Equivalent -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
                         <div class="flip-card-front bg-gradient-to-br from-cyan-600 to-cyan-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-cyan-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Daily <span class="text-[10px] opacity-70">(actual)</span></h3>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Daily Equiv.</h3>
                                 <span class="text-xl">📅</span>
                             </div>
                             <p id="dailyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
-                            <p id="dailyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                            <p id="dailyIncomeCount" class="text-xs opacity-70 mt-1">Rental income</p>
                         </div>
                         <div class="flip-card-back bg-gradient-to-br from-cyan-700 to-cyan-900 rounded-2xl shadow-2xl p-3 text-white border border-cyan-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Daily Renters (Actual)</h3>
+                                <h3 class="text-xs font-bold">Daily Breakdown</h3>
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="dailyBreakdown" class="text-xs space-y-1"></div>
@@ -1442,20 +1442,20 @@
                     </div>
                 </div>
 
-                <!-- Weekly Income -->
+                <!-- Weekly Equivalent -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
                         <div class="flip-card-front bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-blue-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Weekly <span class="text-[10px] opacity-70">(actual)</span></h3>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Weekly Equiv.</h3>
                                 <span class="text-xl">📆</span>
                             </div>
                             <p id="weeklyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
-                            <p id="weeklyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                            <p id="weeklyIncomeCount" class="text-xs opacity-70 mt-1">Rental income</p>
                         </div>
                         <div class="flip-card-back bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl shadow-2xl p-3 text-white border border-blue-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Weekly Renters (Actual)</h3>
+                                <h3 class="text-xs font-bold">Weekly Breakdown</h3>
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="weeklyBreakdown" class="text-xs space-y-1"></div>
@@ -1463,20 +1463,20 @@
                     </div>
                 </div>
 
-                <!-- Biweekly Income -->
+                <!-- Biweekly Equivalent -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
                         <div class="flip-card-front bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-purple-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Biweekly <span class="text-[10px] opacity-70">(actual)</span></h3>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Biweekly Equiv.</h3>
                                 <span class="text-xl">📊</span>
                             </div>
                             <p id="biweeklyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
-                            <p id="biweeklyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                            <p id="biweeklyIncomeCount" class="text-xs opacity-70 mt-1">Rental income</p>
                         </div>
                         <div class="flip-card-back bg-gradient-to-br from-purple-700 to-purple-900 rounded-2xl shadow-2xl p-3 text-white border border-purple-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Biweekly Renters (Actual)</h3>
+                                <h3 class="text-xs font-bold">Biweekly Breakdown</h3>
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="biweeklyBreakdown" class="text-xs space-y-1"></div>
@@ -1484,20 +1484,20 @@
                     </div>
                 </div>
 
-                <!-- Monthly Income (Estimated) -->
+                <!-- Monthly Total -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
                         <div class="flip-card-front bg-gradient-to-br from-green-600 to-emerald-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-green-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Monthly Est.</h3>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Monthly Total</h3>
                                 <span class="text-xl">🗓️</span>
                             </div>
                             <p id="monthlyIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
-                            <p id="monthlyIncomeCount" class="text-xs opacity-70 mt-1">0 renters</p>
+                            <p id="monthlyIncomeCount" class="text-xs opacity-70 mt-1">All-time collected</p>
                         </div>
                         <div class="flip-card-back bg-gradient-to-br from-green-700 to-emerald-900 rounded-2xl shadow-2xl p-3 text-white border border-green-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Monthly Estimate</h3>
+                                <h3 class="text-xs font-bold">Monthly Breakdown</h3>
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="monthlyBreakdown" class="text-xs space-y-1"></div>
@@ -1506,18 +1506,18 @@
                 </div>
             </div>
 
-            <!-- Row 2: Property Tiles -->
+            <!-- Row 2: Property & Sales Tiles -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
-                <!-- Total Listings -->
+                <!-- Properties (Combined Rented + Available) -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
                         <div class="flip-card-front bg-gradient-to-br from-slate-600 to-slate-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-slate-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Total Listings</h3>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Properties</h3>
                                 <span class="text-xl">🏠</span>
                             </div>
                             <p id="totalListingsDisplay" class="text-2xl md:text-3xl font-black">0</p>
-                            <p class="text-xs opacity-70 mt-1">All properties</p>
+                            <p id="propertiesSubtitle" class="text-xs opacity-70 mt-1">0 rented • 0 available</p>
                         </div>
                         <div class="flip-card-back bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl shadow-2xl p-3 text-white border border-slate-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
@@ -1529,44 +1529,44 @@
                     </div>
                 </div>
 
-                <!-- Rented -->
+                <!-- RTO Income -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front bg-gradient-to-br from-red-600 to-red-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-red-500">
+                        <div class="flip-card-front bg-gradient-to-br from-indigo-600 to-violet-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-indigo-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Rented</h3>
-                                <span class="text-xl">🔴</span>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">RTO Income</h3>
+                                <span class="text-xl">📋</span>
                             </div>
-                            <p id="rentedCountDisplay" class="text-2xl md:text-3xl font-black">0</p>
-                            <p id="rentedPercentDisplay" class="text-xs opacity-70 mt-1">0% occupied</p>
+                            <p id="rtoIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="rtoIncomeCount" class="text-xs opacity-70 mt-1">0 contracts</p>
                         </div>
-                        <div class="flip-card-back bg-gradient-to-br from-red-700 to-red-900 rounded-2xl shadow-2xl p-3 text-white border border-red-500 overflow-y-auto">
+                        <div class="flip-card-back bg-gradient-to-br from-indigo-700 to-violet-900 rounded-2xl shadow-2xl p-3 text-white border border-indigo-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Rented Properties</h3>
+                                <h3 class="text-xs font-bold">RTO Payments</h3>
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
-                            <div id="rentedBreakdown" class="text-xs space-y-1"></div>
+                            <div id="rtoIncomeBreakdown" class="text-xs space-y-1"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Available -->
+                <!-- House Sales -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
-                        <div class="flip-card-front bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-emerald-500">
+                        <div class="flip-card-front bg-gradient-to-br from-rose-600 to-pink-800 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-rose-500">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Available</h3>
-                                <span class="text-xl">🟢</span>
+                                <h3 class="text-sm md:text-base font-bold opacity-90">House Sales</h3>
+                                <span class="text-xl">🏡</span>
                             </div>
-                            <p id="availableCountDisplay" class="text-2xl md:text-3xl font-black">0</p>
-                            <p id="availablePercentDisplay" class="text-xs opacity-70 mt-1">0% vacancy</p>
+                            <p id="houseSalesDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="houseSalesCount" class="text-xs opacity-70 mt-1">0 sales</p>
                         </div>
-                        <div class="flip-card-back bg-gradient-to-br from-emerald-700 to-emerald-900 rounded-2xl shadow-2xl p-3 text-white border border-emerald-500 overflow-y-auto">
+                        <div class="flip-card-back bg-gradient-to-br from-rose-700 to-pink-900 rounded-2xl shadow-2xl p-3 text-white border border-rose-500 overflow-y-auto">
                             <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Available Properties</h3>
+                                <h3 class="text-xs font-bold">Completed Sales</h3>
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
-                            <div id="availableBreakdown" class="text-xs space-y-1"></div>
+                            <div id="houseSalesBreakdown" class="text-xs space-y-1"></div>
                         </div>
                     </div>
                 </div>
