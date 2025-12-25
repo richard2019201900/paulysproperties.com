@@ -859,6 +859,29 @@ function renderPropertyStatsContent(id) {
                                 <span class="text-[10px] bg-green-900/50 text-green-200 px-2 py-0.5 rounded-full animate-pulse">ACTIVE</span>
                             </h4>
                         </div>
+                        
+                        <!-- Deposit Status -->
+                        ${(() => {
+                            const depositAmount = PropertyDataService.getValue(id, 'rtoDepositAmount', p.rtoDepositAmount || 0);
+                            const depositPaid = PropertyDataService.getValue(id, 'rtoDepositPaid', p.rtoDepositPaid || false);
+                            if (depositAmount === 0) {
+                                return `<div class="bg-gray-800/50 rounded-lg p-2 text-sm">
+                                    <span class="text-gray-400">💰 Deposit:</span>
+                                    <span class="text-green-400 ml-2">$0 (Waived)</span>
+                                </div>`;
+                            } else if (depositPaid) {
+                                return `<div class="bg-gray-800/50 rounded-lg p-2 text-sm">
+                                    <span class="text-gray-400">💰 Deposit:</span>
+                                    <span class="text-green-400 ml-2">$${depositAmount.toLocaleString()} ✓ Paid</span>
+                                </div>`;
+                            } else {
+                                return `<div class="bg-amber-900/50 border border-amber-500/50 rounded-lg p-2 text-sm">
+                                    <span class="text-amber-300">⚠️ Deposit Due:</span>
+                                    <span class="text-amber-400 font-bold ml-2">$${depositAmount.toLocaleString()}</span>
+                                </div>`;
+                            }
+                        })()}
+                        
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs">Buyer</div>
@@ -866,27 +889,33 @@ function renderPropertyStatsContent(id) {
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs">Payment Progress</div>
-                                <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
+                                <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments - 1}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Monthly Amount</div>
-                                <div class="text-amber-400 font-semibold">$${monthlyPrice.toLocaleString()}</div>
+                                <div class="text-gray-400 text-xs">Next Payment</div>
+                                <div class="text-amber-400 font-semibold">$${PropertyDataService.getValue(id, 'rtoExpectedMonthly', p.rtoExpectedMonthly || monthlyPrice).toLocaleString()}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Contract ID</div>
-                                <div class="text-gray-300 font-mono text-xs">${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || 'N/A')}</div>
+                                <div class="text-gray-400 text-xs">Remaining Balance</div>
+                                <div class="text-cyan-400 font-semibold">$${PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0).toLocaleString()}</div>
                             </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <button onclick="viewRTOContract('${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                                 View Contract
                             </button>
-                            <button onclick="showRentToOwnWizard(${id})" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2">
+                            <button onclick="showRTOPaymentHistory(${id})" class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                                Payment History
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="showRentToOwnWizard(${id})" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 New Contract
                             </button>
-                            <button onclick="confirmDeleteRTOContract(${id}, '${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2" title="Delete this contract">
+                            <button onclick="confirmDeleteRTOContract(${id}, '${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2" title="Delete this contract">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                 Delete
                             </button>
@@ -1191,6 +1220,13 @@ window.startEditTile = function(field, propertyId, type) {
         if (!frequency) {
             alert('⚠️ Please set the Payment Frequency first!\n\nThe frequency determines how the next due date is calculated and how payments are logged.\n\n1. Click on "Payment Frequency"\n2. Select: Daily, Weekly, Biweekly, or Monthly\n3. Then you can set the Last Payment date');
             return;
+        }
+        
+        // Check if this is an RTO property - show custom RTO payment modal instead
+        const hasActiveRTO = PropertyDataService.getValue(propertyId, 'hasActiveRTO', p?.hasActiveRTO || false);
+        if (hasActiveRTO) {
+            showRTOPaymentModal(propertyId);
+            return; // Don't continue with normal tile editing
         }
     }
     
@@ -5207,6 +5243,18 @@ window.saveRTOContract = async function() {
         const state = window.rtoWizardState;
         const calc = contract.data.calculations;
         
+        // Calculate initial remaining balance and expected monthly
+        const initialRemainingBalance = calc.purchasePrice - calc.downPayment;
+        const finalPaymentBase = calc.finalPaymentBase || 1500000;
+        const remainingMonths = calc.termMonths - 1; // -1 for final payment month
+        const amountForMonthly = initialRemainingBalance - finalPaymentBase;
+        const initialExpectedMonthly = remainingMonths > 0 ? Math.round(amountForMonthly / remainingMonths) : 0;
+        
+        // Auto-mark $0 deposit as paid
+        const isZeroDeposit = calc.downPayment === 0;
+        const depositPaidStatus = isZeroDeposit;
+        const depositPaidDate = isZeroDeposit ? state.startDate : null;
+        
         // Save contract to Firestore
         await db.collection('rentToOwnContracts').doc(contract.documentId).set({
             documentId: contract.documentId,
@@ -5221,10 +5269,16 @@ window.saveRTOContract = async function() {
             startDate: state.startDate,
             currentPaymentNumber: 0, // Will be 1 after first monthly payment
             totalPayments: calc.termMonths,
-            // Deposit tracking - deposit is due immediately when contract is signed
+            // Deposit tracking - auto-mark $0 deposit as paid
             depositAmount: calc.downPayment,
-            depositPaid: false,
-            depositPaidDate: null,
+            depositPaid: depositPaidStatus,
+            depositPaidDate: depositPaidDate,
+            // Balance tracking for dynamic recalculation
+            remainingBalance: initialRemainingBalance,
+            expectedMonthlyPayment: initialExpectedMonthly,
+            finalPaymentBase: finalPaymentBase,
+            // Payment history array for tracking expected vs actual
+            rtoPaymentHistory: [],
             status: 'active',
             createdBy: auth.currentUser?.email || 'unknown',
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5246,9 +5300,14 @@ window.saveRTOContract = async function() {
             rtoTotalPayments: calc.termMonths,
             rtoBuyer: state.buyer.name,
             rtoStartDate: state.startDate,
-            // Deposit tracking - deposit due immediately
+            // Deposit tracking - auto-mark $0 deposit as paid
             rtoDepositAmount: calc.downPayment,
-            rtoDepositPaid: false,
+            rtoDepositPaid: depositPaidStatus,
+            rtoDepositPaidDate: depositPaidDate,
+            // Balance tracking for dynamic recalculation
+            rtoRemainingBalance: initialRemainingBalance,
+            rtoExpectedMonthly: initialExpectedMonthly,
+            rtoFinalPaymentBase: finalPaymentBase,
             // Set payment frequency to monthly
             paymentFrequency: 'monthly'
         };
@@ -5256,7 +5315,8 @@ window.saveRTOContract = async function() {
         // Update property via PropertyDataService (writes to settings/properties)
         await PropertyDataService.writeMultiple(state.propertyId, propertyUpdates);
         
-        showToast('✅ Contract saved! Property updated to RTO monthly payments.', 'success');
+        const depositMsg = isZeroDeposit ? ' ($0 deposit auto-marked as waived)' : '';
+        showToast(`✅ Contract saved!${depositMsg} Property updated to RTO monthly payments.`, 'success');
         
         // Add XP if gamification is available
         if (typeof awardXP === 'function') {
@@ -5713,6 +5773,10 @@ window.deleteRTOContract = async function(propertyId, contractId) {
             rtoDepositAmount: 0,
             rtoDepositPaid: false,
             rtoDepositPaidDate: '',
+            // Clear balance tracking fields
+            rtoRemainingBalance: 0,
+            rtoExpectedMonthly: 0,
+            rtoFinalPaymentBase: 0,
             // Reset monthly price since RTO set it
             monthlyPrice: 0
         };
@@ -5736,6 +5800,902 @@ window.deleteRTOContract = async function(propertyId, contractId) {
     } catch (error) {
         console.error('Error deleting RTO contract:', error);
         showToast('Failed to delete contract: ' + error.message, 'error');
+    }
+};
+
+// ==================== RTO PAYMENT MODAL ====================
+
+/**
+ * Show the RTO Payment Modal for logging payments with custom amounts
+ */
+window.showRTOPaymentModal = function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) {
+        showToast('Property not found', 'error');
+        return;
+    }
+    
+    const renterName = PropertyDataService.getValue(propertyId, 'renterName', p?.renterName || 'Unknown');
+    const rtoDepositPaid = PropertyDataService.getValue(propertyId, 'rtoDepositPaid', p?.rtoDepositPaid || false);
+    const rtoDepositAmount = PropertyDataService.getValue(propertyId, 'rtoDepositAmount', p?.rtoDepositAmount || 0);
+    const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', p?.rtoCurrentPayment || 0);
+    const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p?.rtoTotalPayments || 24);
+    const rtoRemainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
+    const rtoExpectedMonthly = PropertyDataService.getValue(propertyId, 'rtoExpectedMonthly', p?.rtoExpectedMonthly || 0);
+    const rtoFinalPaymentBase = PropertyDataService.getValue(propertyId, 'rtoFinalPaymentBase', p?.rtoFinalPaymentBase || 1650000);
+    
+    // Determine what type of payment this is
+    let paymentType, paymentNumber, expectedAmount, maxPayment;
+    
+    if (!rtoDepositPaid && rtoDepositAmount > 0) {
+        // Deposit not yet paid
+        paymentType = 'deposit';
+        paymentNumber = 0;
+        expectedAmount = rtoDepositAmount;
+        maxPayment = rtoDepositAmount * 10; // Allow overpayment on deposit
+    } else {
+        // Monthly payment
+        paymentType = 'monthly';
+        paymentNumber = rtoCurrentPayment + 1;
+        expectedAmount = rtoExpectedMonthly;
+        // Max payment = remaining balance minus final payment (to prevent negative recalculation)
+        const amountForMonthly = rtoRemainingBalance - rtoFinalPaymentBase;
+        maxPayment = Math.max(0, amountForMonthly);
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    const titleText = paymentType === 'deposit' 
+        ? 'Log RTO Deposit Payment' 
+        : `Log RTO Payment - Month ${paymentNumber} of ${rtoTotalPayments - 1}`;
+    
+    const modalHTML = `
+        <div id="rtoPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeRTOPaymentModal()">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-amber-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                <div class="bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                        <span>💰</span>
+                        ${titleText}
+                    </h3>
+                    <p class="text-amber-100 text-sm mt-1">Renter: ${renterName}</p>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <!-- Expected Amount Display -->
+                    <div class="bg-gray-800 rounded-xl p-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Expected Amount:</span>
+                            <span class="text-green-400 font-bold text-xl">$${expectedAmount.toLocaleString()}</span>
+                        </div>
+                        ${paymentType === 'monthly' ? `
+                        <div class="flex justify-between items-center mt-2 text-sm">
+                            <span class="text-gray-500">Remaining Balance:</span>
+                            <span class="text-gray-400">$${rtoRemainingBalance.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-500">Max Payment Allowed:</span>
+                            <span class="text-amber-400">$${maxPayment.toLocaleString()}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Actual Amount Input -->
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Actual Amount Received:</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">$</span>
+                            <input type="number" 
+                                   id="rtoPaymentAmount" 
+                                   value="${expectedAmount}" 
+                                   min="1"
+                                   max="${maxPayment}"
+                                   class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 pl-8 text-white text-lg font-bold focus:border-amber-500 focus:outline-none">
+                        </div>
+                        <p class="text-gray-500 text-xs mt-1">Pre-filled with expected amount. Edit if different.</p>
+                    </div>
+                    
+                    <!-- Payment Date -->
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Payment Date:</label>
+                        <input type="date" 
+                               id="rtoPaymentDate" 
+                               value="${today}"
+                               class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-amber-500 focus:outline-none">
+                    </div>
+                    
+                    ${paymentType === 'monthly' ? `
+                    <!-- Overpayment Warning -->
+                    <div id="rtoPaymentWarning" class="hidden bg-red-900/50 border border-red-500/50 rounded-xl p-3 text-sm">
+                        <span class="text-red-400">⚠️ Payment exceeds maximum allowed. This would cause negative remaining balance for monthly payments.</span>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                    <button onclick="closeRTOPaymentModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                    <button onclick="submitRTOPayment(${propertyId}, '${paymentType}', ${expectedAmount}, ${maxPayment})" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        ✓ Log Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove any existing modal
+    const existing = document.getElementById('rtoPaymentModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add input validation listener
+    const amountInput = document.getElementById('rtoPaymentAmount');
+    const warningEl = document.getElementById('rtoPaymentWarning');
+    if (amountInput && paymentType === 'monthly') {
+        amountInput.addEventListener('input', () => {
+            const amount = parseInt(amountInput.value) || 0;
+            if (amount > maxPayment && warningEl) {
+                warningEl.classList.remove('hidden');
+            } else if (warningEl) {
+                warningEl.classList.add('hidden');
+            }
+        });
+    }
+};
+
+window.closeRTOPaymentModal = function() {
+    const modal = document.getElementById('rtoPaymentModal');
+    if (modal) {
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.2s';
+        setTimeout(() => modal.remove(), 200);
+    }
+};
+
+/**
+ * Submit RTO Payment - handles both deposit and monthly payments
+ */
+window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount, maxPayment) {
+    const amountInput = document.getElementById('rtoPaymentAmount');
+    const dateInput = document.getElementById('rtoPaymentDate');
+    
+    if (!amountInput || !dateInput) {
+        showToast('Error: Missing form fields', 'error');
+        return;
+    }
+    
+    const actualAmount = parseInt(amountInput.value) || 0;
+    const paymentDate = dateInput.value;
+    
+    // Validation
+    if (actualAmount <= 0) {
+        showToast('Please enter a valid payment amount', 'error');
+        return;
+    }
+    
+    if (!paymentDate) {
+        showToast('Please select a payment date', 'error');
+        return;
+    }
+    
+    // For monthly payments, check max payment limit
+    if (paymentType === 'monthly' && actualAmount > maxPayment) {
+        showToast(`Payment exceeds maximum allowed ($${maxPayment.toLocaleString()}). This would cause negative remaining balance.`, 'error');
+        return;
+    }
+    
+    try {
+        showToast('💰 Recording payment...', 'info');
+        closeRTOPaymentModal();
+        
+        const p = properties.find(prop => prop.id === propertyId);
+        const renterName = PropertyDataService.getValue(propertyId, 'renterName', p?.renterName || 'Unknown');
+        const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', p?.rtoContractId || '');
+        const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p?.rtoTotalPayments || 24);
+        const rtoFinalPaymentBase = PropertyDataService.getValue(propertyId, 'rtoFinalPaymentBase', p?.rtoFinalPaymentBase || 1650000);
+        
+        if (paymentType === 'deposit') {
+            // Record deposit payment
+            await PropertyDataService.writeMultiple(propertyId, {
+                rtoDepositPaid: true,
+                rtoDepositPaidDate: paymentDate,
+                lastPaymentDate: paymentDate
+            });
+            
+            // Update contract
+            if (rtoContractId) {
+                await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                    depositPaid: true,
+                    depositPaidDate: paymentDate,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Log to payment history
+            await logPayment(propertyId, {
+                paymentDate: paymentDate,
+                recordedAt: new Date().toISOString(),
+                renterName: renterName,
+                frequency: 'deposit',
+                amount: actualAmount,
+                expectedAmount: expectedAmount,
+                recordedBy: auth.currentUser?.email || 'owner',
+                isRTOPayment: true,
+                isRTODeposit: true
+            });
+            
+            // Calculate next due date (1 month from payment)
+            const nextDate = new Date(paymentDate);
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            // Get expected monthly for message
+            const rtoExpectedMonthly = PropertyDataService.getValue(propertyId, 'rtoExpectedMonthly', p?.rtoExpectedMonthly || 0);
+            const rtoRemainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
+            
+            // Show confirmation
+            showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
+                type: 'deposit',
+                nextDueDate: nextDueDateStr,
+                nextExpectedAmount: rtoExpectedMonthly,
+                remainingBalance: rtoRemainingBalance
+            });
+            
+        } else {
+            // Record monthly payment with recalculation
+            const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', p?.rtoCurrentPayment || 0);
+            const rtoRemainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
+            
+            const newPaymentNumber = rtoCurrentPayment + 1;
+            const newRemainingBalance = rtoRemainingBalance - actualAmount;
+            
+            // Calculate new expected monthly (only recalculate for next payment, not historical)
+            const remainingMonths = (rtoTotalPayments - 1) - newPaymentNumber; // -1 for final payment month
+            const amountForMonthly = newRemainingBalance - rtoFinalPaymentBase;
+            const newExpectedMonthly = remainingMonths > 0 ? Math.round(amountForMonthly / remainingMonths) : 0;
+            
+            // Update property
+            await PropertyDataService.writeMultiple(propertyId, {
+                rtoCurrentPayment: newPaymentNumber,
+                rtoRemainingBalance: newRemainingBalance,
+                rtoExpectedMonthly: newExpectedMonthly,
+                monthlyPrice: newExpectedMonthly, // Update displayed monthly price
+                lastPaymentDate: paymentDate
+            });
+            
+            // Update contract
+            if (rtoContractId) {
+                // Get existing payment history from contract
+                const contractDoc = await db.collection('rentToOwnContracts').doc(rtoContractId).get();
+                let rtoPaymentHistory = [];
+                if (contractDoc.exists) {
+                    rtoPaymentHistory = contractDoc.data().rtoPaymentHistory || [];
+                }
+                
+                // Add new payment record
+                rtoPaymentHistory.push({
+                    month: newPaymentNumber,
+                    expected: expectedAmount,
+                    actual: actualAmount,
+                    date: paymentDate,
+                    remainingBalanceAfter: newRemainingBalance,
+                    recordedBy: auth.currentUser?.email || 'owner',
+                    recordedAt: new Date().toISOString()
+                });
+                
+                await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                    currentPaymentNumber: newPaymentNumber,
+                    remainingBalance: newRemainingBalance,
+                    expectedMonthlyPayment: newExpectedMonthly,
+                    rtoPaymentHistory: rtoPaymentHistory,
+                    lastPaymentDate: paymentDate,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Log to payment history
+            await logPayment(propertyId, {
+                paymentDate: paymentDate,
+                recordedAt: new Date().toISOString(),
+                renterName: renterName,
+                frequency: 'monthly',
+                amount: actualAmount,
+                expectedAmount: expectedAmount,
+                rtoMonth: newPaymentNumber,
+                recordedBy: auth.currentUser?.email || 'owner',
+                isRTOPayment: true,
+                isRTODeposit: false
+            });
+            
+            // Calculate next due date (1 month from payment)
+            const nextDate = new Date(paymentDate);
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            
+            // Show confirmation
+            showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
+                type: 'monthly',
+                paymentNumber: newPaymentNumber,
+                totalPayments: rtoTotalPayments - 1, // -1 for final payment
+                nextDueDate: nextDueDateStr,
+                nextExpectedAmount: newExpectedMonthly,
+                remainingBalance: newRemainingBalance
+            });
+        }
+        
+        // Refresh the property stats page
+        setTimeout(() => {
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error recording RTO payment:', error);
+        showToast('Failed to record payment: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Show RTO payment confirmation modal with detailed message
+ */
+window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedAmount, info) {
+    const firstName = renterName.split(' ')[0];
+    
+    let thankYouMessage, headerText, badgeText;
+    
+    if (info.type === 'deposit') {
+        headerText = 'Deposit Received!';
+        badgeText = '💰 RTO Deposit';
+        thankYouMessage = `Thanks ${firstName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for your Rent-to-Own agreement has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+    } else {
+        headerText = 'Payment Logged!';
+        badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
+        thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${actualAmount.toLocaleString()} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+    }
+    
+    // Show variance if different from expected
+    const varianceHtml = actualAmount !== expectedAmount ? `
+        <div class="text-xs mt-1 ${actualAmount > expectedAmount ? 'text-green-400' : 'text-amber-400'}">
+            ${actualAmount > expectedAmount ? '↑' : '↓'} ${actualAmount > expectedAmount ? 'Overpaid' : 'Underpaid'} by $${Math.abs(actualAmount - expectedAmount).toLocaleString()} (Expected: $${expectedAmount.toLocaleString()})
+        </div>
+    ` : '';
+    
+    const modalHTML = `
+        <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closePaymentConfirmModal()">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl" onclick="event.stopPropagation()">
+                <div class="text-center mb-4">
+                    <div class="text-5xl mb-3">✅</div>
+                    <h3 class="text-2xl font-bold text-green-400">${headerText}</h3>
+                    <p class="text-gray-400 mt-1">$${actualAmount.toLocaleString()} from ${renterName}</p>
+                    ${varianceHtml}
+                    <p class="text-amber-400 text-sm mt-2">${badgeText}</p>
+                </div>
+                
+                <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${firstName}:</span>
+                    </div>
+                    <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600">
+                        ${thankYouMessage}
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="copyThankYouMessage()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Message
+                    </button>
+                    <button onclick="closePaymentConfirmModal()" class="flex-1 bg-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove any existing modal
+    const existing = document.getElementById('paymentConfirmModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Store message for copy function
+    window.currentThankYouMessage = thankYouMessage;
+};
+
+// ==================== RTO PAYMENT HISTORY ====================
+
+/**
+ * Show RTO Payment History modal with edit/delete capabilities
+ */
+window.showRTOPaymentHistory = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', p?.rtoContractId || '');
+    
+    if (!rtoContractId) {
+        showToast('No active RTO contract found', 'error');
+        return;
+    }
+    
+    try {
+        showToast('📜 Loading payment history...', 'info');
+        
+        const contractDoc = await db.collection('rentToOwnContracts').doc(rtoContractId).get();
+        if (!contractDoc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = contractDoc.data();
+        const history = contract.rtoPaymentHistory || [];
+        const depositPaid = contract.depositPaid;
+        const depositAmount = contract.depositAmount;
+        const depositPaidDate = contract.depositPaidDate;
+        
+        // Build payment rows
+        let historyRows = '';
+        
+        // Add deposit row if applicable
+        if (depositAmount > 0) {
+            historyRows += `
+                <tr class="border-b border-gray-700">
+                    <td class="py-3 px-4 text-gray-400">Deposit</td>
+                    <td class="py-3 px-4 text-white">$${depositAmount.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-white">$${depositAmount.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-gray-400">${depositPaidDate || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        ${depositPaid ? '<span class="text-green-400">✓ Paid</span>' : '<span class="text-amber-400">Pending</span>'}
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        ${depositPaid ? `
+                            <button onclick="editRTODeposit(${propertyId}, '${rtoContractId}')" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
+                            <button onclick="deleteRTODeposit(${propertyId}, '${rtoContractId}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `;
+        }
+        
+        // Add monthly payment rows
+        history.forEach((payment, index) => {
+            const variance = payment.actual - payment.expected;
+            const varianceClass = variance > 0 ? 'text-green-400' : variance < 0 ? 'text-red-400' : 'text-gray-400';
+            const varianceText = variance !== 0 ? ` (${variance > 0 ? '+' : ''}$${variance.toLocaleString()})` : '';
+            
+            historyRows += `
+                <tr class="border-b border-gray-700">
+                    <td class="py-3 px-4 text-gray-400">Month ${payment.month}</td>
+                    <td class="py-3 px-4 text-gray-400">$${payment.expected.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-white">$${payment.actual.toLocaleString()} <span class="${varianceClass} text-xs">${varianceText}</span></td>
+                    <td class="py-3 px-4 text-gray-400">${payment.date}</td>
+                    <td class="py-3 px-4 text-green-400">✓ Paid</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="editRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
+                        <button onclick="deleteRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        if (historyRows === '') {
+            historyRows = '<tr><td colspan="6" class="py-8 text-center text-gray-500">No payments recorded yet</td></tr>';
+        }
+        
+        const modalHTML = `
+            <div id="rtoHistoryModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+                <div class="bg-gray-900 rounded-2xl max-w-4xl w-full border border-cyan-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                            <span>📜</span>
+                            RTO Payment History
+                        </h3>
+                        <p class="text-cyan-100 text-sm mt-1">${contract.propertyTitle}</p>
+                    </div>
+                    
+                    <div class="p-6 max-h-[60vh] overflow-y-auto">
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-sm">Remaining Balance</div>
+                                <div class="text-2xl font-bold text-white">$${(contract.remainingBalance || 0).toLocaleString()}</div>
+                            </div>
+                            <div class="bg-gray-800 rounded-xl p-4">
+                                <div class="text-gray-400 text-sm">Next Expected Payment</div>
+                                <div class="text-2xl font-bold text-green-400">$${(contract.expectedMonthlyPayment || 0).toLocaleString()}</div>
+                            </div>
+                        </div>
+                        
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-600 text-left">
+                                    <th class="py-3 px-4 text-gray-400 font-medium">Payment</th>
+                                    <th class="py-3 px-4 text-gray-400 font-medium">Expected</th>
+                                    <th class="py-3 px-4 text-gray-400 font-medium">Actual</th>
+                                    <th class="py-3 px-4 text-gray-400 font-medium">Date</th>
+                                    <th class="py-3 px-4 text-gray-400 font-medium">Status</th>
+                                    <th class="py-3 px-4 text-gray-400 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${historyRows}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="px-6 py-4 bg-gray-800/50">
+                        <button onclick="document.getElementById('rtoHistoryModal').remove()" class="w-full bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error loading payment history:', error);
+        showToast('Failed to load payment history: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Edit a monthly payment entry
+ */
+window.editRTOPaymentEntry = async function(propertyId, contractId, paymentIndex) {
+    try {
+        const contractDoc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        if (!contractDoc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = contractDoc.data();
+        const payment = contract.rtoPaymentHistory[paymentIndex];
+        
+        if (!payment) {
+            showToast('Payment not found', 'error');
+            return;
+        }
+        
+        const modalHTML = `
+            <div id="editPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-blue-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                        <h3 class="text-xl font-bold text-white">Edit Payment - Month ${payment.month}</h3>
+                    </div>
+                    
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2">Amount:</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                                <input type="number" id="editPaymentAmount" value="${payment.actual}" 
+                                    class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 pl-8 text-white focus:border-blue-500 focus:outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2">Date:</label>
+                            <input type="date" id="editPaymentDate" value="${payment.date}"
+                                class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                        <button onclick="document.getElementById('editPaymentModal').remove()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button onclick="saveRTOPaymentEdit(${propertyId}, '${contractId}', ${paymentIndex})" class="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error loading payment for edit:', error);
+        showToast('Failed to load payment: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Save edited payment
+ */
+window.saveRTOPaymentEdit = async function(propertyId, contractId, paymentIndex) {
+    const amountInput = document.getElementById('editPaymentAmount');
+    const dateInput = document.getElementById('editPaymentDate');
+    
+    if (!amountInput || !dateInput) return;
+    
+    const newAmount = parseInt(amountInput.value) || 0;
+    const newDate = dateInput.value;
+    
+    if (newAmount <= 0 || !newDate) {
+        showToast('Please enter valid amount and date', 'error');
+        return;
+    }
+    
+    try {
+        showToast('💾 Saving changes...', 'info');
+        
+        // Get contract
+        const contractDoc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        const contract = contractDoc.data();
+        const history = contract.rtoPaymentHistory || [];
+        const oldPayment = history[paymentIndex];
+        
+        // Calculate difference
+        const amountDiff = newAmount - oldPayment.actual;
+        
+        // Update payment in history
+        history[paymentIndex] = {
+            ...oldPayment,
+            actual: newAmount,
+            date: newDate
+        };
+        
+        // Recalculate remaining balance
+        const newRemainingBalance = contract.remainingBalance - amountDiff;
+        
+        // Recalculate expected monthly for next payment
+        const currentPaymentNumber = contract.currentPaymentNumber;
+        const remainingMonths = (contract.totalPayments - 1) - currentPaymentNumber;
+        const amountForMonthly = newRemainingBalance - contract.finalPaymentBase;
+        const newExpectedMonthly = remainingMonths > 0 ? Math.round(amountForMonthly / remainingMonths) : 0;
+        
+        // Update remaining balance after for this payment
+        history[paymentIndex].remainingBalanceAfter = newRemainingBalance;
+        
+        // Update contract
+        await db.collection('rentToOwnContracts').doc(contractId).update({
+            rtoPaymentHistory: history,
+            remainingBalance: newRemainingBalance,
+            expectedMonthlyPayment: newExpectedMonthly,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update property
+        await PropertyDataService.writeMultiple(propertyId, {
+            rtoRemainingBalance: newRemainingBalance,
+            rtoExpectedMonthly: newExpectedMonthly,
+            monthlyPrice: newExpectedMonthly
+        });
+        
+        // Close modals
+        document.getElementById('editPaymentModal')?.remove();
+        document.getElementById('rtoHistoryModal')?.remove();
+        
+        showToast('✅ Payment updated successfully!', 'success');
+        
+        // Refresh
+        setTimeout(() => {
+            showRTOPaymentHistory(propertyId);
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('Error saving payment edit:', error);
+        showToast('Failed to save: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Delete a monthly payment entry
+ */
+window.deleteRTOPaymentEntry = async function(propertyId, contractId, paymentIndex) {
+    if (!confirm('Are you sure you want to delete this payment? This will recalculate the remaining balance.')) {
+        return;
+    }
+    
+    try {
+        showToast('🗑️ Deleting payment...', 'info');
+        
+        // Get contract
+        const contractDoc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        const contract = contractDoc.data();
+        const history = contract.rtoPaymentHistory || [];
+        const deletedPayment = history[paymentIndex];
+        
+        // Remove payment from history
+        history.splice(paymentIndex, 1);
+        
+        // Recalculate remaining balance (add back the deleted payment)
+        const newRemainingBalance = contract.remainingBalance + deletedPayment.actual;
+        
+        // Update payment counter
+        const newPaymentNumber = contract.currentPaymentNumber - 1;
+        
+        // Recalculate expected monthly
+        const remainingMonths = (contract.totalPayments - 1) - newPaymentNumber;
+        const amountForMonthly = newRemainingBalance - contract.finalPaymentBase;
+        const newExpectedMonthly = remainingMonths > 0 ? Math.round(amountForMonthly / remainingMonths) : 0;
+        
+        // Renumber remaining payments
+        history.forEach((p, i) => {
+            p.month = i + 1;
+        });
+        
+        // Update contract
+        await db.collection('rentToOwnContracts').doc(contractId).update({
+            rtoPaymentHistory: history,
+            currentPaymentNumber: newPaymentNumber,
+            remainingBalance: newRemainingBalance,
+            expectedMonthlyPayment: newExpectedMonthly,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update property
+        await PropertyDataService.writeMultiple(propertyId, {
+            rtoCurrentPayment: newPaymentNumber,
+            rtoRemainingBalance: newRemainingBalance,
+            rtoExpectedMonthly: newExpectedMonthly,
+            monthlyPrice: newExpectedMonthly
+        });
+        
+        // Close history modal
+        document.getElementById('rtoHistoryModal')?.remove();
+        
+        showToast('✅ Payment deleted successfully!', 'success');
+        
+        // Refresh
+        setTimeout(() => {
+            showRTOPaymentHistory(propertyId);
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('Error deleting payment:', error);
+        showToast('Failed to delete: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Edit deposit payment
+ */
+window.editRTODeposit = async function(propertyId, contractId) {
+    try {
+        const contractDoc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        if (!contractDoc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = contractDoc.data();
+        
+        const modalHTML = `
+            <div id="editDepositModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-green-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                    <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+                        <h3 class="text-xl font-bold text-white">Edit Deposit Payment</h3>
+                    </div>
+                    
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2">Deposit Amount:</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                                <input type="number" id="editDepositAmount" value="${contract.depositAmount}" 
+                                    class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 pl-8 text-white focus:border-green-500 focus:outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-gray-400 text-sm mb-2">Date Paid:</label>
+                            <input type="date" id="editDepositDate" value="${contract.depositPaidDate || ''}"
+                                class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-green-500 focus:outline-none">
+                        </div>
+                    </div>
+                    
+                    <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                        <button onclick="document.getElementById('editDepositModal').remove()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button onclick="saveRTODepositEdit(${propertyId}, '${contractId}')" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error loading deposit for edit:', error);
+        showToast('Failed to load deposit: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Save edited deposit
+ */
+window.saveRTODepositEdit = async function(propertyId, contractId) {
+    const amountInput = document.getElementById('editDepositAmount');
+    const dateInput = document.getElementById('editDepositDate');
+    
+    if (!amountInput || !dateInput) return;
+    
+    const newAmount = parseInt(amountInput.value) || 0;
+    const newDate = dateInput.value;
+    
+    try {
+        showToast('💾 Saving deposit changes...', 'info');
+        
+        // Update contract
+        await db.collection('rentToOwnContracts').doc(contractId).update({
+            depositAmount: newAmount,
+            depositPaidDate: newDate,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update property
+        await PropertyDataService.writeMultiple(propertyId, {
+            rtoDepositAmount: newAmount,
+            rtoDepositPaidDate: newDate
+        });
+        
+        // Close modals
+        document.getElementById('editDepositModal')?.remove();
+        document.getElementById('rtoHistoryModal')?.remove();
+        
+        showToast('✅ Deposit updated successfully!', 'success');
+        
+        // Refresh
+        setTimeout(() => {
+            showRTOPaymentHistory(propertyId);
+        }, 300);
+        
+    } catch (error) {
+        console.error('Error saving deposit edit:', error);
+        showToast('Failed to save: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Delete deposit payment (reset to unpaid)
+ */
+window.deleteRTODeposit = async function(propertyId, contractId) {
+    if (!confirm('Are you sure you want to delete this deposit payment? It will be marked as unpaid.')) {
+        return;
+    }
+    
+    try {
+        showToast('🗑️ Deleting deposit...', 'info');
+        
+        // Update contract
+        await db.collection('rentToOwnContracts').doc(contractId).update({
+            depositPaid: false,
+            depositPaidDate: null,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update property
+        await PropertyDataService.writeMultiple(propertyId, {
+            rtoDepositPaid: false,
+            rtoDepositPaidDate: ''
+        });
+        
+        // Close history modal
+        document.getElementById('rtoHistoryModal')?.remove();
+        
+        showToast('✅ Deposit deleted - now marked as unpaid', 'success');
+        
+        // Refresh
+        setTimeout(() => {
+            showRTOPaymentHistory(propertyId);
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('Error deleting deposit:', error);
+        showToast('Failed to delete: ' + error.message, 'error');
     }
 };
 
