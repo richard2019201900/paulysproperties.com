@@ -581,7 +581,7 @@ function renderPropertyStatsContent(id) {
         
         <!-- Property Header -->
         <div class="relative">
-            <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover">
+            <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover cursor-pointer hover:opacity-90 transition" onclick="scrollToImagesSection(${id})" title="Click to view all images">
             <div class="absolute top-4 right-4 bg-gradient-to-r ${statusClass} text-white px-4 py-2 rounded-xl font-bold shadow-lg">
                 ${statusText}
             </div>
@@ -687,7 +687,7 @@ function renderPropertyStatsContent(id) {
                 </div>
                 
                 <!-- Property Images Gallery -->
-                <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+                <div id="property-images-section-${id}" class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8 transition-all duration-500">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
                         <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
@@ -695,10 +695,10 @@ function renderPropertyStatsContent(id) {
                             Add Image
                         </button>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="images-grid-${id}">
+                    <div class="flex gap-4 overflow-x-auto pb-4" id="images-grid-${id}">
                         ${p.images.map((img, i) => `
-                            <div class="relative group">
-                                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-32 md:h-40 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
+                            <div class="relative group flex-shrink-0">
+                                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable h-40 w-56 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
                                 <button onclick="deletePropertyImage(${id}, ${i}, '${img.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg" title="Delete image">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
@@ -3054,6 +3054,23 @@ window.resetReminderScript = async function(propertyId) {
     } catch (error) {
         console.error('Failed to reset reminder script:', error);
         alert('Failed to reset. Please try again.');
+    }
+};
+
+// ==================== SCROLL TO IMAGES SECTION ====================
+window.scrollToImagesSection = function(propertyId) {
+    const imagesSection = document.getElementById(`property-images-section-${propertyId}`);
+    if (imagesSection) {
+        // Scroll to the section with offset for header
+        imagesSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Add highlight effect
+        imagesSection.classList.add('ring-4', 'ring-purple-500', 'ring-opacity-75');
+        
+        // Remove highlight after 2 seconds
+        setTimeout(() => {
+            imagesSection.classList.remove('ring-4', 'ring-purple-500', 'ring-opacity-75');
+        }, 2000);
     }
 };
 
@@ -5647,7 +5664,31 @@ window.deleteRTOContract = async function(propertyId, contractId) {
             console.log(`[RTO] Deleted contract document: ${contractId}`);
         }
         
-        // 2. Clear all RTO-related fields from the property
+        // 2. Remove last RTO-related payment(s) from payment history
+        try {
+            const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+            if (historyDoc.exists) {
+                let payments = historyDoc.data().payments || [];
+                const originalCount = payments.length;
+                
+                // Filter out any payments that were RTO payments (deposit or monthly)
+                payments = payments.filter(p => !p.isRTOPayment && !p.isRTODeposit);
+                
+                const removedCount = originalCount - payments.length;
+                if (removedCount > 0) {
+                    await db.collection('paymentHistory').doc(String(propertyId)).set({
+                        propertyId: propertyId,
+                        payments: payments,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    console.log(`[RTO] Removed ${removedCount} RTO payment(s) from history`);
+                }
+            }
+        } catch (e) {
+            console.warn('[RTO] Could not clean up payment history:', e);
+        }
+        
+        // 3. Clear all RTO-related fields from the property (including monthlyPrice)
         const rtoFieldsToClear = {
             hasActiveRTO: false,
             rtoContractId: '',
@@ -5657,13 +5698,15 @@ window.deleteRTOContract = async function(propertyId, contractId) {
             rtoStartDate: '',
             rtoDepositAmount: 0,
             rtoDepositPaid: false,
-            rtoDepositPaidDate: ''
+            rtoDepositPaidDate: '',
+            // Reset monthly price since RTO set it
+            monthlyPrice: 0
         };
         
         await PropertyDataService.writeMultiple(propertyId, rtoFieldsToClear);
-        console.log(`[RTO] Cleared RTO fields from property ${propertyId}`);
+        console.log(`[RTO] Cleared RTO fields and monthlyPrice from property ${propertyId}`);
         
-        // 3. Update local properties array
+        // 4. Update local properties array
         const prop = properties.find(p => p.id === propertyId);
         if (prop) {
             Object.assign(prop, rtoFieldsToClear);
@@ -5671,7 +5714,7 @@ window.deleteRTOContract = async function(propertyId, contractId) {
         
         showToast('✅ Contract deleted successfully!', 'success');
         
-        // 4. Refresh the property stats page
+        // 5. Refresh the property stats page
         if (typeof renderPropertyStatsContent === 'function') {
             renderPropertyStatsContent(propertyId);
         }
