@@ -2540,7 +2540,10 @@ window.renderPropertyAnalytics = async function(propertyId) {
             </div>
             <div id="paymentLedger-${propertyId}" class="space-y-2 max-h-80 overflow-y-auto">
                 ${payments.length > 0 
-                    ? analytics.sortedPayments.slice().reverse().slice(0, 10).map((p, i) => `
+                    ? analytics.sortedPayments
+                        .slice().reverse()
+                        .filter(p => p.type !== 'eviction' && (p.amount || 0) > 0) // Filter out evictions and $0 entries
+                        .slice(0, 10).map((p, i) => `
                         <div class="bg-gray-900/50 rounded-lg p-3 flex items-center justify-between text-sm ${i === 0 ? 'ring-2 ring-green-500/50' : ''} group">
                             <div class="flex items-center gap-3">
                                 <div class="text-2xl">${i === 0 ? '✅' : '💵'}</div>
@@ -2557,7 +2560,9 @@ window.renderPropertyAnalytics = async function(propertyId) {
                                 <div class="text-right">
                                     <div class="text-green-400 font-bold">$${(p.amount || 0).toLocaleString()}</div>
                                     <div class="text-gray-500 text-xs">
-                                        ${new Date(p.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                        ${p.recordedAt && !isNaN(new Date(p.recordedAt)) 
+                                            ? new Date(p.recordedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                                            : (p.paymentDate || 'Unknown date')}
                                     </div>
                                 </div>
                                 <button onclick="deletePayment(${propertyId}, '${p.id}')" 
@@ -3634,15 +3639,37 @@ window.processEviction = async function(propertyId) {
     try {
         const p = properties.find(prop => prop.id === propertyId);
         const renterName = PropertyDataService.getValue(propertyId, 'renterName', '');
+        const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', '');
         
-        // Record eviction in payment history using logPayment
-        await logPayment(propertyId, {
-            renterName: renterName,
-            type: 'eviction',
-            amount: 0,
-            paymentDate: new Date().toISOString().split('T')[0],
-            note: 'Evicted for non-payment'
-        });
+        // Calculate tenure summary before clearing renter
+        const tenure = await calculateTenureSummary(propertyId, renterName);
+        
+        // Record eviction in tenure history (NOT payment history)
+        try {
+            const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+            let tenureHistory = [];
+            if (historyDoc.exists) {
+                tenureHistory = historyDoc.data().tenureHistory || [];
+            }
+            
+            tenureHistory.push({
+                renterName: renterName,
+                startDate: tenure.firstPayment ? tenure.firstPayment.toISOString().split('T')[0] : null,
+                endDate: new Date().toISOString().split('T')[0],
+                endReason: 'eviction',
+                totalCollected: tenure.totalCollected,
+                paymentCount: tenure.paymentCount,
+                tenureDays: tenure.tenureDays,
+                frequency: paymentFrequency,
+                recordedAt: new Date().toISOString()
+            });
+            
+            await db.collection('paymentHistory').doc(String(propertyId)).set({
+                tenureHistory: tenureHistory
+            }, { merge: true });
+        } catch (e) {
+            console.warn('[Eviction] Could not record tenure history:', e);
+        }
         
         // Clear renter info (same as completeLease)
         await PropertyDataService.write(propertyId, 'renterName', '');
