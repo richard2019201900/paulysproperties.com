@@ -1054,6 +1054,7 @@ function updateAllBadges() {
     updateDropdownBadge('dropdownUserBadge', 'dropdownUserCount', userCount);
     updateDropdownBadge('dropdownListingBadge', 'dropdownListingCount', listingCount);
     updateDropdownBadge('dropdownPremiumBadge', 'dropdownPremiumCount', premiumCount);
+    updateDropdownBadge('dropdownPhotoBadge', 'dropdownPhotoCount', photoCount);
     
     // Legacy badge updates (keep for backward compatibility)
     const userBadge = document.getElementById('adminNewUserBadge');

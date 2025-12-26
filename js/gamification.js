@@ -175,10 +175,27 @@ const GamificationService = {
                 const newXP = oldXP + xpAmount;
                 const newLevelInfo = GamificationService.getLevelFromXP(newXP);
                 
+                // Create activity log entry
+                const activityLog = gamification.activityLog || [];
+                const newActivity = {
+                    type: 'xp_gain',
+                    amount: xpAmount,
+                    reason: reason,
+                    timestamp: new Date().toISOString(),
+                    totalAfter: newXP
+                };
+                
+                // Keep only last 20 activities (we show 10, keep extra for safety)
+                activityLog.unshift(newActivity);
+                if (activityLog.length > 20) {
+                    activityLog.length = 20;
+                }
+                
                 transaction.update(userRef, {
                     'gamification.xp': newXP,
                     'gamification.level': newLevelInfo.level,
-                    'gamification.title': newLevelInfo.title
+                    'gamification.title': newLevelInfo.title,
+                    'gamification.activityLog': activityLog
                 });
                 
                 return {
@@ -225,18 +242,38 @@ const GamificationService = {
                 const oldLevel = gamification.level || 1;
                 // Ensure XP doesn't go below 0
                 const newXP = Math.max(0, oldXP - xpAmount);
+                const actualDeducted = oldXP - newXP;
                 const newLevelInfo = GamificationService.getLevelFromXP(newXP);
+                
+                // Create activity log entry for deduction
+                const activityLog = gamification.activityLog || [];
+                if (actualDeducted > 0) {
+                    const newActivity = {
+                        type: 'xp_loss',
+                        amount: -actualDeducted,
+                        reason: reason,
+                        timestamp: new Date().toISOString(),
+                        totalAfter: newXP
+                    };
+                    
+                    // Keep only last 20 activities
+                    activityLog.unshift(newActivity);
+                    if (activityLog.length > 20) {
+                        activityLog.length = 20;
+                    }
+                }
                 
                 transaction.update(userRef, {
                     'gamification.xp': newXP,
                     'gamification.level': newLevelInfo.level,
-                    'gamification.title': newLevelInfo.title
+                    'gamification.title': newLevelInfo.title,
+                    'gamification.activityLog': activityLog
                 });
                 
                 return {
                     oldXP,
                     newXP,
-                    xpLost: oldXP - newXP, // Actual amount deducted (may be less if hitting 0)
+                    xpLost: actualDeducted,
                     oldLevel,
                     newLevel: newLevelInfo.level,
                     leveledDown: newLevelInfo.level < oldLevel
