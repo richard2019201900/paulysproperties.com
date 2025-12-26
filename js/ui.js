@@ -1084,6 +1084,41 @@ window.goToAdminNotifications = function(type) {
                         showPremiumRequestsList();
                     }
                 }
+            } else if (type === 'photo') {
+                // Navigate to Requests tab and highlight photo requests section
+                if (typeof switchAdminTab === 'function') {
+                    switchAdminTab('requests');
+                }
+                
+                // Load fresh photo requests
+                if (typeof loadPhotoRequests === 'function') {
+                    loadPhotoRequests();
+                }
+                
+                setTimeout(() => {
+                    targetElement = $('photoRequestsSection');
+                    highlightColor = 'rgba(168, 85, 247, 0.7)'; // purple
+                    
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        
+                        // Highlight the element
+                        targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+                        targetElement.style.transition = 'box-shadow 0.3s ease';
+                        
+                        setTimeout(() => {
+                            targetElement.style.boxShadow = '';
+                        }, 4000);
+                    }
+                }, 200);
+                return; // Early return since we handle highlighting inside
+            } else if (type === 'users' || type === 'listings') {
+                // Navigate to Requests tab for user/listing notifications
+                if (typeof switchAdminTab === 'function') {
+                    switchAdminTab('requests');
+                }
+                targetElement = $('adminRequestsTab');
+                highlightColor = type === 'users' ? 'rgba(59, 130, 246, 0.7)' : 'rgba(34, 197, 94, 0.7)';
             } else {
                 // Default: scroll to notification stack
                 targetElement = $('adminNotificationsStack');
@@ -3182,7 +3217,10 @@ window.switchAdminTab = function(tab) {
     
     // Load data for the tab
     if (tab === 'users') loadAllUsers();
-    else if (tab === 'requests') loadUpgradeRequests();
+    else if (tab === 'requests') {
+        loadUpgradeRequests();
+        loadPhotoRequests();
+    }
     else if (tab === 'history') loadUpgradeHistory();
     else if (tab === 'log') loadActivityLog();
 };
@@ -3322,6 +3360,191 @@ window.updateRequestsBadge = function(count) {
         } else {
             alertBox.classList.add('hidden');
         }
+    }
+};
+
+// ==================== PHOTO SERVICE REQUESTS ====================
+
+/**
+ * Load and display photo service requests in the Requests tab
+ */
+window.loadPhotoRequests = async function() {
+    const container = $('photoRequestsList');
+    const badge = $('photoRequestsBadge');
+    
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-gray-500 italic">Loading photo requests...</p>';
+    
+    try {
+        const snapshot = await db.collection('photoServiceRequests')
+            .orderBy('timestamp', 'desc')
+            .limit(20)
+            .get();
+        
+        const requests = [];
+        snapshot.forEach(doc => {
+            requests.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Count unreviewed requests
+        const unreviewedCount = requests.filter(r => !r.reviewed && !r.viewed).length;
+        
+        // Update badge
+        if (badge) {
+            if (unreviewedCount > 0) {
+                badge.textContent = unreviewedCount;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+        
+        if (requests.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 bg-gray-800/50 rounded-xl border border-gray-700">
+                    <span class="text-4xl">📸</span>
+                    <p class="text-gray-400 mt-2">No photo service requests</p>
+                    <p class="text-gray-500 text-sm">Contact form submissions will appear here</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = requests.map(req => {
+            const date = req.timestamp?.toDate ? 
+                req.timestamp.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) :
+                'Unknown date';
+            
+            const isReviewed = req.reviewed || req.viewed || false;
+            const reviewedClass = isReviewed ? 'opacity-60' : '';
+            const highlightClass = !isReviewed ? 'border-purple-500/50 bg-purple-900/10' : 'border-gray-700';
+            
+            return `
+                <div id="photoRequest-${req.id}" class="bg-gray-800 rounded-xl p-4 border ${highlightClass} ${reviewedClass} transition-all">
+                    <div class="flex flex-col md:flex-row justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                ${!isReviewed ? '<span class="bg-purple-500 text-white text-xs font-bold px-2 py-0.5 rounded">NEW</span>' : ''}
+                                <span class="text-white font-bold">${escapeHtml(req.name || 'Anonymous')}</span>
+                            </div>
+                            <div class="space-y-1 text-sm">
+                                <p class="text-gray-400">
+                                    <span class="text-gray-500">Email:</span> 
+                                    <a href="mailto:${escapeHtml(req.email || '')}" class="text-cyan-400 hover:underline">${escapeHtml(req.email || 'N/A')}</a>
+                                </p>
+                                <p class="text-gray-400">
+                                    <span class="text-gray-500">Phone:</span> 
+                                    <a href="tel:${escapeHtml(req.phone || '')}" class="text-cyan-400 hover:underline">${escapeHtml(req.phone || 'N/A')}</a>
+                                </p>
+                                <p class="text-gray-400">
+                                    <span class="text-gray-500">Property:</span> 
+                                    <span class="text-white">${escapeHtml(req.propertyName || req.property || 'Not specified')}</span>
+                                </p>
+                                ${req.message ? `
+                                    <div class="mt-2 bg-gray-900/50 rounded-lg p-3 border border-gray-700">
+                                        <span class="text-gray-500 text-xs">Message:</span>
+                                        <p class="text-gray-300 text-sm mt-1">${escapeHtml(req.message)}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="text-gray-500 text-xs mt-2">${date}</div>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            ${!isReviewed ? `
+                                <button onclick="markPhotoRequestReviewed('${req.id}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    Mark Reviewed
+                                </button>
+                            ` : `
+                                <span class="text-green-400 text-sm font-bold flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    Reviewed
+                                </span>
+                            `}
+                            <button onclick="deletePhotoRequest('${req.id}')" class="bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg font-bold text-sm transition">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Error loading photo requests:', error);
+        container.innerHTML = `
+            <div class="text-center py-8 bg-gray-800/50 rounded-xl border border-gray-700">
+                <span class="text-4xl">📸</span>
+                <p class="text-gray-400 mt-2">No photo service requests</p>
+            </div>
+        `;
+    }
+};
+
+/**
+ * Mark a photo request as reviewed (clears the notification)
+ */
+window.markPhotoRequestReviewed = async function(requestId) {
+    try {
+        await db.collection('photoServiceRequests').doc(requestId).update({
+            reviewed: true,
+            viewed: true, // This is what the notification system checks
+            reviewedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('✅ Photo request marked as reviewed', 'success');
+        
+        // Dismiss the notification from the visible list
+        const notifId = 'photo-request-' + requestId;
+        if (typeof AdminNotifications !== 'undefined') {
+            AdminNotifications.dismissed.add(notifId);
+            AdminNotifications.visible.delete(notifId);
+        }
+        
+        // Update notification badge count
+        if (typeof updateAdminBadgeCounts === 'function') {
+            updateAdminBadgeCounts();
+        }
+        
+        // Refresh the list
+        loadPhotoRequests();
+        
+    } catch (error) {
+        console.error('Error marking photo request as reviewed:', error);
+        showToast('Error updating request', 'error');
+    }
+};
+
+/**
+ * Delete a photo request
+ */
+window.deletePhotoRequest = async function(requestId) {
+    if (!confirm('Are you sure you want to delete this photo request?')) return;
+    
+    try {
+        await db.collection('photoServiceRequests').doc(requestId).delete();
+        
+        showToast('🗑️ Photo request deleted', 'success');
+        
+        // Dismiss the notification from the visible list
+        const notifId = 'photo-request-' + requestId;
+        if (typeof AdminNotifications !== 'undefined') {
+            AdminNotifications.dismissed.add(notifId);
+            AdminNotifications.visible.delete(notifId);
+        }
+        
+        // Update notification badge count
+        if (typeof updateAdminBadgeCounts === 'function') {
+            updateAdminBadgeCounts();
+        }
+        
+        // Refresh the list
+        loadPhotoRequests();
+        
+    } catch (error) {
+        console.error('Error deleting photo request:', error);
+        showToast('Error deleting request', 'error');
     }
 };
 

@@ -3882,7 +3882,9 @@ window.completeLease = async function(propertyId) {
         // Close modal and show success after a brief delay for Firestore to propagate
         setTimeout(async () => {
             closeCompleteLeaseModal();
-            showToast(`✅ Lease completed for ${renterName}. Total collected: $${tenureSummary.totalCollected.toLocaleString()}`, 'success');
+            
+            // Show thank you message modal for owner to copy
+            showLeaseCompletionMessage(renterName, p.title, tenureSummary.totalCollected);
             
             // Force refresh ALL data - clear local property object
             const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
@@ -4132,6 +4134,96 @@ window.endVacancyPeriod = endVacancyPeriod;
  */
 window.closeCompleteLeaseModal = function() {
     const modal = document.getElementById('completeLeaseModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Show thank you message modal after lease completion
+ * Gives owner a copy-paste message to send to the renter
+ */
+window.showLeaseCompletionMessage = function(renterName, propertyTitle, totalCollected) {
+    // Remove any existing modal
+    const existing = document.getElementById('leaseCompletionMessageModal');
+    if (existing) existing.remove();
+    
+    const thankYouMessage = `Hey ${renterName}, thank you so much for renting ${propertyTitle} with us! It was a pleasure having you as a tenant. Your total payments of $${totalCollected.toLocaleString()} have all been recorded. If you ever need a place again, hit me up anytime - you're always welcome back! 🏠`;
+    
+    const modalHTML = `
+        <div id="leaseCompletionMessageModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeLeaseCompletionMessageModal()">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-green-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Lease Completed Successfully!
+                    </h3>
+                    <p class="text-green-100 text-sm mt-1">${propertyTitle}</p>
+                </div>
+                
+                <div class="p-6">
+                    <!-- Success Summary -->
+                    <div class="bg-green-900/30 border border-green-500/30 rounded-xl p-4 mb-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center text-2xl">
+                                🎉
+                            </div>
+                            <div>
+                                <div class="text-white font-bold">${renterName}'s lease complete</div>
+                                <div class="text-green-400 text-sm">Total collected: $${totalCollected.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Thank You Message -->
+                    <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-green-400 font-bold flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                Thank You Message
+                            </h4>
+                            <button onclick="copyLeaseCompletionMessage()" class="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 rounded-lg font-semibold transition flex items-center gap-1">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <textarea id="leaseCompletionMessageText" class="w-full bg-gray-900 text-gray-200 rounded-lg p-3 text-sm resize-none border border-gray-600" rows="5">${thankYouMessage}</textarea>
+                        <p class="text-gray-500 text-xs mt-2">Send this message to thank your renter for their business!</p>
+                    </div>
+                    
+                    <!-- XP Earned -->
+                    <div class="bg-amber-900/30 border border-amber-500/30 rounded-xl p-3 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">⭐</span>
+                            <div>
+                                <div class="text-amber-400 font-bold text-sm">+100 XP Earned!</div>
+                                <div class="text-amber-200/70 text-xs">For completing a lease successfully</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Close Button -->
+                    <button onclick="closeLeaseCompletionMessageModal()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-3 px-4 rounded-xl font-bold transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.copyLeaseCompletionMessage = function() {
+    const textarea = document.getElementById('leaseCompletionMessageText');
+    if (textarea) {
+        textarea.select();
+        document.execCommand('copy');
+        showToast('📋 Thank you message copied!', 'success');
+    }
+};
+
+window.closeLeaseCompletionMessageModal = function() {
+    const modal = document.getElementById('leaseCompletionMessageModal');
     if (modal) modal.remove();
 };
 
