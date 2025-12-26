@@ -729,14 +729,27 @@ function startPhotoRequestListener() {
     AdminNotifications.photoRequestsListenerActive = true;
     
     // Listen to photoServiceRequests collection
-    // Note: Using simple query without composite index requirement
+    // Note: No orderBy to avoid index requirements and handle various timestamp field names
     db.collection('photoServiceRequests')
-        .orderBy('requestedAt', 'desc')
         .limit(50)
         .onSnapshot((snapshot) => {
             const isFirst = AdminNotifications.photoRequestsFirstSnapshot;
             const newRequests = [];
             
+            // IMPORTANT: Clear all existing photo notifications from visible
+            // This ensures deleted/viewed documents are removed
+            const keysToDelete = [];
+            AdminNotifications.visible.forEach((value, key) => {
+                if (key.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
+                    keysToDelete.push(key);
+                }
+            });
+            if (keysToDelete.length > 0) {
+                console.log('[AdminNotify:Photo] Clearing', keysToDelete.length, 'existing photo notifications from visible');
+            }
+            keysToDelete.forEach(key => AdminNotifications.visible.delete(key));
+            
+            // Now process current snapshot
             snapshot.forEach(doc => {
                 const data = doc.data();
                 
@@ -765,12 +778,10 @@ function startPhotoRequestListener() {
                 
                 // Add to visible if not dismissed
                 if (!AdminNotifications.dismissed.has(notifId)) {
-                    if (!AdminNotifications.visible.has(notifId)) {
-                        AdminNotifications.visible.set(notifId, {
-                            type: 'photo',
-                            data: { ...data, id: doc.id, notifId }
-                        });
-                    }
+                    AdminNotifications.visible.set(notifId, {
+                        type: 'photo',
+                        data: { ...data, id: doc.id, notifId }
+                    });
                 }
             });
             
@@ -1005,6 +1016,43 @@ window.clearAllAdminNotifications = async function() {
     }
 };
 
+/**
+ * Clear stale photo notifications (utility for debugging)
+ * Call this from console: clearStalePhotoNotifications()
+ */
+window.clearStalePhotoNotifications = function() {
+    console.log('[AdminNotify] Clearing stale photo notifications...');
+    
+    const keysToDelete = [];
+    AdminNotifications.visible.forEach((value, key) => {
+        if (key.startsWith('photo-request-')) {
+            keysToDelete.push(key);
+            console.log('[AdminNotify] Removing stale photo notification:', key);
+        }
+    });
+    
+    keysToDelete.forEach(key => {
+        AdminNotifications.visible.delete(key);
+        AdminNotifications.dismissed.add(key);
+    });
+    
+    updateAllBadges();
+    console.log('[AdminNotify] Cleared', keysToDelete.length, 'stale photo notifications');
+    return keysToDelete.length;
+};
+
+/**
+ * Force restart photo listener (utility for debugging)
+ * Call this from console: restartPhotoListener()
+ */
+window.restartPhotoListener = function() {
+    console.log('[AdminNotify] Force restarting photo listener...');
+    AdminNotifications.photoRequestsListenerActive = false;
+    AdminNotifications.photoRequestsFirstSnapshot = true;
+    startPhotoRequestsListener();
+    console.log('[AdminNotify] Photo listener restarted');
+};
+
 // ============================================================================
 // BADGE MANAGEMENT
 // ============================================================================
@@ -1018,6 +1066,9 @@ function updateAllBadges() {
     let premiumCount = 0;
     let photoCount = 0;
     
+    // Debug: collect photo notification IDs
+    const photoNotifIds = [];
+    
     AdminNotifications.visible.forEach((data, notifId) => {
         if (AdminNotifications.dismissed.has(notifId)) return;
         
@@ -1029,6 +1080,7 @@ function updateAllBadges() {
             premiumCount++;
         } else if (notifId.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
             photoCount++;
+            photoNotifIds.push(notifId);
         }
     });
     
@@ -1040,6 +1092,11 @@ function updateAllBadges() {
     }
     
     console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount, rentCount });
+    
+    // Debug: log photo notification IDs if any exist
+    if (photoCount > 0) {
+        console.log('[AdminNotify:Badge] Photo notification IDs in visible:', photoNotifIds);
+    }
     
     const total = userCount + listingCount + premiumCount + photoCount + rentCount;
     
