@@ -10623,8 +10623,8 @@ window.renderLeaderboardPage = async function() {
                                         </h4>
                                         ${recentActivities.length > 0 ? `
                                             <div class="space-y-2 max-h-64 overflow-y-auto">
-                                                ${recentActivities.map(act => `
-                                                    <div class="flex items-start gap-2 text-sm border-b border-gray-700/50 pb-2 last:border-0">
+                                                ${recentActivities.map((act, actIndex) => `
+                                                    <div class="flex items-start gap-2 text-sm border-b border-gray-700/50 pb-2 last:border-0 group">
                                                         <span class="${act.type === 'xp_gain' ? 'text-green-400' : 'text-red-400'} font-bold whitespace-nowrap">
                                                             ${act.amount >= 0 ? '+' : ''}${act.amount} XP
                                                         </span>
@@ -10632,6 +10632,16 @@ window.renderLeaderboardPage = async function() {
                                                             <div class="text-gray-300 truncate">${escapeHtml(act.reason || 'Activity')}</div>
                                                             <div class="text-gray-500 text-xs">${formatActivityTime(act.timestamp)}</div>
                                                         </div>
+                                                        ${TierService.isMasterAdmin(auth.currentUser?.email) ? `
+                                                            <button onclick="event.stopPropagation(); deleteActivityEntry('${entry.odbc}', ${actIndex});" 
+                                                                class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 p-1 transition-opacity" 
+                                                                title="Delete this activity entry"
+                                                                data-reason="${escapeHtml(act.reason || 'Activity')}">
+                                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                                </svg>
+                                                            </button>
+                                                        ` : ''}
                                                     </div>
                                                 `).join('')}
                                             </div>
@@ -10677,6 +10687,63 @@ window.toggleLeaderboardProfile = function(userId) {
         if (chevron) {
             chevron.classList.toggle('rotate-180');
         }
+    }
+};
+
+/**
+ * Delete an activity entry from a user's activity log (Admin only)
+ * @param {string} userId - The user's document ID
+ * @param {number} activityIndex - Index of the activity in the array
+ */
+window.deleteActivityEntry = async function(userId, activityIndex) {
+    // Verify admin
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Admin access required', 'error');
+        return;
+    }
+    
+    try {
+        // Get current activity log
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            showToast('User not found', 'error');
+            return;
+        }
+        
+        const userData = userDoc.data();
+        const gamification = userData.gamification || {};
+        const activityLog = gamification.activityLog || [];
+        
+        if (activityIndex < 0 || activityIndex >= activityLog.length) {
+            showToast('Activity entry not found', 'error');
+            return;
+        }
+        
+        // Get the entry to show in confirmation
+        const entry = activityLog[activityIndex];
+        const reason = entry.reason || 'Activity';
+        
+        // Confirm deletion
+        if (!confirm(`Delete this activity entry?\n\n"${reason}"\n\nThis will permanently remove this entry from the user's activity log.`)) {
+            return;
+        }
+        
+        // Remove the entry at the specified index
+        activityLog.splice(activityIndex, 1);
+        
+        // Update Firestore
+        await db.collection('users').doc(userId).update({
+            'gamification.activityLog': activityLog
+        });
+        
+        showToast('Activity entry deleted', 'success');
+        console.log(`[Admin] Deleted activity entry ${activityIndex} for user ${userId}: "${reason}"`);
+        
+        // The real-time listener will automatically update the UI
+        
+    } catch (error) {
+        console.error('[Admin] Error deleting activity entry:', error);
+        showToast('Error deleting activity entry', 'error');
     }
 };
 
