@@ -721,7 +721,49 @@ function startPremiumListener() {
 
 function startPhotoRequestListener() {
     if (AdminNotifications.photoRequestsListenerActive) {
-        console.log('[AdminNotify:Photo] Listener already active');
+        console.log('[AdminNotify:Photo] Listener already active, checking for stale entries...');
+        
+        // CRITICAL: Even if listener is active, clear stale entries that shouldn't exist
+        // This handles the case where entries were added before the listener could clear them
+        const keysToDelete = [];
+        AdminNotifications.visible.forEach((value, key) => {
+            if (key.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
+                keysToDelete.push(key);
+            }
+        });
+        
+        if (keysToDelete.length > 0) {
+            console.log('[AdminNotify:Photo] Found', keysToDelete.length, 'stale entries to verify');
+            
+            // Check Firestore to see if these entries actually exist
+            db.collection('photoServiceRequests').limit(50).get().then(snapshot => {
+                const validIds = new Set();
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.viewed !== true) {
+                        validIds.add(NOTIFICATION_TYPES.PHOTO.prefix + doc.id);
+                    }
+                });
+                
+                // Remove entries that don't exist in Firestore
+                let removed = 0;
+                keysToDelete.forEach(key => {
+                    if (!validIds.has(key)) {
+                        AdminNotifications.visible.delete(key);
+                        AdminNotifications.dismissed.add(key);
+                        removed++;
+                        console.log('[AdminNotify:Photo] Removed stale entry:', key);
+                    }
+                });
+                
+                if (removed > 0) {
+                    console.log('[AdminNotify:Photo] Cleared', removed, 'stale entries');
+                    updateAllBadges();
+                }
+            }).catch(err => {
+                console.error('[AdminNotify:Photo] Error verifying entries:', err);
+            });
+        }
         return;
     }
     
