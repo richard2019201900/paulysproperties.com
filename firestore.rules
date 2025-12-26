@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isMasterAdmin() {
+      return request.auth != null && request.auth.token.email == 'richard2019201900@gmail.com';
+    }
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && (isOwner(userId) || isMasterAdmin());
+      allow update: if isAuthenticated() && (isOwner(userId) || isMasterAdmin());
+      allow delete: if isMasterAdmin();
+    }
+    
+    // Settings collection (properties data)
+    match /settings/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    // Upgrade History - admin only
+    match /upgradeHistory/{document} {
+      allow read, write: if isMasterAdmin();
+    }
+    
+    // Upgrade Notifications (requests from users)
+    match /upgradeNotifications/{document} {
+      allow read: if isMasterAdmin();
+      allow read: if isAuthenticated() && resource.data.userEmail == request.auth.token.email;
+      allow create: if isAuthenticated();
+      allow update: if isMasterAdmin();
+      allow delete: if isMasterAdmin();
+    }
+    
+    // User Notifications (approval/denial messages to users)
+    match /userNotifications/{notificationId} {
+      allow read: if isAuthenticated() && 
+                  resource.data.userEmail == request.auth.token.email;
+      allow update: if isAuthenticated() && 
+                    resource.data.userEmail == request.auth.token.email;
+      allow create: if isMasterAdmin();
+      allow delete: if isMasterAdmin();
+    }
+    
+    // Admin Notifications (premium requests, new listings alerts)
+    match /adminNotifications/{notificationId} {
+      allow read: if isMasterAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isMasterAdmin();
+    }
+    
+    // Payment History (rental payment tracking per property)
+    match /paymentHistory/{propertyId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Activity Log (for tracking changes)
+    match /activityLog/{logId} {
+      allow read: if isMasterAdmin();
+      allow create: if isAuthenticated();
+    }
+    
+    // Photo Service Requests (revenue-generating inquiries)
+    match /photoServiceRequests/{requestId} {
+      allow create: if true;
+      allow read, update, delete: if isMasterAdmin();
+    }
+    
+    // Rent-to-Own Contracts
+    match /rentToOwnContracts/{contractId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (request.auth.token.email == resource.data.createdBy || isMasterAdmin());
+      allow delete: if isMasterAdmin();
+    }
+    
+    // Properties collection (for RTO property updates)
+    match /properties/{propertyId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    // House Sales (tracking sold properties)
+    match /houseSales/{saleId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isMasterAdmin();
+    }
+    
+    // Ownership Transfers (property ownership changes)
+    match /ownershipTransfers/{transferId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isMasterAdmin();
+    }
+  }
+}

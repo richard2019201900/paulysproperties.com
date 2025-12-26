@@ -493,7 +493,7 @@ function startUserEventListener() {
                 if (AdminNotifState.seenThisSession.users.has(userId)) return;
                 AdminNotifState.seenThisSession.users.add(userId);
                 
-                console.log('[NotifV2:Users] New user detected:', userId, 'email:', userData.email, 'initComplete:', initializationComplete);
+                console.log('[NotifV2:Users] New user detected:', userId, 'initComplete:', initializationComplete);
                 
                 // Skip admin user
                 if (userData.email === window.MASTER_ADMIN_EMAIL) {
@@ -565,7 +565,7 @@ function startListingEventListener() {
                 if (AdminNotifState.seenThisSession.listings.has(propId)) return;
                 AdminNotifState.seenThisSession.listings.add(propId);
                 
-                console.log('[NotifV2:Listings] New property detected:', propId, 'owner:', prop.ownerEmail, 'initComplete:', initializationComplete);
+                console.log('[NotifV2:Listings] New property detected:', propId, 'initComplete:', initializationComplete);
                 
                 // Skip admin's own listings (check by email, NOT by hardcoded IDs)
                 if (prop.ownerEmail === window.MASTER_ADMIN_EMAIL) {

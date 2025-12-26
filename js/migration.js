@@ -158,7 +158,7 @@ window.runMigration = async function() {
         Object.keys(unifiedProperties).sort((a,b) => parseInt(a) - parseInt(b)).forEach(propId => {
             const p = unifiedProperties[propId];
             console.log(`   ${propId}: ${p.title} (${p.type}) - Owner: ${p.ownerEmail || 'none'}`);
-            if (p.renterName) console.log(`        └─ Renter: ${p.renterName}`);
+            if (p.renterName) console.log(`        └─ Has Active Renter: YES`);
             if (p.isPremium) console.log(`        └─ Premium: YES`);
         });
         

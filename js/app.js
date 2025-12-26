@@ -473,8 +473,8 @@ function renderPropertyStatsContent(id) {
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || '');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
-    // DEBUG: Log what we're getting
-    console.log('[PropertyStats] Rendering property', id, '- renterName:', renterName, '- available:', state.availability[id]);
+    // DEBUG: Log property render (without sensitive renter data)
+    console.log('[PropertyStats] Rendering property', id, '- hasRenter:', !!renterName, '- available:', state.availability[id]);
     
     // NOTE: Removed AUTO-FIX logic that was causing race conditions with lease completion
     // The availability status should be explicitly managed via toggleAvailability/saveAvailability
