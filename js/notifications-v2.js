@@ -32,7 +32,8 @@
 // CONSTANTS
 // =============================================================================
 
-const MASTER_ADMIN_EMAIL = 'richard2019201900@gmail.com';
+// Use MASTER_ADMIN_EMAIL from services.js (window.MASTER_ADMIN_EMAIL)
+// DO NOT redeclare - it's already a global constant
 
 const NOTIF_TYPES = {
     USER: {
@@ -115,7 +116,7 @@ window.AdminNotifState = {
  */
 window.initAdminNotificationSystem = function() {
     const currentUser = auth.currentUser;
-    if (!currentUser || currentUser.email !== MASTER_ADMIN_EMAIL) {
+    if (!currentUser || currentUser.email !== window.MASTER_ADMIN_EMAIL) {
         console.log('[NotifV2] Not admin, skipping initialization');
         return;
     }
@@ -487,7 +488,7 @@ function startUserEventListener() {
                 console.log('[NotifV2:Users] New user detected:', userId, 'email:', userData.email, 'isFirstLoad:', isFirstLoad);
                 
                 // Skip admin user
-                if (userData.email === MASTER_ADMIN_EMAIL) {
+                if (userData.email === window.MASTER_ADMIN_EMAIL) {
                     console.log('[NotifV2:Users] Skipping admin user');
                     return;
                 }
@@ -553,7 +554,7 @@ function startListingEventListener() {
                 console.log('[NotifV2:Listings] New property detected:', propId, 'owner:', prop.ownerEmail, 'isFirstLoad:', isFirstLoad);
                 
                 // Skip admin's own listings (check by email, NOT by hardcoded IDs)
-                if (prop.ownerEmail === MASTER_ADMIN_EMAIL) {
+                if (prop.ownerEmail === window.MASTER_ADMIN_EMAIL) {
                     console.log('[NotifV2:Listings] Skipping admin-owned listing:', propId);
                     return;
                 }
@@ -715,7 +716,7 @@ function startPremiumEventListener() {
                 AdminNotifState.seenThisSession.premium.add(premiumKey);
                 
                 // Skip admin's own listings
-                if (prop.ownerEmail === MASTER_ADMIN_EMAIL) return;
+                if (prop.ownerEmail === window.MASTER_ADMIN_EMAIL) return;
                 
                 // Skip on first load
                 if (isFirstLoad) return;
@@ -773,7 +774,7 @@ async function checkRentDueNotifications() {
             if (!prop || !prop.renter || !prop.nextRentDue) return;
             
             // Only check properties owned by current user or admin
-            if (prop.ownerEmail !== currentUser.email && currentUser.email !== MASTER_ADMIN_EMAIL) return;
+            if (prop.ownerEmail !== currentUser.email && currentUser.email !== window.MASTER_ADMIN_EMAIL) return;
             
             const dueDate = prop.nextRentDue.split('T')[0];
             
