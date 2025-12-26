@@ -723,19 +723,9 @@ function setupRealtimeListener() {
             renderProperties(state.filteredProperties);
             if (state.currentUser === 'owner') renderOwnerDashboard();
         }, error => {
-            console.error('Availability listener error:', error);
-            // Fall back to localStorage
-            const stored = localStorage.getItem('propertyAvailability');
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                Object.keys(parsed).forEach(key => {
-                    const numKey = parseInt(key);
-                    if (!isNaN(numKey)) {
-                        state.availability[numKey] = parsed[key];
-                    }
-                });
-                renderProperties(state.filteredProperties);
-            }
+            console.error('[Availability] Listener error:', error);
+            // No localStorage fallback - Firestore is single source of truth
+            // User will need to refresh if connection is lost
         });
     
     // Listener 2: ALL property data (SINGLE SOURCE OF TRUTH)
@@ -801,11 +791,10 @@ function setupRealtimeListener() {
 window.saveAvailability = async function(id, isAvailable) {
     try {
         await db.collection('settings').doc('propertyAvailability').set({ [id]: isAvailable }, { merge: true });
-        localStorage.setItem('propertyAvailability', JSON.stringify(state.availability));
+        console.log('[Availability] Saved to Firestore:', id, isAvailable);
         return true;
     } catch (error) {
-        console.error('Save error:', error);
-        localStorage.setItem('propertyAvailability', JSON.stringify(state.availability));
+        console.error('[Availability] Save error:', error);
         return false;
     }
 }
