@@ -3225,6 +3225,13 @@ window.switchAdminTab = function(tab) {
     else if (tab === 'log') loadActivityLog();
 };
 
+// Refresh all requests (upgrade + photo)
+window.refreshAllRequests = function() {
+    loadUpgradeRequests();
+    loadPhotoRequests();
+    showToast('🔄 Refreshing all requests...', 'info');
+};
+
 // Load and display pending upgrade requests
 window.loadUpgradeRequests = async function() {
     const container = $('upgradeRequestsList');
@@ -3377,17 +3384,27 @@ window.loadPhotoRequests = async function() {
     container.innerHTML = '<p class="text-gray-500 italic">Loading photo requests...</p>';
     
     try {
+        // Get all photo requests (no ordering to avoid index issues)
         const snapshot = await db.collection('photoServiceRequests')
-            .orderBy('timestamp', 'desc')
-            .limit(20)
+            .limit(50)
             .get();
         
         const requests = [];
         snapshot.forEach(doc => {
-            requests.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            // Get timestamp from either field
+            const timestamp = data.timestamp || data.requestedAt || data.createdAt;
+            requests.push({ 
+                id: doc.id, 
+                ...data,
+                _sortTime: timestamp?.toDate ? timestamp.toDate() : new Date(0)
+            });
         });
         
-        // Count unreviewed requests
+        // Sort by timestamp descending (newest first)
+        requests.sort((a, b) => b._sortTime - a._sortTime);
+        
+        // Count unreviewed requests (same logic as notification system)
         const unreviewedCount = requests.filter(r => !r.reviewed && !r.viewed).length;
         
         // Update badge
@@ -3402,7 +3419,7 @@ window.loadPhotoRequests = async function() {
         
         if (requests.length === 0) {
             container.innerHTML = `
-                <div class="text-center py-8 bg-gray-800/50 rounded-xl border border-gray-700">
+                <div class="text-center py-6">
                     <span class="text-4xl">📸</span>
                     <p class="text-gray-400 mt-2">No photo service requests</p>
                     <p class="text-gray-500 text-sm">Contact form submissions will appear here</p>
@@ -3412,8 +3429,8 @@ window.loadPhotoRequests = async function() {
         }
         
         container.innerHTML = requests.map(req => {
-            const date = req.timestamp?.toDate ? 
-                req.timestamp.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) :
+            const date = req._sortTime && req._sortTime.getTime() > 0 ? 
+                req._sortTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) :
                 'Unknown date';
             
             const isReviewed = req.reviewed || req.viewed || false;
@@ -10466,9 +10483,18 @@ window.renderLeaderboardPage = async function() {
                 const leaderboard = [];
                 let rank = 1;
                 
+                // Master admin email
+                const MASTER_ADMIN_EMAIL = 'richard2019201900@gmail.com';
+                
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     const gam = data.gamification || {};
+                    
+                    // Determine tier - master admin is always "owner"
+                    let displayTier = data.tier || 'free';
+                    if (data.email === MASTER_ADMIN_EMAIL) {
+                        displayTier = 'owner';
+                    }
                     
                     leaderboard.push({
                         rank: rank++,
@@ -10481,7 +10507,7 @@ window.renderLeaderboardPage = async function() {
                         icon: GamificationService.levels.find(l => l.level === (gam.level || 1))?.icon || '🌱',
                         activityLog: gam.activityLog || [],
                         createdAt: data.createdAt || null,
-                        tier: data.tier || 'free'
+                        tier: displayTier
                     });
                 });
                 
@@ -10555,7 +10581,7 @@ window.renderLeaderboardPage = async function() {
                                                 </div>
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-400">Tier</span>
-                                                    <span class="text-${getTierColor(entry.tier)} capitalize">${entry.tier}</span>
+                                                    <span class="text-${getTierColor(entry.tier)}">${getTierDisplay(entry.tier)}</span>
                                                 </div>
                                                 <div class="flex justify-between">
                                                     <span class="text-gray-400">Rank</span>
@@ -10737,10 +10763,24 @@ function getTierColor(tier) {
         'free': 'gray-400',
         'starter': 'gray-400',
         'premium': 'amber-400',
+        'pro': 'amber-400',
         'elite': 'purple-400',
         'owner': 'rose-400'
     };
     return colors[tier] || 'gray-400';
+}
+
+// Get tier display name with icon
+function getTierDisplay(tier) {
+    const displays = {
+        'free': '🆓 Free',
+        'starter': '🆓 Starter',
+        'premium': '👑 Premium',
+        'pro': '👑 Pro',
+        'elite': '💎 Elite',
+        'owner': '🏆 Site Owner'
+    };
+    return displays[tier] || tier;
 }
 
 // Update the user rank card separately

@@ -1193,27 +1193,35 @@
                 
                 <!-- Upgrade Requests Tab -->
                 <div id="adminRequestsTab" class="hidden space-y-6">
+                    <!-- Single Refresh Button for All Requests -->
+                    <div class="flex justify-end">
+                        <button onclick="refreshAllRequests()" class="text-purple-400 hover:text-purple-300 text-sm font-bold px-4 py-2 bg-gray-700 rounded-lg flex items-center gap-2">
+                            🔄 Refresh All
+                        </button>
+                    </div>
+                    
                     <!-- Upgrade Requests Section -->
-                    <div>
-                        <div class="flex justify-between items-center mb-4">
-                            <h4 class="text-lg font-bold text-gray-200">💰 Pending Upgrade Requests</h4>
-                            <button onclick="loadUpgradeRequests()" class="text-purple-400 hover:text-purple-300 text-sm font-bold px-3 py-2 bg-gray-700 rounded-lg">🔄 Refresh</button>
+                    <div class="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+                        <div class="bg-gradient-to-r from-amber-600/20 to-yellow-600/20 px-5 py-3 border-b border-gray-700">
+                            <h4 class="text-lg font-bold text-gray-200 flex items-center gap-2">
+                                💰 Pending Upgrade Requests
+                                <span id="upgradeRequestsBadge" class="hidden bg-amber-500 text-white text-xs font-bold rounded-full px-2 py-0.5">0</span>
+                            </h4>
                         </div>
-                        <div id="upgradeRequestsList" class="space-y-3">
+                        <div id="upgradeRequestsList" class="p-4 space-y-3">
                             <p class="text-gray-500 italic">Loading requests...</p>
                         </div>
                     </div>
                     
                     <!-- Photo Service Requests Section -->
-                    <div id="photoRequestsSection">
-                        <div class="flex justify-between items-center mb-4">
+                    <div id="photoRequestsSection" class="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+                        <div class="bg-gradient-to-r from-purple-600/20 to-pink-600/20 px-5 py-3 border-b border-gray-700">
                             <h4 class="text-lg font-bold text-gray-200 flex items-center gap-2">
                                 📸 Photo Service Requests
                                 <span id="photoRequestsBadge" class="hidden bg-purple-500 text-white text-xs font-bold rounded-full px-2 py-0.5">0</span>
                             </h4>
-                            <button onclick="loadPhotoRequests()" class="text-purple-400 hover:text-purple-300 text-sm font-bold px-3 py-2 bg-gray-700 rounded-lg">🔄 Refresh</button>
                         </div>
-                        <div id="photoRequestsList" class="space-y-3">
+                        <div id="photoRequestsList" class="p-4 space-y-3">
                             <p class="text-gray-500 italic">Loading photo requests...</p>
                         </div>
                     </div>
