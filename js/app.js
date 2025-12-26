@@ -2183,7 +2183,7 @@ window.getPaymentHistory = async function(propertyId) {
 // Delete a payment from the ledger
 window.deletePayment = async function(propertyId, paymentId) {
     // Confirm deletion
-    if (!confirm('Are you sure you want to delete this payment? This will update all financial stats.')) {
+    if (!confirm('Are you sure you want to delete this payment? This will update all financial stats and reverse any XP earned.')) {
         return;
     }
     try {
@@ -2212,7 +2212,22 @@ window.deletePayment = async function(propertyId, paymentId) {
             payments: payments,
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
-        showToast('🗑️ Payment deleted - refreshing stats...', 'success');
+        
+        // Reverse the XP that was awarded for this payment
+        const user = auth.currentUser;
+        if (user && typeof GamificationService !== 'undefined') {
+            try {
+                const property = properties.find(p => p.id === propertyId);
+                const propertyTitle = property?.title || `Property ${propertyId}`;
+                await GamificationService.deductXP(user.uid, 100, `Payment deleted for ${propertyTitle}`);
+                showToast('🗑️ Payment deleted, 100 XP reversed', 'success');
+            } catch (xpError) {
+                console.error('[PaymentLog] Error reversing XP:', xpError);
+                showToast('🗑️ Payment deleted (XP reversal failed)', 'warning');
+            }
+        } else {
+            showToast('🗑️ Payment deleted - refreshing stats...', 'success');
+        }
         
         // Refresh the analytics view
         await refreshPropertyAnalytics(propertyId);
@@ -2731,7 +2746,7 @@ window.showFullLedger = async function(propertyId) {
 
 // Delete payment from the full ledger modal (refreshes modal after)
 window.deletePaymentFromModal = async function(propertyId, paymentId) {
-    if (!confirm('Are you sure you want to delete this payment? This will update all financial stats.')) {
+    if (!confirm('Are you sure you want to delete this payment? This will update all financial stats and reverse any XP earned.')) {
         return;
     }
     try {
@@ -2757,7 +2772,21 @@ window.deletePaymentFromModal = async function(propertyId, paymentId) {
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        showToast('🗑️ Payment deleted', 'success');
+        // Reverse the XP that was awarded for this payment
+        const user = auth.currentUser;
+        if (user && typeof GamificationService !== 'undefined') {
+            try {
+                const property = properties.find(p => p.id === propertyId);
+                const propertyTitle = property?.title || `Property ${propertyId}`;
+                await GamificationService.deductXP(user.uid, 100, `Payment deleted for ${propertyTitle}`);
+                showToast('🗑️ Payment deleted, 100 XP reversed', 'success');
+            } catch (xpError) {
+                console.error('[PaymentLog] Error reversing XP:', xpError);
+                showToast('🗑️ Payment deleted (XP reversal failed)', 'warning');
+            }
+        } else {
+            showToast('🗑️ Payment deleted', 'success');
+        }
         
         // Refresh the modal
         await showFullLedger(propertyId);

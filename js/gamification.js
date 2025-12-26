@@ -207,6 +207,56 @@ const GamificationService = {
         }
     },
 
+    // Deduct XP (for reversing actions like deleted payments)
+    deductXP: async function(userId, xpAmount, reason) {
+        const userRef = db.collection('users').doc(userId);
+        
+        try {
+            const result = await db.runTransaction(async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists) {
+                    throw new Error('User not found');
+                }
+                
+                const userData = userDoc.data();
+                const gamification = userData.gamification || { xp: 0, level: 1, title: 'Newcomer' };
+                
+                const oldXP = gamification.xp || 0;
+                const oldLevel = gamification.level || 1;
+                // Ensure XP doesn't go below 0
+                const newXP = Math.max(0, oldXP - xpAmount);
+                const newLevelInfo = GamificationService.getLevelFromXP(newXP);
+                
+                transaction.update(userRef, {
+                    'gamification.xp': newXP,
+                    'gamification.level': newLevelInfo.level,
+                    'gamification.title': newLevelInfo.title
+                });
+                
+                return {
+                    oldXP,
+                    newXP,
+                    xpLost: oldXP - newXP, // Actual amount deducted (may be less if hitting 0)
+                    oldLevel,
+                    newLevel: newLevelInfo.level,
+                    leveledDown: newLevelInfo.level < oldLevel
+                };
+            });
+            
+            console.log(`[Gamification] Deducted ${result.xpLost} XP for ${reason}. Total: ${result.newXP}`);
+            
+            if (result.leveledDown) {
+                console.log(`[Gamification] Level decreased from ${result.oldLevel} to ${result.newLevel}`);
+            }
+            
+            return result;
+            
+        } catch (error) {
+            console.error('[Gamification] Error deducting XP:', error);
+            throw error;
+        }
+    },
+
     // Handle level up events
     handleLevelUp: async function(userId, newLevelInfo, userData) {
         console.log(`[Gamification] Level up! Now Level ${newLevelInfo.level}: ${newLevelInfo.title}`);
