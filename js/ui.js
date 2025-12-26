@@ -8683,7 +8683,7 @@ window.loadUserNotifications = async function() {
                                     ${notif.createdAt?.toDate ? `<p class="text-gray-500 text-xs mt-2">${notif.createdAt.toDate().toLocaleString()}</p>` : ''}
                                 </div>
                             </div>
-                            <button onclick="dismissNotification('${notif.id}')" 
+                            <button onclick="dismissUserNotification('${notif.id}')" 
                                 class="text-gray-400 hover:text-white transition p-1 flex-shrink-0"
                                 title="Dismiss notification">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8709,7 +8709,7 @@ window.loadUserNotifications = async function() {
     }
 };
 
-window.dismissNotification = async function(notificationId) {
+window.dismissUserNotification = async function(notificationId) {
     try {
         // Mark as read in Firestore
         await db.collection('userNotifications').doc(notificationId).update({
@@ -8734,7 +8734,7 @@ window.dismissNotification = async function(notificationId) {
         }
         
     } catch (error) {
-        console.error('Error dismissing notification:', error);
+        console.error('Error dismissing user notification:', error);
     }
 };
 

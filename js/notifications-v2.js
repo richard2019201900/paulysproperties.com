@@ -471,21 +471,29 @@ function startUserEventListener() {
     
     console.log('[NotifV2] Starting user event listener...');
     
+    // Track initialization with a slight delay to allow initial data to settle
+    let initializationComplete = false;
+    setTimeout(() => {
+        initializationComplete = true;
+        console.log('[NotifV2:Users] Initialization grace period complete');
+    }, 3000); // 3 second grace period
+    
     AdminNotifState.listeners.users = db.collection('users')
         .onSnapshot((snapshot) => {
-            const isFirstLoad = !AdminNotifState.initialized.users;
+            console.log('[NotifV2:Users] Snapshot received, initComplete:', initializationComplete, 'total users:', snapshot.size);
             
-            console.log('[NotifV2:Users] Snapshot received, isFirstLoad:', isFirstLoad, 'total users:', snapshot.size);
-            
-            snapshot.forEach(doc => {
-                const userId = doc.id;
-                const userData = doc.data();
+            // Use docChanges to only process truly new additions
+            snapshot.docChanges().forEach(change => {
+                if (change.type !== 'added') return;
+                
+                const userId = change.doc.id;
+                const userData = change.doc.data();
                 
                 // Skip if already seen this session
                 if (AdminNotifState.seenThisSession.users.has(userId)) return;
                 AdminNotifState.seenThisSession.users.add(userId);
                 
-                console.log('[NotifV2:Users] New user detected:', userId, 'email:', userData.email, 'isFirstLoad:', isFirstLoad);
+                console.log('[NotifV2:Users] New user detected:', userId, 'email:', userData.email, 'initComplete:', initializationComplete);
                 
                 // Skip admin user
                 if (userData.email === window.MASTER_ADMIN_EMAIL) {
@@ -493,9 +501,9 @@ function startUserEventListener() {
                     return;
                 }
                 
-                // Skip on first load (don't notify for existing users)
-                if (isFirstLoad) {
-                    console.log('[NotifV2:Users] Skipping first load for:', userId);
+                // Skip during initialization grace period
+                if (!initializationComplete) {
+                    console.log('[NotifV2:Users] Skipping - still in init grace period');
                     return;
                 }
                 
@@ -534,14 +542,20 @@ function startListingEventListener() {
     
     console.log('[NotifV2] Starting listing event listener...');
     
+    // Track initialization with a slight delay to allow initial data to settle
+    let initializationComplete = false;
+    setTimeout(() => {
+        initializationComplete = true;
+        console.log('[NotifV2:Listings] Initialization grace period complete');
+    }, 3000); // 3 second grace period
+    
     AdminNotifState.listeners.listings = db.collection('settings').doc('properties')
         .onSnapshot((doc) => {
             if (!doc.exists) return;
             
-            const isFirstLoad = !AdminNotifState.initialized.listings;
             const propsData = doc.data();
             
-            console.log('[NotifV2:Listings] Snapshot received, isFirstLoad:', isFirstLoad, 'total properties:', Object.keys(propsData).length);
+            console.log('[NotifV2:Listings] Snapshot received, initComplete:', initializationComplete, 'total properties:', Object.keys(propsData).length);
             
             Object.keys(propsData).forEach(propId => {
                 const prop = propsData[propId];
@@ -551,7 +565,7 @@ function startListingEventListener() {
                 if (AdminNotifState.seenThisSession.listings.has(propId)) return;
                 AdminNotifState.seenThisSession.listings.add(propId);
                 
-                console.log('[NotifV2:Listings] New property detected:', propId, 'owner:', prop.ownerEmail, 'isFirstLoad:', isFirstLoad);
+                console.log('[NotifV2:Listings] New property detected:', propId, 'owner:', prop.ownerEmail, 'initComplete:', initializationComplete);
                 
                 // Skip admin's own listings (check by email, NOT by hardcoded IDs)
                 if (prop.ownerEmail === window.MASTER_ADMIN_EMAIL) {
@@ -559,9 +573,9 @@ function startListingEventListener() {
                     return;
                 }
                 
-                // Skip on first load
-                if (isFirstLoad) {
-                    console.log('[NotifV2:Listings] Skipping first load for:', propId);
+                // Skip during initialization grace period
+                if (!initializationComplete) {
+                    console.log('[NotifV2:Listings] Skipping - still in init grace period');
                     return;
                 }
                 
@@ -895,6 +909,72 @@ window.debugNotificationsV2 = function() {
         premium: AdminNotifState.seenThisSession.premium.size
     });
     return AdminNotifState;
+};
+
+/**
+ * Cleanup old notifications that don't have proper structure
+ * Call this from console: cleanupOldNotifications()
+ */
+window.cleanupOldNotifications = async function() {
+    console.log('[NotifV2] Starting cleanup of old/malformed notifications...');
+    
+    try {
+        const snapshot = await db.collection('adminNotifications').get();
+        let deleted = 0;
+        let kept = 0;
+        
+        const batch = db.batch();
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const validTypes = ['user', 'listing', 'photo', 'premium'];
+            
+            // Check if notification has valid structure
+            if (!data.type || !validTypes.includes(data.type)) {
+                console.log('[NotifV2] Deleting malformed notification:', doc.id, data);
+                batch.delete(doc.ref);
+                deleted++;
+            } else {
+                kept++;
+            }
+        });
+        
+        if (deleted > 0) {
+            await batch.commit();
+            console.log(`[NotifV2] Cleanup complete. Deleted: ${deleted}, Kept: ${kept}`);
+        } else {
+            console.log(`[NotifV2] No malformed notifications found. Total: ${kept}`);
+        }
+        
+        return { deleted, kept };
+        
+    } catch (error) {
+        console.error('[NotifV2] Cleanup error:', error);
+        throw error;
+    }
+};
+
+/**
+ * Clear ALL admin notifications (use with caution!)
+ * Call this from console: clearAllAdminNotifications()
+ */
+window.clearAllAdminNotifications = async function() {
+    if (!confirm('This will DELETE all admin notifications. Are you sure?')) return;
+    
+    try {
+        const snapshot = await db.collection('adminNotifications').get();
+        const batch = db.batch();
+        
+        snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+        console.log(`[NotifV2] Deleted ${snapshot.size} notifications`);
+        
+    } catch (error) {
+        console.error('[NotifV2] Error clearing notifications:', error);
+    }
 };
 
 /**
