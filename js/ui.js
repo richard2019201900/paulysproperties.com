@@ -1007,6 +1007,7 @@ window.goToDashboard = function() {
         hideElement($('propertyDetailPage'));
         hideElement($('propertyStatsPage'));
         hideElement($('blogPage'));
+        hideElement($('leaderboardPage'));
         showElement($('ownerDashboard'));
         renderOwnerDashboard();
         
@@ -1161,6 +1162,10 @@ window.navigateTo = function(section) {
 
 window.goBack = function() {
     hideElement($('propertyDetailPage'));
+    hideElement($('propertyStatsPage'));
+    hideElement($('leaderboardPage'));
+    hideElement($('blogPage'));
+    hideElement($('ownerDashboard'));
     showElement($('renterSection'));
     $('properties').scrollIntoView({ behavior: 'smooth' });
 };

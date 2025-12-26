@@ -42,6 +42,8 @@ window.viewProperty = function(id) {
     hideElement($('renterSection'));
     hideElement($('ownerDashboard'));
     hideElement($('propertyStatsPage'));
+    hideElement($('leaderboardPage'));
+    hideElement($('blogPage'));
     showElement($('propertyDetailPage'));
     
     // Update navigation counter
@@ -380,6 +382,8 @@ window.viewPropertyStats = async function(id) {
     hideElement($('ownerDashboard'));
     hideElement($('renterSection'));
     hideElement($('propertyDetailPage'));
+    hideElement($('leaderboardPage'));
+    hideElement($('blogPage'));
     showElement($('propertyStatsPage'));
     window.scrollTo(0, 0);
     
