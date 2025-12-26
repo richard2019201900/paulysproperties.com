@@ -3512,16 +3512,16 @@ window.markPhotoRequestReviewed = async function(requestId) {
         
         showToast('✅ Photo request marked as reviewed', 'success');
         
-        // Dismiss the notification from the visible list
-        const notifId = 'photo-request-' + requestId;
-        if (typeof AdminNotifications !== 'undefined') {
-            AdminNotifications.dismissed.add(notifId);
-            AdminNotifications.visible.delete(notifId);
-        }
-        
-        // Update notification badge count
-        if (typeof updateAdminBadgeCounts === 'function') {
-            updateAdminBadgeCounts();
+        // Dismiss the notification from adminNotifications collection (new system)
+        const notifId = 'photo-' + requestId;
+        try {
+            await db.collection('adminNotifications').doc(notifId).update({
+                dismissed: true,
+                dismissedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (e) {
+            // Notification may not exist yet, that's OK
+            console.log('[NotifV2] No notification to dismiss for:', notifId);
         }
         
         // Refresh the list
@@ -3544,16 +3544,16 @@ window.deletePhotoRequest = async function(requestId) {
         
         showToast('🗑️ Photo request deleted', 'success');
         
-        // Dismiss the notification from the visible list
-        const notifId = 'photo-request-' + requestId;
-        if (typeof AdminNotifications !== 'undefined') {
-            AdminNotifications.dismissed.add(notifId);
-            AdminNotifications.visible.delete(notifId);
-        }
-        
-        // Update notification badge count
-        if (typeof updateAdminBadgeCounts === 'function') {
-            updateAdminBadgeCounts();
+        // Dismiss the notification from adminNotifications collection (new system)
+        const notifId = 'photo-' + requestId;
+        try {
+            await db.collection('adminNotifications').doc(notifId).update({
+                dismissed: true,
+                dismissedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (e) {
+            // Notification may not exist, that's OK
+            console.log('[NotifV2] No notification to dismiss for:', notifId);
         }
         
         // Refresh the list
