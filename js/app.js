@@ -1630,7 +1630,8 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                 if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
                     const userId = auth.currentUser?.uid;
                     if (userId) {
-                        await GamificationService.awardXP(userId, 100, `Logged payment: $${paymentAmount.toLocaleString()} from ${renterName}`);
+                        const propertyTitle = p?.title || `Property #${propertyId}`;
+                        await GamificationService.awardXP(userId, 100, `Collected $${paymentAmount.toLocaleString()} rent on ${propertyTitle}`);
                     }
                 }
             }
@@ -3858,7 +3859,8 @@ window.completeLease = async function(propertyId) {
         if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
             const userId = auth.currentUser?.uid;
             if (userId) {
-                await GamificationService.awardXP(userId, 100, `Completed lease for ${renterName} - $${tenureSummary.totalCollected.toLocaleString()} collected`);
+                const propertyTitle = p?.title || `Property #${propertyId}`;
+                await GamificationService.awardXP(userId, 100, `Completed lease on ${propertyTitle} - $${tenureSummary.totalCollected.toLocaleString()} collected`);
             }
         }
         
