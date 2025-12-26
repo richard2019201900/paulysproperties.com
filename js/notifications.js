@@ -67,16 +67,17 @@ const NOTIFICATION_TYPES = {
 
 // Initialize notification state
 window.AdminNotifications = {
-    // Sets to track what we've seen (prevent duplicates)
+    // Sets to track what we've seen (prevent duplicate POPUPS)
     seenUsers: new Set(),
     seenListings: new Set(),
     seenPremium: new Set(),
     seenPhotoRequests: new Set(),
     
-    // Currently visible notifications (keyed by full notification ID)
+    // DEPRECATED: visible Map - keeping for backward compatibility but not used for counts
+    // Badge counts now come directly from Firestore snapshots (counts below)
     visible: new Map(),
     
-    // Dismissed notifications (won't show again this session)
+    // Dismissed notifications (won't show popup again this session)
     dismissed: new Set(),
     
     // Session start time (for detecting real-time vs historical)
@@ -93,6 +94,18 @@ window.AdminNotifications = {
     listingsFirstSnapshot: true,
     premiumFirstSnapshot: true,
     photoRequestsFirstSnapshot: true,
+    
+    // =======================================================================
+    // DIRECT COUNTS FROM FIRESTORE (Source of Truth for Badge Counts)
+    // These are updated directly by snapshot listeners - no intermediate Map
+    // =======================================================================
+    counts: {
+        users: 0,      // New users awaiting review
+        listings: 0,   // New listings created
+        premium: 0,    // Premium requests pending
+        photo: 0,      // Photo service requests unreviewed
+        rent: 0        // Rent due notifications
+    },
     
     // Rent due notifications (populated by checkRentDueNotifications)
     rentNotifications: {
@@ -452,12 +465,22 @@ function startUserListener() {
         snapshot.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
         window.adminUsersData = users;
         
+        // SET COUNT: Count undismissed user notifications in visible Map
+        let userNotifCount = 0;
+        AdminNotifications.visible.forEach((data, notifId) => {
+            if (notifId.startsWith(NOTIFICATION_TYPES.USER.prefix) && !AdminNotifications.dismissed.has(notifId)) {
+                userNotifCount++;
+            }
+        });
+        AdminNotifications.counts.users = userNotifCount;
+        
         // Update badges
         updateAllBadges();
         
     }, error => {
         console.error('[AdminNotify:Users] Error:', error);
         AdminNotifications.usersListenerActive = false;
+        AdminNotifications.counts.users = 0;
     });
 }
 
@@ -611,12 +634,22 @@ function startListingListener() {
             });
         }
         
+        // SET COUNT: Count undismissed listing notifications in visible Map
+        let listingNotifCount = 0;
+        AdminNotifications.visible.forEach((data, notifId) => {
+            if (notifId.startsWith(NOTIFICATION_TYPES.LISTING.prefix) && !AdminNotifications.dismissed.has(notifId)) {
+                listingNotifCount++;
+            }
+        });
+        AdminNotifications.counts.listings = listingNotifCount;
+        
         // Update badges
         updateAllBadges();
         
     }, error => {
         console.error('[AdminNotify:Listings] Error:', error);
         AdminNotifications.listingsListenerActive = false;
+        AdminNotifications.counts.listings = 0;
     });
 }
 
@@ -706,12 +739,22 @@ function startPremiumListener() {
                 });
             }
             
+            // SET COUNT: Count undismissed premium notifications in visible Map
+            let premiumNotifCount = 0;
+            AdminNotifications.visible.forEach((data, notifId) => {
+                if (notifId.startsWith(NOTIFICATION_TYPES.PREMIUM.prefix) && !AdminNotifications.dismissed.has(notifId)) {
+                    premiumNotifCount++;
+                }
+            });
+            AdminNotifications.counts.premium = premiumNotifCount;
+            
             // Update badges
             updateAllBadges();
             
         }, error => {
             console.error('[AdminNotify:Premium] Error:', error);
             AdminNotifications.premiumListenerActive = false;
+            AdminNotifications.counts.premium = 0;
         });
 }
 
@@ -721,49 +764,7 @@ function startPremiumListener() {
 
 function startPhotoRequestListener() {
     if (AdminNotifications.photoRequestsListenerActive) {
-        console.log('[AdminNotify:Photo] Listener already active, checking for stale entries...');
-        
-        // CRITICAL: Even if listener is active, clear stale entries that shouldn't exist
-        // This handles the case where entries were added before the listener could clear them
-        const keysToDelete = [];
-        AdminNotifications.visible.forEach((value, key) => {
-            if (key.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
-                keysToDelete.push(key);
-            }
-        });
-        
-        if (keysToDelete.length > 0) {
-            console.log('[AdminNotify:Photo] Found', keysToDelete.length, 'stale entries to verify');
-            
-            // Check Firestore to see if these entries actually exist
-            db.collection('photoServiceRequests').limit(50).get().then(snapshot => {
-                const validIds = new Set();
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.viewed !== true) {
-                        validIds.add(NOTIFICATION_TYPES.PHOTO.prefix + doc.id);
-                    }
-                });
-                
-                // Remove entries that don't exist in Firestore
-                let removed = 0;
-                keysToDelete.forEach(key => {
-                    if (!validIds.has(key)) {
-                        AdminNotifications.visible.delete(key);
-                        AdminNotifications.dismissed.add(key);
-                        removed++;
-                        console.log('[AdminNotify:Photo] Removed stale entry:', key);
-                    }
-                });
-                
-                if (removed > 0) {
-                    console.log('[AdminNotify:Photo] Cleared', removed, 'stale entries');
-                    updateAllBadges();
-                }
-            }).catch(err => {
-                console.error('[AdminNotify:Photo] Error verifying entries:', err);
-            });
-        }
+        console.log('[AdminNotify:Photo] Listener already active');
         return;
     }
     
@@ -771,77 +772,61 @@ function startPhotoRequestListener() {
     AdminNotifications.photoRequestsListenerActive = true;
     
     // Listen to photoServiceRequests collection
-    // Note: No orderBy to avoid index requirements and handle various timestamp field names
+    // ENTERPRISE ARCHITECTURE: Count is derived directly from snapshot, not from a Map
     db.collection('photoServiceRequests')
         .limit(50)
         .onSnapshot((snapshot) => {
             const isFirst = AdminNotifications.photoRequestsFirstSnapshot;
             const newRequests = [];
             
-            // IMPORTANT: Clear all existing photo notifications from visible
-            // This ensures deleted/viewed documents are removed
-            const keysToDelete = [];
-            AdminNotifications.visible.forEach((value, key) => {
-                if (key.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
-                    keysToDelete.push(key);
-                }
-            });
-            if (keysToDelete.length > 0) {
-                console.log('[AdminNotify:Photo] Clearing', keysToDelete.length, 'existing photo notifications from visible');
-            }
-            keysToDelete.forEach(key => AdminNotifications.visible.delete(key));
+            // Count unviewed requests directly from snapshot (SOURCE OF TRUTH)
+            let unviewedCount = 0;
             
-            // Now process current snapshot
             snapshot.forEach(doc => {
                 const data = doc.data();
                 
-                // Skip viewed requests (filtered client-side to avoid composite index)
-                if (data.viewed === true) return;
+                // Skip viewed/reviewed requests
+                if (data.viewed === true || data.reviewed === true) return;
+                
+                // This is an active unviewed request - count it
+                unviewedCount++;
                 
                 const notifId = NOTIFICATION_TYPES.PHOTO.prefix + doc.id;
                 
-                // Check if new to us
+                // Check if new to us (for popup notification)
                 if (!AdminNotifications.seenPhotoRequests.has(doc.id)) {
                     AdminNotifications.seenPhotoRequests.add(doc.id);
                     
+                    // Only show popup for NEW requests (not on first load)
                     if (!isFirst && !AdminNotifications.dismissed.has(notifId)) {
-                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail, 'Package:', data.packageType);
+                        console.log('[AdminNotify:Photo] NEW PHOTO REQUEST:', data.userEmail || data.email, 'Package:', data.packageType);
                         newRequests.push({
                             id: doc.id,
                             notifId: notifId,
-                            userEmail: data.userEmail || 'Anonymous',
-                            username: data.username || 'Anonymous',
+                            userEmail: data.userEmail || data.email || 'Anonymous',
+                            username: data.username || data.name || 'Anonymous',
                             packageType: data.packageType || 'unknown',
                             packageName: data.packageName || 'Photo Services',
                             requestedAt: data.requestedAt?.toDate ? data.requestedAt.toDate() : new Date()
                         });
                     }
                 }
-                
-                // Add to visible if not dismissed
-                if (!AdminNotifications.dismissed.has(notifId)) {
-                    AdminNotifications.visible.set(notifId, {
-                        type: 'photo',
-                        data: { ...data, id: doc.id, notifId }
-                    });
-                }
             });
+            
+            // SET COUNT DIRECTLY FROM FIRESTORE (no intermediate Map)
+            AdminNotifications.counts.photo = unviewedCount;
+            console.log('[AdminNotify:Photo] Count from Firestore:', unviewedCount);
             
             // Mark first snapshot complete
             if (isFirst) {
                 AdminNotifications.photoRequestsFirstSnapshot = false;
-                console.log('[AdminNotify:Photo] Initial load complete, seen', AdminNotifications.seenPhotoRequests.size, 'photo requests');
-                
-                // Render existing photo notifications
-                renderPendingNotifications(NOTIFICATION_TYPES.PHOTO);
+                console.log('[AdminNotify:Photo] Initial load complete, unviewed:', unviewedCount);
             }
             
-            // Handle new photo requests
+            // Handle new photo requests (show popups)
             if (newRequests.length > 0) {
-                // Flash screen (orange for revenue-generating!)
                 flashScreen(NOTIFICATION_TYPES.PHOTO.flashColor);
                 
-                // Create notifications
                 newRequests.forEach(req => {
                     const packageEmoji = req.packageType === 'bundle' ? '🎬' : '📷';
                     const packageLabel = req.packageType === 'bundle' ? 'PREMIUM BUNDLE $125k' : 'Per Photo $10k';
@@ -854,8 +839,17 @@ function startPhotoRequestListener() {
                 });
             }
             
-            // Update badges
+            // Update badges (will read from counts.photo)
             updateAllBadges();
+            
+        }, error => {
+            console.error('[AdminNotify:Photo] Error:', error);
+            AdminNotifications.photoRequestsListenerActive = false;
+            // On error, set count to 0
+            AdminNotifications.counts.photo = 0;
+            updateAllBadges();
+        });
+}
             
         }, error => {
             console.error('[AdminNotify:Photo] Error:', error);
@@ -1056,31 +1050,37 @@ window.clearAllAdminNotifications = async function() {
     for (const notifId of toRemove) {
         await dismissAdminNotification(notifId);
     }
+    
+    // Reset all counts
+    AdminNotifications.counts = { users: 0, listings: 0, premium: 0, photo: 0, rent: 0 };
+    updateAllBadges();
 };
 
 /**
- * Clear stale photo notifications (utility for debugging)
- * Call this from console: clearStalePhotoNotifications()
+ * Force refresh photo count from Firestore
+ * Call this from console: refreshPhotoCount()
  */
-window.clearStalePhotoNotifications = function() {
-    console.log('[AdminNotify] Clearing stale photo notifications...');
+window.refreshPhotoCount = async function() {
+    console.log('[AdminNotify] Refreshing photo count from Firestore...');
     
-    const keysToDelete = [];
-    AdminNotifications.visible.forEach((value, key) => {
-        if (key.startsWith('photo-request-')) {
-            keysToDelete.push(key);
-            console.log('[AdminNotify] Removing stale photo notification:', key);
-        }
-    });
-    
-    keysToDelete.forEach(key => {
-        AdminNotifications.visible.delete(key);
-        AdminNotifications.dismissed.add(key);
-    });
-    
-    updateAllBadges();
-    console.log('[AdminNotify] Cleared', keysToDelete.length, 'stale photo notifications');
-    return keysToDelete.length;
+    try {
+        const snapshot = await db.collection('photoServiceRequests').limit(50).get();
+        let count = 0;
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.viewed !== true && data.reviewed !== true) {
+                count++;
+            }
+        });
+        
+        AdminNotifications.counts.photo = count;
+        updateAllBadges();
+        console.log('[AdminNotify] Photo count refreshed:', count);
+        return count;
+    } catch (error) {
+        console.error('[AdminNotify] Error refreshing photo count:', error);
+        return -1;
+    }
 };
 
 /**
@@ -1091,8 +1091,27 @@ window.restartPhotoListener = function() {
     console.log('[AdminNotify] Force restarting photo listener...');
     AdminNotifications.photoRequestsListenerActive = false;
     AdminNotifications.photoRequestsFirstSnapshot = true;
-    startPhotoRequestsListener();
+    AdminNotifications.counts.photo = 0;
+    startPhotoRequestListener();
     console.log('[AdminNotify] Photo listener restarted');
+};
+
+/**
+ * Debug: Show current notification state
+ * Call this from console: debugNotifications()
+ */
+window.debugNotifications = function() {
+    console.log('=== NOTIFICATION DEBUG ===');
+    console.log('Counts (source of truth):', AdminNotifications.counts);
+    console.log('Visible Map size:', AdminNotifications.visible.size);
+    console.log('Dismissed Set size:', AdminNotifications.dismissed.size);
+    console.log('Listeners active:', {
+        users: AdminNotifications.usersListenerActive,
+        listings: AdminNotifications.listingsListenerActive,
+        premium: AdminNotifications.premiumListenerActive,
+        photo: AdminNotifications.photoRequestsListenerActive
+    });
+    return AdminNotifications.counts;
 };
 
 // ============================================================================
@@ -1101,44 +1120,25 @@ window.restartPhotoListener = function() {
 
 /**
  * Update all notification badges
+ * 
+ * ENTERPRISE ARCHITECTURE: Badge counts come directly from AdminNotifications.counts
+ * which is populated by Firestore snapshot listeners. This ensures counts are always
+ * accurate and in sync with the database - no intermediate state that can become stale.
  */
 function updateAllBadges() {
-    let userCount = 0;
-    let listingCount = 0;
-    let premiumCount = 0;
-    let photoCount = 0;
+    // Get counts directly from the source-of-truth counts object
+    const { users: userCount, listings: listingCount, premium: premiumCount, photo: photoCount } = AdminNotifications.counts;
     
-    // Debug: collect photo notification IDs
-    const photoNotifIds = [];
-    
-    AdminNotifications.visible.forEach((data, notifId) => {
-        if (AdminNotifications.dismissed.has(notifId)) return;
-        
-        if (notifId.startsWith(NOTIFICATION_TYPES.USER.prefix)) {
-            userCount++;
-        } else if (notifId.startsWith(NOTIFICATION_TYPES.LISTING.prefix)) {
-            listingCount++;
-        } else if (notifId.startsWith(NOTIFICATION_TYPES.PREMIUM.prefix)) {
-            premiumCount++;
-        } else if (notifId.startsWith(NOTIFICATION_TYPES.PHOTO.prefix)) {
-            photoCount++;
-            photoNotifIds.push(notifId);
-        }
-    });
-    
-    // Get rent notification count
+    // Calculate rent count from rent notifications
     let rentCount = 0;
     if (AdminNotifications.rentNotifications) {
         const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
         rentCount = (overdue?.length || 0) + (today?.length || 0) + (tomorrow?.length || 0);
     }
+    // Update the counts object with rent count too
+    AdminNotifications.counts.rent = rentCount;
     
-    console.log('[AdminNotify:Badge] Counts:', { userCount, listingCount, premiumCount, photoCount, rentCount });
-    
-    // Debug: log photo notification IDs if any exist
-    if (photoCount > 0) {
-        console.log('[AdminNotify:Badge] Photo notification IDs in visible:', photoNotifIds);
-    }
+    console.log('[AdminNotify:Badge] Counts (from Firestore):', { userCount, listingCount, premiumCount, photoCount, rentCount });
     
     const total = userCount + listingCount + premiumCount + photoCount + rentCount;
     
