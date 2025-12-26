@@ -1621,6 +1621,14 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             // Show thank you message popup with copy functionality
             if (logSuccess) {
                 showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, rtoPaymentInfo);
+                
+                // Award XP for logging a payment
+                if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
+                    const userId = auth.currentUser?.uid;
+                    if (userId) {
+                        await GamificationService.awardXP(userId, 100, `Logged payment: $${paymentAmount.toLocaleString()} from ${renterName}`);
+                    }
+                }
             }
         }
         
@@ -3813,6 +3821,14 @@ window.completeLease = async function(propertyId) {
         // Save tenure to history
         await saveTenureHistory(propertyId, tenureRecord);
         
+        // Award XP for completing a lease
+        if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
+            const userId = auth.currentUser?.uid;
+            if (userId) {
+                await GamificationService.awardXP(userId, 100, `Completed lease for ${renterName} - $${tenureSummary.totalCollected.toLocaleString()} collected`);
+            }
+        }
+        
         // Clear renter data (this clears BOTH Firestore docs and all local caches)
         await clearRenterData(propertyId);
         
@@ -5386,9 +5402,12 @@ window.saveRTOContract = async function() {
         const depositMsg = isZeroDeposit ? ' ($0 deposit auto-marked as waived)' : '';
         showToast(`✅ Contract saved!${depositMsg} Property updated to RTO monthly payments.`, 'success');
         
-        // Add XP if gamification is available
-        if (typeof awardXP === 'function') {
-            await awardXP('contract_created', 150, `Created rent-to-own contract: ${contract.documentId}`);
+        // Award XP for creating RTO contract
+        if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
+            const userId = auth.currentUser?.uid;
+            if (userId) {
+                await GamificationService.awardXP(userId, 150, `Created rent-to-own contract: ${contract.documentId}`);
+            }
         }
         
         // Close the modal after a short delay and refresh the page

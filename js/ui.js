@@ -10206,7 +10206,10 @@ function formatLargeNumber(num) {
 // GAMIFICATION UI FUNCTIONS
 // ============================================================
 
-// Render the leaderboard page
+// Leaderboard real-time listener (stored globally to prevent duplicates)
+window.leaderboardUnsubscribe = null;
+
+// Render the leaderboard page with real-time updates
 window.renderLeaderboardPage = async function() {
     const listContainer = $('leaderboardList');
     const userRankCard = $('userRankCard');
@@ -10217,71 +10220,125 @@ window.renderLeaderboardPage = async function() {
     // Show loading
     listContainer.innerHTML = '<div class="p-8 text-center text-gray-400"><div class="animate-pulse">Loading leaderboard...</div></div>';
     
+    // Clean up existing listener if any
+    if (window.leaderboardUnsubscribe) {
+        window.leaderboardUnsubscribe();
+        window.leaderboardUnsubscribe = null;
+    }
+    
     try {
-        // Fetch top 10
-        const leaderboard = await GamificationService.getLeaderboard(10);
-        
-        if (leaderboard.length === 0) {
-            listContainer.innerHTML = '<div class="p-8 text-center text-gray-400">No rankings yet. Be the first to compete!</div>';
-            return;
-        }
-        
-        // Render leaderboard
-        listContainer.innerHTML = leaderboard.map((entry, index) => {
-            const isTop3 = index < 3;
-            const medalIcons = ['🥇', '🥈', '🥉'];
-            const medal = isTop3 ? medalIcons[index] : '';
-            const bgClass = isTop3 ? 'bg-gradient-to-r from-amber-900/20 to-yellow-900/20' : '';
-            
-            return `
-                <div class="flex items-center justify-between p-4 ${bgClass} hover:bg-gray-700/30 transition">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 text-center">
-                            ${medal ? `<span class="text-2xl">${medal}</span>` : `<span class="text-gray-500 font-bold">#${entry.rank}</span>`}
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-2xl">${entry.icon}</span>
-                            <div>
-                                <div class="text-white font-bold">${escapeHtml(entry.username)}</div>
-                                <div class="text-gray-400 text-sm">${entry.title}</div>
+        // Set up real-time listener for top 10 users by XP
+        window.leaderboardUnsubscribe = db.collection('users')
+            .orderBy('gamification.xp', 'desc')
+            .limit(10)
+            .onSnapshot(async (snapshot) => {
+                const leaderboard = [];
+                let rank = 1;
+                
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const gam = data.gamification || {};
+                    
+                    leaderboard.push({
+                        rank: rank++,
+                        odbc: doc.id,
+                        username: data.username || data.displayName || data.email?.split('@')[0] || 'Anonymous',
+                        email: data.email,
+                        xp: gam.xp || 0,
+                        level: gam.level || 1,
+                        title: gam.title || 'Newcomer',
+                        icon: GamificationService.levels.find(l => l.level === (gam.level || 1))?.icon || '🌱'
+                    });
+                });
+                
+                if (leaderboard.length === 0) {
+                    listContainer.innerHTML = '<div class="p-8 text-center text-gray-400">No rankings yet. Be the first to compete!</div>';
+                    return;
+                }
+                
+                // Render leaderboard
+                listContainer.innerHTML = leaderboard.map((entry, index) => {
+                    const isTop3 = index < 3;
+                    const medalIcons = ['🥇', '🥈', '🥉'];
+                    const medal = isTop3 ? medalIcons[index] : '';
+                    const bgClass = isTop3 ? 'bg-gradient-to-r from-amber-900/20 to-yellow-900/20' : '';
+                    const isCurrentUser = auth.currentUser?.email === entry.email;
+                    const highlightClass = isCurrentUser ? 'ring-2 ring-purple-500/50' : '';
+                    
+                    return `
+                        <div class="flex items-center justify-between p-4 ${bgClass} ${highlightClass} hover:bg-gray-700/30 transition rounded-lg">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 text-center">
+                                    ${medal ? `<span class="text-2xl">${medal}</span>` : `<span class="text-gray-500 font-bold">#${entry.rank}</span>`}
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-2xl">${entry.icon}</span>
+                                    <div>
+                                        <div class="text-white font-bold">${escapeHtml(entry.username)}${isCurrentUser ? ' <span class="text-purple-400 text-xs">(You)</span>' : ''}</div>
+                                        <div class="text-gray-400 text-sm">${entry.title}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-amber-400 font-bold">${entry.xp.toLocaleString()} XP</div>
+                                <div class="text-gray-500 text-sm">Level ${entry.level}</div>
                             </div>
                         </div>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-amber-400 font-bold">${entry.xp.toLocaleString()} XP</div>
-                        <div class="text-gray-500 text-sm">Level ${entry.level}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+                    `;
+                }).join('');
+                
+                // Update user rank card
+                await updateUserRankCard();
+                
+            }, (error) => {
+                console.error('[Leaderboard] Real-time error:', error);
+                listContainer.innerHTML = '<div class="p-8 text-center text-red-400">Error loading leaderboard. Please refresh.</div>';
+            });
         
         // Handle logged-in user rank card
-        const user = auth.currentUser;
-        if (user && window.currentUserData?.gamification) {
-            const gam = window.currentUserData.gamification;
-            const userRank = await GamificationService.getUserRank(gam.xp || 0);
-            const levelInfo = GamificationService.getLevelFromXP(gam.xp || 0);
-            
-            $('userRankPosition').textContent = `#${userRank || '--'}`;
-            $('userRankName').textContent = window.currentUserData.username || user.email.split('@')[0];
-            $('userRankIcon').textContent = levelInfo.icon;
-            $('userRankTitleText').textContent = levelInfo.title;
-            $('userRankXP').textContent = `${(gam.xp || 0).toLocaleString()} XP`;
-            $('userRankLevel').textContent = `Level ${gam.level || 1}`;
-            
-            showElement(userRankCard);
-            hideElement(loginPrompt);
-        } else if (!user) {
-            hideElement(userRankCard);
-            showElement(loginPrompt);
-        } else {
-            hideElement(userRankCard);
-            hideElement(loginPrompt);
-        }
+        await updateUserRankCard();
         
     } catch (error) {
         console.error('[Leaderboard] Error:', error);
         listContainer.innerHTML = '<div class="p-8 text-center text-red-400">Error loading leaderboard</div>';
+    }
+};
+
+// Update the user rank card separately
+async function updateUserRankCard() {
+    const userRankCard = $('userRankCard');
+    const loginPrompt = $('leaderboardLoginPrompt');
+    
+    const user = auth.currentUser;
+    if (user && window.currentUserData?.gamification) {
+        const gam = window.currentUserData.gamification;
+        const userRank = await GamificationService.getUserRank(gam.xp || 0);
+        const levelInfo = GamificationService.getLevelFromXP(gam.xp || 0);
+        
+        if ($('userRankPosition')) $('userRankPosition').textContent = `#${userRank || '--'}`;
+        if ($('userRankName')) $('userRankName').textContent = window.currentUserData.username || window.currentUserData.displayName || user.email.split('@')[0];
+        if ($('userRankIcon')) $('userRankIcon').textContent = levelInfo.icon;
+        if ($('userRankTitleText')) $('userRankTitleText').textContent = levelInfo.title;
+        if ($('userRankXP')) $('userRankXP').textContent = `${(gam.xp || 0).toLocaleString()} XP`;
+        if ($('userRankLevel')) $('userRankLevel').textContent = `Level ${gam.level || 1}`;
+        
+        showElement(userRankCard);
+        hideElement(loginPrompt);
+    } else if (!user) {
+        hideElement(userRankCard);
+        showElement(loginPrompt);
+    } else {
+        hideElement(userRankCard);
+        hideElement(loginPrompt);
+    }
+}
+
+// Clean up leaderboard listener when navigating away
+window.cleanupLeaderboardListener = function() {
+    if (window.leaderboardUnsubscribe) {
+        window.leaderboardUnsubscribe();
+        window.leaderboardUnsubscribe = null;
+        console.log('[Leaderboard] Listener cleaned up');
     }
 };
 
@@ -10768,7 +10825,7 @@ window.submitHouseSale = async function(propertyId, saleType, rtoContractId) {
         if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
             const userId = auth.currentUser?.uid;
             if (userId) {
-                await GamificationService.awardXP(userId, 1000, `Sold ${p?.title} to ${buyerName} for $${salePrice.toLocaleString()}`);
+                await GamificationService.awardXP(userId, 2500, `Sold ${p?.title} to ${buyerName} for $${salePrice.toLocaleString()}`);
             }
         }
         
