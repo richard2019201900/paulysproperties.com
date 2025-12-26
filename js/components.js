@@ -139,24 +139,8 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     // Reset to default phone first
     $('modalPhone').value = defaultPhone;
     
-    // Load owner's phone number if property ID is provided
-    if (propertyId) {
-        try {
-            const ownerEmail = getPropertyOwnerEmail(propertyId);
-            if (ownerEmail) {
-                const usersSnapshot = await db.collection('users').where('email', '==', ownerEmail).get();
-                if (!usersSnapshot.empty) {
-                    const userData = usersSnapshot.docs[0].data();
-                    if (userData.phone) {
-                        // Sanitize phone - remove all non-digits
-                        $('modalPhone').value = userData.phone.replace(/\D/g, '');
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Error loading owner phone:', error);
-        }
-    }
+    // Note: Owner phone can be added to property data if owners want to display it
+    // We don't query user documents to preserve privacy
     
     openModal('contactModal');
 };

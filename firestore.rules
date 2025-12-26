@@ -11,9 +11,11 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
     
-    // Users collection - authenticated read only for privacy
+    // Users collection - users can only read their OWN document
+    // Admin can read all (for admin panel, notifications, etc.)
+    // Leaderboard data is served via Cloud Function (getLeaderboard) - no emails exposed
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwner(userId) || isMasterAdmin();
       allow create: if isAuthenticated() && (isOwner(userId) || isMasterAdmin());
       allow update: if isAuthenticated() && (isOwner(userId) || isMasterAdmin());
       allow delete: if isMasterAdmin();

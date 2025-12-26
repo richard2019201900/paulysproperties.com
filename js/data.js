@@ -84,6 +84,12 @@ async function getUsernameByEmail(email) {
             return username;
         }
     } catch (error) {
+        // Permission denied (user can only read own doc) - use email prefix
+        if (error.code === 'permission-denied') {
+            const fallback = email.split('@')[0];
+            window.ownerUsernameCache[email] = fallback;
+            return fallback;
+        }
         console.error('Error fetching username:', error);
     }
     
@@ -130,7 +136,21 @@ async function getPropertyOwnerWithTier(propertyId) {
             }
         }
     } catch (error) {
-        console.error('[getPropertyOwnerWithTier] Error:', error);
+        // Permission denied - use default tier (can't read other users' docs)
+        if (error.code === 'permission-denied') {
+            // Check if master admin (we can do this without querying)
+            if (TierService.isMasterAdmin(email)) {
+                return {
+                    username,
+                    tier: 'owner',
+                    tierData: { icon: '👑', name: 'Owner' },
+                    display: `👑 ${username}`
+                };
+            }
+            tier = 'starter'; // Default tier for display
+        } else {
+            console.error('[getPropertyOwnerWithTier] Error:', error);
+        }
     }
     
     const tierData = TIERS[tier] || TIERS.starter;

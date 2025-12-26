@@ -423,3 +423,157 @@ async function calculateRetroactiveXP(user, properties, availability) {
         rewards
     };
 }
+
+// ============================================================
+// SECURE LEADERBOARD FUNCTIONS
+// ============================================================
+
+// Level icons mapping
+const LEVEL_ICONS = ['🌱', '🏠', '🔑', '🏢', '🏰', '👑', '💎', '🌟'];
+
+/**
+ * Get leaderboard data - returns ONLY public fields (no emails)
+ * Callable by any authenticated user
+ */
+exports.getLeaderboard = functions.https.onCall(async (data, context) => {
+    // Require authentication to view leaderboard
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in to view leaderboard');
+    }
+    
+    const limit = Math.min(data?.limit || 10, 50); // Max 50 users
+    
+    try {
+        const snapshot = await db.collection('users')
+            .orderBy('gamification.xp', 'desc')
+            .limit(limit)
+            .get();
+        
+        const leaderboard = [];
+        let rank = 1;
+        
+        snapshot.forEach(doc => {
+            const userData = doc.data();
+            const gam = userData.gamification || {};
+            
+            // Determine tier - master admin shows as "owner"
+            // We check email server-side but NEVER expose it
+            let displayTier = userData.tier || 'free';
+            if (userData.email === MASTER_ADMIN_EMAIL) {
+                displayTier = 'owner';
+            }
+            
+            // Get level icon
+            const levelIndex = Math.min((gam.level || 1) - 1, LEVEL_ICONS.length - 1);
+            const icon = LEVEL_ICONS[levelIndex];
+            
+            // Sanitize activity log - remove any potential sensitive data
+            const sanitizedActivityLog = (gam.activityLog || []).map(act => ({
+                type: act.type || 'xp_gain',
+                amount: act.amount || 0,
+                reason: act.reason || 'Activity',
+                timestamp: act.timestamp || null
+            }));
+            
+            // Return ONLY public fields - NEVER email, phone, etc.
+            leaderboard.push({
+                odbc: doc.id,
+                rank: rank++,
+                username: userData.username || userData.displayName || 'Anonymous',
+                xp: gam.xp || 0,
+                level: gam.level || 1,
+                title: gam.title || 'Newcomer',
+                icon: icon,
+                tier: displayTier,
+                activityLog: sanitizedActivityLog,
+                createdAt: userData.createdAt || null
+            });
+        });
+        
+        return {
+            success: true,
+            leaderboard: leaderboard,
+            timestamp: new Date().toISOString()
+        };
+        
+    } catch (error) {
+        console.error('[Leaderboard] Error fetching leaderboard:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to fetch leaderboard');
+    }
+});
+
+/**
+ * Get user's rank based on their XP
+ * Callable by any authenticated user
+ */
+exports.getUserRank = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    }
+    
+    const userXP = data?.xp;
+    
+    if (typeof userXP !== 'number') {
+        throw new functions.https.HttpsError('invalid-argument', 'XP must be a number');
+    }
+    
+    try {
+        // Count users with higher XP
+        const snapshot = await db.collection('users')
+            .where('gamification.xp', '>', userXP)
+            .count()
+            .get();
+        
+        const rank = snapshot.data().count + 1;
+        
+        return {
+            success: true,
+            rank: rank,
+            xp: userXP
+        };
+        
+    } catch (error) {
+        console.error('[Leaderboard] Error getting user rank:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to get rank');
+    }
+});
+
+/**
+ * Get current user's own profile data (for dashboard widget)
+ * This allows users to get their own data even with restricted rules
+ */
+exports.getMyProfile = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    }
+    
+    try {
+        const userDoc = await db.collection('users').doc(context.auth.uid).get();
+        
+        if (!userDoc.exists) {
+            return { success: false, exists: false };
+        }
+        
+        const userData = userDoc.data();
+        const gam = userData.gamification || {};
+        
+        // Return user's own data (they can see their own email)
+        return {
+            success: true,
+            exists: true,
+            profile: {
+                odbc: userDoc.id,
+                email: userData.email,
+                username: userData.username || userData.displayName,
+                phone: userData.phone,
+                tier: userData.tier || 'free',
+                gamification: gam,
+                createdAt: userData.createdAt
+            }
+        };
+        
+    } catch (error) {
+        console.error('[Profile] Error fetching profile:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to fetch profile');
+    }
+});

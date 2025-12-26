@@ -454,12 +454,15 @@ const GamificationService = {
     // Get user's rank
     getUserRank: async function(userXP) {
         try {
-            // Count users with more XP
-            const snapshot = await db.collection('users')
-                .where('gamification.xp', '>', userXP)
-                .get();
+            // Use Cloud Function for secure rank calculation
+            // (Users can no longer query other users' documents)
+            const getUserRankFn = functions.httpsCallable('getUserRank');
+            const result = await getUserRankFn({ xp: userXP });
             
-            return snapshot.size + 1;
+            if (result.data.success) {
+                return result.data.rank;
+            }
+            return null;
             
         } catch (error) {
             console.error('[Gamification] Error getting user rank:', error);
