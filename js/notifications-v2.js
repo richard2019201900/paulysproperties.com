@@ -112,16 +112,45 @@ window.AdminNotifState = {
 // =============================================================================
 
 /**
- * Initialize the notification system for admin
+ * Initialize rent notifications for ALL logged-in property owners
+ * This is separate from admin notifications - ALL users see their rent alerts
+ */
+window.initRentNotifications = function() {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+        console.log('[NotifV2] Not logged in, skipping rent notifications');
+        return;
+    }
+    
+    console.log('[NotifV2] Initializing rent notifications for user:', currentUser.email);
+    
+    // Check rent due notifications immediately
+    checkRentDueNotifications();
+    
+    // Set up interval to check every minute
+    // Clear any existing interval first
+    if (window.rentNotificationInterval) {
+        clearInterval(window.rentNotificationInterval);
+    }
+    window.rentNotificationInterval = setInterval(checkRentDueNotifications, 60000);
+    
+    console.log('[NotifV2] Rent notifications initialized for all users');
+};
+
+/**
+ * Initialize the full notification system for admin only
+ * Includes user/listing/photo/premium event listeners
  */
 window.initAdminNotificationSystem = function() {
     const currentUser = auth.currentUser;
     if (!currentUser || currentUser.email !== window.MASTER_ADMIN_EMAIL) {
-        console.log('[NotifV2] Not admin, skipping initialization');
+        console.log('[NotifV2] Not admin, skipping admin notification initialization');
+        // But still init rent notifications for non-admin owners
+        initRentNotifications();
         return;
     }
     
-    console.log('[NotifV2] Initializing notification system...');
+    console.log('[NotifV2] Initializing admin notification system...');
     
     // Start the main notifications listener (reads from Firestore)
     startNotificationsListener();
@@ -132,11 +161,10 @@ window.initAdminNotificationSystem = function() {
     startPhotoEventListener();
     startPremiumEventListener();
     
-    // Start rent checker
-    checkRentDueNotifications();
-    setInterval(checkRentDueNotifications, 60000); // Check every minute
+    // Start rent checker (admin sees all properties)
+    initRentNotifications();
     
-    console.log('[NotifV2] Initialization complete');
+    console.log('[NotifV2] Admin notification system initialized');
 };
 
 // =============================================================================

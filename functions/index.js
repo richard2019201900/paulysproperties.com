@@ -1,4 +1,5 @@
-const functions = require('firebase-functions');
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -10,14 +11,14 @@ const MASTER_ADMIN_EMAIL = 'richard2019201900@gmail.com';
 // HELPER FUNCTIONS
 // ============================================================
 
-// Verify the caller is the master admin
-async function verifyAdmin(context) {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+// Verify the caller is the master admin (v2 API uses request.auth)
+function verifyAdmin(request) {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in');
     }
     
-    if (context.auth.token.email !== MASTER_ADMIN_EMAIL) {
-        throw new functions.https.HttpsError('permission-denied', 'Only admin can perform this action');
+    if (request.auth.token.email !== MASTER_ADMIN_EMAIL) {
+        throw new HttpsError('permission-denied', 'Only admin can perform this action');
     }
     
     return true;
@@ -47,18 +48,21 @@ function getLevelFromXP(xp) {
     return result;
 }
 
+// Level icons mapping
+const LEVEL_ICONS = ['🌱', '🏠', '🔑', '🏢', '🏰', '👑', '💎', '🌟'];
+
 // ============================================================
-// EXISTING USER MANAGEMENT FUNCTIONS
+// USER MANAGEMENT FUNCTIONS
 // ============================================================
 
 // Create a new Auth user (callable from admin panel)
-exports.createAuthUser = functions.https.onCall(async (data, context) => {
-    await verifyAdmin(context);
+exports.createAuthUser = onCall(async (request) => {
+    verifyAdmin(request);
     
-    const { email, password, displayName } = data;
+    const { email, password, displayName } = request.data;
     
     if (!email || !password) {
-        throw new functions.https.HttpsError('invalid-argument', 'Email and password required');
+        throw new HttpsError('invalid-argument', 'Email and password required');
     }
     
     try {
@@ -79,26 +83,26 @@ exports.createAuthUser = functions.https.onCall(async (data, context) => {
         console.error('Error creating user:', error);
         
         if (error.code === 'auth/email-already-exists') {
-            throw new functions.https.HttpsError('already-exists', 'This email is already registered');
+            throw new HttpsError('already-exists', 'This email is already registered');
         }
         
-        throw new functions.https.HttpsError('internal', error.message);
+        throw new HttpsError('internal', error.message);
     }
 });
 
 // Delete an Auth user by email (callable from admin panel)
-exports.deleteAuthUser = functions.https.onCall(async (data, context) => {
-    await verifyAdmin(context);
+exports.deleteAuthUser = onCall(async (request) => {
+    verifyAdmin(request);
     
-    const { email } = data;
+    const { email } = request.data;
     
     if (!email) {
-        throw new functions.https.HttpsError('invalid-argument', 'Email required');
+        throw new HttpsError('invalid-argument', 'Email required');
     }
     
     // Prevent admin from deleting themselves
     if (email.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) {
-        throw new functions.https.HttpsError('permission-denied', 'Cannot delete admin account');
+        throw new HttpsError('permission-denied', 'Cannot delete admin account');
     }
     
     try {
@@ -127,13 +131,13 @@ exports.deleteAuthUser = functions.https.onCall(async (data, context) => {
             };
         }
         
-        throw new functions.https.HttpsError('internal', error.message);
+        throw new HttpsError('internal', error.message);
     }
 });
 
 // Get all Auth users (for syncing/debugging)
-exports.listAuthUsers = functions.https.onCall(async (data, context) => {
-    await verifyAdmin(context);
+exports.listAuthUsers = onCall(async (request) => {
+    verifyAdmin(request);
     
     try {
         const listUsersResult = await admin.auth().listUsers(1000);
@@ -149,12 +153,12 @@ exports.listAuthUsers = functions.https.onCall(async (data, context) => {
         };
     } catch (error) {
         console.error('Error listing users:', error);
-        throw new functions.https.HttpsError('internal', error.message);
+        throw new HttpsError('internal', error.message);
     }
 });
 
 // ============================================================
-// GAMIFICATION FUNCTIONS
+// SCHEDULED CLEANUP FUNCTION
 // ============================================================
 
 /**
@@ -162,84 +166,84 @@ exports.listAuthUsers = functions.https.onCall(async (data, context) => {
  * - Expires premium listings past their expiration date
  * - Removes celebrations older than 24 hours
  */
-exports.scheduledCleanup = functions.pubsub
-    .schedule('every 1 hours')
-    .timeZone('America/Los_Angeles')
-    .onRun(async (context) => {
-        const now = new Date();
-        console.log(`[Cleanup] Running scheduled cleanup at ${now.toISOString()}`);
+exports.scheduledCleanup = onSchedule("every 60 minutes", async (event) => {
+    const now = new Date();
+    console.log(`[Cleanup] Running scheduled cleanup at ${now.toISOString()}`);
+    
+    let premiumExpired = 0;
+    let celebrationsRemoved = 0;
+    
+    // ===== 1. PREMIUM EXPIRATION =====
+    try {
+        const propertiesDoc = await db.collection('settings').doc('properties').get();
         
-        let premiumExpired = 0;
-        let celebrationsRemoved = 0;
-        
-        // ===== 1. PREMIUM EXPIRATION =====
-        try {
-            const propertiesDoc = await db.collection('settings').doc('properties').get();
+        if (propertiesDoc.exists) {
+            const properties = propertiesDoc.data();
+            const updates = {};
             
-            if (propertiesDoc.exists) {
-                const properties = propertiesDoc.data();
-                const updates = {};
-                
-                for (const [id, prop] of Object.entries(properties)) {
-                    if (prop && prop.isPremium && prop.premiumExpiresAt) {
-                        const expiresAt = new Date(prop.premiumExpiresAt);
-                        if (expiresAt < now) {
-                            updates[`${id}.isPremium`] = false;
-                            updates[`${id}.premiumExpiredAt`] = now.toISOString();
-                            updates[`${id}.premiumSource`] = admin.firestore.FieldValue.delete();
-                            updates[`${id}.premiumExpiresAt`] = admin.firestore.FieldValue.delete();
-                            premiumExpired++;
-                            console.log(`[Cleanup] Expiring premium for property ${id}`);
-                        }
+            for (const [id, prop] of Object.entries(properties)) {
+                if (prop && prop.isPremium && prop.premiumExpiresAt) {
+                    const expiresAt = new Date(prop.premiumExpiresAt);
+                    if (expiresAt < now) {
+                        updates[`${id}.isPremium`] = false;
+                        updates[`${id}.premiumExpiredAt`] = now.toISOString();
+                        updates[`${id}.premiumSource`] = admin.firestore.FieldValue.delete();
+                        updates[`${id}.premiumExpiresAt`] = admin.firestore.FieldValue.delete();
+                        premiumExpired++;
+                        console.log(`[Cleanup] Expiring premium for property ${id}`);
                     }
                 }
-                
-                if (Object.keys(updates).length > 0) {
-                    await db.collection('settings').doc('properties').update(updates);
-                    console.log(`[Cleanup] Expired ${premiumExpired} premium listings`);
-                }
             }
-        } catch (error) {
-            console.error('[Cleanup] Premium expiration error:', error);
-        }
-        
-        // ===== 2. CELEBRATION CLEANUP =====
-        try {
-            const celebrationsDoc = await db.collection('settings').doc('celebrations').get();
             
-            if (celebrationsDoc.exists) {
-                const data = celebrationsDoc.data();
-                const active = data.active || [];
-                
-                const stillActive = active.filter(cel => {
-                    if (!cel.expiresAt) return false;
-                    const expiresAt = new Date(cel.expiresAt);
-                    return expiresAt > now;
-                });
-                
-                celebrationsRemoved = active.length - stillActive.length;
-                
-                if (celebrationsRemoved > 0) {
-                    await db.collection('settings').doc('celebrations').update({
-                        active: stillActive
-                    });
-                    console.log(`[Cleanup] Removed ${celebrationsRemoved} expired celebrations`);
-                }
+            if (Object.keys(updates).length > 0) {
+                await db.collection('settings').doc('properties').update(updates);
+                console.log(`[Cleanup] Expired ${premiumExpired} premium listings`);
             }
-        } catch (error) {
-            console.error('[Cleanup] Celebration cleanup error:', error);
         }
+    } catch (error) {
+        console.error('[Cleanup] Premium expiration error:', error);
+    }
+    
+    // ===== 2. CELEBRATION CLEANUP =====
+    try {
+        const celebrationsDoc = await db.collection('settings').doc('celebrations').get();
         
-        console.log(`[Cleanup] Complete: ${premiumExpired} premiums expired, ${celebrationsRemoved} celebrations removed`);
-        return null;
-    });
+        if (celebrationsDoc.exists) {
+            const data = celebrationsDoc.data();
+            const active = data.active || [];
+            
+            const stillActive = active.filter(cel => {
+                if (!cel.expiresAt) return false;
+                const expiresAt = new Date(cel.expiresAt);
+                return expiresAt > now;
+            });
+            
+            celebrationsRemoved = active.length - stillActive.length;
+            
+            if (celebrationsRemoved > 0) {
+                await db.collection('settings').doc('celebrations').update({
+                    active: stillActive
+                });
+                console.log(`[Cleanup] Removed ${celebrationsRemoved} expired celebrations`);
+            }
+        }
+    } catch (error) {
+        console.error('[Cleanup] Celebration cleanup error:', error);
+    }
+    
+    console.log(`[Cleanup] Complete: ${premiumExpired} premiums expired, ${celebrationsRemoved} celebrations removed`);
+});
+
+// ============================================================
+// GAMIFICATION MIGRATION FUNCTION
+// ============================================================
 
 /**
  * Callable function: One-time migration for existing users
  * Calculates retroactive XP based on existing data
  */
-exports.migrateAllUsersToGamification = functions.https.onCall(async (data, context) => {
-    await verifyAdmin(context);
+exports.migrateAllUsersToGamification = onCall(async (request) => {
+    verifyAdmin(request);
     
     console.log('[Migration] Starting gamification migration...');
     
@@ -428,20 +432,17 @@ async function calculateRetroactiveXP(user, properties, availability) {
 // SECURE LEADERBOARD FUNCTIONS
 // ============================================================
 
-// Level icons mapping
-const LEVEL_ICONS = ['🌱', '🏠', '🔑', '🏢', '🏰', '👑', '💎', '🌟'];
-
 /**
  * Get leaderboard data - returns ONLY public fields (no emails)
  * Callable by any authenticated user
  */
-exports.getLeaderboard = functions.https.onCall(async (data, context) => {
+exports.getLeaderboard = onCall(async (request) => {
     // Require authentication to view leaderboard
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in to view leaderboard');
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in to view leaderboard');
     }
     
-    const limit = Math.min(data?.limit || 10, 50); // Max 50 users
+    const limit = Math.min(request.data?.limit || 10, 50); // Max 50 users
     
     try {
         const snapshot = await db.collection('users')
@@ -498,7 +499,7 @@ exports.getLeaderboard = functions.https.onCall(async (data, context) => {
         
     } catch (error) {
         console.error('[Leaderboard] Error fetching leaderboard:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to fetch leaderboard');
+        throw new HttpsError('internal', 'Failed to fetch leaderboard');
     }
 });
 
@@ -506,15 +507,15 @@ exports.getLeaderboard = functions.https.onCall(async (data, context) => {
  * Get user's rank based on their XP
  * Callable by any authenticated user
  */
-exports.getUserRank = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+exports.getUserRank = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in');
     }
     
-    const userXP = data?.xp;
+    const userXP = request.data?.xp;
     
     if (typeof userXP !== 'number') {
-        throw new functions.https.HttpsError('invalid-argument', 'XP must be a number');
+        throw new HttpsError('invalid-argument', 'XP must be a number');
     }
     
     try {
@@ -534,7 +535,7 @@ exports.getUserRank = functions.https.onCall(async (data, context) => {
         
     } catch (error) {
         console.error('[Leaderboard] Error getting user rank:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to get rank');
+        throw new HttpsError('internal', 'Failed to get rank');
     }
 });
 
@@ -542,13 +543,13 @@ exports.getUserRank = functions.https.onCall(async (data, context) => {
  * Get current user's own profile data (for dashboard widget)
  * This allows users to get their own data even with restricted rules
  */
-exports.getMyProfile = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+exports.getMyProfile = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'Must be logged in');
     }
     
     try {
-        const userDoc = await db.collection('users').doc(context.auth.uid).get();
+        const userDoc = await db.collection('users').doc(request.auth.uid).get();
         
         if (!userDoc.exists) {
             return { success: false, exists: false };
@@ -574,6 +575,6 @@ exports.getMyProfile = functions.https.onCall(async (data, context) => {
         
     } catch (error) {
         console.error('[Profile] Error fetching profile:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to fetch profile');
+        throw new HttpsError('internal', 'Failed to fetch profile');
     }
 });

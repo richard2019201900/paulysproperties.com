@@ -361,6 +361,102 @@ window.validatePriceLogic = function(weekly, biweekly, monthly) {
     return warnings;
 };
 
+// ==================== BUY PRICE VALIDATION ====================
+// Validates buy price against city minimums based on property type and storage
+
+/**
+ * Get minimum buy price based on property type and storage (for create listing form)
+ * Uses the same logic as getMinimumBuyPrice in app.js
+ */
+window.getMinimumBuyPriceForForm = function() {
+    const type = ($('newListingType')?.value || '').toLowerCase();
+    const interiorType = ($('newListingInterior')?.value || '').toLowerCase();
+    const storage = parseInt($('newListingStorage')?.value) || 0;
+    const title = ($('newListingTitle')?.value || '').toLowerCase();
+    
+    // Check for walk-in house first (highest tier) - $1.5M
+    if (interiorType.includes('walk') || title.includes('walk in') || title.includes('walk-in') || title.includes('walkin')) {
+        return { min: 1500000, category: 'Walk-In House', storage: storage ? storage + ' storage' : 'N/A' };
+    }
+    
+    // Check for hotel
+    if (type === 'hotel' || title.includes('hotel')) {
+        if (storage >= 1050) return { min: 900000, category: 'Hotel 1050+ Storage', storage: storage + ' storage' };
+        if (storage >= 800) return { min: 750000, category: 'Hotel 800+ Storage', storage: storage + ' storage' };
+        return { min: 750000, category: 'Hotel', storage: storage ? storage + ' storage' : 'Unknown' };
+    }
+    
+    // Check for apartment
+    if (type === 'apartment' || title.includes('apartment') || title.includes('apt')) {
+        return { min: 700000, category: 'Apartment', storage: storage ? storage + ' storage' : '600 storage' };
+    }
+    
+    // Check for instance house (or default house type)
+    if (interiorType === 'instance' || type === 'house' || title.includes('instance') || title.includes('house')) {
+        if (storage >= 1000) return { min: 1200000, category: 'Instance House 1000+', storage: storage + ' storage' };
+        if (storage >= 800) return { min: 800000, category: 'Instance House 800-900', storage: storage + ' storage' };
+        return { min: 1200000, category: 'Instance House 1000+', storage: storage ? storage + ' storage' : 'Unknown' };
+    }
+    
+    // Default to walk-in tier (safest)
+    return { min: 1500000, category: 'Walk-In House (Default)', storage: storage ? storage + ' storage' : 'N/A' };
+};
+
+/**
+ * Validate buy price against city minimum - called on input change
+ * Updates hint text and shows warning if price is below minimum
+ */
+window.validateBuyPrice = function() {
+    const buyPriceInput = $('newListingBuyPrice');
+    const warningDiv = $('buyPriceWarning');
+    const warningText = $('buyPriceWarningText');
+    const hintDiv = $('buyPriceHint');
+    
+    if (!buyPriceInput) return true;
+    
+    const buyPrice = parseInt(buyPriceInput.value) || 0;
+    
+    // If no buy price entered, just show hint and return valid
+    if (buyPrice === 0) {
+        if (hintDiv) {
+            const minInfo = getMinimumBuyPriceForForm();
+            hintDiv.innerHTML = `Enter a price if for sale. <span class="text-amber-400">City min for ${minInfo.category}: $${minInfo.min.toLocaleString()}</span>`;
+        }
+        if (warningDiv) hideElement(warningDiv);
+        buyPriceInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500');
+        return true;
+    }
+    
+    // Get minimum price based on form values
+    const minInfo = getMinimumBuyPriceForForm();
+    
+    // Update hint with detected category
+    if (hintDiv) {
+        hintDiv.innerHTML = `Detected: <span class="text-cyan-400">${minInfo.category}</span> (${minInfo.storage}) → <span class="text-amber-400">City min: $${minInfo.min.toLocaleString()}</span>`;
+    }
+    
+    // Check if below minimum
+    if (buyPrice < minInfo.min) {
+        if (warningText) {
+            warningText.innerHTML = `
+                <strong>${minInfo.category}</strong> requires minimum <strong>$${minInfo.min.toLocaleString()}</strong>.<br>
+                Your price: <span class="text-red-400">$${buyPrice.toLocaleString()}</span> 
+                (Short by <span class="text-red-400">$${(minInfo.min - buyPrice).toLocaleString()}</span>)
+            `;
+        }
+        if (warningDiv) showElement(warningDiv);
+        buyPriceInput.classList.add('border-red-500', 'ring-2', 'ring-red-500');
+        return false;
+    }
+    
+    // Valid price
+    if (warningDiv) hideElement(warningDiv);
+    buyPriceInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500');
+    buyPriceInput.classList.add('border-green-500');
+    setTimeout(() => buyPriceInput.classList.remove('border-green-500'), 1000);
+    return true;
+};
+
 // Show price warning modal (for stats page edits)
 window.showPriceWarningModal = function(warnings, onConfirm, onCancel) {
     const modalHTML = `
@@ -548,6 +644,9 @@ async function updateNavUserDisplay() {
                     navUpgradeOption.classList.remove('hidden');
                 }
             }
+            
+            // Update rent badges for all property owners (not just admin)
+            updateMobileRentBadge();
         }
     } catch (error) {
         console.error('Error updating nav user display:', error);
@@ -563,30 +662,14 @@ async function updateNavUserDisplay() {
 
 // Update mobile admin notification badges
 function updateMobileAdminBadges() {
+    // Update rent badges for ALL logged-in users (not just admin)
+    updateMobileRentBadge();
+    
+    // Admin-only badges
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
-    // Check rent notifications
-   if (typeof checkRentDueNotifications === 'function') {
-        checkRentDueNotifications();
-    }
-    
-    const mobileRentBadge = $('mobileRentBadge');
-    const mobileRentCount = $('mobileRentCount');
     const mobileAdminBadge = $('mobileAdminBadge');
     const mobileAdminCount = $('mobileAdminCount');
-    
-    // Update rent badge (shown for all users with rent due)
-    if (mobileRentBadge && window.AdminNotifications?.rentNotifications) {
-        const { overdue, today, tomorrow } = AdminNotifications.rentNotifications;
-        const rentTotal = overdue.length + today.length + tomorrow.length;
-        
-        if (rentTotal > 0) {
-            if (mobileRentCount) mobileRentCount.textContent = rentTotal;
-            mobileRentBadge.className = 'flex bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 items-center justify-center shadow-lg animate-pulse cursor-pointer';
-        } else {
-            mobileRentBadge.className = 'hidden';
-        }
-    }
     
     // Update combined admin badge (users + listings + premium) - ADMIN ONLY
     if (mobileAdminBadge && window.AdminNotifications && TierService.isMasterAdmin(auth.currentUser?.email)) {
@@ -1031,30 +1114,15 @@ window.goToDashboard = function() {
 
 // Go to Dashboard -> My Properties tab and highlight rent alerts
 window.goToRentAlerts = function() {
-    goToDashboard();
-    
-    setTimeout(() => {
-        // Switch to My Properties tab
-        if (typeof switchDashboardTab === 'function') {
-            switchDashboardTab('myProperties');
-        }
-        
-        // Scroll to rent notifications panel and highlight it
-        setTimeout(() => {
-            const rentPanel = $('rentNotificationsPanel');
-            if (rentPanel && !rentPanel.classList.contains('hidden')) {
-                rentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                // Add highlight effect
-                rentPanel.style.boxShadow = '0 0 0 4px rgba(239, 68, 68, 0.7), 0 0 30px rgba(239, 68, 68, 0.4)';
-                rentPanel.style.transition = 'box-shadow 0.3s ease';
-                
-                setTimeout(() => {
-                    rentPanel.style.boxShadow = '';
-                }, 4000);
-            }
-        }, 300);
-    }, 200);
+    // Use the enterprise scroll-to-highlight pattern
+    scrollToAndHighlightElement({
+        targetSelector: '#rentNotificationsPanel',
+        tabName: 'myProperties',
+        maxWaitMs: 3000,
+        highlightColor: 'rgba(239, 68, 68, 0.7)',
+        glowColor: 'rgba(239, 68, 68, 0.4)',
+        onNotFound: () => console.log('[RentAlerts] Rent notifications panel not found or hidden')
+    });
 };
 
 // Go to Dashboard -> Admin Panel and scroll to notifications
@@ -4812,40 +4880,104 @@ window.showNewUserNotification = function(user, isMissed = false) {
 
 // Handle click on new user notification - navigate and highlight user
 window.handleNewUserNotificationClick = function(userId) {
-    // Make sure we're on the dashboard
+    // Use the enterprise scroll-to-highlight pattern
+    scrollToAndHighlightElement({
+        targetSelector: `.admin-user-card[data-userid="${userId}"]`,
+        tabName: 'admin',
+        maxWaitMs: 5000,
+        highlightColor: 'rgba(251, 146, 60, 0.8)',
+        glowColor: 'rgba(251, 146, 60, 0.5)',
+        onNotFound: () => console.log('[Notification] User card not found for userId:', userId)
+    });
+};
+
+/**
+ * Enterprise scroll-to-highlight utility
+ * Handles navigation, tab switching, async waiting for element, scrolling, and highlighting
+ * 
+ * @param {Object} options
+ * @param {string} options.targetSelector - CSS selector for target element
+ * @param {string} options.tabName - Dashboard tab to switch to (e.g., 'admin', 'myProperties')
+ * @param {number} options.maxWaitMs - Maximum time to wait for element (default: 5000)
+ * @param {string} options.highlightColor - Border highlight color
+ * @param {string} options.glowColor - Glow effect color
+ * @param {Function} options.onNotFound - Callback if element not found
+ */
+window.scrollToAndHighlightElement = async function(options) {
+    const {
+        targetSelector,
+        tabName = 'myProperties',
+        maxWaitMs = 5000,
+        highlightColor = 'rgba(239, 68, 68, 0.7)',
+        glowColor = 'rgba(239, 68, 68, 0.4)',
+        onNotFound = null
+    } = options;
+    
+    // Step 1: Ensure we're on the dashboard
     if (!$('ownerDashboard') || $('ownerDashboard').classList.contains('hidden')) {
         goToDashboard();
+        await sleep(300); // Wait for dashboard to render
     }
     
-    // Switch to Admin Panel tab
+    // Step 2: Switch to the correct tab
+    if (typeof switchDashboardTab === 'function') {
+        switchDashboardTab(tabName);
+        await sleep(200); // Wait for tab switch animation
+    }
+    
+    // Step 3: Wait for the target element to exist (with polling)
+    const element = await waitForElement(targetSelector, maxWaitMs);
+    
+    if (!element) {
+        console.log('[ScrollHighlight] Element not found:', targetSelector);
+        if (onNotFound) onNotFound();
+        return false;
+    }
+    
+    // Step 4: Scroll to element
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Step 5: Add highlight effect
+    const originalBoxShadow = element.style.boxShadow;
+    element.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${glowColor}`;
+    element.style.transition = 'box-shadow 0.3s ease';
+    
+    // Step 6: Remove highlight after 4 seconds
     setTimeout(() => {
-        if (typeof switchDashboardTab === 'function') {
-            switchDashboardTab('admin');
-        }
-        
-        // Find and highlight the user card
-        setTimeout(() => {
-            // Try to find user card by data-userid attribute
-            const userCard = document.querySelector(`.admin-user-card[data-userid="${userId}"]`);
-            
-            if (userCard) {
-                // Scroll to the user card
-                userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Add highlight effect
-                userCard.style.boxShadow = '0 0 0 4px rgba(251, 146, 60, 0.8), 0 0 30px rgba(251, 146, 60, 0.5)';
-                userCard.style.transition = 'box-shadow 0.3s ease';
-                
-                // Remove highlight after 4 seconds
-                setTimeout(() => {
-                    userCard.style.boxShadow = '';
-                }, 4000);
-            } else {
-                console.log('[Notification] User card not found for userId:', userId);
-            }
-        }, 400);
-    }, 200);
+        element.style.boxShadow = originalBoxShadow || '';
+    }, 4000);
+    
+    return true;
 };
+
+/**
+ * Wait for an element to exist in DOM with polling
+ * @param {string} selector - CSS selector
+ * @param {number} maxWaitMs - Maximum wait time in milliseconds
+ * @param {number} pollIntervalMs - Polling interval (default: 100ms)
+ * @returns {Promise<Element|null>}
+ */
+async function waitForElement(selector, maxWaitMs = 5000, pollIntervalMs = 100) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitMs) {
+        const element = document.querySelector(selector);
+        if (element) {
+            return element;
+        }
+        await sleep(pollIntervalMs);
+    }
+    
+    return null;
+}
+
+/**
+ * Promise-based sleep utility
+ * @param {number} ms - Milliseconds to sleep
+ */
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // Dismiss new user notification
 window.dismissNewUserNotification = function(notificationId) {
@@ -7980,7 +8112,7 @@ window.openCreateListingModal = async function() {
     // Explicitly clear all input values to prevent browser autocomplete
     const inputs = ['newListingTitle', 'newListingLocation', 'newListingBedrooms', 
                     'newListingBathrooms', 'newListingStorage', 'newListingWeekly', 
-                    'newListingMonthly', 'newListingImages'];
+                    'newListingBiweekly', 'newListingMonthly', 'newListingBuyPrice', 'newListingImages'];
     inputs.forEach(id => {
         const el = $(id);
         if (el) el.value = '';
@@ -7991,6 +8123,11 @@ window.openCreateListingModal = async function() {
     if (typeSelect) typeSelect.selectedIndex = 0;
     const interiorSelect = $('newListingInterior');
     if (interiorSelect) interiorSelect.selectedIndex = 0;
+    
+    // Reset buy price warning and hint
+    hideElement($('buyPriceWarning'));
+    const hintDiv = $('buyPriceHint');
+    if (hintDiv) hintDiv.textContent = 'Enter a price if this property is available for purchase';
     
     // Reset buttons to initial state
     const createBtn = $('createListingBtn');
@@ -8003,11 +8140,22 @@ window.openCreateListingModal = async function() {
     
     hideElement($('createListingError'));
     hideElement($('createListingSuccess'));
+    hideElement($('priceWarning'));
     openModal('createListingModal');
 };
 
 // Handle create listing form submission
 document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners for fields that affect buy price validation
+    const buyPriceAffectingFields = ['newListingType', 'newListingInterior', 'newListingStorage', 'newListingTitle'];
+    buyPriceAffectingFields.forEach(id => {
+        const el = $(id);
+        if (el) {
+            el.addEventListener('change', validateBuyPrice);
+            el.addEventListener('input', validateBuyPrice);
+        }
+    });
+    
     const createForm = $('createListingForm');
     if (createForm) {
         createForm.addEventListener('submit', async function(e) {
@@ -8031,6 +8179,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const weeklyPrice = parseInt($('newListingWeekly').value);
             const biweeklyPrice = parseInt($('newListingBiweekly').value) || 0;
             const monthlyPrice = parseInt($('newListingMonthly').value) || 0;
+            const buyPrice = parseInt($('newListingBuyPrice')?.value) || 0;
             const imagesText = $('newListingImages').value.trim();
             const isPremium = $('newListingPremium')?.checked || false;
             
@@ -8045,6 +8194,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorDiv.textContent = 'Please fill in all required fields (Address, Type, Description, and Weekly Price).';
                 showElement(errorDiv);
                 return;
+            }
+            
+            // Validate buy price against city minimum (HARD BLOCK)
+            if (buyPrice > 0) {
+                const minInfo = getMinimumBuyPriceForForm();
+                if (buyPrice < minInfo.min) {
+                    errorDiv.innerHTML = `
+                        <strong>🚫 City Minimum Violation</strong><br>
+                        ${minInfo.category} requires minimum <strong>$${minInfo.min.toLocaleString()}</strong>.<br>
+                        Your price: $${buyPrice.toLocaleString()} (Short by $${(minInfo.min - buyPrice).toLocaleString()})
+                    `;
+                    showElement(errorDiv);
+                    // Highlight the buy price field
+                    const buyPriceInput = $('newListingBuyPrice');
+                    if (buyPriceInput) {
+                        buyPriceInput.classList.add('border-red-500', 'ring-2', 'ring-red-500');
+                        buyPriceInput.focus();
+                    }
+                    return;
+                }
             }
             
             btn.disabled = true;
@@ -8075,6 +8244,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     weeklyPrice: weeklyPrice,
                     biweeklyPrice: biweeklyPrice,
                     monthlyPrice: monthlyPrice,
+                    buyPrice: buyPrice, // Buy It Now Price (0 if not for sale)
                     images: images,
                     videoUrl: null,
                     features: false,
