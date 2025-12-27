@@ -1126,85 +1126,96 @@ window.goToRentAlerts = function() {
 };
 
 // Go to Dashboard -> Admin Panel and scroll to notifications
-window.goToAdminNotifications = function(type) {
-    goToDashboard();
+window.goToAdminNotifications = async function(type) {
+    // Ensure we're on the dashboard
+    if (!$('ownerDashboard') || $('ownerDashboard').classList.contains('hidden')) {
+        goToDashboard();
+        await sleep(300);
+    }
     
-    setTimeout(() => {
-        // Switch to Admin Panel tab
-        if (typeof switchDashboardTab === 'function') {
-            switchDashboardTab('admin');
+    // Switch to Admin Panel tab
+    if (typeof switchDashboardTab === 'function') {
+        switchDashboardTab('admin');
+        await sleep(200);
+    }
+    
+    // Determine target based on notification type
+    if (type === 'users' || type === 'listings') {
+        // For new users and new listings, scroll to the notification stack at top of admin panel
+        // This is where "While You Were Away" and "New User Registration" cards appear
+        const targetElement = await waitForElement('#adminNotificationsStack', 3000);
+        
+        if (targetElement && !targetElement.classList.contains('hidden')) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Highlight the notification stack
+            const highlightColor = type === 'users' ? 'rgba(59, 130, 246, 0.7)' : 'rgba(34, 197, 94, 0.7)';
+            targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+            targetElement.style.transition = 'box-shadow 0.3s ease';
+            
+            setTimeout(() => {
+                targetElement.style.boxShadow = '';
+            }, 4000);
         }
         
-        // Scroll to appropriate section based on type
-        setTimeout(() => {
-            let targetElement = null;
-            let highlightColor = 'rgba(59, 130, 246, 0.7)'; // default blue
-            
-            if (type === 'premium') {
-                // Scroll to premium alert
-                targetElement = $('pendingPremiumAlert');
-                highlightColor = 'rgba(245, 158, 11, 0.7)'; // amber
-                
-                // Also expand the details
-                if (targetElement && !targetElement.classList.contains('hidden')) {
-                    const listEl = $('premiumRequestsList');
-                    if (listEl && listEl.classList.contains('hidden')) {
-                        showPremiumRequestsList();
-                    }
+    } else if (type === 'premium') {
+        // For premium requests, scroll to the premium alert section
+        const targetElement = await waitForElement('#pendingPremiumAlert', 3000);
+        
+        if (targetElement && !targetElement.classList.contains('hidden')) {
+            // Expand the details if collapsed
+            const listEl = $('premiumRequestsList');
+            if (listEl && listEl.classList.contains('hidden')) {
+                if (typeof showPremiumRequestsList === 'function') {
+                    showPremiumRequestsList();
                 }
-            } else if (type === 'photo') {
-                // Navigate to Requests tab and highlight photo requests section
-                if (typeof switchAdminTab === 'function') {
-                    switchAdminTab('requests');
-                }
-                
-                // Load fresh photo requests
-                if (typeof loadPhotoRequests === 'function') {
-                    loadPhotoRequests();
-                }
-                
-                setTimeout(() => {
-                    targetElement = $('photoRequestsSection');
-                    highlightColor = 'rgba(168, 85, 247, 0.7)'; // purple
-                    
-                    if (targetElement) {
-                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        
-                        // Highlight the element
-                        targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
-                        targetElement.style.transition = 'box-shadow 0.3s ease';
-                        
-                        setTimeout(() => {
-                            targetElement.style.boxShadow = '';
-                        }, 4000);
-                    }
-                }, 200);
-                return; // Early return since we handle highlighting inside
-            } else if (type === 'users' || type === 'listings') {
-                // Navigate to Requests tab for user/listing notifications
-                if (typeof switchAdminTab === 'function') {
-                    switchAdminTab('requests');
-                }
-                targetElement = $('adminRequestsTab');
-                highlightColor = type === 'users' ? 'rgba(59, 130, 246, 0.7)' : 'rgba(34, 197, 94, 0.7)';
-            } else {
-                // Default: scroll to notification stack
-                targetElement = $('adminNotificationsStack');
             }
             
-            if (targetElement && !targetElement.classList.contains('hidden')) {
-                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                // Highlight the element
-                targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
-                targetElement.style.transition = 'box-shadow 0.3s ease';
-                
-                setTimeout(() => {
-                    targetElement.style.boxShadow = '';
-                }, 4000);
-            }
-        }, 300);
-    }, 200);
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            const highlightColor = 'rgba(245, 158, 11, 0.7)';
+            targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+            targetElement.style.transition = 'box-shadow 0.3s ease';
+            
+            setTimeout(() => {
+                targetElement.style.boxShadow = '';
+            }, 4000);
+        }
+        
+    } else if (type === 'photo') {
+        // For photo requests, switch to Requests subtab and highlight photo section
+        if (typeof switchAdminTab === 'function') {
+            switchAdminTab('requests');
+            await sleep(200);
+        }
+        
+        // Load fresh photo requests
+        if (typeof loadPhotoRequests === 'function') {
+            loadPhotoRequests();
+        }
+        
+        const targetElement = await waitForElement('#photoRequestsSection', 3000);
+        
+        if (targetElement) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            const highlightColor = 'rgba(168, 85, 247, 0.7)';
+            targetElement.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+            targetElement.style.transition = 'box-shadow 0.3s ease';
+            
+            setTimeout(() => {
+                targetElement.style.boxShadow = '';
+            }, 4000);
+        }
+        
+    } else {
+        // Default: scroll to notification stack
+        const targetElement = await waitForElement('#adminNotificationsStack', 3000);
+        
+        if (targetElement && !targetElement.classList.contains('hidden')) {
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
 };
 
 window.backToDashboard = function() {
@@ -4951,13 +4962,21 @@ window.scrollToAndHighlightElement = async function(options) {
 };
 
 /**
+ * Promise-based sleep utility
+ * @param {number} ms - Milliseconds to sleep
+ */
+window.sleep = function(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+/**
  * Wait for an element to exist in DOM with polling
  * @param {string} selector - CSS selector
  * @param {number} maxWaitMs - Maximum wait time in milliseconds
  * @param {number} pollIntervalMs - Polling interval (default: 100ms)
  * @returns {Promise<Element|null>}
  */
-async function waitForElement(selector, maxWaitMs = 5000, pollIntervalMs = 100) {
+window.waitForElement = async function(selector, maxWaitMs = 5000, pollIntervalMs = 100) {
     const startTime = Date.now();
     
     while (Date.now() - startTime < maxWaitMs) {
@@ -4969,15 +4988,7 @@ async function waitForElement(selector, maxWaitMs = 5000, pollIntervalMs = 100) 
     }
     
     return null;
-}
-
-/**
- * Promise-based sleep utility
- * @param {number} ms - Milliseconds to sleep
- */
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+};
 
 // Dismiss new user notification
 window.dismissNewUserNotification = function(notificationId) {
@@ -8174,9 +8185,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const location = $('newListingLocation').value.trim();
             const bedrooms = parseInt($('newListingBedrooms').value) || 0;
             const bathrooms = parseInt($('newListingBathrooms').value) || 0;
-            const storage = parseInt($('newListingStorage').value) || 600;
+            const storage = parseInt($('newListingStorage').value) || 0;
             const interiorType = $('newListingInterior').value;
-            const weeklyPrice = parseInt($('newListingWeekly').value);
+            const weeklyPrice = parseInt($('newListingWeekly').value) || 0;
             const biweeklyPrice = parseInt($('newListingBiweekly').value) || 0;
             const monthlyPrice = parseInt($('newListingMonthly').value) || 0;
             const buyPrice = parseInt($('newListingBuyPrice')?.value) || 0;
@@ -8189,9 +8200,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? imagesText.split('\n').map(url => url.trim()).filter(url => url)
                 : [];
             
-            // Validate - bedrooms and bathrooms are now optional
-            if (!title || !type || !location || !weeklyPrice) {
-                errorDiv.textContent = 'Please fill in all required fields (Address, Type, Description, and Weekly Price).';
+            // Validate required fields: Address, Type, Storage, Interior
+            if (!title || !type || !storage || !interiorType) {
+                errorDiv.textContent = 'Please fill in all required fields (Address, Type, Storage, and Interior).';
                 showElement(errorDiv);
                 return;
             }

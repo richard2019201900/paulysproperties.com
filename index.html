@@ -307,8 +307,8 @@
     </div>
 
     <!-- Create Listing Modal -->
-    <div id="createListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden overflow-y-auto py-8" role="dialog" aria-modal="true">
-        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 border border-amber-700/50">
+    <div id="createListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-start justify-center hidden overflow-y-auto py-8" role="dialog" aria-modal="true">
+        <div class="glass-effect rounded-2xl shadow-2xl p-8 max-w-2xl w-full mx-4 border border-amber-700/50 my-auto max-h-[90vh] overflow-y-auto">
             <h2 class="text-3xl font-black bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent mb-6 text-center">✨ Create New Listing</h2>
             
             <form id="createListingForm" class="space-y-4" autocomplete="off">
@@ -334,8 +334,8 @@
                 </div>
                 
                 <div>
-                    <label class="block text-gray-300 font-semibold mb-2">Description *</label>
-                    <input type="text" id="newListingLocation" required autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Close to Benny's, garage included, ocean view">
+                    <label class="block text-gray-300 font-semibold mb-2">Description</label>
+                    <input type="text" id="newListingLocation" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="e.g. Close to Benny's, garage included, ocean view (optional)">
                 </div>
                 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -348,12 +348,13 @@
                         <input type="number" id="newListingBathrooms" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="1">
                     </div>
                     <div>
-                        <label class="block text-gray-300 font-semibold mb-2">Storage</label>
-                        <input type="number" id="newListingStorage" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="600">
+                        <label class="block text-gray-300 font-semibold mb-2">Storage *</label>
+                        <input type="number" id="newListingStorage" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="600">
                     </div>
                     <div>
-                        <label class="block text-gray-300 font-semibold mb-2">Interior</label>
-                        <select id="newListingInterior" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition">
+                        <label class="block text-gray-300 font-semibold mb-2">Interior *</label>
+                        <select id="newListingInterior" required class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition">
+                            <option value="">Select interior...</option>
                             <option value="Instance">Instance</option>
                             <option value="Walk-in">Walk-in</option>
                         </select>
@@ -362,8 +363,8 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-gray-300 font-semibold mb-2">Weekly Price *</label>
-                        <input type="number" id="newListingWeekly" required min="1" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000" oninput="checkPriceWarning()">
+                        <label class="block text-gray-300 font-semibold mb-2">Weekly Price</label>
+                        <input type="number" id="newListingWeekly" min="0" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="35000 (optional)" oninput="checkPriceWarning()">
                     </div>
                     <div>
                         <label class="block text-gray-300 font-semibold mb-2">Biweekly Price</label>
