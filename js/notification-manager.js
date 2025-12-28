@@ -137,7 +137,7 @@
                     type: 'scrollToUser',
                     target: rawData.id,
                     tab: 'admin',
-                    subtab: 'allUsers',
+                    subtab: 'users',
                     highlightSelector: `.admin-user-card[data-userid="${rawData.id}"]`
                 };
                 break;
@@ -157,7 +157,7 @@
                     target: rawData.ownerEmail,
                     propertyId: rawData.id,
                     tab: 'admin',
-                    subtab: 'allUsers',
+                    subtab: 'users',
                     highlightSelector: `.admin-user-card[data-email="${rawData.ownerEmail}"]`
                 };
                 notification.isPremium = isPremium;
@@ -185,7 +185,7 @@
                     type: 'scrollToSection',
                     target: 'pendingPremiumAlert',
                     tab: 'admin',
-                    subtab: 'allUsers',
+                    subtab: 'users',
                     highlightSelector: '#pendingPremiumAlert'
                 };
                 break;
@@ -929,13 +929,36 @@
             
             const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
             
+            console.log('[NotificationManager] Checking rent due. isAdmin:', isAdmin, 'todayStr:', todayStr, 'tomorrowStr:', tomorrowStr);
+            
             Object.entries(properties).forEach(([propId, prop]) => {
-                if (!prop || !prop.renter || !prop.nextRentDue) return;
+                if (!prop) return;
+                
+                // Debug: Log properties with renters
+                if (prop.renter) {
+                    console.log('[NotificationManager] Property with renter:', propId, {
+                        renter: prop.renter,
+                        nextRentDue: prop.nextRentDue,
+                        ownerEmail: prop.ownerEmail
+                    });
+                }
+                
+                if (!prop.renter || !prop.nextRentDue) return;
                 
                 // Only check properties owned by current user OR all if admin
                 if (!isAdmin && prop.ownerEmail !== currentUser.email) return;
                 
-                const dueDate = prop.nextRentDue.split('T')[0];
+                // Handle different date formats - extract just the date part
+                let dueDate;
+                if (prop.nextRentDue.includes('T')) {
+                    dueDate = prop.nextRentDue.split('T')[0];
+                } else if (prop.nextRentDue.includes(' ')) {
+                    dueDate = prop.nextRentDue.split(' ')[0];
+                } else {
+                    // Assume it's already just a date string
+                    dueDate = prop.nextRentDue;
+                }
+                
                 const rentData = {
                     propId,
                     propertyId: propId,
@@ -943,6 +966,16 @@
                     ...prop,
                     dueDate
                 };
+                
+                console.log('[NotificationManager] Comparing dates:', {
+                    propId,
+                    dueDate,
+                    todayStr,
+                    tomorrowStr,
+                    isOverdue: dueDate < todayStr,
+                    isToday: dueDate === todayStr,
+                    isTomorrow: dueDate === tomorrowStr
+                });
                 
                 if (dueDate < todayStr) {
                     const dueDateObj = new Date(dueDate);
@@ -955,6 +988,12 @@
                 } else if (dueDate === tomorrowStr) {
                     dueTomorrow.push(rentData);
                 }
+            });
+            
+            console.log('[NotificationManager] Rent due results:', {
+                overdue: overdue.length,
+                today: dueToday.length,
+                tomorrow: dueTomorrow.length
             });
             
             state.rentAlerts = {

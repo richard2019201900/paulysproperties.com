@@ -104,7 +104,7 @@ window.closeModal = function(id) {
 window.openContactModal = async function(type, propertyTitle, propertyId) {
     const isRent = type === 'rent';
     const colors = isRent ? ['purple', 'blue'] : ['amber', 'orange'];
-    const defaultPhone = '2057028233';
+    const defaultPhone = '2057028233'; // Pauly's number as fallback
     
     $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer to Purchase';
     $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
@@ -139,8 +139,41 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     // Reset to default phone first
     $('modalPhone').value = defaultPhone;
     
-    // Note: Owner phone can be added to property data if owners want to display it
-    // We don't query user documents to preserve privacy
+    // Try to fetch property owner's phone number
+    try {
+        if (propertyId && typeof db !== 'undefined') {
+            // Get property data to find owner email
+            const propsDoc = await db.collection('settings').doc('properties').get();
+            if (propsDoc.exists) {
+                const properties = propsDoc.data();
+                const property = properties[propertyId] || properties[String(propertyId)];
+                
+                if (property && property.ownerEmail) {
+                    // First check if property has ownerPhone directly
+                    if (property.ownerPhone) {
+                        $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
+                        console.log('[Contact] Using property ownerPhone:', property.ownerPhone);
+                    } else {
+                        // Look up user by email to get their phone
+                        const usersSnapshot = await db.collection('users')
+                            .where('email', '==', property.ownerEmail.toLowerCase())
+                            .limit(1)
+                            .get();
+                        
+                        if (!usersSnapshot.empty) {
+                            const userData = usersSnapshot.docs[0].data();
+                            if (userData.phone) {
+                                $('modalPhone').value = userData.phone.replace(/\D/g, '');
+                                console.log('[Contact] Using owner phone from user doc:', userData.phone);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('[Contact] Could not fetch owner phone, using default:', error);
+    }
     
     openModal('contactModal');
 };
