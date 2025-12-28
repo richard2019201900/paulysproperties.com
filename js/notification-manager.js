@@ -990,8 +990,9 @@
                     return;
                 }
                 
-                // Only check properties owned by current user OR all if admin
-                if (!isAdmin && prop.ownerEmail !== currentUser.email) return;
+                // Rent alerts are ALWAYS filtered to current user's properties only
+                // Even admins only see their own rent alerts (they can view all in admin panel)
+                if (prop.ownerEmail !== currentUser.email) return;
                 
                 // Calculate next rent due date from lastPaymentDate + paymentFrequency
                 // Parse the lastPaymentDate (format: YYYY-MM-DD)
