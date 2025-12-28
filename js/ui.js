@@ -2442,13 +2442,16 @@ function renderOwnerDashboard() {
     loadUserNotifications();
     
     // Initialize NotificationManager (handles rent alerts, badges, etc.)
-    if (typeof NotificationManager !== 'undefined' && NotificationManager.init) {
-        // Only init if not already initialized
-        if (!NotificationManager.state.initialized) {
-            NotificationManager.init();
-        } else {
-            // Just refresh the rent check and badges
-            NotificationManager.checkRentDue();
+    // Must check auth.currentUser directly since it may have become available
+    if (typeof NotificationManager !== 'undefined') {
+        const currentUser = auth?.currentUser;
+        if (currentUser) {
+            if (!NotificationManager.state.initialized) {
+                NotificationManager.init();
+            } else {
+                // Already initialized, just refresh rent check and badges
+                NotificationManager.checkRentDue();
+            }
         }
     }
     

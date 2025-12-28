@@ -508,7 +508,7 @@
         const stack = document.getElementById('adminNotificationsStack');
         if (!stack) return;
         
-        if (!window.TierService?.isMasterAdmin(window.auth?.currentUser?.email)) {
+        if (!window.TierService?.isMasterAdmin(auth?.currentUser?.email)) {
             stack.classList.add('hidden');
             return;
         }
@@ -597,7 +597,7 @@
         const panel = document.getElementById('rentNotificationsPanel');
         if (!panel) return;
         
-        if (!window.auth?.currentUser?.email) {
+        if (!auth?.currentUser?.email) {
             panel.classList.add('hidden');
             return;
         }
@@ -752,7 +752,7 @@
             return;
         }
         
-        const currentUser = window.auth?.currentUser;
+        const currentUser = auth?.currentUser;
         if (!currentUser) {
             console.log('[NotificationManager] No user logged in, skipping init');
             return;
@@ -815,7 +815,7 @@
     function startUserListener() {
         if (state.listeners.users) state.listeners.users();
         
-        state.listeners.users = window.db.collection('users')
+        state.listeners.users = db.collection('users')
             .orderBy('createdAt', 'desc')
             .limit(50)
             .onSnapshot(snapshot => {
@@ -858,7 +858,7 @@
     function startListingListener() {
         if (state.listeners.listings) state.listeners.listings();
         
-        state.listeners.listings = window.db.collection('settings').doc('properties')
+        state.listeners.listings = db.collection('settings').doc('properties')
             .onSnapshot(doc => {
                 if (!doc.exists) return;
                 
@@ -875,7 +875,7 @@
                         state.knownListingIds.add(propId);
                         
                         // Skip admin's own listings
-                        if (prop.ownerEmail === window.auth?.currentUser?.email) return;
+                        if (prop.ownerEmail === auth?.currentUser?.email) return;
                         
                         if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
                             const listing = { id: parseInt(propId), ...prop };
@@ -892,7 +892,7 @@
                             state.knownListingIds.add(propId);
                             
                             // Skip admin's own listings
-                            if (prop.ownerEmail === window.auth?.currentUser?.email) return;
+                            if (prop.ownerEmail === auth?.currentUser?.email) return;
                             
                             const listing = { id: parseInt(propId), ...prop };
                             const notification = createNotification('listing', listing, {
@@ -911,11 +911,11 @@
     }
     
     async function checkRentDue() {
-        const currentUser = window.auth?.currentUser;
+        const currentUser = auth?.currentUser;
         if (!currentUser) return;
         
         try {
-            const propsDoc = await window.db.collection('settings').doc('properties').get();
+            const propsDoc = await db.collection('settings').doc('properties').get();
             if (!propsDoc.exists) return;
             
             const properties = propsDoc.data();
