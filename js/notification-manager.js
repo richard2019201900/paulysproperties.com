@@ -1,0 +1,1062 @@
+/**
+ * ============================================================================
+ * NOTIFICATION MANAGER - Enterprise Unified Notification System
+ * ============================================================================
+ * 
+ * Single source of truth for all notification state and behavior.
+ * 
+ * NOTIFICATION TYPES:
+ * - user: New user registrations
+ * - listing: New property listings
+ * - photo: Photo service requests
+ * - premium: Premium listing requests
+ * - rent: Rent payment alerts (computed, not stored)
+ * 
+ * ARCHITECTURE:
+ * - State: Single state object with all notification data
+ * - Listeners: Firestore real-time listeners feed state
+ * - Actions: Unified click routing for all notification types
+ * - UI: Centralized badge and panel updates
+ * 
+ * ============================================================================
+ */
+
+(function() {
+    'use strict';
+
+    // =========================================================================
+    // CONFIGURATION
+    // =========================================================================
+    
+    const CONFIG = {
+        // How long highlights last (ms)
+        HIGHLIGHT_DURATION: 4000,
+        
+        // Polling interval for rent checks (ms)
+        RENT_CHECK_INTERVAL: 60000,
+        
+        // Max notifications to keep in memory per type
+        MAX_PER_TYPE: 50,
+        
+        // Colors for each notification type
+        COLORS: {
+            user: { primary: 'rgba(59, 130, 246, 0.7)', glow: 'rgba(59, 130, 246, 0.4)' },      // Blue
+            listing: { primary: 'rgba(34, 197, 94, 0.7)', glow: 'rgba(34, 197, 94, 0.4)' },    // Green
+            photo: { primary: 'rgba(168, 85, 247, 0.7)', glow: 'rgba(168, 85, 247, 0.4)' },    // Purple
+            premium: { primary: 'rgba(245, 158, 11, 0.7)', glow: 'rgba(245, 158, 11, 0.4)' },  // Amber
+            rent: { primary: 'rgba(239, 68, 68, 0.7)', glow: 'rgba(239, 68, 68, 0.4)' }        // Red
+        },
+        
+        // Icons for each notification type
+        ICONS: {
+            user: '👤',
+            listing: '🏠',
+            photo: '📸',
+            premium: '👑',
+            rent: '💰'
+        },
+        
+        // Urgency levels
+        URGENCY: {
+            CRITICAL: 'critical',   // Red - needs immediate action
+            WARNING: 'warning',     // Orange/Yellow - needs attention soon
+            INFO: 'info'            // Blue/Green - informational
+        }
+    };
+
+    // =========================================================================
+    // STATE
+    // =========================================================================
+    
+    const state = {
+        // All active notifications (unified schema)
+        notifications: [],
+        
+        // Dismissed notification IDs (persisted to localStorage)
+        dismissed: new Set(),
+        
+        // Rent alerts (computed from properties, not stored in Firestore)
+        rentAlerts: {
+            overdue: [],    // Past due date
+            today: [],      // Due today
+            tomorrow: []    // Due tomorrow
+        },
+        
+        // Listener unsubscribe functions
+        listeners: {
+            users: null,
+            listings: null,
+            rentInterval: null
+        },
+        
+        // Initialization flags
+        initialized: false,
+        initialLoadComplete: {
+            users: false,
+            listings: false
+        },
+        
+        // Session tracking (for "While You Were Away" detection)
+        sessionStart: null,
+        lastAdminVisit: null,
+        
+        // Known IDs to detect new items
+        knownUserIds: new Set(),
+        knownListingIds: new Set()
+    };
+
+    // =========================================================================
+    // UNIFIED NOTIFICATION SCHEMA FACTORY
+    // =========================================================================
+    
+    /**
+     * Create a unified notification object from raw data
+     */
+    function createNotification(type, rawData, options = {}) {
+        const id = options.id || `${type}-${rawData.id || Date.now()}`;
+        const timestamp = options.timestamp || new Date().toISOString();
+        const isMissed = options.isMissed || false;
+        
+        // Base notification structure
+        const notification = {
+            id,
+            type,
+            timestamp,
+            isMissed,
+            urgency: CONFIG.URGENCY.INFO,
+            icon: CONFIG.ICONS[type],
+            data: rawData
+        };
+        
+        // Type-specific enrichment
+        switch (type) {
+            case 'user':
+                notification.title = isMissed ? '📬 While You Were Away...' : '👤 New User Registered!';
+                notification.subtitle = `${rawData.username || rawData.email?.split('@')[0] || 'Unknown'} created a Starter account`;
+                notification.action = {
+                    type: 'scrollToUser',
+                    target: rawData.id,
+                    tab: 'admin',
+                    subtab: 'allUsers',
+                    highlightSelector: `.admin-user-card[data-userid="${rawData.id}"]`
+                };
+                break;
+                
+            case 'listing':
+                const isPremium = rawData.isPremium && !rawData.premiumTrialEnds;
+                const isPremiumTrial = rawData.isPremium && rawData.premiumTrialEnds;
+                const ownerName = rawData.ownerName || rawData.ownerEmail?.split('@')[0] || 'Unknown';
+                notification.title = isMissed 
+                    ? (isPremiumTrial ? '🎁 Premium Trial Listing' : '📬 While You Were Away...')
+                    : (isPremium ? '👑 New Premium Listing!' : isPremiumTrial ? '🎁 New Premium Trial!' : '🏠 New Listing Posted!');
+                notification.subtitle = `${rawData.title || 'New Property'} by ${ownerName}`;
+                notification.ownerName = ownerName;
+                notification.urgency = isPremium ? CONFIG.URGENCY.WARNING : CONFIG.URGENCY.INFO;
+                notification.action = {
+                    type: 'scrollToUserByEmail',
+                    target: rawData.ownerEmail,
+                    propertyId: rawData.id,
+                    tab: 'admin',
+                    subtab: 'allUsers',
+                    highlightSelector: `.admin-user-card[data-email="${rawData.ownerEmail}"]`
+                };
+                notification.isPremium = isPremium;
+                notification.isPremiumTrial = isPremiumTrial;
+                break;
+                
+            case 'photo':
+                notification.title = '📸 Photo Service Request';
+                notification.subtitle = `${rawData.name || 'Someone'} requested photos for ${rawData.propertyAddress || 'a property'}`;
+                notification.urgency = CONFIG.URGENCY.INFO;
+                notification.action = {
+                    type: 'scrollToSection',
+                    target: 'photoRequestsSection',
+                    tab: 'admin',
+                    subtab: 'requests',
+                    highlightSelector: '#photoRequestsSection'
+                };
+                break;
+                
+            case 'premium':
+                notification.title = '👑 Premium Listing Request';
+                notification.subtitle = `${rawData.title || 'Property'} wants premium placement`;
+                notification.urgency = CONFIG.URGENCY.WARNING;
+                notification.action = {
+                    type: 'scrollToSection',
+                    target: 'pendingPremiumAlert',
+                    tab: 'admin',
+                    subtab: 'allUsers',
+                    highlightSelector: '#pendingPremiumAlert'
+                };
+                break;
+                
+            case 'rent':
+                const daysOverdue = rawData.daysOverdue || 0;
+                const isOverdue = daysOverdue > 0;
+                const isToday = rawData.isToday;
+                notification.title = isOverdue 
+                    ? `🚨 OVERDUE: ${daysOverdue} day${daysOverdue > 1 ? 's' : ''}`
+                    : isToday 
+                        ? '⏰ Due Today'
+                        : '📅 Due Tomorrow';
+                notification.subtitle = `${rawData.title || rawData.propertyId} - ${rawData.renter}`;
+                notification.urgency = isOverdue ? CONFIG.URGENCY.CRITICAL : isToday ? CONFIG.URGENCY.WARNING : CONFIG.URGENCY.INFO;
+                notification.action = {
+                    type: 'scrollToRent',
+                    target: rawData.propertyId,
+                    tab: 'myProperties',
+                    highlightSelector: `#rent-item-${rawData.propertyId}`
+                };
+                break;
+        }
+        
+        return notification;
+    }
+
+    // =========================================================================
+    // STATE MANAGEMENT
+    // =========================================================================
+    
+    function addNotification(notification) {
+        if (state.dismissed.has(notification.id)) return;
+        
+        const exists = state.notifications.find(n => n.id === notification.id);
+        if (exists) return;
+        
+        state.notifications.unshift(notification);
+        
+        // Trim if over max
+        const byType = state.notifications.filter(n => n.type === notification.type);
+        if (byType.length > CONFIG.MAX_PER_TYPE) {
+            const oldest = byType[byType.length - 1];
+            state.notifications = state.notifications.filter(n => n.id !== oldest.id);
+        }
+        
+        refreshUI();
+    }
+    
+    function dismissNotification(id) {
+        state.dismissed.add(id);
+        state.notifications = state.notifications.filter(n => n.id !== id);
+        
+        try {
+            localStorage.setItem('dismissedNotifications', JSON.stringify([...state.dismissed]));
+        } catch (e) {}
+        
+        // Remove the notification card from DOM
+        const card = document.getElementById(`notification-${id}`);
+        if (card) {
+            card.style.transition = 'opacity 0.3s, transform 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(100px)';
+            setTimeout(() => card.remove(), 300);
+        }
+        
+        refreshUI();
+    }
+    
+    function dismissAllOfType(type) {
+        const toRemove = state.notifications.filter(n => n.type === type);
+        toRemove.forEach(n => state.dismissed.add(n.id));
+        state.notifications = state.notifications.filter(n => n.type !== type);
+        
+        try {
+            localStorage.setItem('dismissedNotifications', JSON.stringify([...state.dismissed]));
+        } catch (e) {}
+        
+        refreshUI();
+    }
+    
+    function getCounts() {
+        const counts = {
+            user: 0,
+            listing: 0,
+            photo: 0,
+            premium: 0,
+            rent: 0,
+            total: 0
+        };
+        
+        state.notifications.forEach(n => {
+            if (counts.hasOwnProperty(n.type)) {
+                counts[n.type]++;
+                counts.total++;
+            }
+        });
+        
+        counts.rent = (state.rentAlerts.overdue?.length || 0) +
+                      (state.rentAlerts.today?.length || 0) +
+                      (state.rentAlerts.tomorrow?.length || 0);
+        counts.total += counts.rent;
+        
+        return counts;
+    }
+    
+    function getByType(type) {
+        return state.notifications.filter(n => n.type === type);
+    }
+
+    // =========================================================================
+    // CLICK ROUTING
+    // =========================================================================
+    
+    async function handleClick(notificationOrId) {
+        let notification;
+        if (typeof notificationOrId === 'string') {
+            notification = state.notifications.find(n => n.id === notificationOrId);
+            if (!notification) {
+                console.warn('[NotificationManager] Notification not found:', notificationOrId);
+                return;
+            }
+        } else {
+            notification = notificationOrId;
+        }
+        
+        const { action } = notification;
+        if (!action) {
+            console.warn('[NotificationManager] Notification has no action:', notification);
+            return;
+        }
+        
+        console.log('[NotificationManager] Handling click:', notification.type, action);
+        
+        // Step 1: Ensure dashboard is visible
+        if (typeof window.goToDashboard === 'function') {
+            window.goToDashboard();
+        }
+        await sleep(300);
+        
+        // Step 2: Switch to correct dashboard tab
+        if (action.tab && typeof window.switchDashboardTab === 'function') {
+            window.switchDashboardTab(action.tab);
+            await sleep(200);
+        }
+        
+        // Step 3: Switch to correct admin subtab (if applicable)
+        if (action.subtab && typeof window.switchAdminTab === 'function') {
+            window.switchAdminTab(action.subtab);
+            await sleep(200);
+        }
+        
+        // Step 4: Scroll and highlight
+        if (action.highlightSelector) {
+            await scrollToAndHighlight(action.highlightSelector, notification.type);
+        }
+    }
+    
+    /**
+     * Handle badge click - navigates to appropriate section based on type
+     * Used by dropdown and mobile badges
+     */
+    async function handleBadgeClick(type) {
+        console.log('[NotificationManager] Badge click:', type);
+        
+        // Ensure dashboard is visible
+        if (typeof window.goToDashboard === 'function') {
+            window.goToDashboard();
+        }
+        await sleep(300);
+        
+        // Route based on notification type
+        switch (type) {
+            case 'user':
+            case 'listing':
+                // Navigate to admin panel, All Users tab, scroll to notification stack
+                if (typeof window.switchDashboardTab === 'function') {
+                    window.switchDashboardTab('admin');
+                    await sleep(200);
+                }
+                if (typeof window.switchAdminTab === 'function') {
+                    window.switchAdminTab('allUsers');
+                    await sleep(200);
+                }
+                // Highlight the notification stack
+                await scrollToAndHighlight('#adminNotificationsStack', type);
+                break;
+                
+            case 'photo':
+                // Navigate to admin panel, Requests tab, scroll to photo section
+                if (typeof window.switchDashboardTab === 'function') {
+                    window.switchDashboardTab('admin');
+                    await sleep(200);
+                }
+                if (typeof window.switchAdminTab === 'function') {
+                    window.switchAdminTab('requests');
+                    await sleep(200);
+                }
+                await scrollToAndHighlight('#photoRequestsSection', type);
+                break;
+                
+            case 'premium':
+                // Navigate to admin panel, All Users tab, scroll to premium alert
+                if (typeof window.switchDashboardTab === 'function') {
+                    window.switchDashboardTab('admin');
+                    await sleep(200);
+                }
+                if (typeof window.switchAdminTab === 'function') {
+                    window.switchAdminTab('allUsers');
+                    await sleep(200);
+                }
+                await scrollToAndHighlight('#pendingPremiumAlert', type);
+                break;
+                
+            case 'rent':
+                // Navigate to My Properties tab, scroll to rent panel
+                if (typeof window.switchDashboardTab === 'function') {
+                    window.switchDashboardTab('myProperties');
+                    await sleep(200);
+                }
+                await scrollToAndHighlight('#rentNotificationsPanel', type);
+                break;
+                
+            default:
+                console.warn('[NotificationManager] Unknown badge type:', type);
+        }
+    }
+    
+    async function scrollToAndHighlight(selector, type) {
+        const colors = CONFIG.COLORS[type] || CONFIG.COLORS.user;
+        
+        const element = await waitForElement(selector, 5000);
+        
+        if (!element) {
+            console.warn('[NotificationManager] Element not found:', selector);
+            return;
+        }
+        
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        const originalBoxShadow = element.style.boxShadow;
+        element.style.boxShadow = `0 0 0 4px ${colors.primary}, 0 0 30px ${colors.glow}`;
+        element.style.transition = 'box-shadow 0.3s ease';
+        
+        setTimeout(() => {
+            element.style.boxShadow = originalBoxShadow || '';
+        }, CONFIG.HIGHLIGHT_DURATION);
+    }
+    
+    function waitForElement(selector, maxWait = 5000) {
+        return new Promise(resolve => {
+            const startTime = Date.now();
+            
+            function check() {
+                const element = document.querySelector(selector);
+                if (element) {
+                    resolve(element);
+                } else if (Date.now() - startTime > maxWait) {
+                    resolve(null);
+                } else {
+                    setTimeout(check, 100);
+                }
+            }
+            
+            check();
+        });
+    }
+    
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // =========================================================================
+    // UI UPDATES
+    // =========================================================================
+    
+    function refreshUI() {
+        refreshBadges();
+        refreshPanels();
+    }
+    
+    function refreshBadges() {
+        const counts = getCounts();
+        
+        // Dropdown badges
+        updateBadge('dropdownUserBadge', 'dropdownUserCount', counts.user);
+        updateBadge('dropdownListingBadge', 'dropdownListingCount', counts.listing);
+        updateBadge('dropdownPhotoBadge', 'dropdownPhotoCount', counts.photo);
+        updateBadge('dropdownPremiumBadge', 'dropdownPremiumCount', counts.premium);
+        updateBadge('dropdownRentBadge', 'dropdownRentCount', counts.rent);
+        
+        // Mobile badges
+        const mobileAdminTotal = counts.user + counts.listing + counts.photo + counts.premium;
+        updateBadge('mobileAdminBadge', 'mobileAdminCount', mobileAdminTotal);
+        updateBadge('mobileRentBadge', 'mobileRentCount', counts.rent);
+        
+        console.log('[NotificationManager] Badges refreshed:', counts);
+    }
+    
+    function updateBadge(badgeId, countId, count) {
+        const badge = document.getElementById(badgeId);
+        const countEl = document.getElementById(countId);
+        
+        if (!badge) return;
+        
+        if (count > 0) {
+            badge.classList.remove('hidden');
+            if (countEl) countEl.textContent = count;
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+    
+    function refreshPanels() {
+        renderNotificationStack();
+        renderRentAlertsPanel();
+    }
+    
+    function renderNotificationStack() {
+        const stack = document.getElementById('adminNotificationsStack');
+        if (!stack) return;
+        
+        if (!window.TierService?.isMasterAdmin(window.auth?.currentUser?.email)) {
+            stack.classList.add('hidden');
+            return;
+        }
+        
+        const stackNotifications = state.notifications.filter(n => 
+            n.type === 'user' || n.type === 'listing'
+        );
+        
+        if (stackNotifications.length === 0) {
+            stack.classList.add('hidden');
+            return;
+        }
+        
+        stack.classList.remove('hidden');
+        
+        let html = '';
+        stackNotifications.forEach(notification => {
+            html += renderNotificationCard(notification);
+        });
+        
+        stack.innerHTML = html;
+    }
+    
+    function renderNotificationCard(notification) {
+        const { id, type, title, subtitle, timestamp, isMissed, isPremium, isPremiumTrial } = notification;
+        
+        let gradientClass, icon;
+        
+        if (type === 'user') {
+            gradientClass = isMissed 
+                ? 'from-orange-600 to-amber-600 border-orange-500'
+                : 'from-cyan-600 to-blue-600 border-cyan-500';
+            icon = isMissed ? '📬' : '👤';
+        } else if (type === 'listing') {
+            if (isPremium) {
+                gradientClass = 'from-amber-600 to-yellow-500 border-amber-400';
+                icon = '👑';
+            } else if (isPremiumTrial) {
+                gradientClass = 'from-cyan-600 to-blue-600 border-cyan-400';
+                icon = '🎁';
+            } else {
+                gradientClass = isMissed 
+                    ? 'from-emerald-700 to-green-600 border-emerald-500'
+                    : 'from-green-600 to-teal-600 border-green-500';
+                icon = isMissed ? '📬' : '🏠';
+            }
+        }
+        
+        const timeDisplay = new Date(timestamp).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        });
+        
+        let premiumBadge = '';
+        if (isPremium) {
+            premiumBadge = `
+                <div class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded mt-2 animate-pulse">
+                    ⚠️ COLLECT $10,000/week PAYMENT
+                </div>
+            `;
+        } else if (isPremiumTrial) {
+            premiumBadge = `<div class="text-cyan-300 text-xs mt-1">Free trial - no payment needed</div>`;
+        }
+        
+        return `
+            <div id="notification-${id}" 
+                 class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new cursor-pointer" 
+                 onclick="NotificationManager.handleClick('${id}')">
+                <button onclick="event.stopPropagation(); NotificationManager.dismiss('${id}')" 
+                        class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
+                    ✕
+                </button>
+                <div class="flex items-center gap-4 pr-8">
+                    <span class="text-3xl">${icon}</span>
+                    <div class="flex-1">
+                        <div class="text-white font-bold text-lg">${title}</div>
+                        <div class="text-white/90">${subtitle}</div>
+                        ${premiumBadge}
+                        <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    function renderRentAlertsPanel() {
+        const panel = document.getElementById('rentNotificationsPanel');
+        if (!panel) return;
+        
+        if (!window.auth?.currentUser?.email) {
+            panel.classList.add('hidden');
+            return;
+        }
+        
+        const { overdue, today, tomorrow } = state.rentAlerts;
+        const total = overdue.length + today.length + tomorrow.length;
+        
+        if (total === 0) {
+            panel.classList.add('hidden');
+            return;
+        }
+        
+        panel.classList.remove('hidden');
+        
+        const isUrgent = overdue.length > 0;
+        const isWarning = today.length > 0;
+        
+        const borderColor = isUrgent ? 'border-red-500/70' : isWarning ? 'border-orange-500/70' : 'border-yellow-500/70';
+        const headerGradient = isUrgent ? 'from-red-600 to-red-700' : isWarning ? 'from-orange-500 to-red-500' : 'from-yellow-500 to-orange-400';
+        const headerIcon = isUrgent ? '🚨' : isWarning ? '⏰' : '📅';
+        
+        let html = `
+            <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 ${borderColor}">
+                <div class="bg-gradient-to-r ${headerGradient} px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">${headerIcon}</span>
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Rent Collection Alert</h3>
+                                <p class="text-white/80 text-sm">${total} payment${total !== 1 ? 's' : ''} need${total === 1 ? 's' : ''} attention</p>
+                            </div>
+                        </div>
+                        <button onclick="NotificationManager.toggleRentPanel()" id="rentPanelToggle" class="text-white/80 hover:text-white transition">
+                            <svg class="w-6 h-6 transform transition-transform" id="rentPanelArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="rentPanelContent" class="p-4 space-y-4">
+        `;
+        
+        if (overdue.length > 0) {
+            html += `
+                <div class="bg-red-900/30 rounded-xl p-4 border border-red-500/50">
+                    <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                        <span>🚨</span> OVERDUE (${overdue.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${overdue.map(rent => renderRentItem(rent, 'overdue')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (today.length > 0) {
+            html += `
+                <div class="bg-orange-900/30 rounded-xl p-4 border border-orange-500/50">
+                    <h4 class="text-orange-400 font-bold mb-3 flex items-center gap-2">
+                        <span>⏰</span> DUE TODAY (${today.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${today.map(rent => renderRentItem(rent, 'today')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (tomorrow.length > 0) {
+            html += `
+                <div class="bg-yellow-900/30 rounded-xl p-4 border border-yellow-500/50">
+                    <h4 class="text-yellow-400 font-bold mb-3 flex items-center gap-2">
+                        <span>📅</span> DUE TOMORROW (${tomorrow.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${tomorrow.map(rent => renderRentItem(rent, 'tomorrow')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        panel.innerHTML = html;
+    }
+    
+    function renderRentItem(rent, status) {
+        const statusColors = {
+            overdue: 'text-red-300',
+            today: 'text-orange-300',
+            tomorrow: 'text-yellow-300'
+        };
+        
+        const propertyId = rent.propId || rent.propertyId || rent.id;
+        const rentAmount = rent.weeklyPrice || rent.rentAmount || 0;
+        const renterName = rent.renter || 'Unknown';
+        const propertyTitle = rent.title || `Property ${propertyId}`;
+        
+        return `
+            <div id="rent-item-${propertyId}" class="bg-gray-800/50 rounded-lg p-3 flex items-center justify-between gap-3">
+                <div class="flex-1 min-w-0 cursor-pointer" onclick="viewPropertyStats(${propertyId})">
+                    <div class="text-white font-medium truncate">${propertyTitle}</div>
+                    <div class="text-gray-400 text-sm">Renter: ${renterName}</div>
+                    <div class="${statusColors[status]} text-xs">Due: ${rent.dueDate || rent.nextRentDue || 'Unknown'}</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-white font-bold">$${rentAmount.toLocaleString()}</div>
+                    <button onclick="event.stopPropagation(); NotificationManager.copyRentReminder('${propertyId}', '${renterName.replace(/'/g, "\\'")}', '${propertyTitle.replace(/'/g, "\\'")}', ${rentAmount})" 
+                            class="text-cyan-400 hover:text-cyan-300 text-xs mt-1 flex items-center gap-1">
+                        📋 Copy Reminder
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    function toggleRentPanel() {
+        const content = document.getElementById('rentPanelContent');
+        const arrow = document.getElementById('rentPanelArrow');
+        
+        if (content && arrow) {
+            content.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+    }
+    
+    function copyRentReminder(propertyId, renterName, propertyTitle, amount) {
+        const message = `Hey ${renterName}! 👋 Just a friendly reminder that rent for ${propertyTitle} ($${amount.toLocaleString()}) is due. Please send payment when you get a chance. Thanks! 🏠`;
+        
+        navigator.clipboard.writeText(message).then(() => {
+            // Show toast notification
+            if (typeof window.showToast === 'function') {
+                window.showToast('Reminder copied to clipboard!', 'success');
+            } else {
+                alert('Reminder copied to clipboard!');
+            }
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+
+    // =========================================================================
+    // DATA FETCHING & LISTENERS
+    // =========================================================================
+    
+    async function init() {
+        if (state.initialized) {
+            console.log('[NotificationManager] Already initialized');
+            return;
+        }
+        
+        const currentUser = window.auth?.currentUser;
+        if (!currentUser) {
+            console.log('[NotificationManager] No user logged in, skipping init');
+            return;
+        }
+        
+        console.log('[NotificationManager] Initializing for:', currentUser.email);
+        
+        // Load dismissed state
+        try {
+            const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
+            state.dismissed = new Set(dismissed);
+        } catch (e) {}
+        
+        // Load last admin visit time
+        try {
+            const lastVisit = localStorage.getItem('adminLastVisit');
+            if (lastVisit) {
+                state.lastAdminVisit = new Date(lastVisit);
+            }
+        } catch (e) {}
+        
+        state.sessionStart = new Date();
+        
+        const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
+        
+        if (isAdmin) {
+            startUserListener();
+            startListingListener();
+            
+            // Save admin visit time
+            try {
+                localStorage.setItem('adminLastVisit', new Date().toISOString());
+            } catch (e) {}
+        }
+        
+        // All users get rent checks
+        await checkRentDue();
+        state.listeners.rentInterval = setInterval(checkRentDue, CONFIG.RENT_CHECK_INTERVAL);
+        
+        state.initialized = true;
+        refreshUI();
+        
+        console.log('[NotificationManager] Initialization complete');
+    }
+    
+    function destroy() {
+        if (state.listeners.users) state.listeners.users();
+        if (state.listeners.listings) state.listeners.listings();
+        if (state.listeners.rentInterval) clearInterval(state.listeners.rentInterval);
+        
+        state.notifications = [];
+        state.rentAlerts = { overdue: [], today: [], tomorrow: [] };
+        state.initialized = false;
+        state.knownUserIds.clear();
+        state.knownListingIds.clear();
+        
+        console.log('[NotificationManager] Destroyed');
+    }
+    
+    function startUserListener() {
+        if (state.listeners.users) state.listeners.users();
+        
+        state.listeners.users = window.db.collection('users')
+            .orderBy('createdAt', 'desc')
+            .limit(50)
+            .onSnapshot(snapshot => {
+                snapshot.docs.forEach(doc => {
+                    const userId = doc.id;
+                    const user = { id: userId, ...doc.data() };
+                    const createdAt = user.createdAt?.toDate?.();
+                    
+                    if (!state.initialLoadComplete.users) {
+                        // Initial load - check for missed notifications
+                        state.knownUserIds.add(userId);
+                        
+                        if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
+                            const notification = createNotification('user', user, {
+                                id: `user-${userId}`,
+                                timestamp: createdAt.toISOString(),
+                                isMissed: true
+                            });
+                            addNotification(notification);
+                        }
+                    } else {
+                        // Real-time - check for new users
+                        if (!state.knownUserIds.has(userId)) {
+                            state.knownUserIds.add(userId);
+                            const notification = createNotification('user', user, {
+                                id: `user-${userId}`,
+                                isMissed: false
+                            });
+                            addNotification(notification);
+                        }
+                    }
+                });
+                
+                state.initialLoadComplete.users = true;
+            }, error => {
+                console.error('[NotificationManager] Users listener error:', error);
+            });
+    }
+    
+    function startListingListener() {
+        if (state.listeners.listings) state.listeners.listings();
+        
+        state.listeners.listings = window.db.collection('settings').doc('properties')
+            .onSnapshot(doc => {
+                if (!doc.exists) return;
+                
+                const properties = doc.data();
+                
+                Object.entries(properties).forEach(([propId, prop]) => {
+                    if (!prop) return;
+                    
+                    const createdAt = prop.createdAtTimestamp?.toDate?.() || 
+                                     (prop.createdAt ? new Date(prop.createdAt) : null);
+                    
+                    if (!state.initialLoadComplete.listings) {
+                        // Initial load
+                        state.knownListingIds.add(propId);
+                        
+                        // Skip admin's own listings
+                        if (prop.ownerEmail === window.auth?.currentUser?.email) return;
+                        
+                        if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
+                            const listing = { id: parseInt(propId), ...prop };
+                            const notification = createNotification('listing', listing, {
+                                id: `listing-${propId}`,
+                                timestamp: createdAt.toISOString(),
+                                isMissed: true
+                            });
+                            addNotification(notification);
+                        }
+                    } else {
+                        // Real-time
+                        if (!state.knownListingIds.has(propId)) {
+                            state.knownListingIds.add(propId);
+                            
+                            // Skip admin's own listings
+                            if (prop.ownerEmail === window.auth?.currentUser?.email) return;
+                            
+                            const listing = { id: parseInt(propId), ...prop };
+                            const notification = createNotification('listing', listing, {
+                                id: `listing-${propId}`,
+                                isMissed: false
+                            });
+                            addNotification(notification);
+                        }
+                    }
+                });
+                
+                state.initialLoadComplete.listings = true;
+            }, error => {
+                console.error('[NotificationManager] Listings listener error:', error);
+            });
+    }
+    
+    async function checkRentDue() {
+        const currentUser = window.auth?.currentUser;
+        if (!currentUser) return;
+        
+        try {
+            const propsDoc = await window.db.collection('settings').doc('properties').get();
+            if (!propsDoc.exists) return;
+            
+            const properties = propsDoc.data();
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const tomorrowStr = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
+            
+            const overdue = [];
+            const dueToday = [];
+            const dueTomorrow = [];
+            
+            const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
+            
+            Object.entries(properties).forEach(([propId, prop]) => {
+                if (!prop || !prop.renter || !prop.nextRentDue) return;
+                
+                // Only check properties owned by current user OR all if admin
+                if (!isAdmin && prop.ownerEmail !== currentUser.email) return;
+                
+                const dueDate = prop.nextRentDue.split('T')[0];
+                const rentData = {
+                    propId,
+                    propertyId: propId,
+                    id: propId,
+                    ...prop,
+                    dueDate
+                };
+                
+                if (dueDate < todayStr) {
+                    const dueDateObj = new Date(dueDate);
+                    const daysOverdue = Math.floor((now - dueDateObj) / 86400000);
+                    rentData.daysOverdue = daysOverdue;
+                    overdue.push(rentData);
+                } else if (dueDate === todayStr) {
+                    rentData.isToday = true;
+                    dueToday.push(rentData);
+                } else if (dueDate === tomorrowStr) {
+                    dueTomorrow.push(rentData);
+                }
+            });
+            
+            state.rentAlerts = {
+                overdue,
+                today: dueToday,
+                tomorrow: dueTomorrow
+            };
+            
+            refreshUI();
+            
+        } catch (error) {
+            console.error('[NotificationManager] Error checking rent due:', error);
+        }
+    }
+
+    // =========================================================================
+    // BACKWARD COMPATIBILITY
+    // =========================================================================
+    
+    const AdminNotificationsCompat = {
+        get rentNotifications() { return state.rentAlerts; },
+        get visible() {
+            const map = new Map();
+            state.notifications.forEach(n => {
+                map.set(n.id, { type: `new-${n.type}-`, content: n });
+            });
+            return map;
+        },
+        dismissed: state.dismissed,
+        get counts() { return getCounts(); }
+    };
+    
+    const AdminNotifStateCompat = {
+        get rentNotifications() { return state.rentAlerts; },
+        get currentNotifications() { return state.notifications; },
+        seenThisSession: { users: new Set(), listings: new Set(), photos: new Set(), premium: new Set() },
+        listeners: state.listeners,
+        initialized: {
+            get users() { return state.initialized; },
+            get listings() { return state.initialized; },
+            get photos() { return state.initialized; },
+            get premium() { return state.initialized; }
+        }
+    };
+
+    // =========================================================================
+    // PUBLIC API
+    // =========================================================================
+    
+    window.NotificationManager = {
+        // State
+        get state() { return state; },
+        get notifications() { return state.notifications; },
+        get rentAlerts() { return state.rentAlerts; },
+        
+        // Core
+        init,
+        destroy,
+        
+        // Notification management
+        add: addNotification,
+        dismiss: dismissNotification,
+        dismissAll: dismissAllOfType,
+        
+        // Getters
+        getCounts,
+        getByType,
+        
+        // Actions
+        handleClick,
+        handleBadgeClick,
+        
+        // UI
+        refreshUI,
+        refreshBadges,
+        refreshPanels,
+        
+        // Rent
+        checkRentDue,
+        toggleRentPanel,
+        copyRentReminder,
+        
+        // Utilities
+        createNotification,
+        scrollToAndHighlight,
+        
+        CONFIG
+    };
+    
+    // Backward compatibility
+    window.AdminNotifications = AdminNotificationsCompat;
+    window.AdminNotifState = AdminNotifStateCompat;
+    
+    // Legacy aliases
+    window.initAdminNotifications = init;
+    window.initAdminNotificationSystem = init;
+    window.initRentNotifications = checkRentDue;
+    window.checkRentDueNotifications = checkRentDue;
+    window.renderRentNotificationsPanel = renderRentAlertsPanel;
+    window.updateMobileRentBadge = refreshBadges;
+    window.updateMobileAdminBadges = refreshBadges;
+
+    console.log('[NotificationManager] Module loaded');
+
+})();

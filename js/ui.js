@@ -2441,22 +2441,14 @@ function renderOwnerDashboard() {
     // Load user notifications
     loadUserNotifications();
     
-    // Check rent due notifications (for all property owners)
-    if (typeof checkRentDueNotifications === 'function') {
-        checkRentDueNotifications();
-    }
-    // Render the rent notifications panel
-    renderRentNotificationsPanel();
-    
-    // Update mobile rent badge for all users
-    if (typeof updateMobileRentBadge === 'function') {
-        updateMobileRentBadge();
-    }
-    
-    // Update admin-specific mobile badges
-    if (TierService.isMasterAdmin(auth.currentUser?.email)) {
-        if (typeof updateMobileAdminBadges === 'function') {
-            updateMobileAdminBadges();
+    // Initialize NotificationManager (handles rent alerts, badges, etc.)
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.init) {
+        // Only init if not already initialized
+        if (!NotificationManager.getState().isInitialized) {
+            NotificationManager.init();
+        } else {
+            // Just refresh the rent check and badges
+            NotificationManager.checkRentDue();
         }
     }
     
@@ -4655,7 +4647,7 @@ window.showNewListingNotification = function(listing, isMissed = false) {
     
     const notificationHTML = `
         <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new" 
-             onclick="viewPropertyStats(${listing.id})">
+             onclick="handleListingNotificationClick('${listing.ownerEmail}', ${listing.id})">
             <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
                     class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
                 ✕
@@ -4674,6 +4666,65 @@ window.showNewListingNotification = function(listing, isMissed = false) {
     `;
     
     stack.insertAdjacentHTML('afterbegin', notificationHTML);
+};
+
+/**
+ * Handle click on listing notification - navigate to user who created the listing
+ */
+window.handleListingNotificationClick = async function(ownerEmail, listingId) {
+    console.log('[Notification] Listing click - navigating to user:', ownerEmail);
+    
+    // Ensure we're on the dashboard
+    if (typeof goToDashboard === 'function') {
+        goToDashboard();
+    }
+    await sleep(300);
+    
+    // Switch to Admin Panel tab
+    if (typeof switchDashboardTab === 'function') {
+        switchDashboardTab('admin');
+    }
+    await sleep(200);
+    
+    // Make sure we're on All Users subtab
+    if (typeof switchAdminTab === 'function') {
+        switchAdminTab('allUsers');
+    }
+    await sleep(200);
+    
+    // Expand all user groups to ensure the user is visible
+    const groups = ['ownerGroup', 'eliteGroup', 'proGroup', 'starterGroup'];
+    groups.forEach(groupId => {
+        const group = document.getElementById(groupId);
+        const toggle = document.getElementById(groupId + 'Toggle');
+        if (group && group.classList.contains('hidden')) {
+            group.classList.remove('hidden');
+            if (toggle) toggle.textContent = '▼';
+        }
+    });
+    await sleep(100);
+    
+    // Find user card by email
+    const userCard = document.querySelector(`.admin-user-card[data-email="${ownerEmail}"]`);
+    
+    if (userCard) {
+        userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Highlight with green (listing color)
+        const highlightColor = 'rgba(34, 197, 94, 0.7)';
+        userCard.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+        userCard.style.transition = 'box-shadow 0.3s ease';
+        
+        setTimeout(() => {
+            userCard.style.boxShadow = '';
+        }, 4000);
+    } else {
+        console.warn('[Notification] User card not found for email:', ownerEmail);
+        // Fallback: open property stats
+        if (typeof viewPropertyStats === 'function') {
+            viewPropertyStats(listingId);
+        }
+    }
 };
 
 // Log admin activity for history
@@ -4890,16 +4941,56 @@ window.showNewUserNotification = function(user, isMissed = false) {
 };
 
 // Handle click on new user notification - navigate and highlight user
-window.handleNewUserNotificationClick = function(userId) {
-    // Use the enterprise scroll-to-highlight pattern
-    scrollToAndHighlightElement({
-        targetSelector: `.admin-user-card[data-userid="${userId}"]`,
-        tabName: 'admin',
-        maxWaitMs: 5000,
-        highlightColor: 'rgba(251, 146, 60, 0.8)',
-        glowColor: 'rgba(251, 146, 60, 0.5)',
-        onNotFound: () => console.log('[Notification] User card not found for userId:', userId)
+window.handleNewUserNotificationClick = async function(userId) {
+    console.log('[Notification] User click - navigating to user:', userId);
+    
+    // Ensure we're on the dashboard
+    if (typeof goToDashboard === 'function') {
+        goToDashboard();
+    }
+    await sleep(300);
+    
+    // Switch to Admin Panel tab
+    if (typeof switchDashboardTab === 'function') {
+        switchDashboardTab('admin');
+    }
+    await sleep(200);
+    
+    // Make sure we're on All Users subtab
+    if (typeof switchAdminTab === 'function') {
+        switchAdminTab('allUsers');
+    }
+    await sleep(200);
+    
+    // Expand all user groups to ensure the user is visible
+    const groups = ['ownerGroup', 'eliteGroup', 'proGroup', 'starterGroup'];
+    groups.forEach(groupId => {
+        const group = document.getElementById(groupId);
+        const toggle = document.getElementById(groupId + 'Toggle');
+        if (group && group.classList.contains('hidden')) {
+            group.classList.remove('hidden');
+            if (toggle) toggle.textContent = '▼';
+        }
     });
+    await sleep(100);
+    
+    // Find user card by userid
+    const userCard = document.querySelector(`.admin-user-card[data-userid="${userId}"]`);
+    
+    if (userCard) {
+        userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Highlight with blue (user color)
+        const highlightColor = 'rgba(59, 130, 246, 0.7)';
+        userCard.style.boxShadow = `0 0 0 4px ${highlightColor}, 0 0 30px ${highlightColor.replace('0.7', '0.4')}`;
+        userCard.style.transition = 'box-shadow 0.3s ease';
+        
+        setTimeout(() => {
+            userCard.style.boxShadow = '';
+        }, 4000);
+    } else {
+        console.warn('[Notification] User card not found for userId:', userId);
+    }
 };
 
 /**
@@ -6221,17 +6312,17 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         `;
     }
     
-    // Owner/Admin section (collapsed by default)
+    // Owner/Admin section (expanded by default)
     if (groups.owner.length > 0) {
         html += `
             <div class="mb-6">
                 <div class="flex items-center gap-2 mb-3 pb-2 border-b border-red-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('ownerGroup')">
-                    <span id="ownerGroupToggle" class="text-gray-400 transition">▶</span>
+                    <span id="ownerGroupToggle" class="text-gray-400 transition">▼</span>
                     <span class="text-xl">👑</span>
                     <h5 class="text-red-400 font-bold">Owner / Admin</h5>
                     <span class="text-gray-500 text-sm">(${groups.owner.length})</span>
                 </div>
-                <div id="ownerGroup" class="space-y-3 hidden">
+                <div id="ownerGroup" class="space-y-3">
                     ${groups.owner.map(renderUserCard).join('')}
                 </div>
             </div>

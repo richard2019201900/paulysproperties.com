@@ -803,19 +803,19 @@
                                     </div>
                                     <!-- Notification badges inline - each clickable separately -->
                                     <div id="dropdownNotifBadges" class="flex items-center gap-1" onclick="event.stopPropagation()">
-                                        <span id="dropdownRentBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-red-500" title="Rent due - Click to view" onclick="goToRentAlerts(); closeUserDropdown()">
+                                        <span id="dropdownRentBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-red-500" title="Rent due - Click to view" onclick="NotificationManager.handleBadgeClick('rent'); closeUserDropdown()">
                                             <span id="dropdownRentCount">0</span>
                                         </span>
-                                        <span id="dropdownUserBadge" class="hidden bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-blue-400" title="New users" onclick="goToAdminNotifications('users'); closeUserDropdown()">
+                                        <span id="dropdownUserBadge" class="hidden bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-blue-400" title="New users" onclick="NotificationManager.handleBadgeClick('user'); closeUserDropdown()">
                                             <span id="dropdownUserCount">0</span>
                                         </span>
-                                        <span id="dropdownListingBadge" class="hidden bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-green-400" title="New listings" onclick="goToAdminNotifications('listings'); closeUserDropdown()">
+                                        <span id="dropdownListingBadge" class="hidden bg-green-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-green-400" title="New listings" onclick="NotificationManager.handleBadgeClick('listing'); closeUserDropdown()">
                                             <span id="dropdownListingCount">0</span>
                                         </span>
-                                        <span id="dropdownPremiumBadge" class="hidden bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-amber-400" title="Premium" onclick="goToAdminNotifications('premium'); closeUserDropdown()">
+                                        <span id="dropdownPremiumBadge" class="hidden bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-amber-400" title="Premium" onclick="NotificationManager.handleBadgeClick('premium'); closeUserDropdown()">
                                             <span id="dropdownPremiumCount">0</span>
                                         </span>
-                                        <span id="dropdownPhotoBadge" class="hidden bg-purple-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-purple-400" title="Photo requests" onclick="goToAdminNotifications('photo'); closeUserDropdown()">
+                                        <span id="dropdownPhotoBadge" class="hidden bg-purple-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-purple-400" title="Photo requests" onclick="NotificationManager.handleBadgeClick('photo'); closeUserDropdown()">
                                             <span id="dropdownPhotoCount">0</span>
                                         </span>
                                     </div>
@@ -870,12 +870,12 @@
                     </div>
                     <!-- Mobile Notification Badges -->
                     <div id="mobileNotificationBadges" class="flex items-center gap-2">
-                        <!-- Rent badge (admin only) -->
-                        <span id="mobileRentBadge" class="hidden bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Rent due">
+                        <!-- Rent badge (all property owners) -->
+                        <span id="mobileRentBadge" class="hidden bg-red-600 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="NotificationManager.handleBadgeClick('rent'); hideMobileMenu();" title="Rent due">
                             <span id="mobileRentCount">0</span>
                         </span>
-                        <!-- Combined notification badge -->
-                        <span id="mobileAdminBadge" class="hidden bg-blue-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="goToDashboard(); hideMobileMenu();" title="Notifications">
+                        <!-- Combined notification badge (admin only) -->
+                        <span id="mobileAdminBadge" class="hidden bg-blue-500 text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg animate-pulse cursor-pointer" onclick="NotificationManager.handleBadgeClick('user'); hideMobileMenu();" title="Notifications">
                             <span id="mobileAdminCount">0</span>
                         </span>
                         <!-- User notification badge -->
@@ -927,6 +927,11 @@
             <!-- Site Update Notification -->
             <div id="siteUpdateNotificationContainer" class="mb-6">
                 <!-- Site update notification will be inserted here by JS -->
+            </div>
+
+            <!-- RENT ALERTS - First thing users see -->
+            <div id="rentNotificationsPanel" class="hidden mb-6">
+                <!-- Rent notifications will be rendered here by NotificationManager -->
             </div>
 
             <!-- User Notifications Banner -->
@@ -1339,10 +1344,6 @@
 
             <!-- ==================== MY PROPERTIES TAB CONTENT ==================== -->
             <div id="myPropertiesTabContent">
-            <!-- Rent Due Notifications Panel (Owner's Properties Only) -->
-            <div id="rentNotificationsPanel" class="hidden mb-6">
-                <!-- Rent notifications will be rendered here by JS -->
-            </div>
 
             <!-- Username Section -->
             <div id="profileSettingsSection" class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
@@ -2121,9 +2122,10 @@
     <script src="js/data.js"></script>
     <script src="js/state.js"></script>
     <script src="js/services.js"></script>
+    <script src="js/notification-manager.js"></script>
     <script src="js/gamification.js"></script>
     <script src="js/ui-leaderboard.js"></script>
-    <script src="js/notifications-v2.js"></script>
+    <!-- notifications-v2.js removed - replaced by notification-manager.js -->
     <script src="js/components.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/filters.js"></script>
