@@ -94,13 +94,24 @@ window.viewProperty = function(id) {
         ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' 
         : '';
 
-    // Build images section - show placeholder if no images
+    // Build images section - horizontal scroll layout with large main image and thumbnails below
     const imagesSection = hasImages 
-        ? `<div class="relative grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 p-4 md:p-6">
+        ? `<div class="relative p-4 md:p-6">
             ${premiumImageBadge}
-            ${p.images.map((img, i) => `
-                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable w-full h-60 md:h-80 object-cover rounded-xl shadow-lg border border-gray-600 ${i === 0 ? 'md:col-span-2' : ''}" loading="lazy" onerror="${imgErrorHandler}">
-            `).join('')}
+            <!-- Main large image -->
+            <div class="mb-4">
+                <img src="${p.images[0]}" alt="${sanitize(p.title)} - Main Image" onclick="openLightbox(state.currentImages, 0)" class="img-clickable w-full h-72 md:h-[500px] object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy" onerror="${imgErrorHandler}">
+            </div>
+            <!-- Horizontal scroll thumbnails -->
+            ${p.images.length > 1 ? `
+            <div class="flex gap-3 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                ${p.images.slice(1).map((img, i) => `
+                    <div class="flex-shrink-0">
+                        <img src="${img}" alt="${sanitize(p.title)} - Image ${i+2}" onclick="openLightbox(state.currentImages, ${i+1})" class="img-clickable h-48 md:h-64 w-72 md:w-96 object-cover rounded-xl shadow-lg border border-gray-600 hover:border-purple-500 transition" loading="lazy" onerror="${imgErrorHandler}">
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
            </div>`
         : `<div class="relative p-4 md:p-6">
             ${premiumImageBadge}
@@ -712,26 +723,32 @@ function renderPropertyStatsContent(id) {
                     </div>
                 </div>
                 
-                <!-- Property Images Gallery -->
+                <!-- Property Images Gallery with Drag & Drop -->
                 <div id="property-images-section-${id}" class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8 transition-all duration-500">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
+                            <p class="text-gray-400 text-sm mt-1">Drag to reorder • First image is the main photo</p>
+                        </div>
                         <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            Add Image
+                            Add Images
                         </button>
                     </div>
-                    <div class="flex gap-4 overflow-x-auto pb-4" id="images-grid-${id}">
+                    <div class="flex gap-4 overflow-x-auto pb-4" id="images-grid-${id}" data-property-id="${id}">
                         ${p.images.map((img, i) => `
-                            <div class="relative group flex-shrink-0">
-                                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable h-40 w-56 object-cover rounded-xl shadow-lg border border-gray-600" loading="lazy">
-                                <button onclick="deletePropertyImage(${id}, ${i}, '${img.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg" title="Delete image">
+                            <div class="relative group flex-shrink-0 draggable-image" draggable="true" data-index="${i}" data-property-id="${id}">
+                                <div class="absolute top-2 left-2 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded-lg font-bold cursor-grab active:cursor-grabbing">
+                                    ${i === 0 ? '⭐ Main' : `#${i + 1}`}
+                                </div>
+                                <img src="${img}" alt="${sanitize(p.title)} - Image ${i+1}" onclick="openLightbox(state.currentImages, ${i})" class="img-clickable h-40 w-56 object-cover rounded-xl shadow-lg border-2 border-gray-600 hover:border-purple-500 transition pointer-events-auto" loading="lazy">
+                                <button onclick="event.stopPropagation(); deletePropertyImage(${id}, ${i}, '${img.replace(/'/g, "\\'")}')" class="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-lg z-10" title="Delete image">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                 </button>
                             </div>
                         `).join('')}
                     </div>
-                    ${p.images.length === 0 ? '<p class="text-gray-500 text-center py-8">No images yet. Add some images to showcase your property!</p>' : ''}
+                    ${p.images.length === 0 ? '<p class="text-gray-500 text-center py-8">No images yet. Click "Add Images" to showcase your property!</p>' : ''}
                 </div>
                 
                 <!-- Renter & Payment Info -->
@@ -2953,7 +2970,8 @@ window.startEditField = function(field, propertyId, element) {
 // ==================== IMAGE MANAGEMENT ====================
 window.openAddImageModal = function(propertyId) {
     window.currentImagePropertyId = propertyId;
-    $('newImageUrl').value = '';
+    const textarea = $('newImageUrls');
+    if (textarea) textarea.value = '';
     hideElement($('addImageError'));
     openModal('addImageModal');
 };
@@ -2963,39 +2981,56 @@ window.closeAddImageModal = function() {
     window.currentImagePropertyId = null;
 };
 
-window.saveNewImage = async function() {
+// Updated to handle multiple image URLs (bulk paste)
+window.saveNewImages = async function() {
     const propertyId = window.currentImagePropertyId;
     if (!propertyId) return;
     
-    const imageUrl = $('newImageUrl').value.trim();
+    const textarea = $('newImageUrls');
+    const rawText = textarea ? textarea.value.trim() : '';
     const errorDiv = $('addImageError');
     
-    if (!imageUrl) {
-        errorDiv.textContent = 'Please enter an image URL';
+    if (!rawText) {
+        errorDiv.textContent = 'Please enter at least one image URL';
         showElement(errorDiv);
         return;
     }
     
-    // Basic URL validation
-    if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
-        errorDiv.textContent = 'Please enter a valid URL starting with http:// or https://';
+    // Parse URLs - split by newlines and filter empty lines
+    const urls = rawText.split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
+    
+    if (urls.length === 0) {
+        errorDiv.textContent = 'Please enter at least one image URL';
+        showElement(errorDiv);
+        return;
+    }
+    
+    // Validate all URLs
+    const invalidUrls = urls.filter(url => !url.startsWith('http://') && !url.startsWith('https://'));
+    if (invalidUrls.length > 0) {
+        errorDiv.textContent = `Invalid URL(s): ${invalidUrls.slice(0, 2).join(', ')}${invalidUrls.length > 2 ? '...' : ''}. URLs must start with http:// or https://`;
         showElement(errorDiv);
         return;
     }
     
     const btn = $('saveImageBtn');
     btn.disabled = true;
-    btn.textContent = 'Adding...';
+    btn.textContent = `Adding ${urls.length} image${urls.length > 1 ? 's' : ''}...`;
     
     try {
         const prop = properties.find(p => p.id === propertyId);
         if (!prop) throw new Error('Property not found');
         
-        // Add new image to array
-        prop.images.push(imageUrl);
+        // Initialize images array if needed
+        if (!prop.images) prop.images = [];
+        
+        // Add all new images to array
+        prop.images.push(...urls);
         state.currentImages = prop.images;
         
-        // Ensure owner info is set (especially for base properties being edited)
+        // Ensure owner info is set
         if (!prop.ownerEmail) {
             prop.ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
         }
@@ -3009,15 +3044,23 @@ window.saveNewImage = async function() {
         renderPropertyStatsContent(propertyId);
         closeAddImageModal();
         
+        // Show success toast
+        if (typeof showToast === 'function') {
+            showToast(`Added ${urls.length} image${urls.length > 1 ? 's' : ''} successfully!`, 'success');
+        }
+        
     } catch (error) {
-        console.error('Failed to add image:', error);
-        errorDiv.textContent = 'Failed to add image. Please try again.';
+        console.error('Failed to add images:', error);
+        errorDiv.textContent = 'Failed to add images. Please try again.';
         showElement(errorDiv);
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Add Image';
+        btn.textContent = 'Add Images';
     }
 };
+
+// Keep old function for backwards compatibility
+window.saveNewImage = window.saveNewImages;
 
 window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
     const prop = properties.find(p => p.id === propertyId);
@@ -3051,6 +3094,150 @@ window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
     } catch (error) {
         console.error('Failed to delete image:', error);
         alert('Failed to delete image. Please try again.');
+    }
+};
+
+// ==================== IMAGE DRAG & DROP REORDERING ====================
+// Initialize drag and drop for image reordering
+(function initImageDragDrop() {
+    let draggedElement = null;
+    let draggedIndex = null;
+    let draggedPropertyId = null;
+    
+    // Use event delegation on document
+    document.addEventListener('dragstart', function(e) {
+        const draggable = e.target.closest('.draggable-image');
+        if (!draggable) return;
+        
+        draggedElement = draggable;
+        draggedIndex = parseInt(draggable.dataset.index);
+        draggedPropertyId = parseInt(draggable.dataset.propertyId);
+        
+        // Add visual feedback
+        setTimeout(() => {
+            draggable.style.opacity = '0.5';
+        }, 0);
+        
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', draggedIndex);
+    });
+    
+    document.addEventListener('dragend', function(e) {
+        const draggable = e.target.closest('.draggable-image');
+        if (!draggable) return;
+        
+        draggable.style.opacity = '1';
+        
+        // Remove all drag-over styling
+        document.querySelectorAll('.draggable-image').forEach(el => {
+            el.classList.remove('drag-over-left', 'drag-over-right');
+        });
+        
+        draggedElement = null;
+        draggedIndex = null;
+        draggedPropertyId = null;
+    });
+    
+    document.addEventListener('dragover', function(e) {
+        const dropTarget = e.target.closest('.draggable-image');
+        if (!dropTarget || !draggedElement || dropTarget === draggedElement) return;
+        
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        // Determine if dropping before or after
+        const rect = dropTarget.getBoundingClientRect();
+        const midpoint = rect.left + rect.width / 2;
+        
+        // Remove previous drag-over styling from all
+        document.querySelectorAll('.draggable-image').forEach(el => {
+            el.classList.remove('drag-over-left', 'drag-over-right');
+        });
+        
+        // Add styling based on drop position
+        if (e.clientX < midpoint) {
+            dropTarget.classList.add('drag-over-left');
+        } else {
+            dropTarget.classList.add('drag-over-right');
+        }
+    });
+    
+    document.addEventListener('dragleave', function(e) {
+        const dropTarget = e.target.closest('.draggable-image');
+        if (!dropTarget) return;
+        
+        // Only remove if actually leaving the element
+        if (!dropTarget.contains(e.relatedTarget)) {
+            dropTarget.classList.remove('drag-over-left', 'drag-over-right');
+        }
+    });
+    
+    document.addEventListener('drop', async function(e) {
+        const dropTarget = e.target.closest('.draggable-image');
+        if (!dropTarget || !draggedElement || dropTarget === draggedElement) return;
+        
+        e.preventDefault();
+        
+        const targetIndex = parseInt(dropTarget.dataset.index);
+        const targetPropertyId = parseInt(dropTarget.dataset.propertyId);
+        
+        // Must be same property
+        if (draggedPropertyId !== targetPropertyId) return;
+        
+        // Determine final position based on drop location
+        const rect = dropTarget.getBoundingClientRect();
+        const midpoint = rect.left + rect.width / 2;
+        let newIndex = e.clientX < midpoint ? targetIndex : targetIndex + 1;
+        
+        // Adjust for moving from before to after
+        if (draggedIndex < newIndex) {
+            newIndex--;
+        }
+        
+        // Remove drag-over styling
+        dropTarget.classList.remove('drag-over-left', 'drag-over-right');
+        
+        // Reorder the images
+        await reorderPropertyImages(draggedPropertyId, draggedIndex, newIndex);
+    });
+})();
+
+// Reorder images and save to Firestore
+window.reorderPropertyImages = async function(propertyId, fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    
+    const prop = properties.find(p => p.id === propertyId);
+    if (!prop || !prop.images) return;
+    
+    console.log(`[Images] Reordering: moving index ${fromIndex} to ${toIndex}`);
+    
+    try {
+        // Remove from old position and insert at new position
+        const [movedImage] = prop.images.splice(fromIndex, 1);
+        prop.images.splice(toIndex, 0, movedImage);
+        state.currentImages = prop.images;
+        
+        // Ensure owner info is set
+        if (!prop.ownerEmail) {
+            prop.ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
+        }
+        
+        // Save to Firestore
+        await db.collection('settings').doc('properties').set({
+            [propertyId]: prop
+        }, { merge: true });
+        
+        // Re-render
+        renderPropertyStatsContent(propertyId);
+        
+        // Show success feedback
+        if (typeof showToast === 'function') {
+            showToast('Image order updated!', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Failed to reorder images:', error);
+        alert('Failed to reorder images. Please try again.');
     }
 };
 

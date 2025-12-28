@@ -1271,6 +1271,13 @@ window.navigateTo = function(section) {
     }
     
     showElement($('renterSection'));
+    
+    // Re-apply filters when navigating to properties section
+    // This ensures checkbox state matches displayed properties
+    if (section === 'properties' && typeof applyAllFilters === 'function') {
+        applyAllFilters();
+    }
+    
     setTimeout(() => $(section)?.scrollIntoView({ behavior: 'smooth' }), 100);
 };
 
@@ -1281,6 +1288,12 @@ window.goBack = function() {
     hideElement($('blogPage'));
     hideElement($('ownerDashboard'));
     showElement($('renterSection'));
+    
+    // Re-apply filters to ensure checkbox state matches displayed properties
+    if (typeof applyAllFilters === 'function') {
+        applyAllFilters();
+    }
+    
     $('properties').scrollIntoView({ behavior: 'smooth' });
 };
 
