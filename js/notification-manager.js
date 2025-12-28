@@ -367,11 +367,11 @@
                     await sleep(200);
                 }
                 if (typeof window.switchAdminTab === 'function') {
-                    window.switchAdminTab('allUsers');
+                    window.switchAdminTab('users');
                     await sleep(200);
                 }
-                // Highlight the notification stack
-                await scrollToAndHighlight('#adminNotificationsStack', type);
+                // Highlight the first notification card (not the container)
+                await scrollToAndHighlight('#adminNotificationsStack .admin-notification-new', type);
                 break;
                 
             case 'photo':
@@ -426,12 +426,42 @@
         
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
+        // Store original styles
         const originalBoxShadow = element.style.boxShadow;
-        element.style.boxShadow = `0 0 0 4px ${colors.primary}, 0 0 30px ${colors.glow}`;
-        element.style.transition = 'box-shadow 0.3s ease';
+        const originalTransition = element.style.transition;
+        const originalBorderRadius = element.style.borderRadius;
         
+        // Ensure border-radius is set for rounded highlight
+        if (!element.style.borderRadius && !element.classList.contains('rounded-xl')) {
+            element.style.borderRadius = '0.75rem'; // rounded-xl equivalent
+        }
+        
+        // Apply highlight with animation
+        element.style.transition = 'box-shadow 0.3s ease';
+        element.style.boxShadow = `0 0 0 4px ${colors.primary}, 0 0 30px ${colors.glow}`;
+        
+        // Add pulse effect by toggling intensity
+        let pulseCount = 0;
+        const pulseInterval = setInterval(() => {
+            pulseCount++;
+            if (pulseCount % 2 === 0) {
+                element.style.boxShadow = `0 0 0 4px ${colors.primary}, 0 0 30px ${colors.glow}`;
+            } else {
+                element.style.boxShadow = `0 0 0 3px ${colors.primary}, 0 0 20px ${colors.glow}`;
+            }
+            if (pulseCount >= 6) {
+                clearInterval(pulseInterval);
+            }
+        }, 200);
+        
+        // Remove highlight after duration
         setTimeout(() => {
+            clearInterval(pulseInterval);
             element.style.boxShadow = originalBoxShadow || '';
+            element.style.transition = originalTransition || '';
+            if (!originalBorderRadius) {
+                element.style.borderRadius = '';
+            }
         }, CONFIG.HIGHLIGHT_DURATION);
     }
     
