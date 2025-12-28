@@ -574,7 +574,7 @@
         
         return `
             <div id="notification-${id}" 
-                 class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new cursor-pointer" 
+                 class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new cursor-pointer outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-gray-900" 
                  onclick="NotificationManager.handleClick('${id}')">
                 <button onclick="event.stopPropagation(); NotificationManager.dismiss('${id}')" 
                         class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">

@@ -101,6 +101,49 @@
         #globalAlertBar {
             animation: slideDown 0.3s ease-out, gradientShift 2s ease infinite;
         }
+        
+        /* Custom focus styles - remove default browser outline, add rounded focus ring */
+        /* Navigation links */
+        nav a:focus,
+        nav a:focus-visible,
+        [onclick]:focus,
+        [onclick]:focus-visible {
+            outline: none;
+            border-radius: inherit;
+        }
+        
+        /* Notification cards - rounded focus ring matching card shape */
+        .admin-notification-new:focus,
+        .admin-notification-new:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 0 15px rgba(99, 102, 241, 0.3);
+        }
+        
+        /* Dashboard tabs and buttons */
+        .dashboard-tab:focus,
+        .dashboard-tab:focus-visible,
+        button:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
+            border-radius: inherit;
+        }
+        
+        /* Remove focus outline on click, keep for keyboard navigation */
+        *:focus:not(:focus-visible) {
+            outline: none;
+            box-shadow: none;
+        }
+        
+        /* Preserve focus ring for keyboard users */
+        *:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
+        }
+        
+        /* Specific rounded elements */
+        [class*="rounded"]:focus-visible {
+            outline: none;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-gray-100">
@@ -759,12 +802,12 @@
                 
                 <!-- Center nav links (hidden on mobile, shown on lg+) -->
                 <div class="hidden lg:flex items-center space-x-4 xl:space-x-6 flex-shrink-0">
-                    <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Home</a>
-                    <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Properties</a>
-                    <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">About</a>
-                    <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Contact</a>
-                    <a onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Leaderboard</a>
-                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition text-sm" role="button" tabindex="0">Dashboard</a>
+                    <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Home</a>
+                    <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Properties</a>
+                    <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">About</a>
+                    <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Contact</a>
+                    <a onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-amber-400 rounded px-1" role="button" tabindex="0">Leaderboard</a>
+                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-300 rounded px-1" role="button" tabindex="0">Dashboard</a>
                 </div>
                 
                 <!-- Right side: buttons + user - with proper spacing -->
