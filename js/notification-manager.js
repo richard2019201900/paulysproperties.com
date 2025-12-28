@@ -574,10 +574,14 @@
         
         return `
             <div id="notification-${id}" 
-                 class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new cursor-pointer outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-gray-900" 
+                 class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new cursor-pointer" 
+                 tabindex="-1"
+                 onmousedown="event.preventDefault()"
                  onclick="NotificationManager.handleClick('${id}')">
                 <button onclick="event.stopPropagation(); NotificationManager.dismiss('${id}')" 
-                        class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
+                        class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition"
+                        tabindex="-1"
+                        onmousedown="event.preventDefault()">
                     ✕
                 </button>
                 <div class="flex items-center gap-4 pr-8">
@@ -695,21 +699,23 @@
         };
         
         const propertyId = rent.propId || rent.propertyId || rent.id;
-        const rentAmount = rent.weeklyPrice || rent.rentAmount || 0;
+        const rentAmount = rent.rentAmount || rent.weeklyPrice || 0;
         const renterName = rent.renterName || 'Unknown';
         const propertyTitle = rent.title || `Property ${propertyId}`;
+        const dueDisplay = rent.dueDate ? new Date(rent.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Unknown';
         
         return `
             <div id="rent-item-${propertyId}" class="bg-gray-800/50 rounded-lg p-3 flex items-center justify-between gap-3">
-                <div class="flex-1 min-w-0 cursor-pointer" onclick="viewPropertyStats(${propertyId})">
+                <div class="flex-1 min-w-0 cursor-pointer" onclick="viewPropertyStats(${propertyId})" style="outline: none;">
                     <div class="text-white font-medium truncate">${propertyTitle}</div>
                     <div class="text-gray-400 text-sm">Renter: ${renterName}</div>
-                    <div class="${statusColors[status]} text-xs">Due: ${rent.dueDate || rent.nextRentDue || 'Unknown'}</div>
+                    <div class="${statusColors[status]} text-xs">Due: ${dueDisplay}</div>
                 </div>
                 <div class="text-right">
                     <div class="text-white font-bold">$${rentAmount.toLocaleString()}</div>
-                    <button onclick="event.stopPropagation(); NotificationManager.copyRentReminder('${propertyId}', '${renterName.replace(/'/g, "\\'")}', '${propertyTitle.replace(/'/g, "\\'")}', ${rentAmount})" 
-                            class="text-cyan-400 hover:text-cyan-300 text-xs mt-1 flex items-center gap-1">
+                    <button onclick="event.stopPropagation(); this.blur(); NotificationManager.copyRentReminder('${propertyId}', '${renterName.replace(/'/g, "\\'")}', '${propertyTitle.replace(/'/g, "\\'")}', ${rentAmount})" 
+                            class="text-cyan-400 hover:text-cyan-300 text-xs mt-1 flex items-center gap-1"
+                            style="outline: none;">
                         📋 Copy Reminder
                     </button>
                 </div>
@@ -920,8 +926,10 @@
             
             const properties = propsDoc.data();
             const now = new Date();
+            now.setHours(0, 0, 0, 0);
             const todayStr = now.toISOString().split('T')[0];
-            const tomorrowStr = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
+            const tomorrow = new Date(now.getTime() + 86400000);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
             
             const overdue = [];
             const dueToday = [];
@@ -934,59 +942,98 @@
             Object.entries(properties).forEach(([propId, prop]) => {
                 if (!prop) return;
                 
-                // Debug: Log properties with renters (field is renterName, not renter)
+                // Debug: Log ALL properties with renters to see what fields they have
                 if (prop.renterName) {
                     console.log('[NotificationManager] Property with renter:', propId, {
                         renterName: prop.renterName,
-                        nextRentDue: prop.nextRentDue,
+                        lastPaymentDate: prop.lastPaymentDate || 'NOT SET',
+                        paymentFrequency: prop.paymentFrequency || 'NOT SET',
                         ownerEmail: prop.ownerEmail
                     });
                 }
                 
-                // Check for renterName (not renter) and nextRentDue
-                if (!prop.renterName || !prop.nextRentDue) return;
+                // Must have renterName, lastPaymentDate, and paymentFrequency to calculate due date
+                if (!prop.renterName || !prop.lastPaymentDate || !prop.paymentFrequency) {
+                    if (prop.renterName) {
+                        console.log('[NotificationManager] SKIPPED - missing required fields:', propId);
+                    }
+                    return;
+                }
                 
                 // Only check properties owned by current user OR all if admin
                 if (!isAdmin && prop.ownerEmail !== currentUser.email) return;
                 
-                // Handle different date formats - extract just the date part
-                let dueDate;
-                if (prop.nextRentDue.includes('T')) {
-                    dueDate = prop.nextRentDue.split('T')[0];
-                } else if (prop.nextRentDue.includes(' ')) {
-                    dueDate = prop.nextRentDue.split(' ')[0];
+                // Calculate next rent due date from lastPaymentDate + paymentFrequency
+                // Parse the lastPaymentDate (format: YYYY-MM-DD)
+                const lastDateParts = prop.lastPaymentDate.split('-');
+                const lastDate = new Date(
+                    parseInt(lastDateParts[0]), 
+                    parseInt(lastDateParts[1]) - 1, 
+                    parseInt(lastDateParts[2])
+                );
+                lastDate.setHours(0, 0, 0, 0);
+                
+                const nextDate = new Date(lastDate);
+                if (prop.paymentFrequency === 'daily') {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                } else if (prop.paymentFrequency === 'weekly') {
+                    nextDate.setDate(nextDate.getDate() + 7);
+                } else if (prop.paymentFrequency === 'biweekly') {
+                    nextDate.setDate(nextDate.getDate() + 14);
                 } else {
-                    // Assume it's already just a date string
-                    dueDate = prop.nextRentDue;
+                    // Monthly
+                    nextDate.setMonth(nextDate.getMonth() + 1);
                 }
+                
+                const dueDate = nextDate.toISOString().split('T')[0];
+                const daysUntilDue = Math.ceil((nextDate - now) / (1000 * 60 * 60 * 24));
+                
+                // Get rent amount based on frequency
+                let rentAmount = prop.weeklyPrice || 0;
+                if (prop.paymentFrequency === 'daily' && prop.dailyPrice) {
+                    rentAmount = prop.dailyPrice;
+                } else if (prop.paymentFrequency === 'biweekly' && prop.biweeklyPrice) {
+                    rentAmount = prop.biweeklyPrice;
+                } else if (prop.paymentFrequency === 'monthly' && prop.monthlyPrice) {
+                    rentAmount = prop.monthlyPrice;
+                } else if (prop.paymentFrequency === 'daily') {
+                    rentAmount = Math.round((prop.weeklyPrice || 0) / 7);
+                } else if (prop.paymentFrequency === 'biweekly') {
+                    rentAmount = (prop.weeklyPrice || 0) * 2;
+                } else if (prop.paymentFrequency === 'monthly') {
+                    rentAmount = (prop.weeklyPrice || 0) * 4;
+                }
+                
+                console.log('[NotificationManager] Property rent check:', propId, {
+                    renterName: prop.renterName,
+                    lastPaymentDate: prop.lastPaymentDate,
+                    paymentFrequency: prop.paymentFrequency,
+                    calculatedDueDate: dueDate,
+                    daysUntilDue,
+                    rentAmount
+                });
                 
                 const rentData = {
                     propId,
                     propertyId: propId,
                     id: propId,
                     ...prop,
-                    dueDate
+                    dueDate,
+                    nextRentDue: dueDate,
+                    rentAmount,
+                    daysUntilDue
                 };
                 
-                console.log('[NotificationManager] Comparing dates:', {
-                    propId,
-                    dueDate,
-                    todayStr,
-                    tomorrowStr,
-                    isOverdue: dueDate < todayStr,
-                    isToday: dueDate === todayStr,
-                    isTomorrow: dueDate === tomorrowStr
-                });
-                
-                if (dueDate < todayStr) {
-                    const dueDateObj = new Date(dueDate);
-                    const daysOverdue = Math.floor((now - dueDateObj) / 86400000);
-                    rentData.daysOverdue = daysOverdue;
+                if (daysUntilDue < 0) {
+                    // Overdue
+                    rentData.daysOverdue = Math.abs(daysUntilDue);
                     overdue.push(rentData);
-                } else if (dueDate === todayStr) {
+                } else if (daysUntilDue === 0) {
+                    // Due today
                     rentData.isToday = true;
                     dueToday.push(rentData);
-                } else if (dueDate === tomorrowStr) {
+                } else if (daysUntilDue === 1) {
+                    // Due tomorrow
                     dueTomorrow.push(rentData);
                 }
             });

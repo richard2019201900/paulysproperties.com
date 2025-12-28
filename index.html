@@ -102,47 +102,20 @@
             animation: slideDown 0.3s ease-out, gradientShift 2s ease infinite;
         }
         
-        /* Custom focus styles - remove default browser outline, add rounded focus ring */
-        /* Navigation links */
-        nav a:focus,
-        nav a:focus-visible,
-        [onclick]:focus,
-        [onclick]:focus-visible {
-            outline: none;
-            border-radius: inherit;
+        /* GLOBAL: Remove ALL browser focus outlines completely */
+        *:focus,
+        *:focus-visible,
+        *:focus-within {
+            outline: none !important;
+            outline-width: 0 !important;
+            box-shadow: none !important;
         }
         
-        /* Notification cards - rounded focus ring matching card shape */
-        .admin-notification-new:focus,
-        .admin-notification-new:focus-visible {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5), 0 0 15px rgba(99, 102, 241, 0.3);
-        }
-        
-        /* Dashboard tabs and buttons */
-        .dashboard-tab:focus,
-        .dashboard-tab:focus-visible,
-        button:focus-visible {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
-            border-radius: inherit;
-        }
-        
-        /* Remove focus outline on click, keep for keyboard navigation */
-        *:focus:not(:focus-visible) {
-            outline: none;
-            box-shadow: none;
-        }
-        
-        /* Preserve focus ring for keyboard users */
-        *:focus-visible {
-            outline: none;
-            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5);
-        }
-        
-        /* Specific rounded elements */
-        [class*="rounded"]:focus-visible {
-            outline: none;
+        /* Ensure inputs/buttons still get focus ring for accessibility */
+        input:focus-visible,
+        textarea:focus-visible,
+        select:focus-visible {
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5) !important;
         }
     </style>
 </head>
