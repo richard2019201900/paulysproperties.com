@@ -199,7 +199,7 @@
                     : isToday 
                         ? '⏰ Due Today'
                         : '📅 Due Tomorrow';
-                notification.subtitle = `${rawData.title || rawData.propertyId} - ${rawData.renter}`;
+                notification.subtitle = `${rawData.title || rawData.propertyId} - ${rawData.renterName || 'Unknown'}`;
                 notification.urgency = isOverdue ? CONFIG.URGENCY.CRITICAL : isToday ? CONFIG.URGENCY.WARNING : CONFIG.URGENCY.INFO;
                 notification.action = {
                     type: 'scrollToRent',
@@ -696,7 +696,7 @@
         
         const propertyId = rent.propId || rent.propertyId || rent.id;
         const rentAmount = rent.weeklyPrice || rent.rentAmount || 0;
-        const renterName = rent.renter || 'Unknown';
+        const renterName = rent.renterName || 'Unknown';
         const propertyTitle = rent.title || `Property ${propertyId}`;
         
         return `
@@ -934,16 +934,17 @@
             Object.entries(properties).forEach(([propId, prop]) => {
                 if (!prop) return;
                 
-                // Debug: Log properties with renters
-                if (prop.renter) {
+                // Debug: Log properties with renters (field is renterName, not renter)
+                if (prop.renterName) {
                     console.log('[NotificationManager] Property with renter:', propId, {
-                        renter: prop.renter,
+                        renterName: prop.renterName,
                         nextRentDue: prop.nextRentDue,
                         ownerEmail: prop.ownerEmail
                     });
                 }
                 
-                if (!prop.renter || !prop.nextRentDue) return;
+                // Check for renterName (not renter) and nextRentDue
+                if (!prop.renterName || !prop.nextRentDue) return;
                 
                 // Only check properties owned by current user OR all if admin
                 if (!isAdmin && prop.ownerEmail !== currentUser.email) return;
