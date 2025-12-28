@@ -2444,7 +2444,7 @@ function renderOwnerDashboard() {
     // Initialize NotificationManager (handles rent alerts, badges, etc.)
     if (typeof NotificationManager !== 'undefined' && NotificationManager.init) {
         // Only init if not already initialized
-        if (!NotificationManager.getState().isInitialized) {
+        if (!NotificationManager.state.initialized) {
             NotificationManager.init();
         } else {
             // Just refresh the rent check and badges
