@@ -4972,9 +4972,9 @@ window.handleNewUserNotificationClick = async function(userId) {
     }
     await sleep(200);
     
-    // Make sure we're on All Users subtab
+    // Make sure we're on Users subtab (not 'allUsers' - that's invalid)
     if (typeof switchAdminTab === 'function') {
-        switchAdminTab('allUsers');
+        switchAdminTab('users');
     }
     await sleep(200);
     

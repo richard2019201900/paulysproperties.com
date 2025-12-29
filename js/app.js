@@ -3480,6 +3480,13 @@ async function init() {
             renderOwnerDashboard();
             loadUsername();
             
+            // Initialize NotificationManager immediately on login for real-time notifications
+            // This ensures we start listening for new users/listings right away, not just when dashboard opens
+            if (typeof NotificationManager !== 'undefined' && !NotificationManager.state?.initialized) {
+                console.log('[Auth] Initializing NotificationManager on login');
+                NotificationManager.init();
+            }
+            
             // Start real-time property sync listener (all users)
             if (typeof startPropertySyncListener === 'function') {
                 startPropertySyncListener();
