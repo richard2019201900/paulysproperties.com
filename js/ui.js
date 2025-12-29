@@ -1706,6 +1706,10 @@ window.saveUsername = async function() {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
         
+        // IMPORTANT: Store display name on all user's properties for public visibility
+        // This allows non-logged-in users to see owner names without permission issues
+        await updateOwnerDisplayNameOnProperties(user.email, username);
+        
         status.textContent = 'Display name saved successfully!';
         status.className = 'text-green-400 text-sm mt-3';
         showElement(status);
@@ -6984,6 +6988,51 @@ window.syncOwnerNameEverywhere = function(email, newName) {
             el.textContent = newName;
         }
     });
+};
+
+// Update ownerDisplayName on all properties owned by this email in Firestore
+// This ensures display names are publicly readable without permission issues
+window.updateOwnerDisplayNameOnProperties = async function(email, displayName) {
+    if (!email || !displayName) return;
+    
+    const normalizedEmail = email.toLowerCase();
+    console.log('[DisplayName] Updating display name on properties for:', normalizedEmail);
+    
+    try {
+        // Get all properties owned by this user
+        const userProperties = OwnershipService.getPropertiesForOwner(normalizedEmail);
+        
+        if (userProperties.length === 0) {
+            console.log('[DisplayName] No properties found for user');
+            return;
+        }
+        
+        // Build batch update for all properties
+        const updates = {};
+        userProperties.forEach(prop => {
+            updates[prop.id] = {
+                ...prop,
+                ownerDisplayName: displayName
+            };
+        });
+        
+        // Save to Firestore
+        await db.collection('settings').doc('properties').set(updates, { merge: true });
+        
+        // Update local properties array
+        userProperties.forEach(prop => {
+            prop.ownerDisplayName = displayName;
+        });
+        
+        // Update cache
+        window.ownerUsernameCache = window.ownerUsernameCache || {};
+        window.ownerUsernameCache[normalizedEmail] = displayName;
+        
+        console.log(`[DisplayName] Updated ${userProperties.length} properties with display name: ${displayName}`);
+        
+    } catch (error) {
+        console.error('[DisplayName] Error updating properties:', error);
+    }
 };
 
 window.adminDeleteUser = async function(userId, email) {

@@ -70,24 +70,48 @@ function getPropertyOwnerEmail(propertyId) {
 async function getUsernameByEmail(email) {
     if (!email) return 'Unassigned';
     
+    const normalizedEmail = email.toLowerCase();
+    
     // Check cache first
-    if (window.ownerUsernameCache[email]) {
-        return window.ownerUsernameCache[email];
+    if (window.ownerUsernameCache[normalizedEmail]) {
+        return window.ownerUsernameCache[normalizedEmail];
     }
 
     try {
-        const querySnapshot = await db.collection('users').where('email', '==', email).get();
+        const querySnapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
         if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
             const username = userData.username || email.split('@')[0];
-            window.ownerUsernameCache[email] = username; // Cache it
+            window.ownerUsernameCache[normalizedEmail] = username; // Cache it
             return username;
         }
     } catch (error) {
-        // Permission denied (user can only read own doc) - use email prefix
+        // Permission denied (user can only read own doc) - try getting from property data
         if (error.code === 'permission-denied') {
+            // Check if we have ownerDisplayName stored on any property
+            const userProperties = typeof OwnershipService !== 'undefined' 
+                ? OwnershipService.getPropertiesForOwner(normalizedEmail)
+                : [];
+            
+            // Look for ownerDisplayName on any of their properties
+            for (const prop of userProperties) {
+                if (prop.ownerDisplayName) {
+                    window.ownerUsernameCache[normalizedEmail] = prop.ownerDisplayName;
+                    return prop.ownerDisplayName;
+                }
+            }
+            
+            // Check if master admin (we can do this without querying)
+            if (typeof TierService !== 'undefined' && TierService.isMasterAdmin(normalizedEmail)) {
+                // For master admin, use a nice default
+                const fallback = email.split('@')[0];
+                window.ownerUsernameCache[normalizedEmail] = fallback;
+                return fallback;
+            }
+            
+            // Final fallback to email prefix
             const fallback = email.split('@')[0];
-            window.ownerUsernameCache[email] = fallback;
+            window.ownerUsernameCache[normalizedEmail] = fallback;
             return fallback;
         }
         console.error('Error fetching username:', error);
