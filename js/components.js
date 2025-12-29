@@ -140,32 +140,44 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     $('modalPhone').value = defaultPhone;
     
     // Try to fetch property owner's phone number
+    // Priority: 1) ownerContactPhone on property, 2) ownerPhone on property, 3) user doc, 4) default
     try {
         if (propertyId && typeof db !== 'undefined') {
-            // Get property data to find owner email
+            // Get property data to find owner contact info
             const propsDoc = await db.collection('settings').doc('properties').get();
             if (propsDoc.exists) {
                 const properties = propsDoc.data();
                 const property = properties[propertyId] || properties[String(propertyId)];
                 
-                if (property && property.ownerEmail) {
-                    // First check if property has ownerPhone directly
-                    if (property.ownerPhone) {
+                if (property) {
+                    // Check ownerContactPhone first (synced from user profile)
+                    if (property.ownerContactPhone) {
+                        $('modalPhone').value = property.ownerContactPhone.replace(/\D/g, '');
+                        console.log('[Contact] Using property ownerContactPhone');
+                    }
+                    // Then check legacy ownerPhone field
+                    else if (property.ownerPhone) {
                         $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
-                        console.log('[Contact] Using property ownerPhone:', property.ownerPhone);
-                    } else {
-                        // Look up user by email to get their phone
-                        const usersSnapshot = await db.collection('users')
-                            .where('email', '==', property.ownerEmail.toLowerCase())
-                            .limit(1)
-                            .get();
-                        
-                        if (!usersSnapshot.empty) {
-                            const userData = usersSnapshot.docs[0].data();
-                            if (userData.phone) {
-                                $('modalPhone').value = userData.phone.replace(/\D/g, '');
-                                console.log('[Contact] Using owner phone from user doc:', userData.phone);
+                        console.log('[Contact] Using property ownerPhone');
+                    }
+                    // Finally try user doc (may fail for non-admins due to permissions)
+                    else if (property.ownerEmail) {
+                        try {
+                            const usersSnapshot = await db.collection('users')
+                                .where('email', '==', property.ownerEmail.toLowerCase())
+                                .limit(1)
+                                .get();
+                            
+                            if (!usersSnapshot.empty) {
+                                const userData = usersSnapshot.docs[0].data();
+                                if (userData.phone) {
+                                    $('modalPhone').value = userData.phone.replace(/\D/g, '');
+                                    console.log('[Contact] Using phone from user doc');
+                                }
                             }
+                        } catch (permError) {
+                            // Permission denied - expected for non-admins
+                            console.log('[Contact] Cannot read user doc (permission denied), using default');
                         }
                     }
                 }

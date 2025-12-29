@@ -1706,9 +1706,10 @@ window.saveUsername = async function() {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
         
-        // IMPORTANT: Store display name on all user's properties for public visibility
-        // This allows non-logged-in users to see owner names without permission issues
-        await updateOwnerDisplayNameOnProperties(user.email, username);
+        // IMPORTANT: Sync display name (and phone if available) to all user's properties
+        // This allows non-admin users to see owner info without permission issues
+        const phone = $('ownerPhone')?.value?.replace(/\D/g, '') || '';
+        await syncOwnerProfileToProperties(user.email, username, phone);
         
         status.textContent = 'Display name saved successfully!';
         status.className = 'text-green-400 text-sm mt-3';
@@ -1733,8 +1734,7 @@ window.saveUsername = async function() {
             }
         }
         
-        // Re-check profile completion
-        const phone = $('ownerPhone')?.value?.replace(/\D/g, '') || '';
+        // Re-check profile completion (reuse phone variable from sync call above)
         checkProfileCompletion(username, phone);
         
         // Award XP for adding display name (gamification)
@@ -1789,6 +1789,11 @@ window.saveOwnerPhone = async function() {
             email: user.email,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
+        
+        // IMPORTANT: Sync phone to all user's properties for public visibility
+        // This allows non-admin users to see owner contact info
+        const displayName = $('ownerUsername')?.value?.trim() || '';
+        await syncOwnerProfileToProperties(user.email, displayName, phone);
         
         status.textContent = 'Phone number saved successfully!';
         status.className = 'text-green-400 text-sm mt-3';
@@ -6990,30 +6995,50 @@ window.syncOwnerNameEverywhere = function(email, newName) {
     });
 };
 
-// Update ownerDisplayName on all properties owned by this email in Firestore
-// This ensures display names are publicly readable without permission issues
-window.updateOwnerDisplayNameOnProperties = async function(email, displayName) {
-    if (!email || !displayName) return;
+// ============================================================================
+// ENTERPRISE: Sync Owner Profile to Properties
+// ============================================================================
+// Stores ownerDisplayName and ownerContactPhone on property documents
+// This is CRITICAL for public visibility - Firestore security rules only allow
+// users to read their own user doc, so we must store public info on properties
+// ============================================================================
+
+window.syncOwnerProfileToProperties = async function(email, displayName, phone) {
+    if (!email) return;
     
     const normalizedEmail = email.toLowerCase();
-    console.log('[DisplayName] Updating display name on properties for:', normalizedEmail);
+    console.log('[ProfileSync] Syncing profile to properties for:', normalizedEmail);
     
     try {
         // Get all properties owned by this user
-        const userProperties = OwnershipService.getPropertiesForOwner(normalizedEmail);
+        const userProperties = typeof OwnershipService !== 'undefined' 
+            ? OwnershipService.getPropertiesForOwner(normalizedEmail)
+            : [];
         
         if (userProperties.length === 0) {
-            console.log('[DisplayName] No properties found for user');
+            console.log('[ProfileSync] No properties found for user');
+            // Still update caches even if no properties
+            if (displayName) {
+                window.ownerUsernameCache = window.ownerUsernameCache || {};
+                window.ownerUsernameCache[normalizedEmail] = displayName;
+            }
             return;
         }
         
         // Build batch update for all properties
         const updates = {};
         userProperties.forEach(prop => {
-            updates[prop.id] = {
-                ...prop,
-                ownerDisplayName: displayName
-            };
+            const propUpdate = { ...prop };
+            
+            // Only update fields that have values
+            if (displayName) {
+                propUpdate.ownerDisplayName = displayName;
+            }
+            if (phone) {
+                propUpdate.ownerContactPhone = phone;
+            }
+            
+            updates[prop.id] = propUpdate;
         });
         
         // Save to Firestore
@@ -7021,18 +7046,32 @@ window.updateOwnerDisplayNameOnProperties = async function(email, displayName) {
         
         // Update local properties array
         userProperties.forEach(prop => {
-            prop.ownerDisplayName = displayName;
+            if (displayName) prop.ownerDisplayName = displayName;
+            if (phone) prop.ownerContactPhone = phone;
         });
         
-        // Update cache
-        window.ownerUsernameCache = window.ownerUsernameCache || {};
-        window.ownerUsernameCache[normalizedEmail] = displayName;
+        // Update caches
+        if (displayName) {
+            window.ownerUsernameCache = window.ownerUsernameCache || {};
+            window.ownerUsernameCache[normalizedEmail] = displayName;
+        }
         
-        console.log(`[DisplayName] Updated ${userProperties.length} properties with display name: ${displayName}`);
+        console.log(`[ProfileSync] Updated ${userProperties.length} properties:`, {
+            displayName: displayName || '(not updated)',
+            phone: phone ? '***' + phone.slice(-4) : '(not updated)'
+        });
+        
+        // Sync DOM elements
+        syncOwnerNameEverywhere(normalizedEmail, displayName);
         
     } catch (error) {
-        console.error('[DisplayName] Error updating properties:', error);
+        console.error('[ProfileSync] Error syncing profile to properties:', error);
     }
+};
+
+// Legacy alias for backwards compatibility
+window.updateOwnerDisplayNameOnProperties = function(email, displayName) {
+    return syncOwnerProfileToProperties(email, displayName, null);
 };
 
 window.adminDeleteUser = async function(userId, email) {
