@@ -8286,6 +8286,208 @@ window.findUserByProperty = function() {
     }
 };
 
+// ============================================================================
+// BATCH SYNC OWNER PROFILES TO PROPERTIES
+// ============================================================================
+// Admin tool to sync all users' display names and phone numbers to their properties
+// This fixes visibility for non-admin users who can't read the users collection
+// ============================================================================
+
+window.previewBatchSync = async function() {
+    const previewDiv = $('batchSyncPreview');
+    const statusDiv = $('batchSyncStatus');
+    
+    previewDiv.classList.remove('hidden');
+    previewDiv.innerHTML = '<span class="text-gray-400">Loading preview...</span>';
+    
+    try {
+        // Get all users
+        const usersSnapshot = await db.collection('users').get();
+        const users = {};
+        usersSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.email) {
+                users[data.email.toLowerCase()] = {
+                    displayName: data.username || null,
+                    phone: data.phone || null
+                };
+            }
+        });
+        
+        // Get all properties
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        const allProperties = propsDoc.exists ? propsDoc.data() : {};
+        
+        // Build preview
+        let previewHtml = '<div class="space-y-2">';
+        let needsUpdate = 0;
+        let alreadySynced = 0;
+        
+        for (const [propId, prop] of Object.entries(allProperties)) {
+            if (!prop || !prop.ownerEmail) continue;
+            
+            const ownerEmail = prop.ownerEmail.toLowerCase();
+            const userData = users[ownerEmail];
+            
+            if (!userData) continue;
+            
+            const needsName = userData.displayName && prop.ownerDisplayName !== userData.displayName;
+            const needsPhone = userData.phone && prop.ownerContactPhone !== userData.phone;
+            
+            if (needsName || needsPhone) {
+                needsUpdate++;
+                previewHtml += `<div class="text-yellow-300">📝 ${prop.title || propId}`;
+                if (needsName) previewHtml += `<br>&nbsp;&nbsp;Name: "${prop.ownerDisplayName || 'not set'}" → "${userData.displayName}"`;
+                if (needsPhone) previewHtml += `<br>&nbsp;&nbsp;Phone: "${prop.ownerContactPhone || 'not set'}" → "***${userData.phone.slice(-4)}"`;
+                previewHtml += '</div>';
+            } else {
+                alreadySynced++;
+            }
+        }
+        
+        previewHtml += '</div>';
+        previewHtml += `<div class="mt-3 pt-3 border-t border-gray-700">
+            <span class="text-cyan-400">Summary:</span> 
+            <span class="text-yellow-300">${needsUpdate} properties need updates</span>, 
+            <span class="text-green-300">${alreadySynced} already synced</span>
+        </div>`;
+        
+        previewDiv.innerHTML = previewHtml;
+        
+    } catch (error) {
+        console.error('[BatchSync] Preview error:', error);
+        previewDiv.innerHTML = `<span class="text-red-400">Error: ${error.message}</span>`;
+    }
+};
+
+window.batchSyncOwnerProfiles = async function() {
+    const btn = $('batchSyncBtn');
+    const statusDiv = $('batchSyncStatus');
+    const previewDiv = $('batchSyncPreview');
+    
+    if (!confirm('This will update all properties with owner display names and phone numbers from user profiles.\n\nContinue?')) {
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="animate-spin">⏳</span> Syncing...';
+    statusDiv.classList.remove('hidden');
+    statusDiv.className = 'mb-3 p-3 rounded-lg text-sm bg-blue-900/50 text-blue-300';
+    statusDiv.textContent = 'Starting batch sync...';
+    
+    try {
+        // Step 1: Get all users with their profile data
+        statusDiv.textContent = 'Fetching user profiles...';
+        const usersSnapshot = await db.collection('users').get();
+        const users = {};
+        usersSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.email) {
+                users[data.email.toLowerCase()] = {
+                    displayName: data.username || null,
+                    phone: data.phone || null
+                };
+            }
+        });
+        console.log(`[BatchSync] Found ${Object.keys(users).length} users`);
+        
+        // Step 2: Get all properties
+        statusDiv.textContent = 'Fetching properties...';
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        const allProperties = propsDoc.exists ? propsDoc.data() : {};
+        console.log(`[BatchSync] Found ${Object.keys(allProperties).length} properties`);
+        
+        // Step 3: Build updates
+        statusDiv.textContent = 'Building updates...';
+        const updates = {};
+        let updateCount = 0;
+        let skipCount = 0;
+        
+        for (const [propId, prop] of Object.entries(allProperties)) {
+            if (!prop || !prop.ownerEmail) {
+                skipCount++;
+                continue;
+            }
+            
+            const ownerEmail = prop.ownerEmail.toLowerCase();
+            const userData = users[ownerEmail];
+            
+            if (!userData) {
+                skipCount++;
+                continue;
+            }
+            
+            // Check if update needed
+            const needsName = userData.displayName && prop.ownerDisplayName !== userData.displayName;
+            const needsPhone = userData.phone && prop.ownerContactPhone !== userData.phone;
+            
+            if (needsName || needsPhone) {
+                updates[propId] = { ...prop };
+                if (userData.displayName) updates[propId].ownerDisplayName = userData.displayName;
+                if (userData.phone) updates[propId].ownerContactPhone = userData.phone;
+                updateCount++;
+            } else {
+                skipCount++;
+            }
+        }
+        
+        console.log(`[BatchSync] ${updateCount} properties to update, ${skipCount} skipped`);
+        
+        if (updateCount === 0) {
+            statusDiv.className = 'mb-3 p-3 rounded-lg text-sm bg-green-900/50 text-green-300';
+            statusDiv.textContent = '✅ All properties are already synced! No updates needed.';
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔄</span> Sync All Users';
+            return;
+        }
+        
+        // Step 4: Save to Firestore
+        statusDiv.textContent = `Saving ${updateCount} property updates...`;
+        await db.collection('settings').doc('properties').set(updates, { merge: true });
+        
+        // Step 5: Update local properties array
+        for (const [propId, updatedProp] of Object.entries(updates)) {
+            const localProp = properties.find(p => String(p.id) === String(propId));
+            if (localProp) {
+                if (updatedProp.ownerDisplayName) localProp.ownerDisplayName = updatedProp.ownerDisplayName;
+                if (updatedProp.ownerContactPhone) localProp.ownerContactPhone = updatedProp.ownerContactPhone;
+            }
+        }
+        
+        // Step 6: Update caches
+        for (const [email, userData] of Object.entries(users)) {
+            if (userData.displayName) {
+                window.ownerUsernameCache = window.ownerUsernameCache || {};
+                window.ownerUsernameCache[email] = userData.displayName;
+            }
+        }
+        
+        // Success
+        statusDiv.className = 'mb-3 p-3 rounded-lg text-sm bg-green-900/50 text-green-300';
+        statusDiv.innerHTML = `✅ <strong>Sync complete!</strong> Updated ${updateCount} properties with owner profiles.`;
+        
+        // Update preview if visible
+        if (!previewDiv.classList.contains('hidden')) {
+            previewBatchSync();
+        }
+        
+        // Refresh property display
+        if (typeof renderProperties === 'function') {
+            renderProperties(state.filteredProperties || properties);
+        }
+        
+        console.log(`[BatchSync] Complete! Updated ${updateCount} properties`);
+        
+    } catch (error) {
+        console.error('[BatchSync] Error:', error);
+        statusDiv.className = 'mb-3 p-3 rounded-lg text-sm bg-red-900/50 text-red-300';
+        statusDiv.textContent = `❌ Error: ${error.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔄</span> Sync All Users';
+    }
+};
+
 // ==================== CREATE LISTING ====================
 window.openCreateListingModal = async function() {
     hideElement($('mobileMenu'));

@@ -1373,6 +1373,25 @@
                             <button onclick="findUserByProperty()" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90">🔍 Find Owner</button>
                             <div id="adminFindResult" class="mt-2 text-sm"></div>
                         </div>
+                        
+                        <!-- Batch Sync Owner Profiles Tool -->
+                        <div class="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-xl p-4 border border-cyan-700 md:col-span-2">
+                            <h5 class="text-cyan-300 font-bold mb-2">🔄 Sync Owner Profiles to Properties</h5>
+                            <p class="text-gray-400 text-sm mb-3">
+                                Batch update all properties with owner display names and phone numbers from user profiles. 
+                                This fixes visibility for non-admin users who can't read the users collection.
+                            </p>
+                            <div id="batchSyncStatus" class="hidden mb-3 p-3 rounded-lg text-sm"></div>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="batchSyncOwnerProfiles()" id="batchSyncBtn" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 flex items-center gap-2">
+                                    <span>🔄</span> Sync All Users
+                                </button>
+                                <button onclick="previewBatchSync()" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90">
+                                    👁️ Preview Changes
+                                </button>
+                            </div>
+                            <div id="batchSyncPreview" class="hidden mt-4 max-h-64 overflow-y-auto bg-gray-900/50 rounded-lg p-3 text-xs font-mono"></div>
+                        </div>
                     </div>
                 </div>
                 
