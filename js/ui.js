@@ -1,6 +1,6 @@
 // ==================== SITE UPDATE NOTIFICATIONS ====================
 // Change this version string whenever you publish a new site update
-const LATEST_SITE_UPDATE_VERSION = '2024-12-15-v1';
+const LATEST_SITE_UPDATE_VERSION = '2024-12-30-v1';
 
 // Check if user has seen the latest site update
 window.hasUnreadSiteUpdate = function() {
@@ -784,6 +784,84 @@ window.renderBlogPage = function() {
     
     // Blog posts data - add new posts at the top
     const blogPosts = [
+        {
+            date: 'December 30, 2024',
+            title: '📱 Now Available On Your In-City Phone + Massive Platform Upgrades',
+            category: 'Major Update',
+            categoryColor: 'bg-purple-500',
+            content: `
+                <p class="mb-4"><strong>PaulysProperties.com now works directly in your phone browser while you're in the city.</strong> No more alt-tabbing to Chrome — browse listings, manage your properties, and check your dashboard right from your phone. Just type paulysproperties.com and you're in.</p>
+                
+                <p class="mb-4">Over the past two weeks, we've pushed <strong>26 major updates</strong> and completely transformed the platform. Here's what's new:</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">📱 In-City Phone Support:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Full site now works in the phone browser — no alt-tab needed</li>
+                    <li>Custom domain: just type <strong>paulysproperties.com</strong></li>
+                    <li>Optimized for smooth scrolling and fast loading in-city</li>
+                    <li>More phone-friendly improvements coming in 2025</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🏠 Rent-to-Own System <span class="text-amber-400">(Elite Members)</span>:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Create RTO contracts on any property with custom terms</li>
+                    <li>Flexible deposit amounts and payment schedules</li>
+                    <li>Track every payment with automatic balance calculations</li>
+                    <li>Listing ownership transfers on the site when contract completes</li>
+                    <li>Edit or delete payments if mistakes are made</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🏷️ House Sales Tracking:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Log property sales and track the financials on your dashboard</li>
+                    <li>Celebration banners when you complete a sale</li>
+                    <li>Earn XP and climb the leaderboard with each sale</li>
+                    <li>Everything still happens in city — the site just keeps you organized</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">📊 Redesigned Dashboard:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>8 new tiles showing exactly what you're earning</li>
+                    <li>Income broken down by Daily, Weekly, Biweekly, and Monthly renters</li>
+                    <li>Dedicated RTO Income and House Sales tracking</li>
+                    <li>Click any tile for a detailed breakdown</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🔔 Smart Rent Collection Alerts:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Automatic alerts when rent is overdue, due today, or coming up</li>
+                    <li>One-click copy for reminder messages to send to tenants</li>
+                    <li>Dashboard notifications so you never miss a payment</li>
+                    <li>Works for all property owners, not just admin</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">📸 Bulk Image Uploads:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Upload multiple property photos at once</li>
+                    <li>Drag and drop to reorder your gallery</li>
+                    <li>Horizontal layout for easier browsing</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🏆 Improved Leaderboard:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>XP now updates in real-time as you complete actions</li>
+                    <li>Earn XP for logging payments, completing leases, and making sales</li>
+                    <li>Privacy protections keep your renters' info private</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">⚡ Under the Hood:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Complete notification system rebuild for reliability</li>
+                    <li>Upgraded server infrastructure for faster performance</li>
+                    <li>Enhanced security across the entire platform</li>
+                    <li>Dozens of bug fixes and quality improvements</li>
+                </ul>
+                
+                <p class="mt-6 text-gray-300">We're going all-in on the phone browser experience. Our goal is to make PaulysProperties.com the smoothest, most useful tool you can access without ever leaving the city.</p>
+                
+                <p class="mt-4 text-gray-400 italic">Questions, ideas, or feedback? <strong class="text-green-400">Text Pauly in city</strong> — everything you tell us shapes what we build next.</p>
+            `
+        },
         {
             date: 'December 15, 2024',
             title: '🚀 Two Weeks In - A Complete Property Management Platform',
