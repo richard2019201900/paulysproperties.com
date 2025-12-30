@@ -4,30 +4,30 @@
     'use strict';
     
     // Detection methods for FiveM/CEF environment
-    const isFiveM = (
+    var isFiveM = (
         typeof GetParentResourceName === 'function' ||
         typeof invokeNative === 'function' ||
         (typeof navigator !== 'undefined' && (
-            navigator.userAgent.includes('CitizenFX') ||
-            navigator.userAgent.includes('FiveM')
+            navigator.userAgent.indexOf('CitizenFX') !== -1 ||
+            navigator.userAgent.indexOf('FiveM') !== -1
         ))
     );
     
     // Detection for lb-phone browser (runs inside iframe in FiveM)
-    const isLbPhone = (
-        window.parent !== window ||  // Inside iframe
-        document.referrer.includes('lb-phone') ||
-        window.location.href.includes('lb-phone')
+    var isLbPhone = (
+        window.parent !== window ||
+        (document.referrer && document.referrer.indexOf('lb-phone') !== -1) ||
+        window.location.href.indexOf('lb-phone') !== -1
     );
     
     // Additional CEF detection - check for missing features
-    const isCEF = (
+    var isCEF = (
         typeof window.chrome !== 'undefined' &&
-        !window.chrome.runtime  // CEF doesn't have chrome.runtime
+        !window.chrome.runtime
     );
     
     // Check for backdrop-filter support (CEF often lacks this)
-    const hasBackdropFilter = CSS.supports && CSS.supports('backdrop-filter', 'blur(10px)');
+    var hasBackdropFilter = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('backdrop-filter', 'blur(10px)');
     
     // Apply FiveM mode if detected
     if (isFiveM || isLbPhone || (isCEF && !hasBackdropFilter)) {
@@ -37,7 +37,7 @@
         document.documentElement.classList.add('fivem-mode');
         
         // Load compatibility stylesheet
-        const link = document.createElement('link');
+        var link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'css/fivem-compat.css';
         link.id = 'fivem-compat-css';
