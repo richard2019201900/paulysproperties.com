@@ -1,3 +1,55 @@
+// ==================== FIVEM / LB-PHONE DETECTION ====================
+// Auto-detect FiveM CEF browser environment and load compatibility styles
+(function() {
+    'use strict';
+    
+    // Detection methods for FiveM/CEF environment
+    const isFiveM = (
+        typeof GetParentResourceName === 'function' ||
+        typeof invokeNative === 'function' ||
+        (typeof navigator !== 'undefined' && (
+            navigator.userAgent.includes('CitizenFX') ||
+            navigator.userAgent.includes('FiveM')
+        ))
+    );
+    
+    // Detection for lb-phone browser (runs inside iframe in FiveM)
+    const isLbPhone = (
+        window.parent !== window ||  // Inside iframe
+        document.referrer.includes('lb-phone') ||
+        window.location.href.includes('lb-phone')
+    );
+    
+    // Additional CEF detection - check for missing features
+    const isCEF = (
+        typeof window.chrome !== 'undefined' &&
+        !window.chrome.runtime  // CEF doesn't have chrome.runtime
+    );
+    
+    // Check for backdrop-filter support (CEF often lacks this)
+    const hasBackdropFilter = CSS.supports && CSS.supports('backdrop-filter', 'blur(10px)');
+    
+    // Apply FiveM mode if detected
+    if (isFiveM || isLbPhone || (isCEF && !hasBackdropFilter)) {
+        console.log('[FiveM Compat] FiveM/lb-phone environment detected, loading compatibility styles');
+        
+        // Add class to document for CSS targeting
+        document.documentElement.classList.add('fivem-mode');
+        
+        // Load compatibility stylesheet
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'css/fivem-compat.css';
+        link.id = 'fivem-compat-css';
+        document.head.appendChild(link);
+        
+        // Store detection result globally
+        window.isFiveMMode = true;
+    } else {
+        window.isFiveMMode = false;
+    }
+})();
+
 // ==================== DATE HELPER ====================
 // Parse date string (YYYY-MM-DD) as local time, not UTC
 window.parseLocalDate = function(dateStr) {
