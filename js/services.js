@@ -720,7 +720,12 @@ function setupRealtimeListener() {
                     }
                 });
             }
-            renderProperties(state.filteredProperties);
+            // Apply filters including hideUnavailable if checked
+            if (typeof applyAllFilters === 'function') {
+                applyAllFilters();
+            } else {
+                renderProperties(state.filteredProperties);
+            }
             if (state.currentUser === 'owner') renderOwnerDashboard();
         }, error => {
             console.error('[Availability] Listener error:', error);
