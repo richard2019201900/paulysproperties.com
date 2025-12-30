@@ -4738,28 +4738,27 @@ window.showNewListingNotification = function(listing, isMissed = false) {
     const ownerEmail = listing.ownerEmail || 'Unknown';
     const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
     
-    // Time display - handle various timestamp formats
+    // ALWAYS use actual creation time from listing data
     let timeDisplay;
-    if (isMissed) {
-        let createdDate = null;
-        if (listing.createdAt) {
-            if (typeof listing.createdAt === 'string') {
-                createdDate = new Date(listing.createdAt);
-            } else if (listing.createdAt.toDate) {
-                createdDate = listing.createdAt.toDate();
-            }
+    let createdDate = null;
+    
+    if (listing.createdAt) {
+        if (typeof listing.createdAt === 'string') {
+            createdDate = new Date(listing.createdAt);
+        } else if (listing.createdAt.toDate) {
+            createdDate = listing.createdAt.toDate();
         }
-        if (createdDate) {
-            timeDisplay = createdDate.toLocaleString('en-US', { 
-                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-            });
-        } else {
-            timeDisplay = 'Recently';
-        }
-    } else {
-        timeDisplay = new Date().toLocaleString('en-US', { 
+    } else if (listing.createdAtTimestamp?.toDate) {
+        createdDate = listing.createdAtTimestamp.toDate();
+    }
+    
+    if (createdDate && !isNaN(createdDate.getTime())) {
+        timeDisplay = createdDate.toLocaleString('en-US', { 
             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
         });
+    } else {
+        // Fallback only if no timestamp exists
+        timeDisplay = 'Recently';
     }
     
     // Check if this is a premium listing
@@ -5046,14 +5045,22 @@ window.showNewUserNotification = function(user, isMissed = false) {
     if (window.dismissedAdminNotifications.has(notificationId)) return;
     if ($('notification-' + notificationId)) return;
     
-    // For missed users, show actual creation time; for real-time, show now
+    // ALWAYS use the user's actual creation time, not current time
     let timeDisplay;
-    if (isMissed && user.createdAt?.toDate) {
+    if (user.createdAt?.toDate) {
+        // Firestore Timestamp object
         const createdDate = user.createdAt.toDate();
         timeDisplay = createdDate.toLocaleString('en-US', { 
             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
         });
+    } else if (user.createdAt) {
+        // String or Date object
+        const createdDate = new Date(user.createdAt);
+        timeDisplay = createdDate.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
     } else {
+        // Fallback only if no createdAt exists at all
         timeDisplay = new Date().toLocaleString('en-US', { 
             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
         });
@@ -5387,9 +5394,27 @@ window.showNewPremiumNotification = function(property, ownerEmail, isMissed = fa
     // Get owner name
     const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
     
-    const timeDisplay = new Date().toLocaleString('en-US', { 
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-    });
+    // Use actual premium activation timestamp if available
+    let timeDisplay;
+    let activatedDate = null;
+    
+    if (property.premiumActivatedAt?.toDate) {
+        activatedDate = property.premiumActivatedAt.toDate();
+    } else if (property.premiumActivatedAt) {
+        activatedDate = new Date(property.premiumActivatedAt);
+    } else if (property.createdAt?.toDate) {
+        activatedDate = property.createdAt.toDate();
+    } else if (property.createdAt) {
+        activatedDate = new Date(property.createdAt);
+    }
+    
+    if (activatedDate && !isNaN(activatedDate.getTime())) {
+        timeDisplay = activatedDate.toLocaleString('en-US', { 
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
+        });
+    } else {
+        timeDisplay = 'Recently';
+    }
     
     const gradientClass = isMissed 
         ? 'from-amber-700 to-orange-600 border-amber-500' 
