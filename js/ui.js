@@ -1981,48 +1981,110 @@ function getAvailableCount() {
 }
 
 /**
- * Calculate dashboard totals from ACTUAL payment history (all-time collected)
- * Shows frequency equivalents across all tiles
+ * Calculate dashboard totals for active renters grouped by payment frequency
+ * Shows current income rates (not historical), plus RTO and House Sales
  */
 async function calculateTotalsAsync() {
     const ownedProps = getOwnedProperties();
     
     // Initialize data structure
     const data = {
-        // Monthly total from all actual payments
-        monthlyTotal: 0,
-        paymentsByProperty: [],
+        // Active renters by frequency (current income rates)
+        activeRenters: {
+            daily: [],    // { id, title, renterName, price }
+            weekly: [],
+            biweekly: [],
+            monthly: []
+        },
+        // Income totals by frequency
+        incomeByFrequency: {
+            daily: 0,
+            weekly: 0,
+            biweekly: 0,
+            monthly: 0
+        },
         // Property info
         rented: [],
         available: [],
         premium: [],
-        // RTO Income
+        // RTO Income (historical - actual collected)
         rtoTotal: 0,
         rtoContracts: [],
-        // House Sales
+        // House Sales (historical - actual collected)
         houseSalesTotal: 0,
         houseSales: []
     };
     
-    // Fetch payment history for all owned properties
-    const paymentPromises = ownedProps.map(async (p) => {
-        try {
-            const historyDoc = await db.collection('paymentHistory').doc(String(p.id)).get();
-            if (historyDoc.exists) {
-                const histData = historyDoc.data();
-                return {
-                    propertyId: p.id,
-                    propertyTitle: p.title,
-                    payments: histData.payments || []
-                };
-            }
-        } catch (e) {
-            console.warn(`[Dashboard] Could not fetch history for property ${p.id}:`, e);
+    // Process each owned property for active renters
+    ownedProps.forEach(p => {
+        const isRented = state.availability[p.id] === false;
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+        const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
+        const premiumWeeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
+        const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
+        
+        // Get prices for each frequency
+        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+        
+        const propInfo = {
+            id: p.id,
+            title: p.title,
+            renterName,
+            isPremium,
+            isPremiumTrial,
+            premiumWeeklyFee,
+            isSold
+        };
+        
+        // Track premium properties
+        if (isPremium) {
+            data.premium.push(propInfo);
         }
-        return { propertyId: p.id, propertyTitle: p.title, payments: [] };
+        
+        // Track rented vs available
+        if (isRented) {
+            data.rented.push(propInfo);
+            
+            // Only count active renters with a valid payment frequency
+            if (paymentFrequency && ['daily', 'weekly', 'biweekly', 'monthly'].includes(paymentFrequency)) {
+                let price = 0;
+                
+                // Get the price for this frequency
+                switch (paymentFrequency) {
+                    case 'daily':
+                        price = dailyPrice;
+                        break;
+                    case 'weekly':
+                        price = weeklyPrice;
+                        break;
+                    case 'biweekly':
+                        price = biweeklyPrice;
+                        break;
+                    case 'monthly':
+                        price = monthlyPrice;
+                        break;
+                }
+                
+                // Add to active renters for this frequency
+                data.activeRenters[paymentFrequency].push({
+                    id: p.id,
+                    title: p.title,
+                    renterName: renterName || 'Unknown',
+                    price: price
+                });
+                
+                // Add to income total for this frequency
+                data.incomeByFrequency[paymentFrequency] += price;
+            }
+        } else {
+            data.available.push(propInfo);
+        }
     });
-    
-    const allPaymentData = await Promise.all(paymentPromises);
     
     // Fetch RTO contracts for this owner
     let rtoContracts = [];
@@ -2056,26 +2118,7 @@ async function calculateTotalsAsync() {
         console.warn('[Dashboard] Could not fetch house sales:', e);
     }
     
-    // Calculate totals from ACTUAL payments (excluding RTO payments - those go to RTO tile)
-    let totalCollected = 0;
-    allPaymentData.forEach(pd => {
-        const regularPayments = pd.payments.filter(pay => !pay.isRTOPayment && !pay.isRTODeposit);
-        const propertyTotal = regularPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
-        totalCollected += propertyTotal;
-        
-        if (propertyTotal > 0) {
-            data.paymentsByProperty.push({
-                id: pd.propertyId,
-                title: pd.propertyTitle,
-                total: propertyTotal,
-                paymentCount: regularPayments.length
-            });
-        }
-    });
-    
-    data.monthlyTotal = totalCollected;
-    
-    // Calculate RTO income (deposits + monthly payments)
+    // Calculate RTO income (deposits + monthly payments - historical)
     rtoContracts.forEach(contract => {
         const history = contract.rtoPaymentHistory || [];
         const depositPaid = contract.depositPaid ? (contract.depositAmount || 0) : 0;
@@ -2096,7 +2139,7 @@ async function calculateTotalsAsync() {
         }
     });
     
-    // Calculate house sales
+    // Calculate house sales (historical)
     houseSales.forEach(sale => {
         data.houseSalesTotal += (sale.salePrice || 0);
         data.houseSales.push({
@@ -2107,36 +2150,6 @@ async function calculateTotalsAsync() {
             buyerName: sale.buyerName,
             saleType: sale.saleType
         });
-    });
-    
-    // Track property status
-    ownedProps.forEach(p => {
-        const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
-        const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
-        const premiumWeeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
-        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
-        const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
-        const isRented = state.availability[p.id] === false;
-        
-        const propInfo = {
-            id: p.id,
-            title: p.title,
-            renterName,
-            isPremium,
-            isPremiumTrial,
-            premiumWeeklyFee,
-            isSold
-        };
-        
-        if (isPremium) {
-            data.premium.push(propInfo);
-        }
-        
-        if (isRented) {
-            data.rented.push(propInfo);
-        } else {
-            data.available.push(propInfo);
-        }
     });
     
     // Store globally
@@ -2152,10 +2165,20 @@ async function calculateTotalsAsync() {
 function calculateTotals() {
     const ownedProps = getOwnedProperties();
     
-    // Basic data structure for synchronous fallback
+    // Data structure matching async version
     const data = {
-        monthlyTotal: 0,
-        paymentsByProperty: [],
+        activeRenters: {
+            daily: [],
+            weekly: [],
+            biweekly: [],
+            monthly: []
+        },
+        incomeByFrequency: {
+            daily: 0,
+            weekly: 0,
+            biweekly: 0,
+            monthly: 0
+        },
         rented: [],
         available: [],
         premium: [],
@@ -2172,6 +2195,13 @@ function calculateTotals() {
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
         const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
         const isRented = state.availability[p.id] === false;
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
+        
+        // Get prices
+        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
         
         const propInfo = {
             id: p.id,
@@ -2189,6 +2219,25 @@ function calculateTotals() {
         
         if (isRented) {
             data.rented.push(propInfo);
+            
+            // Track active renters by frequency
+            if (paymentFrequency && ['daily', 'weekly', 'biweekly', 'monthly'].includes(paymentFrequency)) {
+                let price = 0;
+                switch (paymentFrequency) {
+                    case 'daily': price = dailyPrice; break;
+                    case 'weekly': price = weeklyPrice; break;
+                    case 'biweekly': price = biweeklyPrice; break;
+                    case 'monthly': price = monthlyPrice; break;
+                }
+                
+                data.activeRenters[paymentFrequency].push({
+                    id: p.id,
+                    title: p.title,
+                    renterName: renterName || 'Unknown',
+                    price: price
+                });
+                data.incomeByFrequency[paymentFrequency] += price;
+            }
         } else {
             data.available.push(propInfo);
         }
@@ -2207,42 +2256,65 @@ window.flipCard = function(card) {
     card.classList.toggle('flipped');
 };
 
-// Update all 8 dashboard tiles with frequency equivalents
+// Update all 8 dashboard tiles with active renter income by frequency
 function updateDashboardTiles(totals) {
     const { ownedCount, data } = totals;
     
-    // Calculate frequency equivalents from monthly total
-    const monthlyTotal = data.monthlyTotal || 0;
-    const dailyEquiv = Math.round(monthlyTotal / 30);
-    const weeklyEquiv = Math.round(monthlyTotal / 4);
-    const biweeklyEquiv = Math.round(monthlyTotal / 2);
+    // Get income and renter counts by frequency
+    const income = data.incomeByFrequency || { daily: 0, weekly: 0, biweekly: 0, monthly: 0 };
+    const renters = data.activeRenters || { daily: [], weekly: [], biweekly: [], monthly: [] };
     
-    // === ROW 1: INCOME TILES (Frequency Equivalents) ===
+    // Calculate total rental income (sum of all frequencies)
+    const totalRentalIncome = income.daily + income.weekly + income.biweekly + income.monthly;
+    const totalRenters = renters.daily.length + renters.weekly.length + renters.biweekly.length + renters.monthly.length;
     
-    // Daily Equivalent
-    $('dailyIncomeDisplay').textContent = formatPrice(dailyEquiv);
-    $('dailyIncomeCount').textContent = monthlyTotal > 0 ? 'Rental income' : 'No income yet';
-    $('dailyBreakdown').innerHTML = renderFrequencyBreakdown(data.paymentsByProperty, 30, '/day');
+    // === ROW 1: INCOME BY FREQUENCY (Active Renters Only) ===
     
-    // Weekly Equivalent
-    $('weeklyIncomeDisplay').textContent = formatPrice(weeklyEquiv);
-    $('weeklyIncomeCount').textContent = monthlyTotal > 0 ? 'Rental income' : 'No income yet';
-    $('weeklyBreakdown').innerHTML = renderFrequencyBreakdown(data.paymentsByProperty, 4, '/wk');
+    // Daily Rentals
+    $('dailyIncomeDisplay').textContent = formatPrice(income.daily);
+    $('dailyIncomeCount').textContent = renters.daily.length > 0 
+        ? `${renters.daily.length} renter${renters.daily.length > 1 ? 's' : ''}` 
+        : 'No daily renters';
+    $('dailyBreakdown').innerHTML = renderActiveRentersBreakdown(renters.daily, 'daily');
     
-    // Biweekly Equivalent
-    $('biweeklyIncomeDisplay').textContent = formatPrice(biweeklyEquiv);
-    $('biweeklyIncomeCount').textContent = monthlyTotal > 0 ? 'Rental income' : 'No income yet';
-    $('biweeklyBreakdown').innerHTML = renderFrequencyBreakdown(data.paymentsByProperty, 2, '/2wk');
+    // Weekly Rentals
+    $('weeklyIncomeDisplay').textContent = formatPrice(income.weekly);
+    $('weeklyIncomeCount').textContent = renters.weekly.length > 0 
+        ? `${renters.weekly.length} renter${renters.weekly.length > 1 ? 's' : ''}` 
+        : 'No weekly renters';
+    $('weeklyBreakdown').innerHTML = renderActiveRentersBreakdown(renters.weekly, 'weekly');
     
-    // Monthly Total
-    $('monthlyIncomeDisplay').textContent = formatPrice(monthlyTotal);
-    const paymentCount = data.paymentsByProperty.reduce((sum, p) => sum + p.paymentCount, 0);
-    $('monthlyIncomeCount').textContent = paymentCount > 0 
-        ? `${paymentCount} payments collected` 
-        : 'All-time collected';
-    $('monthlyBreakdown').innerHTML = renderMonthlyBreakdown(data.paymentsByProperty);
+    // Biweekly Rentals
+    $('biweeklyIncomeDisplay').textContent = formatPrice(income.biweekly);
+    $('biweeklyIncomeCount').textContent = renters.biweekly.length > 0 
+        ? `${renters.biweekly.length} renter${renters.biweekly.length > 1 ? 's' : ''}` 
+        : 'No biweekly renters';
+    $('biweeklyBreakdown').innerHTML = renderActiveRentersBreakdown(renters.biweekly, 'biweekly');
     
-    // === ROW 2: PROPERTY & SALES TILES ===
+    // Monthly Rentals
+    $('monthlyIncomeDisplay').textContent = formatPrice(income.monthly);
+    $('monthlyIncomeCount').textContent = renters.monthly.length > 0 
+        ? `${renters.monthly.length} renter${renters.monthly.length > 1 ? 's' : ''}` 
+        : 'No monthly renters';
+    $('monthlyBreakdown').innerHTML = renderActiveRentersBreakdown(renters.monthly, 'monthly');
+    
+    // === ROW 2: TOTALS & OTHER INCOME ===
+    
+    // Total Rental Income
+    const totalIncomeEl = $('totalRentalIncomeDisplay');
+    const totalCountEl = $('totalRentalIncomeCount');
+    const totalBreakdownEl = $('totalRentalIncomeBreakdown');
+    if (totalIncomeEl) {
+        totalIncomeEl.textContent = formatPrice(totalRentalIncome);
+    }
+    if (totalCountEl) {
+        totalCountEl.textContent = totalRenters > 0 
+            ? `${totalRenters} renter${totalRenters > 1 ? 's' : ''} total` 
+            : 'No active renters';
+    }
+    if (totalBreakdownEl) {
+        totalBreakdownEl.innerHTML = renderTotalIncomeBreakdown(income, renters, data);
+    }
     
     // Properties (Combined)
     const rentedCount = data.rented?.length || 0;
@@ -2262,8 +2334,8 @@ function updateDashboardTiles(totals) {
     if (rtoCountEl) {
         const activeContracts = (data.rtoContracts || []).filter(c => c.status === 'active').length;
         rtoCountEl.textContent = activeContracts > 0 
-            ? `${activeContracts} active contract${activeContracts > 1 ? 's' : ''}` 
-            : 'No active contracts';
+            ? `Rent-to-Own • ${activeContracts} active` 
+            : 'Rent-to-Own income';
     }
     if (rtoBreakdownEl) {
         rtoBreakdownEl.innerHTML = renderRTOBreakdown(data.rtoContracts || []);
@@ -2285,23 +2357,75 @@ function updateDashboardTiles(totals) {
     if (houseSalesBreakdownEl) {
         houseSalesBreakdownEl.innerHTML = renderHouseSalesBreakdown(data.houseSales || []);
     }
-    
-    // Premium
-    const premiumCount = data.premium?.length || 0;
-    const paidPremiums = (data.premium || []).filter(p => !p.isPremiumTrial);
-    const trialCount = (data.premium || []).filter(p => p.isPremiumTrial).length;
-    const premiumIncome = paidPremiums.reduce((sum, p) => sum + (p.premiumWeeklyFee || 10000), 0);
-    $('premiumCountDisplay').textContent = premiumCount;
-    if (premiumCount === 0) {
-        $('premiumIncomeDisplay').textContent = 'No premium';
-    } else if (trialCount === premiumCount) {
-        $('premiumIncomeDisplay').textContent = 'All on trial';
-    } else if (trialCount > 0) {
-        $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk + ${trialCount} trial`;
-    } else {
-        $('premiumIncomeDisplay').textContent = `$${premiumIncome.toLocaleString()}/wk fees`;
+}
+
+// Render active renters breakdown for a frequency tile flip
+function renderActiveRentersBreakdown(renters, frequency) {
+    if (!renters || renters.length === 0) {
+        return `<div class="opacity-70 italic">No ${frequency} renters</div>`;
     }
-    $('premiumBreakdown').innerHTML = renderPremiumList(data.premium || []);
+    
+    const freqLabel = frequency === 'daily' ? '/day' : 
+                      frequency === 'weekly' ? '/wk' : 
+                      frequency === 'biweekly' ? '/2wk' : '/mo';
+    
+    return renters.map(r => `
+        <div class="flex justify-between items-center py-1 border-b border-white/10">
+            <div class="truncate pr-2">
+                <div class="font-medium truncate">🏠 ${sanitize(r.title)}</div>
+                <div class="opacity-70 text-[10px]">${sanitize(r.renterName)}</div>
+            </div>
+            <div class="text-right font-bold whitespace-nowrap">$${(r.price || 0).toLocaleString()}${freqLabel}</div>
+        </div>
+    `).join('');
+}
+
+// Render total income breakdown for the Total Rental Income tile flip
+function renderTotalIncomeBreakdown(income, renters, data) {
+    const lines = [];
+    
+    // Rental income by frequency
+    lines.push('<div class="font-bold text-amber-300 mb-2">📊 Rental Income</div>');
+    
+    const frequencies = [
+        { key: 'daily', label: 'Daily', icon: '📅' },
+        { key: 'weekly', label: 'Weekly', icon: '📆' },
+        { key: 'biweekly', label: 'Biweekly', icon: '📊' },
+        { key: 'monthly', label: 'Monthly', icon: '🗓️' }
+    ];
+    
+    frequencies.forEach(f => {
+        const amount = income[f.key] || 0;
+        const count = renters[f.key]?.length || 0;
+        lines.push(`
+            <div class="flex justify-between py-1 border-b border-white/10">
+                <span>${f.icon} ${f.label}</span>
+                <span class="font-medium">$${amount.toLocaleString()} <span class="opacity-60">(${count})</span></span>
+            </div>
+        `);
+    });
+    
+    // RTO Income
+    if (data.rtoTotal > 0) {
+        lines.push(`
+            <div class="flex justify-between py-1 border-b border-white/10 mt-2">
+                <span>📋 RTO Income</span>
+                <span class="font-medium">$${(data.rtoTotal || 0).toLocaleString()}</span>
+            </div>
+        `);
+    }
+    
+    // House Sales
+    if (data.houseSalesTotal > 0) {
+        lines.push(`
+            <div class="flex justify-between py-1 border-b border-white/10">
+                <span>🏡 House Sales</span>
+                <span class="font-medium">$${(data.houseSalesTotal || 0).toLocaleString()}</span>
+            </div>
+        `);
+    }
+    
+    return lines.join('');
 }
 
 // Render frequency breakdown (converts monthly totals to other frequencies)
