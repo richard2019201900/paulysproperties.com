@@ -34,46 +34,8 @@
     <link rel="dns-prefetch" href="https://r2.fivemanage.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- Tailwind CSS - Conditional loading for lb-phone/CEF compatibility -->
-    <script>
-    (function() {
-        // Detect FiveM/lb-phone/CEF environment BEFORE loading Tailwind
-        var isFiveM = (
-            typeof GetParentResourceName === 'function' ||
-            typeof invokeNative === 'function' ||
-            navigator.userAgent.indexOf('CitizenFX') !== -1 ||
-            navigator.userAgent.indexOf('FiveM') !== -1
-        );
-        var isIframe = window.parent !== window;
-        var isCEF = typeof window.chrome !== 'undefined' && !window.chrome.runtime;
-        
-        // Use Tailwind v3 for lb-phone/CEF (Chromium 103 doesn't support v4)
-        // Use Tailwind v4 for modern browsers
-        var tailwindUrl = (isFiveM || isIframe || isCEF)
-            ? 'https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css'
-            : 'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4';
-        
-        var isCSS = tailwindUrl.endsWith('.css');
-        
-        if (isCSS) {
-            // Load as stylesheet for v3
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = tailwindUrl;
-            document.head.appendChild(link);
-            document.documentElement.classList.add('fivem-mode');
-            window.isFiveMMode = true;
-            console.log('[Tailwind] Loading v3 CSS for CEF/lb-phone compatibility');
-        } else {
-            // Load as script for v4
-            var script = document.createElement('script');
-            script.src = tailwindUrl;
-            document.head.appendChild(script);
-            window.isFiveMMode = false;
-            console.log('[Tailwind] Loading v4 browser build for modern browsers');
-        }
-    })();
-    </script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>

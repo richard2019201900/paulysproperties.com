@@ -3,63 +3,45 @@
 (function() {
     'use strict';
     
-    // Check if already detected in head script
-    if (window.isFiveMMode === true) {
-        console.log('[FiveM Compat] FiveM mode already enabled from head script');
-        // Load compatibility stylesheet if not already loaded
-        if (!document.getElementById('fivem-compat-css')) {
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'css/fivem-compat.css';
-            link.id = 'fivem-compat-css';
-            document.head.appendChild(link);
-        }
-        return;
-    }
-    
-    // Detection methods for FiveM/CEF environment (fallback check)
-    var isFiveM = (
+    // Detection methods for FiveM/CEF environment
+    const isFiveM = (
         typeof GetParentResourceName === 'function' ||
         typeof invokeNative === 'function' ||
         (typeof navigator !== 'undefined' && (
-            navigator.userAgent.indexOf('CitizenFX') !== -1 ||
-            navigator.userAgent.indexOf('FiveM') !== -1
+            navigator.userAgent.includes('CitizenFX') ||
+            navigator.userAgent.includes('FiveM')
         ))
     );
     
     // Detection for lb-phone browser (runs inside iframe in FiveM)
-    var isLbPhone = (
-        window.parent !== window ||
-        (document.referrer && document.referrer.indexOf('lb-phone') !== -1) ||
-        window.location.href.indexOf('lb-phone') !== -1
+    const isLbPhone = (
+        window.parent !== window ||  // Inside iframe
+        document.referrer.includes('lb-phone') ||
+        window.location.href.includes('lb-phone')
     );
     
     // Additional CEF detection - check for missing features
-    var isCEF = (
+    const isCEF = (
         typeof window.chrome !== 'undefined' &&
-        !window.chrome.runtime
+        !window.chrome.runtime  // CEF doesn't have chrome.runtime
     );
     
     // Check for backdrop-filter support (CEF often lacks this)
-    var hasBackdropFilter = typeof CSS !== 'undefined' && CSS.supports && CSS.supports('backdrop-filter', 'blur(10px)');
+    const hasBackdropFilter = CSS.supports && CSS.supports('backdrop-filter', 'blur(10px)');
     
     // Apply FiveM mode if detected
     if (isFiveM || isLbPhone || (isCEF && !hasBackdropFilter)) {
         console.log('[FiveM Compat] FiveM/lb-phone environment detected, loading compatibility styles');
         
         // Add class to document for CSS targeting
-        if (!document.documentElement.classList.contains('fivem-mode')) {
-            document.documentElement.classList.add('fivem-mode');
-        }
+        document.documentElement.classList.add('fivem-mode');
         
         // Load compatibility stylesheet
-        if (!document.getElementById('fivem-compat-css')) {
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'css/fivem-compat.css';
-            link.id = 'fivem-compat-css';
-            document.head.appendChild(link);
-        }
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'css/fivem-compat.css';
+        link.id = 'fivem-compat-css';
+        document.head.appendChild(link);
         
         // Store detection result globally
         window.isFiveMMode = true;
