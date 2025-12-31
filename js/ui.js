@@ -799,7 +799,7 @@ window.renderBlogPage = function() {
                     <li>Full site now works in the phone browser — no alt-tab needed</li>
                     <li>Custom domain: just type <strong>paulysproperties.com</strong></li>
                     <li>Optimized for smooth scrolling and fast loading in-city</li>
-                    <li>More phone-friendly improvements coming in 2025</li>
+                    <li>More phone-friendly improvements coming in 2026</li>
                 </ul>
                 
                 <h4 class="font-bold text-white mb-2 mt-6">🏠 Rent-to-Own System <span class="text-amber-400">(Elite Members)</span>:</h4>
