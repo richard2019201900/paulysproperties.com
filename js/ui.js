@@ -2564,12 +2564,24 @@ function renderHouseSalesBreakdown(sales) {
         return '<div class="opacity-70 italic">No house sales yet</div>';
     }
     
+    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
+    
     return sales.map((s, i) => {
         const typeIcon = s.saleType === 'rto_completion' ? '📋' : '🏡';
+        const sellerName = s.sellerDisplayName || s.sellerName || 'Unknown';
+        const deleteBtn = isAdmin && s.id ? `
+            <button onclick="event.stopPropagation(); showDeleteSaleModal('${s.id}', '${(s.propertyTitle || '').replace(/'/g, "\\'")}', '${sellerName.replace(/'/g, "\\'")}', ${s.salePrice || 0})" 
+                    class="ml-2 text-red-400 hover:text-red-300 text-xs" title="Delete/Reverse Sale">
+                🗑️
+            </button>
+        ` : '';
         return `
-            <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
+            <div class="flex justify-between items-center py-1 border-b border-white/10 last:border-0">
                 <span class="truncate mr-2">${typeIcon} ${s.propertyTitle}</span>
-                <span class="font-bold whitespace-nowrap">$${s.salePrice.toLocaleString()}</span>
+                <span class="flex items-center">
+                    <span class="font-bold whitespace-nowrap">$${s.salePrice.toLocaleString()}</span>
+                    ${deleteBtn}
+                </span>
             </div>
         `;
     }).join('');
@@ -11291,17 +11303,18 @@ async function checkCelebrationBanners() {
 /**
  * Create a house sale celebration banner (24 hours)
  */
-window.createSaleCelebration = async function(sellerName, propertyTitle, salePrice, buyerName) {
+window.createSaleCelebration = async function(sellerDisplayName, propertyTitle, salePrice, buyerName) {
     try {
         const celebrationId = `sale_${Date.now()}`;
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
         
+        // Only show seller name and property - no buyer or price for privacy
         const celebration = {
             id: celebrationId,
             type: 'house_sale',
             icon: '🏆',
-            userName: sellerName,
-            message: `just sold ${propertyTitle} to ${buyerName} for $${salePrice.toLocaleString()}! 🎉`,
+            userName: sellerDisplayName,
+            message: `just sold ${propertyTitle}! 🎉`,
             createdAt: new Date().toISOString(),
             expiresAt: expiresAt
         };
@@ -11345,14 +11358,34 @@ window.showLogSaleModal = function(propertyId, rtoContractId = null) {
     const buyPrice = PropertyDataService.getValue(propertyId, 'buyPrice', p.buyPrice || 0);
     const renterName = PropertyDataService.getValue(propertyId, 'renterName', p.renterName || '');
     const today = new Date().toISOString().split('T')[0];
+    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
     
     // Determine if this is from RTO completion
     const isRTOCompletion = !!rtoContractId;
     const saleType = isRTOCompletion ? 'rto_completion' : 'direct_sale';
     
+    // Get current property owner info
+    const propertyOwnerEmail = PropertyDataService.getValue(propertyId, 'owner', p.owner || '');
+    const currentUserEmail = auth.currentUser?.email || '';
+    const currentUserDisplayName = window.currentUserData?.displayName || currentUserEmail.split('@')[0];
+    
+    // Build seller selection HTML for admins
+    const sellerSelectionHTML = isAdmin ? `
+        <div>
+            <label class="block text-gray-400 text-sm mb-2">Seller (who sold the property):</label>
+            <select id="saleSellerSelect" class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-rose-500 focus:outline-none">
+                <option value="">-- Select Seller --</option>
+                <!-- Will be populated dynamically -->
+            </select>
+            <p class="text-gray-500 text-xs mt-1">Select the property owner who made this sale</p>
+        </div>
+    ` : `
+        <input type="hidden" id="saleSellerSelect" value="${currentUserEmail}">
+    `;
+    
     const modalHTML = `
         <div id="logSaleModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-rose-500/50 shadow-2xl overflow-hidden relative">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-rose-500/50 shadow-2xl overflow-hidden relative max-h-[90vh] overflow-y-auto">
                 <!-- X Close Button -->
                 <button onclick="closeLogSaleModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -11373,6 +11406,8 @@ window.showLogSaleModal = function(propertyId, rtoContractId = null) {
                         <p class="text-indigo-200 text-xs mt-1">This sale is being logged from a completed Rent-to-Own contract.</p>
                     </div>
                     ` : ''}
+                    
+                    ${sellerSelectionHTML}
                     
                     <div>
                         <label class="block text-gray-400 text-sm mb-2">Sale Price:</label>
@@ -11443,12 +11478,56 @@ window.showLogSaleModal = function(propertyId, rtoContractId = null) {
             feeDisplay.textContent = `$${Math.round(price * 0.10).toLocaleString()}`;
         });
     }
+    
+    // Populate seller dropdown for admins
+    if (isAdmin) {
+        populateSellerDropdown(propertyId, propertyOwnerEmail);
+    }
 };
 
 window.closeLogSaleModal = function() {
     const modal = document.getElementById('logSaleModal');
     if (modal) modal.remove();
 };
+
+/**
+ * Populate seller dropdown with property owners (for admin use)
+ */
+async function populateSellerDropdown(propertyId, defaultOwnerEmail) {
+    const select = document.getElementById('saleSellerSelect');
+    if (!select) return;
+    
+    try {
+        // Get all users who own properties
+        const usersSnapshot = await db.collection('users').get();
+        const owners = [];
+        
+        usersSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.email) {
+                owners.push({
+                    email: data.email,
+                    displayName: data.displayName || data.username || data.email.split('@')[0],
+                    uid: doc.id
+                });
+            }
+        });
+        
+        // Sort by display name
+        owners.sort((a, b) => a.displayName.localeCompare(b.displayName));
+        
+        // Build options
+        let optionsHTML = '<option value="">-- Select Seller --</option>';
+        owners.forEach(owner => {
+            const selected = owner.email.toLowerCase() === defaultOwnerEmail?.toLowerCase() ? 'selected' : '';
+            optionsHTML += `<option value="${owner.email}" data-displayname="${owner.displayName}" data-uid="${owner.uid}" ${selected}>${owner.displayName}</option>`;
+        });
+        
+        select.innerHTML = optionsHTML;
+    } catch (e) {
+        console.error('[PopulateSellerDropdown] Error:', e);
+    }
+}
 
 /**
  * Submit house sale to Firestore
@@ -11459,12 +11538,28 @@ window.submitHouseSale = async function(propertyId, saleType, rtoContractId) {
     const dateInput = document.getElementById('saleDateInput');
     const notesInput = document.getElementById('saleNotesInput');
     const transferCheckbox = document.getElementById('transferOwnershipCheckbox');
+    const sellerSelect = document.getElementById('saleSellerSelect');
     
     const salePrice = parseInt(priceInput?.value) || 0;
     const buyerName = buyerInput?.value?.trim() || '';
     const saleDate = dateInput?.value || '';
     const notes = notesInput?.value?.trim() || '';
     const requestTransfer = transferCheckbox?.checked || false;
+    
+    // Get seller info - from dropdown for admins, or current user for regular users
+    let sellerEmail, sellerDisplayName, sellerUid;
+    const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
+    
+    if (isAdmin && sellerSelect && sellerSelect.value) {
+        sellerEmail = sellerSelect.value;
+        const selectedOption = sellerSelect.options[sellerSelect.selectedIndex];
+        sellerDisplayName = selectedOption?.dataset?.displayname || sellerEmail.split('@')[0];
+        sellerUid = selectedOption?.dataset?.uid || null;
+    } else {
+        sellerEmail = auth.currentUser?.email || '';
+        sellerDisplayName = window.currentUserData?.displayName || sellerEmail.split('@')[0];
+        sellerUid = auth.currentUser?.uid || null;
+    }
     
     if (salePrice <= 0) {
         showToast('Please enter a valid sale price', 'error');
@@ -11478,27 +11573,30 @@ window.submitHouseSale = async function(propertyId, saleType, rtoContractId) {
         showToast('Please select a sale date', 'error');
         return;
     }
+    if (isAdmin && !sellerEmail) {
+        showToast('Please select the seller', 'error');
+        return;
+    }
     
     try {
         showToast('🏡 Recording sale...', 'info');
         closeLogSaleModal();
         
         const p = properties.find(prop => prop.id === propertyId);
-        const currentUserEmail = auth.currentUser?.email || '';
-        const sellerName = window.currentUserData?.displayName || currentUserEmail.split('@')[0];
         
         const realtorFee = Math.round(salePrice * 0.10);
         const netProceeds = salePrice - realtorFee;
         
-        // Create sale record
+        // Create sale record - NEVER store usernames, only display names
         const saleDoc = {
             propertyId: propertyId,
             propertyTitle: p?.title || `Property #${propertyId}`,
             salePrice: salePrice,
             saleDate: saleDate,
             buyerName: buyerName,
-            sellerName: sellerName,
-            sellerEmail: currentUserEmail,
+            sellerDisplayName: sellerDisplayName,  // Display name only for public display
+            sellerEmail: sellerEmail,              // Email for internal reference only
+            sellerUid: sellerUid,                  // UID for XP awards
             saleType: saleType,
             rtoContractId: rtoContractId || null,
             realtorFee: realtorFee,
@@ -11507,7 +11605,8 @@ window.submitHouseSale = async function(propertyId, saleType, rtoContractId) {
             requestTransfer: requestTransfer,
             transferStatus: requestTransfer ? 'pending' : null,
             notes: notes,
-            recordedAt: new Date().toISOString()
+            recordedAt: new Date().toISOString(),
+            recordedBy: auth.currentUser?.email  // Who logged it (for audit)
         };
         
         // Save to houseSales collection
@@ -11532,16 +11631,13 @@ window.submitHouseSale = async function(propertyId, saleType, rtoContractId) {
             });
         }
         
-        // Award XP for completing a sale
-        if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
-            const userId = auth.currentUser?.uid;
-            if (userId) {
-                await GamificationService.awardXP(userId, 2500, `Sold ${p?.title} to ${buyerName} for $${salePrice.toLocaleString()}`);
-            }
+        // Award XP to the SELLER (not the person logging it)
+        if (typeof GamificationService !== 'undefined' && GamificationService.awardXP && sellerUid) {
+            await GamificationService.awardXP(sellerUid, 2500, `Sold ${p?.title} for $${salePrice.toLocaleString()}`);
         }
         
-        // Create celebration banner (visible to all users for 24 hours)
-        await createSaleCelebration(sellerName, p?.title, salePrice, buyerName);
+        // Create celebration banner - use display name only, no buyer or price
+        await createSaleCelebration(sellerDisplayName, p?.title, salePrice, buyerName);
         
         // If transfer requested, create transfer request
         if (requestTransfer) {
@@ -11655,5 +11751,171 @@ window.rejectOwnershipTransfer = async function(transferId, reason) {
     } catch (e) {
         console.error('[OwnershipTransfer] Error rejecting:', e);
         showToast('Failed to reject transfer', 'error');
+    }
+};
+
+// ==================== DELETE/REVERSE SALE SYSTEM ====================
+
+/**
+ * Show confirmation modal to delete a sale (admin only)
+ */
+window.showDeleteSaleModal = function(saleId, propertyTitle, sellerDisplayName, salePrice) {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Only admins can delete sales', 'error');
+        return;
+    }
+    
+    const modalHTML = `
+        <div id="deleteSaleModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-red-500/50 shadow-2xl overflow-hidden">
+                <div class="bg-gradient-to-r from-red-600 to-red-800 px-6 py-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                        <span>⚠️</span>
+                        Delete Sale Record
+                    </h3>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <div class="bg-red-900/30 border border-red-500/50 rounded-xl p-4">
+                        <p class="text-red-200 font-medium">This will permanently reverse the following sale:</p>
+                        <ul class="mt-3 space-y-1 text-gray-300 text-sm">
+                            <li><strong>Property:</strong> ${propertyTitle}</li>
+                            <li><strong>Seller:</strong> ${sellerDisplayName}</li>
+                            <li><strong>Amount:</strong> $${salePrice?.toLocaleString() || 0}</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="text-gray-400 text-sm space-y-2">
+                        <p><strong>This action will:</strong></p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Delete the sale record from houseSales</li>
+                            <li>Remove the sale celebration banner</li>
+                            <li>Deduct 2,500 XP from the seller</li>
+                            <li>Mark the property as unsold</li>
+                            <li>Clear sold date, buyer, and price</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Reason for deletion (required):</label>
+                        <textarea id="deleteSaleReason" rows="2" placeholder="e.g., Logged under wrong seller, duplicate entry..."
+                            class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-red-500 focus:outline-none"></textarea>
+                    </div>
+                </div>
+                
+                <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                    <button onclick="closeDeleteSaleModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                    <button onclick="confirmDeleteSale('${saleId}')" class="flex-1 bg-gradient-to-r from-red-500 to-red-700 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        🗑️ Delete Sale
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeDeleteSaleModal = function() {
+    const modal = document.getElementById('deleteSaleModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Confirm and execute sale deletion with full reversal
+ */
+window.confirmDeleteSale = async function(saleId) {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Only admins can delete sales', 'error');
+        return;
+    }
+    
+    const reasonInput = document.getElementById('deleteSaleReason');
+    const reason = reasonInput?.value?.trim() || '';
+    
+    if (!reason) {
+        showToast('Please provide a reason for deletion', 'error');
+        return;
+    }
+    
+    try {
+        showToast('🗑️ Reversing sale...', 'info');
+        closeDeleteSaleModal();
+        
+        // 1. Get the sale record
+        const saleDoc = await db.collection('houseSales').doc(saleId).get();
+        if (!saleDoc.exists) {
+            showToast('Sale record not found', 'error');
+            return;
+        }
+        
+        const sale = saleDoc.data();
+        const propertyId = sale.propertyId;
+        const sellerUid = sale.sellerUid;
+        const sellerDisplayName = sale.sellerDisplayName || sale.sellerName;
+        
+        // 2. Deduct XP from seller
+        if (sellerUid && typeof GamificationService !== 'undefined' && GamificationService.deductXP) {
+            await GamificationService.deductXP(sellerUid, 2500, `Sale reversed: ${sale.propertyTitle} (Admin: ${reason})`);
+        }
+        
+        // 3. Remove celebration banner
+        const celebDoc = await db.collection('settings').doc('celebrations').get();
+        if (celebDoc.exists) {
+            let active = celebDoc.data().active || [];
+            // Remove any celebration matching this seller and property
+            active = active.filter(c => {
+                if (c.type === 'house_sale' && c.userName === sellerDisplayName && c.message.includes(sale.propertyTitle)) {
+                    return false;
+                }
+                return true;
+            });
+            await db.collection('settings').doc('celebrations').set({ active }, { merge: true });
+        }
+        
+        // 4. Unmark property as sold
+        await PropertyDataService.writeMultiple(propertyId, {
+            isSold: false,
+            soldDate: null,
+            soldTo: null,
+            soldPrice: null,
+            saleId: null
+        });
+        
+        // 5. If there was an RTO contract, revert it
+        if (sale.rtoContractId) {
+            await db.collection('rentToOwnContracts').doc(sale.rtoContractId).update({
+                status: 'active',
+                completedDate: null,
+                saleId: null
+            });
+        }
+        
+        // 6. Delete the sale record
+        await db.collection('houseSales').doc(saleId).delete();
+        
+        // 7. Log the deletion for audit
+        await db.collection('adminLogs').add({
+            action: 'sale_deleted',
+            saleId: saleId,
+            saleData: sale,
+            reason: reason,
+            deletedBy: auth.currentUser?.email,
+            deletedAt: new Date().toISOString()
+        });
+        
+        console.log('[DeleteSale] Sale reversed successfully:', saleId);
+        showToast('✅ Sale deleted and fully reversed', 'success');
+        
+        // Refresh dashboard
+        if (typeof renderOwnerDashboard === 'function') {
+            setTimeout(() => renderOwnerDashboard(), 500);
+        }
+        
+    } catch (error) {
+        console.error('[DeleteSale] Error:', error);
+        showToast('Failed to delete sale: ' + error.message, 'error');
     }
 };
