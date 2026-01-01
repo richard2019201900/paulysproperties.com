@@ -11755,6 +11755,111 @@ window.rejectOwnershipTransfer = async function(transferId, reason) {
     }
 };
 
+// ==================== ADMIN XP ADJUSTMENT ====================
+
+/**
+ * Admin function to manually adjust a user's XP
+ * Can be called from browser console: adminAdjustXP('user@email.com', -2500, 'Correction: sale was reversed')
+ */
+window.adminAdjustXP = async function(userEmail, xpAmount, reason) {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        console.error('Only admins can adjust XP');
+        return;
+    }
+    
+    if (!userEmail || typeof xpAmount !== 'number' || !reason) {
+        console.error('Usage: adminAdjustXP("user@email.com", -2500, "Reason for adjustment")');
+        return;
+    }
+    
+    try {
+        // Find user by email
+        const usersSnapshot = await db.collection('users').where('email', '==', userEmail.toLowerCase()).get();
+        
+        if (usersSnapshot.empty) {
+            console.error('User not found:', userEmail);
+            return;
+        }
+        
+        const userDoc = usersSnapshot.docs[0];
+        const userId = userDoc.id;
+        const userData = userDoc.data();
+        
+        console.log(`[AdminXP] Adjusting XP for ${userData.displayName || userEmail} by ${xpAmount}`);
+        
+        if (xpAmount > 0) {
+            await GamificationService.awardXP(userId, xpAmount, `Admin adjustment: ${reason}`);
+        } else {
+            await GamificationService.deductXP(userId, Math.abs(xpAmount), `Admin adjustment: ${reason}`);
+        }
+        
+        console.log(`[AdminXP] Successfully adjusted XP by ${xpAmount} for ${userEmail}`);
+        showToast(`XP adjusted by ${xpAmount} for ${userData.displayName || userEmail}`, 'success');
+        
+        // Log the adjustment
+        await db.collection('adminLogs').add({
+            action: 'xp_adjustment',
+            userEmail: userEmail,
+            userId: userId,
+            amount: xpAmount,
+            reason: reason,
+            adjustedBy: auth.currentUser?.email,
+            adjustedAt: new Date().toISOString()
+        });
+        
+    } catch (e) {
+        console.error('[AdminXP] Error:', e);
+        showToast('Failed to adjust XP: ' + e.message, 'error');
+    }
+};
+
+/**
+ * Admin function to remove a specific activity log entry
+ * Can be called from browser console: adminRemoveActivityEntry('user@email.com', 'Sold 125 Del Perro')
+ */
+window.adminRemoveActivityEntry = async function(userEmail, searchText) {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        console.error('Only admins can modify activity logs');
+        return;
+    }
+    
+    try {
+        const usersSnapshot = await db.collection('users').where('email', '==', userEmail.toLowerCase()).get();
+        
+        if (usersSnapshot.empty) {
+            console.error('User not found:', userEmail);
+            return;
+        }
+        
+        const userDoc = usersSnapshot.docs[0];
+        const userId = userDoc.id;
+        const userData = userDoc.data();
+        const activityLog = userData.gamification?.activityLog || [];
+        
+        const originalLength = activityLog.length;
+        const filteredLog = activityLog.filter(entry => {
+            return !entry.reason?.includes(searchText);
+        });
+        
+        const removed = originalLength - filteredLog.length;
+        
+        if (removed === 0) {
+            console.log(`No entries found containing "${searchText}"`);
+            return;
+        }
+        
+        await db.collection('users').doc(userId).update({
+            'gamification.activityLog': filteredLog
+        });
+        
+        console.log(`[AdminXP] Removed ${removed} activity entries containing "${searchText}" from ${userEmail}`);
+        showToast(`Removed ${removed} activity entries`, 'success');
+        
+    } catch (e) {
+        console.error('[AdminXP] Error:', e);
+    }
+};
+
 // ==================== DELETE/REVERSE SALE SYSTEM ====================
 
 /**
