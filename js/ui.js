@@ -2226,7 +2226,8 @@ async function calculateTotalsAsync() {
             salePrice: sale.salePrice,
             saleDate: sale.saleDate,
             buyerName: sale.buyerName,
-            saleType: sale.saleType
+            saleType: sale.saleType,
+            sellerDisplayName: sale.sellerDisplayName || sale.sellerName || 'Unknown'
         });
     });
     
@@ -11875,22 +11876,36 @@ window.confirmDeleteSale = async function(saleId) {
             await db.collection('settings').doc('celebrations').set({ active }, { merge: true });
         }
         
-        // 4. Unmark property as sold
-        await PropertyDataService.writeMultiple(propertyId, {
+        // 4. Unmark property as sold and clear renter info if RTO
+        const propertyUpdates = {
             isSold: false,
             soldDate: null,
             soldTo: null,
             soldPrice: null,
             saleId: null
-        });
+        };
         
-        // 5. If there was an RTO contract, revert it
+        // If this was an RTO completion, also clear renter/payment info
+        if (sale.saleType === 'rto_completion' || sale.rtoContractId) {
+            propertyUpdates.renterName = null;
+            propertyUpdates.renterPhone = null;
+            propertyUpdates.renterNotes = null;
+            propertyUpdates.paymentFrequency = null;
+            propertyUpdates.lastPaymentDate = null;
+            propertyUpdates.hasActiveRTO = false;
+            propertyUpdates.rtoContractId = null;
+        }
+        
+        await PropertyDataService.writeMultiple(propertyId, propertyUpdates);
+        
+        // 5. If there was an RTO contract, fully delete it (not just revert)
         if (sale.rtoContractId) {
-            await db.collection('rentToOwnContracts').doc(sale.rtoContractId).update({
-                status: 'active',
-                completedDate: null,
-                saleId: null
-            });
+            try {
+                await db.collection('rentToOwnContracts').doc(sale.rtoContractId).delete();
+                console.log('[DeleteSale] Deleted RTO contract:', sale.rtoContractId);
+            } catch (rtoErr) {
+                console.warn('[DeleteSale] Could not delete RTO contract:', rtoErr);
+            }
         }
         
         // 6. Delete the sale record

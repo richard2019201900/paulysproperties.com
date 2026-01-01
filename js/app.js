@@ -1327,12 +1327,36 @@ window.startEditTile = function(field, propertyId, type) {
     
     if (!tile || !valueEl || tile.classList.contains('editing')) return;
     
-    // VALIDATION: Block lastPaymentDate if frequency is not set
+    // VALIDATION: Block lastPaymentDate if frequency is not set (unless clearing)
     if (field === 'lastPaymentDate') {
         const p = properties.find(prop => prop.id === propertyId);
         const frequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p?.paymentFrequency || '');
-        if (!frequency) {
+        const currentValue = PropertyDataService.getValue(propertyId, 'lastPaymentDate', p?.lastPaymentDate || '');
+        
+        // If frequency not set, only allow if we're clearing an existing value
+        if (!frequency && !currentValue) {
             alert('⚠️ Please set the Payment Frequency first!\n\nThe frequency determines how the next due date is calculated and how payments are logged.\n\n1. Click on "Payment Frequency"\n2. Select: Daily, Weekly, Biweekly, or Monthly\n3. Then you can set the Last Payment date');
+            return;
+        }
+        
+        // If frequency not set but there IS a value, allow editing so user can clear it
+        if (!frequency && currentValue) {
+            // Show a modified editor that allows clearing
+            tile.classList.add('editing');
+            const inputHtml = `
+                <input type="date" id="input-${field}-${propertyId}" class="stat-input text-lg" value="${currentValue}">
+                <div class="text-xs text-yellow-300 mt-1">⚠️ Set frequency first, or clear this field</div>
+            `;
+            valueEl.innerHTML = inputHtml;
+            const input = $(`input-${field}-${propertyId}`);
+            if (input) {
+                input.focus();
+                input.addEventListener('blur', () => saveTileEdit(field, propertyId, type));
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') saveTileEdit(field, propertyId, type);
+                    if (e.key === 'Escape') cancelTileEdit(field, propertyId);
+                });
+            }
             return;
         }
         
@@ -2123,8 +2147,20 @@ window.logPayment = async function(propertyId, paymentData) {
 
 // Show payment confirmation modal with copyable thank you message
 window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, rtoInfo = null) {
-    // Get first name only for friendlier message
-    const firstName = renterName.split(' ')[0];
+    // Get display name - handle titles like Dr., Mr., Mrs., Ms.
+    const nameParts = renterName.trim().split(' ');
+    const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'miss', 'prof.', 'prof'];
+    let displayName;
+    
+    if (nameParts.length >= 2 && titles.includes(nameParts[0].toLowerCase())) {
+        // Has a title - use "Title Lastname" (e.g., "Dr. Smith")
+        const title = nameParts[0];
+        const lastName = nameParts[nameParts.length - 1];
+        displayName = `${title} ${lastName}`;
+    } else {
+        // No title - just use first name
+        displayName = nameParts[0];
+    }
     
     let thankYouMessage;
     let headerSubtext;
@@ -2132,18 +2168,18 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
     
     if (rtoInfo && rtoInfo.isDeposit) {
         // DEPOSIT PAYMENT MESSAGE
-        thankYouMessage = `Thanks ${firstName}! 🙏 Your deposit of $${amount.toLocaleString()} for your Rent-to-Own agreement has been received. Your first monthly payment of $${rtoInfo.monthlyAmount.toLocaleString()} will be due on ${nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${amount.toLocaleString()} for your Rent-to-Own agreement has been received. Your first monthly payment of $${rtoInfo.monthlyAmount.toLocaleString()} will be due on ${nextDueDate}. Let me know if you have any questions!`;
         headerSubtext = `$${amount.toLocaleString()} deposit from ${renterName}`;
         rtoBadge = `<p class="text-emerald-400 text-sm mt-1">💰 RTO Deposit Received</p>`;
     } else if (rtoInfo && !rtoInfo.isDeposit) {
         // MONTHLY RTO PAYMENT MESSAGE
         const rtoPaymentStr = ` (Payment ${rtoInfo.current} of ${rtoInfo.total} in your Rent-to-Own agreement)`;
-        thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${amount.toLocaleString()}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
         headerSubtext = `$${amount.toLocaleString()} from ${renterName}`;
         rtoBadge = `<p class="text-amber-400 text-sm mt-1">📋 RTO Payment ${rtoInfo.current} of ${rtoInfo.total}</p>`;
     } else {
         // REGULAR (NON-RTO) PAYMENT MESSAGE
-        thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${amount.toLocaleString()} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${amount.toLocaleString()} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
         headerSubtext = `$${amount.toLocaleString()} from ${renterName}`;
     }
     
@@ -6613,18 +6649,31 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
  * Show RTO payment confirmation modal with detailed message
  */
 window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedAmount, info) {
-    const firstName = renterName.split(' ')[0];
+    // Get display name - handle titles like Dr., Mr., Mrs., Ms.
+    const nameParts = renterName.trim().split(' ');
+    const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'miss', 'prof.', 'prof'];
+    let displayName;
+    
+    if (nameParts.length >= 2 && titles.includes(nameParts[0].toLowerCase())) {
+        // Has a title - use "Title Lastname" (e.g., "Dr. Smith")
+        const title = nameParts[0];
+        const lastName = nameParts[nameParts.length - 1];
+        displayName = `${title} ${lastName}`;
+    } else {
+        // No title - just use first name
+        displayName = nameParts[0];
+    }
     
     let thankYouMessage, headerText, badgeText;
     
     if (info.type === 'deposit') {
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
-        thankYouMessage = `Thanks ${firstName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for your Rent-to-Own agreement has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for your Rent-to-Own agreement has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
     } else {
         headerText = 'Payment Logged!';
         badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
-        thankYouMessage = `Thanks ${firstName}! 🙏 Your payment of $${actualAmount.toLocaleString()} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
     }
     
     // Show variance if different from expected
