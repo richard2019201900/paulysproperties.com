@@ -2196,7 +2196,7 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
                 
                 <div class="bg-gray-800 rounded-xl p-4 mb-4">
                     <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${firstName}:</span>
+                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${displayName}:</span>
                     </div>
                     <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600">
                         ${thankYouMessage}
@@ -6701,7 +6701,7 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
                 
                 <div class="bg-gray-800 rounded-xl p-4 mb-4">
                     <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${firstName}:</span>
+                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${displayName}:</span>
                     </div>
                     <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600">
                         ${thankYouMessage}
