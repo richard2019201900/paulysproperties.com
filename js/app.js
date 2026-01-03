@@ -331,8 +331,6 @@ window.viewProperty = function(id) {
             <button id="offerPurchaseBtn" onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
         </div>`;
     
-    displayReviews(id);
-    
     // Load and display owner username with tier badge
     getPropertyOwnerWithTier(id).then(ownerInfo => {
         const ownerEl = $('propertyOwnerDisplay');
@@ -521,12 +519,6 @@ function renderPropertyStatsContent(id) {
     const biweeklyPrice = PropertyDataService.getValue(id, 'biweeklyPrice', p.biweeklyPrice || 0);
     const monthlyPrice = PropertyDataService.getValue(id, 'monthlyPrice', p.monthlyPrice);
     const buyPrice = PropertyDataService.getValue(id, 'buyPrice', p.buyPrice || 0);
-    
-    // Get reviews for this property
-    const propertyReviews = state.reviews[id] || [];
-    const avgRating = propertyReviews.length > 0 
-        ? (propertyReviews.reduce((sum, r) => sum + r.rating, 0) / propertyReviews.length).toFixed(1)
-        : 'N/A';
     
     // Renter & Payment info
     const renterName = PropertyDataService.getValue(id, 'renterName', p.renterName || '');
@@ -1293,26 +1285,7 @@ function renderPropertyStatsContent(id) {
             </div>
         </div>
         
-        <!-- Reviews Section -->
-        <div class="bg-gray-800/50 rounded-2xl p-6 border border-gray-700">
-            <h3 class="text-2xl font-bold text-gray-200 mb-6">⭐ Property Reviews (${propertyReviews.length})</h3>
-            <div class="space-y-4">
-                ${propertyReviews.length > 0 ? propertyReviews.map(r => `
-                    <div class="review-card p-5 rounded-xl shadow-md">
-                        <div class="flex justify-between items-start mb-3">
-                            <div>
-                                <h5 class="font-bold text-white text-lg">${sanitize(r.name)}</h5>
-                                <div class="text-yellow-400 text-lg">${'*'.repeat(r.rating)}</div>
-                            </div>
-                            <div class="text-sm text-gray-400 font-medium">${sanitize(r.date)}</div>
-                        </div>
-                        <p class="text-gray-300 font-medium">${sanitize(r.text)}</p>
-                    </div>
-                `).join('') : '<p class="text-gray-500 text-center font-semibold py-8">No reviews yet for this property.</p>'}
-            </div>
-        </div>
-        
-        </div><!-- End of Analytics and Reviews section -->
+        </div><!-- End of Analytics section -->
     `;
 }
 
@@ -2969,31 +2942,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Review form
-    const reviewForm = $('reviewForm');
-    if (reviewForm) {
-        reviewForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (!state.currentPropertyId) return;
-            
-            const review = {
-                name: $('reviewerName').value.trim(),
-                rating: parseInt($('reviewRating').value),
-                text: $('reviewText').value.trim(),
-                date: new Date().toLocaleDateString()
-            };
-            
-            if (!state.reviews[state.currentPropertyId]) {
-                state.reviews[state.currentPropertyId] = [];
-            }
-            state.reviews[state.currentPropertyId].unshift(review);
-            localStorage.setItem('propertyReviews', JSON.stringify(state.reviews));
-            displayReviews(state.currentPropertyId);
-            this.reset();
-            alert('Thank you for your review!');
-        });
-    }
-    
     // Mobile menu
     const menuBtn = $('menuBtn');
     if (menuBtn) {
@@ -3524,7 +3472,6 @@ window.copyRenterPhone = function(phoneNumber, btn) {
 
 // ==================== INITIALIZE ====================
 async function init() {
-    loadReviews();
     await initFirestore();
     setupRealtimeListener();
     

@@ -788,30 +788,3 @@ const EditableStatTile = {
 
 // Make EditableStatTile globally accessible
 window.EditableStatTile = EditableStatTile;
-
-// ==================== REVIEWS ====================
-function loadReviews() {
-    try {
-        state.reviews = JSON.parse(localStorage.getItem('propertyReviews') || '{}');
-    } catch {
-        state.reviews = {};
-    }
-}
-
-function displayReviews(id) {
-    const reviews = state.reviews[id] || [];
-    $('reviewsDisplay').innerHTML = reviews.length 
-        ? reviews.map(r => `
-            <div class="review-card p-5 md:p-6 rounded-xl shadow-md">
-                <div class="flex justify-between items-start mb-3">
-                    <div>
-                        <h5 class="font-bold text-white text-lg">${sanitize(r.name)}</h5>
-                        <div class="text-yellow-400 text-lg md:text-xl">${'*'.repeat(r.rating)}</div>
-                    </div>
-                    <div class="text-sm text-gray-400 font-medium">${sanitize(r.date)}</div>
-                </div>
-                <p class="text-gray-300 font-medium">${sanitize(r.text)}</p>
-            </div>
-        `).join('')
-        : '<p class="text-gray-500 text-center font-semibold">No reviews yet. Be the first to leave a review!</p>';
-}

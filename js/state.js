@@ -3,7 +3,6 @@ let state = {
     filteredProperties: [...properties],
     currentUser: null,
     currentPropertyId: null,
-    reviews: {},
     currentImageIndex: 0,
     currentImages: [],
     availability: {},
