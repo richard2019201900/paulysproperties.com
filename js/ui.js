@@ -4,13 +4,20 @@ const LATEST_SITE_UPDATE_VERSION = '2024-12-30-v1';
 
 // Check if user has seen the latest site update
 window.hasUnreadSiteUpdate = function() {
-    const lastSeen = localStorage.getItem('lastSeenSiteUpdate');
-    return lastSeen !== LATEST_SITE_UPDATE_VERSION;
+    // Use UserPreferencesService if available
+    if (window.UserPreferencesService) {
+        return !UserPreferencesService.hasSeenSiteUpdate(LATEST_SITE_UPDATE_VERSION);
+    }
+    // Fallback for logged-out users (always show)
+    return true;
 };
 
 // Mark site update as read
 window.markSiteUpdateAsRead = function() {
-    localStorage.setItem('lastSeenSiteUpdate', LATEST_SITE_UPDATE_VERSION);
+    // Save to Firestore via UserPreferencesService
+    if (window.UserPreferencesService) {
+        UserPreferencesService.markSiteUpdateSeen(LATEST_SITE_UPDATE_VERSION);
+    }
     // Hide both badges
     const navBadge = $('siteUpdateNavBadge');
     const dropdownBadge = $('siteUpdateBadge');
@@ -99,8 +106,10 @@ window.switchDashboardTab = function(tabName) {
     // Update current tab
     window.currentDashboardTab = tabName;
     
-    // Save preference to localStorage
-    localStorage.setItem('dashboardTab', tabName);
+    // Save preference to Firestore via UserPreferencesService
+    if (window.UserPreferencesService) {
+        UserPreferencesService.setDashboardTab(tabName);
+    }
     
     if (tabName === 'myProperties') {
         // Show My Properties, hide Admin
@@ -144,8 +153,10 @@ window.initDashboardTabs = function() {
         // Show tabs for admin
         dashboardTabs.classList.remove('hidden');
         
-        // Restore last used tab from localStorage, default to myProperties
-        const savedTab = localStorage.getItem('dashboardTab') || 'myProperties';
+        // Restore last used tab from Firestore via UserPreferencesService, default to myProperties
+        const savedTab = window.UserPreferencesService 
+            ? UserPreferencesService.getDashboardTab() 
+            : 'myProperties';
         switchDashboardTab(savedTab);
         
         // Show admin content container (the inner adminSection visibility is handled separately)
@@ -4448,50 +4459,31 @@ window.startAdminUsersListener = function() {
         window.adminUsersUnsubscribe();
     }
     
-    // Get admin's last visit time from localStorage
+    // Get admin's last visit time from UserPreferencesService
     let lastAdminVisit = null;
-    try {
-        const lastVisitStr = localStorage.getItem('adminLastVisit');
-        if (lastVisitStr) {
-            lastAdminVisit = new Date(lastVisitStr);
-        }
-    } catch (e) {
-        // Ignore
+    if (window.UserPreferencesService) {
+        lastAdminVisit = UserPreferencesService.getAdminLastVisit();
     }
     
-    // Record current session start time (but don't save to localStorage yet!)
+    // Record current session start time
     window.adminSessionStartTime = new Date();
     
-    // Load pending notifications from localStorage (these need to be shown again)
-    try {
-        const pending = localStorage.getItem('pendingUserNotifications');
-        if (pending) {
-            window.pendingAdminNotifications = new Set(JSON.parse(pending));
-        } else {
-            window.pendingAdminNotifications = new Set();
-        }
-    } catch (e) {
+    // Load pending notifications from UserPreferencesService
+    if (window.UserPreferencesService) {
+        const pendingList = UserPreferencesService.getPendingNotifications('user');
+        window.pendingAdminNotifications = new Set(pendingList);
+        
+        // Load dismissed notifications
+        const dismissedList = UserPreferencesService.getAll().dismissedNotifications || [];
+        dismissedList.forEach(id => window.dismissedAdminNotifications.add(id));
+    } else {
         window.pendingAdminNotifications = new Set();
-    }
-    
-    // Load dismissed notifications from localStorage
-    try {
-        const dismissed = localStorage.getItem('dismissedUserNotifications');
-        if (dismissed) {
-            JSON.parse(dismissed).forEach(id => window.dismissedAdminNotifications.add(id));
-        }
-    } catch (e) {
-        // Ignore
     }
     
     // Clean up: remove any pending notifications that are also in dismissed
     window.dismissedAdminNotifications.forEach(id => {
         window.pendingAdminNotifications.delete(id);
     });
-    // Save cleaned pending set
-    try {
-        localStorage.setItem('pendingUserNotifications', JSON.stringify(Array.from(window.pendingAdminNotifications)));
-    } catch (e) {}
     
     // First snapshot flag - used for catching "missed" users
     let isFirstSnapshot = true;
@@ -4549,11 +4541,14 @@ window.startAdminUsersListener = function() {
                 window.knownUserIds.add(doc.id);
             });
             
-            // Save pending notifications to localStorage
-            try {
-                localStorage.setItem('pendingUserNotifications', JSON.stringify(Array.from(window.pendingAdminNotifications)));
-            } catch (e) {
-                console.warn('[AdminUsers] Could not save pending notifications');
+            // Save pending notifications to Firestore via UserPreferencesService
+            if (window.UserPreferencesService) {
+                // Add any new pending notifications
+                window.pendingAdminNotifications.forEach(id => {
+                    if (id.startsWith('new-user-')) {
+                        UserPreferencesService.addPendingNotification(id, 'user');
+                    }
+                });
             }
             
             // Update admin data
@@ -4607,12 +4602,10 @@ window.startAdminUsersListener = function() {
                         window.pendingAdminNotifications.delete(id);
                         window.dismissedAdminNotifications.add(id);
                     });
-                    // Save cleaned set
-                    try {
-                        localStorage.setItem('pendingUserNotifications', JSON.stringify(
-                            Array.from(window.pendingAdminNotifications).filter(id => id.startsWith('new-user-'))
-                        ));
-                    } catch (e) {}
+                    // Clean up via UserPreferencesService
+                    if (window.UserPreferencesService) {
+                        UserPreferencesService.cleanupStalePending(Array.from(currentUserIds), 'user');
+                    }
                     // Update badge after cleanup
                     updateNotificationBadge();
                 }
@@ -4643,22 +4636,17 @@ window.startSettingsPropertiesListener = function() {
         window.adminSessionStartTime = new Date();
     }
     
-    // Get admin's last visit time from localStorage for missed listings detection
+    // Get admin's last visit time from UserPreferencesService for missed listings detection
     let lastAdminVisit = null;
-    try {
-        const lastVisitStr = localStorage.getItem('adminLastVisit');
-        if (lastVisitStr) {
-            lastAdminVisit = new Date(lastVisitStr);
-        }
-    } catch (e) {}
+    if (window.UserPreferencesService) {
+        lastAdminVisit = UserPreferencesService.getAdminLastVisit();
+    }
     
-    // Load pending listing notifications from localStorage
-    try {
-        const pending = localStorage.getItem('pendingListingNotifications');
-        if (pending) {
-            JSON.parse(pending).forEach(id => window.pendingAdminNotifications.add(id));
-        }
-    } catch (e) {}
+    // Load pending listing notifications from UserPreferencesService
+    if (window.UserPreferencesService) {
+        const pendingListings = UserPreferencesService.getPendingNotifications('listing');
+        pendingListings.forEach(id => window.pendingAdminNotifications.add(id));
+    }
     
     // Use GLOBAL seenPropertyIds set so it persists
     if (!window.seenPropertyIds) {
@@ -4756,11 +4744,13 @@ window.startSettingsPropertiesListener = function() {
             // Update filtered properties
             state.filteredProperties = [...properties];
             
-            // Save pending notifications to localStorage
-            try {
+            // Save pending listing notifications to Firestore via UserPreferencesService
+            if (window.UserPreferencesService) {
                 const listingNotifs = Array.from(window.pendingAdminNotifications).filter(id => id.startsWith('new-listing-'));
-                localStorage.setItem('pendingListingNotifications', JSON.stringify(listingNotifs));
-            } catch (e) {}
+                listingNotifs.forEach(id => {
+                    UserPreferencesService.addPendingNotification(id, 'listing');
+                });
+            }
             
             // Show notifications for MISSED listings (on first load only)
             if (isFirstSnapshot && missedListings.length > 0) {
@@ -4984,13 +4974,9 @@ window.logAdminActivity = function(type, data) {
         window.adminActivityLog = window.adminActivityLog.slice(0, 100);
     }
     
-    // Also save to localStorage for persistence
-    try {
-        const existing = JSON.parse(localStorage.getItem('adminActivityLog') || '[]');
-        existing.unshift(entry);
-        localStorage.setItem('adminActivityLog', JSON.stringify(existing.slice(0, 100)));
-    } catch (e) {
-        console.warn('[AdminActivity] Could not save to localStorage');
+    // Save to Firestore via UserPreferencesService
+    if (window.UserPreferencesService) {
+        UserPreferencesService.addActivityLogEntry(entry);
     }
 };
 
@@ -4999,12 +4985,10 @@ window.loadActivityLog = function() {
     const container = $('activityLogList');
     if (!container) return;
     
-    // Load from localStorage
+    // Load from UserPreferencesService (Firestore)
     let entries = [];
-    try {
-        entries = JSON.parse(localStorage.getItem('adminActivityLog') || '[]');
-    } catch (e) {
-        console.warn('[AdminActivity] Could not load from localStorage');
+    if (window.UserPreferencesService) {
+        entries = UserPreferencesService.getActivityLog();
     }
     
     if (entries.length === 0) {
@@ -5119,7 +5103,10 @@ window.clearActivityLog = function() {
     if (!confirm('Clear all activity log entries? This cannot be undone.')) return;
     
     window.adminActivityLog = [];
-    localStorage.removeItem('adminActivityLog');
+    // Clear from Firestore via UserPreferencesService
+    if (window.UserPreferencesService) {
+        UserPreferencesService.clearActivityLog();
+    }
     loadActivityLog();
 };
 
@@ -5335,20 +5322,14 @@ window.dismissNewUserNotification = function(notificationId) {
     // Remove from pending notifications
     window.pendingAdminNotifications.delete(notificationId);
     
-    // Save to localStorage for persistence across sessions
-    try {
-        const dismissed = Array.from(window.dismissedAdminNotifications);
-        localStorage.setItem('dismissedUserNotifications', JSON.stringify(dismissed));
-        
-        const pending = Array.from(window.pendingAdminNotifications);
-        localStorage.setItem('pendingUserNotifications', JSON.stringify(pending));
+    // Save to Firestore via UserPreferencesService
+    if (window.UserPreferencesService) {
+        UserPreferencesService.dismissNotification(notificationId);
         
         // If all notifications are dismissed, update lastVisit time
         if (window.pendingAdminNotifications.size === 0) {
-            localStorage.setItem('adminLastVisit', new Date().toISOString());
+            UserPreferencesService.updateAdminLastVisit();
         }
-    } catch (e) {
-        console.warn('[AdminNotify] Could not save dismissed state');
     }
     
     const notification = $('notification-' + notificationId);
@@ -5660,11 +5641,13 @@ window.clearAllAdminNotifications = function() {
     if (!stack) return;
     
     // Get all notification IDs
+    const notificationIds = [];
     const notifications = stack.querySelectorAll('[id^="notification-"]');
     notifications.forEach(notif => {
         const id = notif.id.replace('notification-', '');
         window.dismissedAdminNotifications.add(id);
         window.pendingAdminNotifications.delete(id);
+        notificationIds.push(id);
     });
     
     // Clear all visual notifications
@@ -5675,12 +5658,11 @@ window.clearAllAdminNotifications = function() {
     const clearBtn = $('clearAllNotificationsBtn');
     if (clearBtn) clearBtn.classList.add('hidden');
     
-    // Save to localStorage
-    try {
-        localStorage.setItem('dismissedUserNotifications', JSON.stringify(Array.from(window.dismissedAdminNotifications)));
-        localStorage.setItem('pendingUserNotifications', JSON.stringify(Array.from(window.pendingAdminNotifications)));
-        localStorage.setItem('adminLastVisit', new Date().toISOString());
-    } catch (e) {}
+    // Save to Firestore via UserPreferencesService
+    if (window.UserPreferencesService && notificationIds.length > 0) {
+        UserPreferencesService.dismissNotifications(notificationIds);
+        UserPreferencesService.updateAdminLastVisit();
+    }
     
     // Update badge
     updateNotificationBadge();
@@ -11284,9 +11266,11 @@ async function checkCelebrationBanners() {
             if (!cel.expiresAt) return false;
             if (new Date(cel.expiresAt) < now) return false;
             
-            // Check if user dismissed this one
+            // Check if user dismissed this one via UserPreferencesService
             const dismissedKey = `dismissed_${cel.id}`;
-            if (localStorage.getItem(dismissedKey)) return false;
+            if (window.UserPreferencesService && UserPreferencesService.isNotificationDismissed(dismissedKey)) {
+                return false;
+            }
             
             return true;
         });

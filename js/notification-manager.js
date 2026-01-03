@@ -72,7 +72,8 @@
         // All active notifications (unified schema)
         notifications: [],
         
-        // Dismissed notification IDs (persisted to localStorage)
+        // Dismissed notification IDs - now managed by UserPreferencesService
+        // Kept as Set for fast lookups, synced with Firestore via UserPreferencesService
         dismissed: new Set(),
         
         // Rent alerts (computed from properties, not stored in Firestore)
@@ -239,9 +240,10 @@
         state.dismissed.add(id);
         state.notifications = state.notifications.filter(n => n.id !== id);
         
-        try {
-            localStorage.setItem('dismissedNotifications', JSON.stringify([...state.dismissed]));
-        } catch (e) {}
+        // Save to Firestore via UserPreferencesService
+        if (window.UserPreferencesService) {
+            UserPreferencesService.dismissNotification(id);
+        }
         
         // Remove the notification card from DOM
         const card = document.getElementById(`notification-${id}`);
@@ -260,9 +262,10 @@
         toRemove.forEach(n => state.dismissed.add(n.id));
         state.notifications = state.notifications.filter(n => n.type !== type);
         
-        try {
-            localStorage.setItem('dismissedNotifications', JSON.stringify([...state.dismissed]));
-        } catch (e) {}
+        // Save to Firestore via UserPreferencesService
+        if (window.UserPreferencesService) {
+            UserPreferencesService.dismissNotifications(toRemove.map(n => n.id));
+        }
         
         refreshUI();
     }
@@ -796,19 +799,17 @@
         
         console.log('[NotificationManager] Initializing for:', currentUser.email);
         
-        // Load dismissed state
-        try {
-            const dismissed = JSON.parse(localStorage.getItem('dismissedNotifications') || '[]');
-            state.dismissed = new Set(dismissed);
-        } catch (e) {}
-        
-        // Load last admin visit time
-        try {
-            const lastVisit = localStorage.getItem('adminLastVisit');
-            if (lastVisit) {
-                state.lastAdminVisit = new Date(lastVisit);
-            }
-        } catch (e) {}
+        // Load preferences from Firestore via UserPreferencesService
+        if (window.UserPreferencesService) {
+            await UserPreferencesService.load();
+            
+            // Load dismissed notifications into local Set for fast lookups
+            const dismissedList = UserPreferencesService.getAll().dismissedNotifications || [];
+            state.dismissed = new Set(dismissedList);
+            
+            // Load last admin visit time
+            state.lastAdminVisit = UserPreferencesService.getAdminLastVisit();
+        }
         
         state.sessionStart = new Date();
         
@@ -818,10 +819,10 @@
             startUserListener();
             startListingListener();
             
-            // Save admin visit time
-            try {
-                localStorage.setItem('adminLastVisit', new Date().toISOString());
-            } catch (e) {}
+            // Update admin visit time in Firestore
+            if (window.UserPreferencesService) {
+                UserPreferencesService.updateAdminLastVisit();
+            }
         }
         
         // All users get rent checks

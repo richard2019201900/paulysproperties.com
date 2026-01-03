@@ -563,9 +563,11 @@ window.setupCelebrationListener = function() {
             if (!cel.expiresAt) return false;
             if (new Date(cel.expiresAt) < now) return false;
             
-            // Check if user dismissed this one (using sessionStorage for non-critical UI state)
+            // Check if user dismissed this one via UserPreferencesService
             const dismissedKey = `dismissed_${cel.id}`;
-            if (sessionStorage.getItem(dismissedKey)) return false;
+            if (window.UserPreferencesService && UserPreferencesService.isNotificationDismissed(dismissedKey)) {
+                return false;
+            }
             
             return true;
         });
@@ -618,8 +620,10 @@ window.dismissCelebration = function() {
     
     const celebrationId = container.dataset.celebrationId;
     if (celebrationId) {
-        // Use sessionStorage for dismissal (non-critical UI state, OK per architecture)
-        sessionStorage.setItem(`dismissed_${celebrationId}`, 'true');
+        // Save dismissal to Firestore via UserPreferencesService
+        if (window.UserPreferencesService) {
+            UserPreferencesService.dismissNotification(`dismissed_${celebrationId}`);
+        }
     }
     
     hideCelebrationBanner();
