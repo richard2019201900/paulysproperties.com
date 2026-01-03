@@ -203,31 +203,52 @@ window.searchProperties = function() {
     const frequency = $('searchFrequency')?.value;
     
     state.filteredProperties = properties.filter(p => {
-        // Property type filter
-        if (type && p.type !== type) return false;
+        // Property type filter - use Firestore value if available
+        if (type) {
+            const propertyType = PropertyDataService.getValue(p.id, 'type', p.type);
+            if (propertyType !== type) return false;
+        }
         
-        // Interior filter
-        if (interior && p.interiorType !== interior) return false;
+        // Interior filter - use Firestore value if available
+        if (interior) {
+            const interiorType = PropertyDataService.getValue(p.id, 'interiorType', p.interiorType);
+            if (interiorType !== interior) return false;
+        }
+        
+        // Listing type filter (rental vs purchase)
+        if (listingType === 'purchase') {
+            // For purchase: only show properties with a buy price set
+            const buyPrice = PropertyDataService.getValue(p.id, 'buyPrice', p.buyPrice || 0);
+            if (!buyPrice || buyPrice <= 0) return false;
+        }
+        // Note: For rental, we show all properties (all can be rented)
         
         // Price filter - determine which price field to use
         if (price) {
-            let priceToCheck = p.weeklyPrice || 0; // default to weekly
+            let priceToCheck = 0;
             
             if (listingType === 'purchase') {
-                // For purchases, check purchase price (or estimate from weekly * 52 * 10 years)
-                priceToCheck = p.purchasePrice || (p.weeklyPrice * 52 * 10) || 0;
+                // For purchases, check buy price
+                priceToCheck = PropertyDataService.getValue(p.id, 'buyPrice', p.buyPrice || 0);
             } else if (listingType === 'rental') {
                 // Check based on frequency
                 if (frequency === 'weekly') {
-                    priceToCheck = p.weeklyPrice || 0;
+                    priceToCheck = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
                 } else if (frequency === 'biweekly') {
-                    priceToCheck = p.biweeklyPrice || (p.weeklyPrice * 2) || 0;
+                    const biweekly = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+                    const weekly = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+                    priceToCheck = biweekly || (weekly * 2) || 0;
                 } else if (frequency === 'monthly') {
-                    priceToCheck = p.monthlyPrice || (p.weeklyPrice * 4) || 0;
+                    const monthly = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+                    const weekly = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+                    priceToCheck = monthly || (weekly * 4) || 0;
+                } else {
+                    // Default to weekly
+                    priceToCheck = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
                 }
             } else {
                 // Default to weekly price
-                priceToCheck = p.weeklyPrice || 0;
+                priceToCheck = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
             }
             
             // Parse price range
