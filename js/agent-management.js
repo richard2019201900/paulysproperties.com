@@ -264,9 +264,36 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
         // Add agent
         currentAgents.push(agentEmail.toLowerCase());
         
+        // Get agent display name for public viewing (anonymous users can't query users collection)
+        var agentDisplayName = 'Agent';
+        if (agentEmail.toLowerCase() === 'richard2019201900@gmail.com') {
+            agentDisplayName = 'Pauly Amato';
+        } else {
+            // Try to get from cache
+            await loadAgents();
+            var agent = agentsCache.find(function(a) { 
+                return a.email.toLowerCase() === agentEmail.toLowerCase(); 
+            });
+            if (agent) {
+                agentDisplayName = agent.username;
+            }
+        }
+        
+        // Store agent display names map for public view
+        var agentDisplayNames = properties[propKey].agentDisplayNames || {};
+        agentDisplayNames[agentEmail.toLowerCase()] = agentDisplayName;
+        
         await db.collection('settings').doc('properties').update({
-            [propKey + '.agents']: currentAgents
+            [propKey + '.agents']: currentAgents,
+            [propKey + '.agentDisplayNames']: agentDisplayNames
         });
+        
+        // Update local cache
+        var localProp = window.properties?.find(function(p) { return p.id == propertyId; });
+        if (localProp) {
+            localProp.agents = currentAgents;
+            localProp.agentDisplayNames = agentDisplayNames;
+        }
         
         // Log activity
         if (typeof logActivity === 'function') {
@@ -758,6 +785,77 @@ window.promptRemoveAgentFromProperty = function(propertyId, agentEmail, isSelf) 
             renderPropertyStatsContent(propertyId);
         }
     });
+};
+
+/**
+ * One-time migration: Populate agentDisplayNames for properties that already have agents
+ * Run from console: migrateAgentDisplayNames()
+ */
+window.migrateAgentDisplayNames = async function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        console.error('[Agents] Only master admin can run migration');
+        return;
+    }
+    
+    console.log('[Agents] Starting agentDisplayNames migration...');
+    
+    try {
+        // Load agents first
+        await loadAgents();
+        
+        var propsDoc = await db.collection('settings').doc('properties').get();
+        if (!propsDoc.exists) {
+            console.log('[Agents] No properties found');
+            return;
+        }
+        
+        var allProperties = propsDoc.data();
+        var updates = {};
+        var migratedCount = 0;
+        
+        Object.entries(allProperties).forEach(function([propId, prop]) {
+            if (!prop || !prop.agents || prop.agents.length === 0) return;
+            
+            // Check if already has agentDisplayNames
+            if (prop.agentDisplayNames && Object.keys(prop.agentDisplayNames).length > 0) {
+                console.log('[Agents] Property', propId, 'already has agentDisplayNames');
+                return;
+            }
+            
+            var displayNames = {};
+            prop.agents.forEach(function(agentEmail) {
+                var emailLower = agentEmail.toLowerCase();
+                
+                // Master admin special case
+                if (emailLower === 'richard2019201900@gmail.com') {
+                    displayNames[emailLower] = 'Pauly Amato';
+                } else {
+                    // Find in cache
+                    var agent = agentsCache.find(function(a) {
+                        return a.email.toLowerCase() === emailLower;
+                    });
+                    displayNames[emailLower] = agent ? agent.username : 'Agent';
+                }
+            });
+            
+            updates[propId + '.agentDisplayNames'] = displayNames;
+            migratedCount++;
+            console.log('[Agents] Will migrate property', propId, ':', displayNames);
+        });
+        
+        if (Object.keys(updates).length === 0) {
+            console.log('[Agents] No properties need migration');
+            return;
+        }
+        
+        await db.collection('settings').doc('properties').update(updates);
+        console.log('[Agents] ✅ Migration complete! Updated', migratedCount, 'properties');
+        showToast('Migration complete! Updated ' + migratedCount + ' properties', 'success');
+        
+    } catch (error) {
+        console.error('[Agents] Migration error:', error);
+        showToast('Migration failed: ' + error.message, 'error');
+    }
 };
 
 console.log('[Agents] Agent management module loaded');

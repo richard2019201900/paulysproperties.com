@@ -166,14 +166,20 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
                 const agentEmail = agents[0];
                 let agentName = 'Agent';
                 
-                // Try to get agent name from cache
-                if (typeof agentsCache !== 'undefined' && agentsCache.length > 0) {
+                // First, try to get agent display name from property data (works for anonymous users)
+                const prop = properties.find(p => p.id === propertyId || p.id === parseInt(propertyId));
+                if (prop && prop.agentDisplayNames && prop.agentDisplayNames[agentEmail.toLowerCase()]) {
+                    agentName = prop.agentDisplayNames[agentEmail.toLowerCase()];
+                }
+                // Next, try to get from cache (for logged-in users)
+                else if (typeof agentsCache !== 'undefined' && agentsCache.length > 0) {
                     const agent = agentsCache.find(a => a.email.toLowerCase() === agentEmail.toLowerCase());
                     if (agent) {
                         agentName = agent.username;
                     }
-                } else if (typeof loadAgents === 'function') {
-                    // Try to load agents
+                } 
+                // Finally, try to load agents (requires auth)
+                else if (typeof loadAgents === 'function' && auth?.currentUser) {
                     try {
                         const loadedAgents = await loadAgents();
                         const agent = loadedAgents.find(a => a.email.toLowerCase() === agentEmail.toLowerCase());
@@ -181,8 +187,13 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
                             agentName = agent.username;
                         }
                     } catch (e) {
-                        console.warn('[getPropertyOwnerWithTier] Could not load agents:', e);
+                        // Silent fail for anonymous users
                     }
+                }
+                
+                // Special case: if agent email is master admin, always show "Pauly Amato"
+                if (agentEmail.toLowerCase() === 'richard2019201900@gmail.com') {
+                    agentName = 'Pauly Amato';
                 }
                 
                 return {
