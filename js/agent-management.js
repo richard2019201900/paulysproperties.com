@@ -396,17 +396,16 @@ window.getAgentContactsForProperty = async function(propertyId) {
     
     var contacts = [];
     
-    // First, try to get from property data (works for anonymous users)
-    var prop = window.properties?.find(function(p) { 
-        return p.id == propertyId || p.id === parseInt(propertyId); 
-    });
+    // First, try to get from property data via PropertyDataService (works for anonymous users)
+    var agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+    var agentPhones = PropertyDataService.getValue(propertyId, 'agentPhones', null);
     
-    if (prop && prop.agentDisplayNames && prop.agentPhones) {
+    if (agentDisplayNames && agentPhones) {
         // Use stored agent data from property (no auth required)
         agentEmails.forEach(function(email) {
             var emailLower = email.toLowerCase();
-            var displayName = prop.agentDisplayNames[emailLower];
-            var phone = prop.agentPhones[emailLower];
+            var displayName = agentDisplayNames[emailLower];
+            var phone = agentPhones[emailLower];
             
             if (displayName && phone) {
                 contacts.push({

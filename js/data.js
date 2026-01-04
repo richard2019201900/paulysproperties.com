@@ -166,10 +166,10 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
                 const agentEmail = agents[0];
                 let agentName = 'Agent';
                 
-                // First, try to get agent display name from property data (works for anonymous users)
-                const prop = properties.find(p => p.id === propertyId || p.id === parseInt(propertyId));
-                if (prop && prop.agentDisplayNames && prop.agentDisplayNames[agentEmail.toLowerCase()]) {
-                    agentName = prop.agentDisplayNames[agentEmail.toLowerCase()];
+                // First, try to get agent display name from property data via PropertyDataService (works for anonymous users)
+                const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+                if (agentDisplayNames && agentDisplayNames[agentEmail.toLowerCase()]) {
+                    agentName = agentDisplayNames[agentEmail.toLowerCase()];
                 }
                 // Next, try to get from cache (for logged-in users)
                 else if (typeof agentsCache !== 'undefined' && agentsCache.length > 0) {
