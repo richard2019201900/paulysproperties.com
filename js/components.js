@@ -139,52 +139,93 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     // Reset to default phone first
     $('modalPhone').value = defaultPhone;
     
-    // Try to fetch property owner's phone number
-    // Priority: 1) ownerContactPhone on property, 2) ownerPhone on property, 3) user doc, 4) default
-    try {
-        if (propertyId && typeof db !== 'undefined') {
-            // Get property data to find owner contact info
-            const propsDoc = await db.collection('settings').doc('properties').get();
-            if (propsDoc.exists) {
-                const properties = propsDoc.data();
-                const property = properties[propertyId] || properties[String(propertyId)];
-                
-                if (property) {
-                    // Check ownerContactPhone first (synced from user profile)
-                    if (property.ownerContactPhone) {
-                        $('modalPhone').value = property.ownerContactPhone.replace(/\D/g, '');
-                        console.log('[Contact] Using property ownerContactPhone');
-                    }
-                    // Then check legacy ownerPhone field
-                    else if (property.ownerPhone) {
-                        $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
-                        console.log('[Contact] Using property ownerPhone');
-                    }
-                    // Finally try user doc (may fail for non-admins due to permissions)
-                    else if (property.ownerEmail) {
-                        try {
-                            const usersSnapshot = await db.collection('users')
-                                .where('email', '==', property.ownerEmail.toLowerCase())
-                                .limit(1)
-                                .get();
-                            
-                            if (!usersSnapshot.empty) {
-                                const userData = usersSnapshot.docs[0].data();
-                                if (userData.phone) {
-                                    $('modalPhone').value = userData.phone.replace(/\D/g, '');
-                                    console.log('[Contact] Using phone from user doc');
+    // Check for assigned agents first (for purchase offers)
+    let agentContacts = [];
+    if (!isRent && typeof getAgentContactsForProperty === 'function') {
+        try {
+            agentContacts = await getAgentContactsForProperty(propertyId);
+        } catch (e) {
+            console.log('[Contact] Error getting agent contacts:', e);
+        }
+    }
+    
+    // If agents are assigned, show their contact info
+    if (agentContacts.length > 0) {
+        if (agentContacts.length === 1) {
+            // Single agent
+            $('modalPhone').value = agentContacts[0].phone.replace(/\D/g, '');
+            console.log('[Contact] Using agent phone:', agentContacts[0].username);
+        } else {
+            // Multiple agents - show all phones
+            const phonesHtml = agentContacts.map(a => 
+                `<div class="bg-gray-700 rounded-lg p-2 text-center">
+                    <div class="text-white font-bold">${a.username}</div>
+                    <div class="text-cyan-400 font-mono text-lg">${a.phone}</div>
+                </div>`
+            ).join('');
+            
+            // Update the accent section to show multiple contacts
+            accent.innerHTML = `
+                <div class="text-gray-300 text-sm mb-3">
+                    <strong>🏢 Multiple Real Estate Agents</strong><br>
+                    This property has ${agentContacts.length} agents. Text <strong>ALL</strong> of them for the quickest response!
+                </div>
+                <div class="grid grid-cols-${Math.min(agentContacts.length, 3)} gap-2">
+                    ${phonesHtml}
+                </div>
+            `;
+            
+            // Set the first agent's phone in the input
+            $('modalPhone').value = agentContacts[0].phone.replace(/\D/g, '');
+            console.log('[Contact] Using multiple agents, first:', agentContacts[0].username);
+        }
+    } else {
+        // No agents - use owner contact (existing behavior)
+        try {
+            if (propertyId && typeof db !== 'undefined') {
+                // Get property data to find owner contact info
+                const propsDoc = await db.collection('settings').doc('properties').get();
+                if (propsDoc.exists) {
+                    const properties = propsDoc.data();
+                    const property = properties[propertyId] || properties[String(propertyId)];
+                    
+                    if (property) {
+                        // Check ownerContactPhone first (synced from user profile)
+                        if (property.ownerContactPhone) {
+                            $('modalPhone').value = property.ownerContactPhone.replace(/\D/g, '');
+                            console.log('[Contact] Using property ownerContactPhone');
+                        }
+                        // Then check legacy ownerPhone field
+                        else if (property.ownerPhone) {
+                            $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
+                            console.log('[Contact] Using property ownerPhone');
+                        }
+                        // Finally try user doc (may fail for non-admins due to permissions)
+                        else if (property.ownerEmail) {
+                            try {
+                                const usersSnapshot = await db.collection('users')
+                                    .where('email', '==', property.ownerEmail.toLowerCase())
+                                    .limit(1)
+                                    .get();
+                                
+                                if (!usersSnapshot.empty) {
+                                    const userData = usersSnapshot.docs[0].data();
+                                    if (userData.phone) {
+                                        $('modalPhone').value = userData.phone.replace(/\D/g, '');
+                                        console.log('[Contact] Using phone from user doc');
+                                    }
                                 }
+                            } catch (permError) {
+                                // Permission denied - expected for non-admins
+                                console.log('[Contact] Cannot read user doc (permission denied), using default');
                             }
-                        } catch (permError) {
-                            // Permission denied - expected for non-admins
-                            console.log('[Contact] Cannot read user doc (permission denied), using default');
                         }
                     }
                 }
             }
+        } catch (error) {
+            console.warn('[Contact] Could not fetch owner phone, using default:', error);
         }
-    } catch (error) {
-        console.warn('[Contact] Could not fetch owner phone, using default:', error);
     }
     
     openModal('contactModal');

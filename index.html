@@ -1250,6 +1250,9 @@
                     <button id="adminTabUsers" onclick="switchAdminTab('users')" class="px-4 py-2 rounded-lg font-bold text-sm bg-purple-600 text-white">
                         👥 All Users
                     </button>
+                    <button id="adminTabAgents" onclick="switchAdminTab('agents')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 relative">
+                        🏢 Agents
+                    </button>
                     <button id="adminTabRequests" onclick="switchAdminTab('requests')" class="px-4 py-2 rounded-lg font-bold text-sm bg-gray-700 text-gray-300 hover:bg-gray-600 relative">
                         🔔 Requests
                         <span id="requestsTabBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
@@ -1302,6 +1305,11 @@
                             <p class="text-gray-500 italic">Loading photo requests...</p>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Agents Tab -->
+                <div id="adminAgentsTab" class="hidden space-y-4">
+                    <p class="text-gray-500 italic">Loading agents...</p>
                 </div>
                 
                 <!-- All Users Tab -->
@@ -2173,6 +2181,7 @@
     <script src="js/ui-rent-notifications.js"></script>
     <script src="js/ui-reports.js"></script>
     <script src="js/ui-sales.js"></script>
+    <script src="js/agent-management.js"></script>
     
     <script src="js/filters.js"></script>
     <script src="js/app.js"></script>

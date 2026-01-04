@@ -25,9 +25,10 @@
 window.adminUsersData = [];
 
 window.switchAdminTab = function(tab) {
-    const tabs = ['users', 'requests', 'create', 'history', 'tools', 'log'];
+    const tabs = ['users', 'agents', 'requests', 'create', 'history', 'tools', 'log'];
     const tabElements = {
         users: $('adminUsersTab'),
+        agents: $('adminAgentsTab'),
         requests: $('adminRequestsTab'),
         create: $('adminCreateTab'),
         history: $('adminHistoryTab'),
@@ -36,6 +37,7 @@ window.switchAdminTab = function(tab) {
     };
     const tabButtons = {
         users: $('adminTabUsers'),
+        agents: $('adminTabAgents'),
         requests: $('adminTabRequests'),
         create: $('adminTabCreate'),
         history: $('adminTabHistory'),
@@ -61,6 +63,7 @@ window.switchAdminTab = function(tab) {
     
     // Load data for the tab
     if (tab === 'users') loadAllUsers();
+    else if (tab === 'agents' && typeof renderAgentsTab === 'function') renderAgentsTab();
     else if (tab === 'requests') {
         loadUpgradeRequests();
         loadPhotoRequests();

@@ -1238,6 +1238,12 @@ function renderPropertyStatsContent(id) {
         </div>
         ` : ''}
         
+        <!-- Agent Management Section -->
+        <div id="propertyAgentSection" class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
+            <!-- Content loaded dynamically by renderPropertyAgentSection() -->
+            <p class="text-gray-500 italic">Loading agent section...</p>
+        </div>
+        
         <!-- Actions -->
         <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8 mb-8">
             <h3 class="text-2xl font-bold text-gray-200 mb-6">⚡ Quick Actions</h3>
@@ -1287,6 +1293,16 @@ function renderPropertyStatsContent(id) {
         
         </div><!-- End of Analytics section -->
     `;
+    
+    // Render agent section dynamically
+    if (typeof renderPropertyAgentSection === 'function') {
+        renderPropertyAgentSection(id).then(function(html) {
+            var agentSection = $('propertyAgentSection');
+            if (agentSection && html) {
+                agentSection.innerHTML = html;
+            }
+        });
+    }
 }
 
 /**
