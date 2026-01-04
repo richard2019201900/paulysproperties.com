@@ -1,21 +1,26 @@
 /**
  * ============================================================================
- * PROPERTY FILTERS - Enterprise Search & Filter System
+ * PROPERTY FILTERS - Button-Based Filter System
  * ============================================================================
  * 
  * ARCHITECTURE:
  * - All property data comes from the `properties` array (synced from Firestore)
  * - PropertyDataService.getValue() reads from this synced array
- * - Filters work on real-time Firestore data, not static data.js values
+ * - Dual-filter system: Interior type + Property type (can combine)
  * 
  * FILTER TYPES:
- * 1. Hero Search (dropdowns): Listing type, Property type, Interior, Price
- * 2. Quick Filters (buttons): All, Houses, Apartments, etc.
+ * 1. Interior Buttons: Walk-in, Instance (cyan border - can combine with type)
+ * 2. Type Buttons: All, Houses, Apartments, etc. (purple - standard)
  * 3. Checkbox Filters: My Properties, Hide Unavailable
  * 4. Sort: Price, Bedrooms, Interior, Storage
  * 
  * ============================================================================
  */
+
+// ==================== FILTER STATE ====================
+// Track active filters separately for dual-filter system
+window.activeInteriorFilter = null;  // 'Walk-in', 'Instance', or null
+window.activeTypeFilter = null;      // 'house', 'apartment', etc., or null
 
 // ==================== HELPER FUNCTIONS ====================
 
@@ -24,154 +29,284 @@
  * Falls back to static property value if not in Firestore
  */
 function getPropertyValue(property, field) {
-    // PropertyDataService reads from the properties array which is synced from Firestore
     return PropertyDataService.getValue(property.id, field, property[field]);
 }
 
 /**
- * Parse price range string into min/max values
- * @param {string} priceRange - e.g., "50000-100000" or "200000+"
- * @returns {Object} { min, max, isPlus }
+ * Format price for display
  */
-function parsePriceRange(priceRange) {
-    if (!priceRange) return null;
-    
-    const isPlus = priceRange.endsWith('+');
-    if (isPlus) {
-        return {
-            min: parseInt(priceRange.replace('+', '')),
-            max: Infinity,
-            isPlus: true
-        };
+function formatPrice(price) {
+    if (price >= 1000000) {
+        return '$' + (price / 1000000).toFixed(1) + 'M';
+    } else if (price >= 1000) {
+        return '$' + Math.round(price / 1000) + 'k';
     }
-    
-    const [min, max] = priceRange.split('-').map(n => parseInt(n));
-    return { min, max, isPlus: false };
+    return '$' + price;
 }
 
-// ==================== MAIN SEARCH FUNCTION ====================
+// ==================== FEATURED PROPERTY ROTATOR ====================
+
+let featuredRotatorInterval = null;
+let currentFeaturedIndex = 0;
 
 /**
- * Search properties using hero dropdown filters
- * This is called when user clicks the "Search" button
+ * Get pool of premium properties that are available
  */
-window.searchProperties = function() {
-    // Get filter values from dropdowns
-    const listingType = $('searchListingType')?.value || '';
-    const propertyType = $('searchType')?.value || '';
-    const interior = $('searchInterior')?.value || '';
-    const priceRange = $('searchPrice')?.value || '';
-    const frequency = $('searchFrequency')?.value || 'weekly';
-    
-    console.log('[Filters] Search triggered with:', {
-        listingType,
-        propertyType,
-        interior,
-        priceRange,
-        frequency,
-        totalProperties: properties.length
+function getFeaturedPool() {
+    return properties.filter(p => {
+        const isPremium = getPropertyValue(p, 'isPremium');
+        const isAvailable = state.availability[p.id] !== false;
+        return isPremium && isAvailable;
     });
+}
+
+/**
+ * Generate short description for featured property
+ */
+function generateShortDescription(property) {
+    const type = getPropertyValue(property, 'type') || 'property';
+    const interior = getPropertyValue(property, 'interiorType') || '';
+    const bedrooms = getPropertyValue(property, 'bedrooms') || 0;
+    const location = getPropertyValue(property, 'location') || property.location || '';
     
-    // Start with all properties
-    let filtered = [...properties];
+    const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+    const parts = [];
     
-    // ========== FILTER 1: Listing Type (Rental vs Purchase) ==========
-    if (listingType === 'purchase') {
-        filtered = filtered.filter(p => {
-            const buyPrice = getPropertyValue(p, 'buyPrice') || 0;
-            const hasBuyPrice = buyPrice > 0;
-            return hasBuyPrice;
-        });
-        console.log('[Filters] After purchase filter:', filtered.length);
-    }
-    // Note: 'rental' shows all properties (everything can be rented)
-    
-    // ========== FILTER 2: Property Type ==========
-    if (propertyType) {
-        filtered = filtered.filter(p => {
-            const pType = getPropertyValue(p, 'type');
-            return pType === propertyType;
-        });
-        console.log('[Filters] After type filter:', filtered.length);
+    if (bedrooms > 0) {
+        parts.push(`${bedrooms} bed ${typeLabel.toLowerCase()}`);
+    } else {
+        parts.push(typeLabel);
     }
     
-    // ========== FILTER 3: Interior Type ==========
     if (interior) {
-        filtered = filtered.filter(p => {
-            const pInterior = getPropertyValue(p, 'interiorType');
-            return pInterior === interior;
-        });
-        console.log('[Filters] After interior filter:', filtered.length);
+        parts.push(`${interior} interior`);
     }
     
-    // ========== FILTER 4: Price Range ==========
-    if (priceRange) {
-        const range = parsePriceRange(priceRange);
-        
-        filtered = filtered.filter(p => {
-            let price = 0;
-            
-            if (listingType === 'purchase') {
-                // Purchase: use buy price
-                price = getPropertyValue(p, 'buyPrice') || 0;
-            } else {
-                // Rental: use price based on frequency
-                if (frequency === 'monthly') {
-                    price = getPropertyValue(p, 'monthlyPrice') || (getPropertyValue(p, 'weeklyPrice') || 0) * 4;
-                } else if (frequency === 'biweekly') {
-                    price = getPropertyValue(p, 'biweeklyPrice') || (getPropertyValue(p, 'weeklyPrice') || 0) * 2;
-                } else {
-                    // Default to weekly
-                    price = getPropertyValue(p, 'weeklyPrice') || 0;
-                }
-            }
-            
-            if (range.isPlus) {
-                return price >= range.min;
-            }
-            return price >= range.min && price <= range.max;
-        });
-        console.log('[Filters] After price filter:', filtered.length);
+    if (location) {
+        parts.push(`in ${location.split(',')[0]}`);
     }
     
-    // Update state and render
-    state.filteredProperties = filtered;
-    console.log('[Filters] Final filtered count:', filtered.length);
+    return parts.join(' • ');
+}
+
+/**
+ * Render the featured property spotlight
+ */
+function renderFeaturedSpotlight() {
+    const container = $('featuredSpotlight');
+    if (!container) return;
     
-    renderProperties(state.filteredProperties);
-    navigateTo('properties');
+    const pool = getFeaturedPool();
+    
+    if (pool.length === 0) {
+        // No premium properties - show CTA message
+        container.innerHTML = `
+            <div class="text-center py-6">
+                <p class="text-amber-300 text-lg font-semibold mb-2">✨ Premium Spotlight Available</p>
+                <p class="text-gray-300">List your property as Premium for featured placement!</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Get current featured property
+    currentFeaturedIndex = currentFeaturedIndex % pool.length;
+    const property = pool[currentFeaturedIndex];
+    
+    const price = getPropertyValue(property, 'weeklyPrice') || property.weeklyPrice || 0;
+    const images = getPropertyValue(property, 'images') || property.images || [];
+    const firstImage = images[0] || 'images/placeholder.png';
+    const description = generateShortDescription(property);
+    
+    container.innerHTML = `
+        <div class="flex items-center gap-4 cursor-pointer group" onclick="viewProperty(${property.id})">
+            <div class="w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden flex-shrink-0 border-2 border-amber-400/50 group-hover:border-amber-400 transition">
+                <img src="${firstImage}" alt="${property.title}" class="w-full h-full object-cover group-hover:scale-110 transition duration-300" onerror="this.src='images/placeholder.png'">
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-amber-400 text-sm font-bold">✨ FEATURED</span>
+                    ${pool.length > 1 ? `<span class="text-gray-500 text-xs">${currentFeaturedIndex + 1}/${pool.length}</span>` : ''}
+                </div>
+                <h3 class="text-white font-bold text-lg md:text-xl truncate group-hover:text-purple-300 transition">${property.title}</h3>
+                <p class="text-gray-400 text-sm truncate">${description}</p>
+                <p class="text-purple-400 font-bold mt-1">${formatPrice(price)}/week</p>
+            </div>
+            <div class="flex-shrink-0">
+                <span class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold transition text-sm md:text-base">
+                    View →
+                </span>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Start the featured property rotator
+ */
+window.initFeaturedRotator = function() {
+    // Initial render
+    renderFeaturedSpotlight();
+    
+    // Clear any existing interval
+    if (featuredRotatorInterval) {
+        clearInterval(featuredRotatorInterval);
+    }
+    
+    // Rotate every 60 seconds
+    featuredRotatorInterval = setInterval(() => {
+        currentFeaturedIndex++;
+        renderFeaturedSpotlight();
+    }, 60000);
+    
+    console.log('[Filters] Featured rotator initialized (60s interval)');
 };
 
-// ==================== QUICK FILTER BUTTONS ====================
+/**
+ * Stop the featured rotator (cleanup)
+ */
+window.stopFeaturedRotator = function() {
+    if (featuredRotatorInterval) {
+        clearInterval(featuredRotatorInterval);
+        featuredRotatorInterval = null;
+    }
+};
+
+// ==================== HERO CTA ACTIONS ====================
 
 /**
- * Apply all active filters (type buttons + checkboxes)
- * Called by filter buttons and checkbox changes
+ * Browse properties - clicks All filter and scrolls to listings
+ */
+window.browseProperties = function() {
+    // Reset all filters
+    activeInteriorFilter = null;
+    activeTypeFilter = null;
+    
+    // Update button states
+    updateFilterButtonStates();
+    
+    // Apply filters (shows all)
+    applyAllFilters();
+    
+    // Scroll to properties section
+    const propertiesSection = $('properties');
+    if (propertiesSection) {
+        propertiesSection.scrollIntoView({ behavior: 'smooth' });
+    }
+};
+
+/**
+ * List property - opens create listing modal
+ */
+window.listYourProperty = function() {
+    if (typeof openCreateListingModal === 'function') {
+        openCreateListingModal();
+    } else {
+        // Fallback - navigate to contact or show login
+        if (!auth.currentUser) {
+            if (typeof openAuthModal === 'function') {
+                openAuthModal();
+            }
+        }
+    }
+};
+
+// ==================== DUAL-FILTER SYSTEM ====================
+
+/**
+ * Update visual state of all filter buttons
+ */
+function updateFilterButtonStates() {
+    // Update interior filter buttons (cyan accent)
+    document.querySelectorAll('.interior-filter-btn').forEach(btn => {
+        const filterValue = btn.dataset.filter;
+        const isActive = activeInteriorFilter === filterValue;
+        
+        btn.classList.toggle('border-cyan-400', isActive);
+        btn.classList.toggle('bg-cyan-500/20', isActive);
+        btn.classList.toggle('text-cyan-300', isActive);
+        btn.classList.toggle('border-gray-600', !isActive);
+        btn.classList.toggle('bg-gray-700', !isActive);
+        btn.classList.toggle('text-gray-200', !isActive);
+    });
+    
+    // Update type filter buttons (purple/gradient)
+    document.querySelectorAll('.type-filter-btn').forEach(btn => {
+        const filterValue = btn.dataset.filter;
+        const isAll = filterValue === 'all';
+        const isActive = isAll 
+            ? (activeTypeFilter === null && activeInteriorFilter === null)
+            : activeTypeFilter === filterValue;
+        
+        btn.classList.toggle('active', isActive);
+        btn.classList.toggle('gradient-bg', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('bg-gray-700', !isActive);
+        btn.classList.toggle('text-gray-200', !isActive);
+    });
+}
+
+/**
+ * Handle interior filter button click (Walk-in / Instance)
+ */
+window.filterByInterior = function(interiorType, btn) {
+    // Toggle: if already active, deactivate
+    if (activeInteriorFilter === interiorType) {
+        activeInteriorFilter = null;
+    } else {
+        activeInteriorFilter = interiorType;
+    }
+    
+    updateFilterButtonStates();
+    applyAllFilters();
+};
+
+/**
+ * Handle type filter button click (All, Houses, Apartments, etc.)
+ */
+window.filterByType = function(type, btn) {
+    if (type === 'all') {
+        // "All" clears BOTH filters
+        activeInteriorFilter = null;
+        activeTypeFilter = null;
+    } else {
+        // Toggle: if already active, deactivate
+        if (activeTypeFilter === type) {
+            activeTypeFilter = null;
+        } else {
+            activeTypeFilter = type;
+        }
+    }
+    
+    updateFilterButtonStates();
+    applyAllFilters();
+};
+
+// Legacy function for backwards compatibility
+window.filterProperties = function(type, btn) {
+    filterByType(type, btn);
+};
+
+/**
+ * Apply all active filters (interior + type + checkboxes)
  */
 window.applyAllFilters = function() {
     // Start with all properties
     let filtered = [...properties];
     
-    // ========== FILTER: Type Button ==========
-    const activeFilterBtn = document.querySelector('.filter-btn.active');
-    const activeFilter = activeFilterBtn ? activeFilterBtn.textContent.trim().toLowerCase() : 'all';
+    // ========== FILTER: Interior Type ==========
+    if (activeInteriorFilter) {
+        filtered = filtered.filter(p => {
+            const pInterior = getPropertyValue(p, 'interiorType');
+            return pInterior === activeInteriorFilter;
+        });
+    }
     
-    if (activeFilter !== 'all') {
-        const typeMap = { 
-            'houses': 'house', 
-            'apartments': 'apartment', 
-            'condos': 'condo', 
-            'villas': 'villa',
-            'hotels': 'hotel',
-            'offices': 'office',
-            'warehouses': 'warehouse',
-            'hideouts': 'hideout'
-        };
-        const filterType = typeMap[activeFilter] || activeFilter;
-        
+    // ========== FILTER: Property Type ==========
+    if (activeTypeFilter) {
         filtered = filtered.filter(p => {
             const pType = getPropertyValue(p, 'type');
-            return pType === filterType;
+            return pType === activeTypeFilter;
         });
     }
     
@@ -189,7 +324,6 @@ window.applyAllFilters = function() {
     const hideUnavailable = $('hideUnavailable')?.checked;
     if (hideUnavailable) {
         filtered = filtered.filter(p => {
-            // Check Firestore availability state first, then property value
             const availability = state.availability[p.id];
             if (availability !== undefined) {
                 return availability !== false;
@@ -200,21 +334,6 @@ window.applyAllFilters = function() {
     
     state.filteredProperties = filtered;
     renderProperties(state.filteredProperties);
-};
-
-/**
- * Filter by property type (button click)
- */
-window.filterProperties = function(type, btn) {
-    // Update button styles
-    document.querySelectorAll('.filter-btn').forEach(b => {
-        b.classList.remove('active', 'gradient-bg', 'text-white');
-        b.classList.add('bg-gray-700', 'text-gray-200');
-    });
-    btn.classList.remove('bg-gray-700', 'text-gray-200');
-    btn.classList.add('active', 'gradient-bg', 'text-white');
-    
-    applyAllFilters();
 };
 
 /**
@@ -281,20 +400,13 @@ window.sortProperties = function() {
  * Reset all filters to default state
  */
 window.clearFilters = function() {
-    // Reset all dropdown values
-    ['searchType', 'searchInterior', 'searchPrice', 'sortBy', 'searchListingType', 'searchFrequency'].forEach(id => {
-        const el = $(id);
-        if (el) {
-            el.selectedIndex = 0; // Reset to first option (placeholder)
-        }
-    });
+    // Reset filter state
+    activeInteriorFilter = null;
+    activeTypeFilter = null;
     
-    // Reset price dropdown to default options
-    updatePriceOptions();
-    
-    // Hide frequency dropdown
-    const freqDropdown = $('searchFrequency');
-    if (freqDropdown) freqDropdown.classList.add('hidden');
+    // Reset Sort By dropdown
+    const sortBy = $('sortBy');
+    if (sortBy) sortBy.selectedIndex = 0;
     
     // Uncheck the filter checkboxes
     const hideUnavailable = $('hideUnavailable');
@@ -302,108 +414,22 @@ window.clearFilters = function() {
     if (hideUnavailable) hideUnavailable.checked = false;
     if (showMyProperties) showMyProperties.checked = false;
     
-    // Reset filter buttons (make "All" active)
-    document.querySelectorAll('.filter-btn').forEach((btn, i) => {
-        toggleClass(btn, 'active', i === 0);
-        toggleClass(btn, 'gradient-bg', i === 0);
-        toggleClass(btn, 'text-white', i === 0);
-        toggleClass(btn, 'bg-gray-700', i !== 0);
-        toggleClass(btn, 'text-gray-200', i !== 0);
-    });
+    // Update button visual states
+    updateFilterButtonStates();
     
     // Apply filters (will show all properties since everything is reset)
     applyAllFilters();
 };
 
-// ==================== PRICE OPTIONS ====================
+// ==================== INITIALIZATION ====================
 
-/**
- * Update price dropdown options based on listing type selection
- */
-window.updatePriceOptions = function() {
-    const listingType = $('searchListingType')?.value;
-    const freqDropdown = $('searchFrequency');
-    const priceDropdown = $('searchPrice');
-    
-    if (!priceDropdown) return;
-    
-    // Show/hide frequency dropdown based on listing type
-    if (freqDropdown) {
-        if (listingType === 'rental') {
-            freqDropdown.classList.remove('hidden');
-        } else {
-            freqDropdown.classList.add('hidden');
-            freqDropdown.selectedIndex = 0;
-        }
-    }
-    
-    // Get frequency for rental price ranges
-    const frequency = freqDropdown?.value || 'weekly';
-    
-    if (listingType === 'purchase') {
-        // Purchase price ranges
-        priceDropdown.innerHTML = `
-            <option value="" disabled selected>── Purchase Price ──</option>
-            <option value="0-1000000">Under $1M</option>
-            <option value="1000000-2000000">$1M - $2M</option>
-            <option value="2000000-3000000">$2M - $3M</option>
-            <option value="3000000-5000000">$3M - $5M</option>
-            <option value="5000000-7500000">$5M - $7.5M</option>
-            <option value="7500000-10000000">$7.5M - $10M</option>
-            <option value="10000000-15000000">$10M - $15M</option>
-            <option value="15000000-20000000">$15M - $20M</option>
-            <option value="20000000+">$20M+</option>
-        `;
-    } else if (listingType === 'rental') {
-        if (frequency === 'weekly') {
-            priceDropdown.innerHTML = `
-                <option value="" disabled selected>── Weekly Rent ──</option>
-                <option value="0-25000">Under $25k/week</option>
-                <option value="25000-50000">$25k - $50k/week</option>
-                <option value="50000-75000">$50k - $75k/week</option>
-                <option value="75000-100000">$75k - $100k/week</option>
-                <option value="100000-150000">$100k - $150k/week</option>
-                <option value="150000+">$150k+/week</option>
-            `;
-        } else if (frequency === 'biweekly') {
-            priceDropdown.innerHTML = `
-                <option value="" disabled selected>── Bi-Weekly Rent ──</option>
-                <option value="0-50000">Under $50k/2wks</option>
-                <option value="50000-100000">$50k - $100k/2wks</option>
-                <option value="100000-150000">$100k - $150k/2wks</option>
-                <option value="150000-200000">$150k - $200k/2wks</option>
-                <option value="200000-300000">$200k - $300k/2wks</option>
-                <option value="300000+">$300k+/2wks</option>
-            `;
-        } else if (frequency === 'monthly') {
-            priceDropdown.innerHTML = `
-                <option value="" disabled selected>── Monthly Rent ──</option>
-                <option value="0-100000">Under $100k/mo</option>
-                <option value="100000-200000">$100k - $200k/mo</option>
-                <option value="200000-300000">$200k - $300k/mo</option>
-                <option value="300000-500000">$300k - $500k/mo</option>
-                <option value="500000-750000">$500k - $750k/mo</option>
-                <option value="750000+">$750k+/mo</option>
-            `;
-        } else {
-            priceDropdown.innerHTML = `
-                <option value="" disabled selected>── Rental Price ──</option>
-                <option value="0-50000">$0 - $50k</option>
-                <option value="50000-100000">$50k - $100k</option>
-                <option value="100000-200000">$100k - $200k</option>
-                <option value="200000+">$200k+</option>
-            `;
-        }
-    } else {
-        // Default (no selection)
-        priceDropdown.innerHTML = `
-            <option value="" disabled selected>── Price ──</option>
-            <option value="0-50000">$0 - $50k</option>
-            <option value="50000-100000">$50k - $100k</option>
-            <option value="100000-200000">$100k - $200k</option>
-            <option value="200000+">$200k+</option>
-        `;
-    }
-};
+// Auto-initialize featured rotator when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initFeaturedRotator, 500); // Small delay to ensure properties are loaded
+    });
+} else {
+    setTimeout(initFeaturedRotator, 500);
+}
 
-console.log('[Filters] Enterprise filter system loaded');
+console.log('[Filters] Button-based filter system loaded');
