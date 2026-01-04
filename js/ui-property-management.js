@@ -114,6 +114,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const buyPrice = parseInt($('newListingBuyPrice')?.value) || 0;
             const imagesText = $('newListingImages').value.trim();
             const isPremium = $('newListingPremium')?.checked || false;
+            const warningDiv = $('createListingWarning');
+            
+            // Hide warning div if it exists
+            if (warningDiv) hideElement(warningDiv);
             
             // Debug logging
             // Parse images - empty array will trigger the card's built-in placeholder
@@ -127,6 +131,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 showElement(errorDiv);
                 return;
             }
+            
+            // Validate image URLs if provided
+            if (images.length > 0) {
+                // Check for local file paths (block completely)
+                const localFilePaths = images.filter(url => url.startsWith('file:///') || url.match(/^[A-Za-z]:\\/));
+                if (localFilePaths.length > 0) {
+                    errorDiv.innerHTML = `<strong>❌ Local file paths don't work!</strong><br>
+                        Files on your computer (like <code class="text-red-300">C:\\Users\\...</code>) can't be seen by other users.<br>
+                        <span class="text-cyan-400">Please upload to <a href="https://fivemanage.com" target="_blank" class="underline">fivemanage.com</a> first, then paste the link here.</span>`;
+                    showElement(errorDiv);
+                    return;
+                }
+                
+                // Check for invalid URLs
+                const invalidUrls = images.filter(url => !url.startsWith('http://') && !url.startsWith('https://'));
+                if (invalidUrls.length > 0) {
+                    errorDiv.textContent = `Invalid URL(s): ${invalidUrls.slice(0, 2).join(', ')}${invalidUrls.length > 2 ? '...' : ''}. URLs must start with http:// or https://`;
+                    showElement(errorDiv);
+                    return;
+                }
+                
+                // Check for Discord links (warning, not error)
+                const discordUrls = images.filter(url => url.includes('cdn.discordapp.com') || url.includes('media.discordapp.net'));
+                if (discordUrls.length > 0 && warningDiv && !window.createListingDiscordWarningAcknowledged) {
+                    warningDiv.innerHTML = `<div class="flex items-start gap-2">
+                        <span class="text-yellow-400">⚠️</span>
+                        <div>
+                            <strong class="text-yellow-300">Warning: Discord links expire!</strong><br>
+                            <span class="text-gray-300">Discord image links stop working after a few weeks. Your property photos will break.</span><br>
+                            <span class="text-cyan-400">We recommend using <a href="https://fivemanage.com" target="_blank" class="underline font-semibold">fivemanage.com</a> instead (it's free!).</span>
+                        </div>
+                    </div>
+                    <div class="mt-2 flex gap-2">
+                        <button type="button" onclick="window.createListingDiscordWarningAcknowledged=true; document.getElementById('createListingWarning').classList.add('hidden'); document.getElementById('createListingBtn').click();" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-sm font-bold">Create Anyway</button>
+                        <button type="button" onclick="document.getElementById('createListingWarning').classList.add('hidden');" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm font-bold">Let Me Fix It</button>
+                    </div>`;
+                    showElement(warningDiv);
+                    return;
+                }
+            }
+            
+            // Reset Discord warning flag for next time
+            window.createListingDiscordWarningAcknowledged = false;
             
             // Validate buy price against city minimum (HARD BLOCK)
             if (buyPrice > 0) {

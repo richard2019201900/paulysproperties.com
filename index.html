@@ -489,10 +489,22 @@
                 
                 <div>
                     <label class="block text-gray-300 font-semibold mb-2">Image URLs (one per line)</label>
-                    <textarea id="newListingImages" rows="3" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
+                    <!-- Hosting Recommendation -->
+                    <div class="bg-gradient-to-r from-blue-900/40 to-cyan-900/40 border border-cyan-600/40 rounded-lg p-3 mb-2">
+                        <div class="flex items-start gap-2">
+                            <span class="text-lg">💡</span>
+                            <div class="text-xs">
+                                <p class="text-cyan-300 font-bold">Recommended: Use a Free Image Host</p>
+                                <p class="text-gray-300">Upload to <a href="https://fivemanage.com" target="_blank" class="text-cyan-400 hover:text-cyan-300 underline font-semibold">fivemanage.com</a> (free, made for FiveM) and paste the link.</p>
+                                <p class="text-yellow-400 mt-1">⚠️ Discord links expire! Local files won't work.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <textarea id="newListingImages" rows="3" autocomplete="off" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-amber-500 transition" placeholder="https://fivemanage.com/your-image.jpg&#10;https://example.com/image2.jpg"></textarea>
                     <p class="text-gray-500 text-xs mt-1">Add image URLs for your property photos</p>
                 </div>
                 
+                <div id="createListingWarning" class="hidden bg-yellow-900/50 border border-yellow-600/50 rounded-lg p-3 text-sm"></div>
                 <div id="createListingError" class="hidden text-red-400 text-sm font-medium"></div>
                 <div id="createListingSuccess" class="hidden text-green-400 text-sm font-medium"></div>
                 
