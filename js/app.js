@@ -3041,6 +3041,11 @@ window.saveNewImages = async function() {
     const textarea = $('newImageUrls');
     const rawText = textarea ? textarea.value.trim() : '';
     const errorDiv = $('addImageError');
+    const warningDiv = $('addImageWarning');
+    
+    // Hide previous messages
+    hideElement(errorDiv);
+    if (warningDiv) hideElement(warningDiv);
     
     if (!rawText) {
         errorDiv.textContent = 'Please enter at least one image URL';
@@ -3059,13 +3064,59 @@ window.saveNewImages = async function() {
         return;
     }
     
-    // Validate all URLs
+    // Check for local file paths (these won't work at all)
+    const localFilePaths = urls.filter(url => url.startsWith('file:///') || url.match(/^[A-Za-z]:\\/));
+    if (localFilePaths.length > 0) {
+        errorDiv.innerHTML = `<strong>❌ Local file paths don't work!</strong><br>
+            Files on your computer (like <code class="text-red-300">C:\\Users\\...</code>) can't be seen by other users.<br>
+            <span class="text-cyan-400">Please upload to <a href="https://fivemanage.com" target="_blank" class="underline">fivemanage.com</a> first, then paste the link here.</span>`;
+        showElement(errorDiv);
+        return;
+    }
+    
+    // Validate all URLs start with http/https
     const invalidUrls = urls.filter(url => !url.startsWith('http://') && !url.startsWith('https://'));
     if (invalidUrls.length > 0) {
         errorDiv.textContent = `Invalid URL(s): ${invalidUrls.slice(0, 2).join(', ')}${invalidUrls.length > 2 ? '...' : ''}. URLs must start with http:// or https://`;
         showElement(errorDiv);
         return;
     }
+    
+    // Check for Discord links (warning, not error - they might still want to use them)
+    const discordUrls = urls.filter(url => url.includes('cdn.discordapp.com') || url.includes('media.discordapp.net'));
+    if (discordUrls.length > 0 && warningDiv) {
+        warningDiv.innerHTML = `<div class="flex items-start gap-2">
+            <span class="text-yellow-400">⚠️</span>
+            <div>
+                <strong class="text-yellow-300">Warning: Discord links expire!</strong><br>
+                <span class="text-gray-300">Discord image links stop working after a few weeks. Your property photos will break.</span><br>
+                <span class="text-cyan-400">We recommend using <a href="https://fivemanage.com" target="_blank" class="underline font-semibold">fivemanage.com</a> instead (it's free!).</span>
+            </div>
+        </div>
+        <div class="mt-2 flex gap-2">
+            <button onclick="document.getElementById('addImageWarning').classList.add('hidden'); saveNewImagesConfirmed();" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-sm font-bold">Add Anyway</button>
+            <button onclick="document.getElementById('addImageWarning').classList.add('hidden');" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm font-bold">Let Me Fix It</button>
+        </div>`;
+        showElement(warningDiv);
+        return;
+    }
+    
+    // No warnings, proceed with save
+    await saveNewImagesConfirmed();
+};
+
+// Actual save function (called after warnings acknowledged)
+window.saveNewImagesConfirmed = async function() {
+    const propertyId = window.currentImagePropertyId;
+    if (!propertyId) return;
+    
+    const textarea = $('newImageUrls');
+    const rawText = textarea ? textarea.value.trim() : '';
+    const errorDiv = $('addImageError');
+    
+    const urls = rawText.split('\n')
+        .map(url => url.trim())
+        .filter(url => url.length > 0);
     
     const btn = $('saveImageBtn');
     btn.disabled = true;
@@ -3116,12 +3167,18 @@ window.saveNewImage = window.saveNewImages;
 
 window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
     const prop = properties.find(p => p.id === propertyId);
-    if (!prop || !prop.images || prop.images.length <= 1) {
-        alert('Cannot delete the last image. Properties must have at least one image.');
+    if (!prop || !prop.images) {
+        alert('No images to delete.');
         return;
     }
     
-    if (!confirm('Are you sure you want to delete this image?')) {
+    // Different confirmation message for last image
+    const isLastImage = prop.images.length === 1;
+    const confirmMessage = isLastImage 
+        ? 'This is the last image. Deleting it will show a placeholder instead.\n\nAre you sure you want to delete this image?'
+        : 'Are you sure you want to delete this image?';
+    
+    if (!confirm(confirmMessage)) {
         return;
     }
     
@@ -3142,6 +3199,15 @@ window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
         
         // Re-render
         renderPropertyStatsContent(propertyId);
+        
+        // Show toast
+        if (typeof showToast === 'function') {
+            if (isLastImage) {
+                showToast('Image deleted. Add a new image to replace the placeholder.', 'info');
+            } else {
+                showToast('Image deleted successfully!', 'success');
+            }
+        }
         
     } catch (error) {
         console.error('Failed to delete image:', error);
