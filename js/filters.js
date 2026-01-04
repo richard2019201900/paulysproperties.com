@@ -7,97 +7,12 @@
 window.activeInteriorFilter = null;
 window.activeTypeFilter = null;
 
-// Featured rotator state
-var featuredRotatorInterval = null;
-var currentFeaturedIndex = 0;
-
 /**
  * Get property value from Firestore-synced data
  */
 function getPropertyValue(property, field) {
     return PropertyDataService.getValue(property.id, field, property[field]);
 }
-
-/**
- * Get pool of premium available properties
- */
-function getFeaturedPool() {
-    return properties.filter(function(p) {
-        var isPremium = getPropertyValue(p, 'isPremium');
-        var isAvailable = state.availability[p.id] !== false;
-        return isPremium && isAvailable;
-    });
-}
-
-/**
- * Render the featured property spotlight - full width image showcase
- */
-function renderFeaturedSpotlight() {
-    var container = $('featuredSpotlight');
-    if (!container) return;
-    
-    var pool = getFeaturedPool();
-    
-    if (pool.length === 0) {
-        container.style.minHeight = '120px';
-        container.innerHTML = '<div class="absolute inset-0 bg-gradient-to-r from-purple-900/50 to-pink-900/50 flex items-center justify-center">' +
-            '<div class="text-center">' +
-                '<p class="text-amber-300 font-bold text-lg">✨ Premium Spotlight Available</p>' +
-                '<p class="text-gray-300 text-sm">List your property as Premium for featured placement!</p>' +
-            '</div>' +
-        '</div>';
-        return;
-    }
-    
-    currentFeaturedIndex = currentFeaturedIndex % pool.length;
-    var property = pool[currentFeaturedIndex];
-    
-    var price = getPropertyValue(property, 'weeklyPrice') || property.weeklyPrice || 0;
-    var images = getPropertyValue(property, 'images') || property.images || [];
-    var firstImage = images[0] || 'images/placeholder.png';
-    var type = getPropertyValue(property, 'type') || 'property';
-    var typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-    var location = getPropertyValue(property, 'location') || property.location || '';
-    
-    container.style.minHeight = '280px';
-    container.onclick = function() { viewProperty(property.id); };
-    
-    container.innerHTML = 
-        '<img src="' + firstImage + '" alt="' + property.title + '" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-500" onerror="this.src=\'images/placeholder.png\'">' +
-        '<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>' +
-        '<div class="absolute top-4 left-4 flex items-center gap-2">' +
-            '<span class="bg-amber-500 text-black px-3 py-1 rounded-full text-xs font-bold">✨ FEATURED</span>' +
-            (pool.length > 1 ? '<span class="bg-black/50 text-white px-2 py-1 rounded-full text-xs">' + (currentFeaturedIndex + 1) + ' / ' + pool.length + '</span>' : '') +
-        '</div>' +
-        '<div class="absolute bottom-0 left-0 right-0 p-6">' +
-            '<div class="flex items-end justify-between">' +
-                '<div>' +
-                    '<p class="text-gray-300 text-sm mb-1">' + typeLabel + (location ? ' • ' + location.split(',')[0] : '') + '</p>' +
-                    '<h3 class="text-white font-bold text-2xl md:text-3xl mb-2 group-hover:text-purple-300 transition">' + property.title + '</h3>' +
-                    '<p class="text-purple-400 font-bold text-xl">' + formatPrice(price) + '<span class="text-gray-400 text-sm font-normal">/week</span></p>' +
-                '</div>' +
-                '<button class="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg">View Property</button>' +
-            '</div>' +
-        '</div>';
-}
-
-/**
- * Initialize featured rotator
- */
-window.initFeaturedRotator = function() {
-    renderFeaturedSpotlight();
-    
-    if (featuredRotatorInterval) {
-        clearInterval(featuredRotatorInterval);
-    }
-    
-    featuredRotatorInterval = setInterval(function() {
-        currentFeaturedIndex++;
-        renderFeaturedSpotlight();
-    }, 60000);
-    
-    console.log('[Filters] Featured rotator initialized');
-};
 
 /**
  * Browse properties - scroll to listings
@@ -300,14 +215,5 @@ window.clearFilters = function() {
     updateFilterButtonStates();
     applyAllFilters();
 };
-
-// Initialize on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(initFeaturedRotator, 500);
-    });
-} else {
-    setTimeout(initFeaturedRotator, 500);
-}
 
 console.log('[Filters] Button-based filter system loaded');

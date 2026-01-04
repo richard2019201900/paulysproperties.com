@@ -1955,73 +1955,62 @@
             </div>
         </div>
         
-        <section id="home" class="gradient-bg text-white py-16 md:py-24">
+        <section id="home" class="gradient-bg text-white py-12 md:py-16">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                <h2 class="text-4xl md:text-6xl font-black mb-6">Live Like You Mean It.</h2>
-                <p class="text-xl md:text-2xl mb-12 font-light max-w-4xl mx-auto">Pauly's exclusive collection. Premium rentals. Professionally managed. Scroll down and find your next home — or make an offer to own it.</p>
-                <!-- Featured Property Showcase + CTAs (compact) -->
-                <div class="max-w-5xl mx-auto">
-                    <!-- Featured Property - Full width image showcase -->
-                    <div id="featuredSpotlight" class="relative rounded-2xl overflow-hidden shadow-2xl mb-4 cursor-pointer group" style="min-height: 200px;">
-                        <!-- Loading state -->
-                        <div class="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                            <div class="animate-pulse text-gray-400">Loading featured properties...</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Compact CTAs - inline -->
-                    <div class="flex flex-wrap justify-center gap-3">
-                        <button onclick="browseProperties()" class="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
-                            🏠 Browse Properties <span>↓</span>
-                        </button>
-                        <button onclick="listYourProperty()" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
-                            🏢 List Your Property <span>→</span>
-                        </button>
-                    </div>
+                <h2 class="text-4xl md:text-5xl font-black mb-4">Live Like You Mean It.</h2>
+                <p class="text-lg md:text-xl mb-6 font-light max-w-3xl mx-auto">Pauly's exclusive collection. Premium rentals. Professionally managed.</p>
+                <!-- Compact CTAs -->
+                <div class="flex flex-wrap justify-center gap-3">
+                    <button onclick="browseProperties()" class="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
+                        🏠 Browse Properties <span>↓</span>
+                    </button>
+                    <button onclick="listYourProperty()" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
+                        🏢 List Your Property <span>→</span>
+                    </button>
                 </div>
             </div>
         </section>
 
-        <section id="properties" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
-            <div class="flex flex-col gap-4">
+        <section id="properties" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6" style="scroll-margin-top: 80px;">
+            <div class="flex flex-col gap-3">
                 <!-- Filter Buttons - Horizontal Scrollable -->
                 <div class="relative">
                     <!-- Scroll fade indicator (right edge) -->
-                    <div class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-gray-900 to-transparent pointer-events-none z-10 md:hidden"></div>
+                    <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-gray-900 to-transparent pointer-events-none z-10"></div>
                     
                     <!-- Scrollable button container -->
-                    <div class="flex gap-2 md:gap-3 overflow-x-auto pb-2 scrollbar-hide" id="filterButtons" style="-webkit-overflow-scrolling: touch;">
+                    <div class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" id="filterButtons" style="-webkit-overflow-scrolling: touch;">
                         <!-- Interior Type Filters (Cyan accent) -->
-                        <button onclick="filterByInterior('Walk-in', this)" data-filter="Walk-in" class="interior-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl border-2 border-gray-600 bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Walk-in</button>
-                        <button onclick="filterByInterior('Instance', this)" data-filter="Instance" class="interior-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl border-2 border-gray-600 bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Instance</button>
+                        <button onclick="filterByInterior('Walk-in', this)" data-filter="Walk-in" class="interior-filter-btn flex-shrink-0 px-4 py-2 rounded-lg border-2 border-gray-600 bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Walk-in</button>
+                        <button onclick="filterByInterior('Instance', this)" data-filter="Instance" class="interior-filter-btn flex-shrink-0 px-4 py-2 rounded-lg border-2 border-gray-600 bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Instance</button>
                         
                         <!-- Separator -->
-                        <div class="flex-shrink-0 w-px bg-gray-600 mx-1 hidden md:block"></div>
+                        <div class="flex-shrink-0 w-px bg-gray-600 mx-1"></div>
                         
                         <!-- Property Type Filters (Purple/gradient) -->
-                        <button onclick="filterByType('all', this)" data-filter="all" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl gradient-bg text-white font-bold shadow-lg text-sm md:text-base active">All</button>
-                        <button onclick="filterByType('house', this)" data-filter="house" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Houses</button>
-                        <button onclick="filterByType('apartment', this)" data-filter="apartment" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Apartments</button>
-                        <button onclick="filterByType('condo', this)" data-filter="condo" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Condos</button>
-                        <button onclick="filterByType('villa', this)" data-filter="villa" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Villas</button>
-                        <button onclick="filterByType('hotel', this)" data-filter="hotel" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hotels</button>
-                        <button onclick="filterByType('office', this)" data-filter="office" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Offices</button>
-                        <button onclick="filterByType('warehouse', this)" data-filter="warehouse" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Warehouses</button>
-                        <button onclick="filterByType('hideout', this)" data-filter="hideout" class="type-filter-btn flex-shrink-0 px-4 md:px-6 py-2 md:py-3 rounded-xl bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm md:text-base">Hideouts</button>
+                        <button onclick="filterByType('all', this)" data-filter="all" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg gradient-bg text-white font-bold shadow-lg text-sm active">All</button>
+                        <button onclick="filterByType('house', this)" data-filter="house" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Houses</button>
+                        <button onclick="filterByType('apartment', this)" data-filter="apartment" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Apartments</button>
+                        <button onclick="filterByType('condo', this)" data-filter="condo" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Condos</button>
+                        <button onclick="filterByType('villa', this)" data-filter="villa" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Villas</button>
+                        <button onclick="filterByType('hotel', this)" data-filter="hotel" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Hotels</button>
+                        <button onclick="filterByType('office', this)" data-filter="office" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Offices</button>
+                        <button onclick="filterByType('warehouse', this)" data-filter="warehouse" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Warehouses</button>
+                        <button onclick="filterByType('hideout', this)" data-filter="hideout" class="type-filter-btn flex-shrink-0 px-4 py-2 rounded-lg bg-gray-700 text-gray-200 font-bold hover:shadow-lg transition shadow text-sm">Hideouts</button>
                     </div>
                 </div>
                 
-                <!-- Checkboxes and Sort - below buttons -->
-                <div class="flex flex-wrap gap-3 md:gap-4 items-center">
-                    <label id="myPropertiesFilter" class="hidden items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition">
-                        <input type="checkbox" id="showMyProperties" onchange="toggleMyProperties()" class="w-4 h-4 md:w-5 md:h-5 rounded border-2 border-purple-500 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                <!-- Checkboxes and Sort - compact row -->
+                <div class="flex flex-wrap gap-3 items-center">
+                    <label id="myPropertiesFilter" class="hidden items-center gap-2 text-gray-300 font-medium cursor-pointer text-sm hover:text-white transition">
+                        <input type="checkbox" id="showMyProperties" onchange="toggleMyProperties()" class="w-4 h-4 rounded border-2 border-purple-500 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer">
                         <span>My Properties</span>
                     </label>
-                    <label class="flex items-center gap-2 text-gray-300 font-semibold cursor-pointer text-sm md:text-base hover:text-white transition">
-                        <input type="checkbox" id="hideUnavailable" onchange="toggleHideUnavailable()" checked class="w-4 h-4 md:w-5 md:h-5 rounded border-2 border-gray-600 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer">
+                    <label class="flex items-center gap-2 text-gray-300 font-medium cursor-pointer text-sm hover:text-white transition">
+                        <input type="checkbox" id="hideUnavailable" onchange="toggleHideUnavailable()" checked class="w-4 h-4 rounded border-2 border-gray-600 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 cursor-pointer">
                         <span>Hide Unavailable</span>
                     </label>
-                    <select id="sortBy" onchange="sortProperties()" class="px-4 md:px-6 py-2 md:py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 font-semibold shadow text-sm md:text-base">
+                    <select id="sortBy" onchange="sortProperties()" class="px-3 py-1.5 border-2 border-gray-600 rounded-lg bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 font-medium shadow text-sm">
                         <option value="">Sort By</option>
                         <option value="price-low">Price: Low to High</option>
                         <option value="price-high">Price: High to Low</option>
@@ -2033,8 +2022,8 @@
             </div>
         </section>
 
-        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-            <h3 class="text-3xl md:text-4xl font-black text-white mb-8 md:mb-10">Featured Properties <span id="propertyCount" class="text-purple-400">(0)</span></h3>
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-6">
+            <h3 class="text-2xl md:text-3xl font-black text-white mb-6">Featured Properties <span id="propertyCount" class="text-purple-400">(0)</span></h3>
             <div id="propertiesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
         </section>
 
