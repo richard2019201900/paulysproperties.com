@@ -1959,37 +1959,30 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                 <h2 class="text-4xl md:text-6xl font-black mb-6">Live Like You Mean It.</h2>
                 <p class="text-xl md:text-2xl mb-12 font-light max-w-4xl mx-auto">Pauly's exclusive collection. Premium rentals. Professionally managed. Scroll down and find your next home — or make an offer to own it.</p>
-                <div class="max-w-4xl mx-auto glass-effect rounded-2xl shadow-2xl p-4 md:p-6">
-                    <!-- Featured Property Spotlight (compact) -->
-                    <div id="featuredSpotlight" class="mb-4 bg-gray-800/50 rounded-lg p-3 border border-amber-400/30">
-                        <div class="text-center py-2">
-                            <div class="animate-pulse text-gray-400 text-sm">Loading featured properties...</div>
+                <!-- Featured Property Showcase + CTAs (compact) -->
+                <div class="max-w-5xl mx-auto">
+                    <!-- Featured Property - Full width image showcase -->
+                    <div id="featuredSpotlight" class="relative rounded-2xl overflow-hidden shadow-2xl mb-4 cursor-pointer group" style="min-height: 200px;">
+                        <!-- Loading state -->
+                        <div class="absolute inset-0 bg-gray-800 flex items-center justify-center">
+                            <div class="animate-pulse text-gray-400">Loading featured properties...</div>
                         </div>
                     </div>
                     
-                    <!-- CTA Cards (compact, side by side) -->
-                    <div class="grid grid-cols-2 gap-3">
-                        <div onclick="browseProperties()" class="bg-purple-600/20 border border-purple-500/50 hover:border-purple-400 rounded-lg p-3 cursor-pointer transition group text-left">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-xl">🏠</span>
-                                <span class="text-white font-bold text-sm md:text-base">Looking to Rent?</span>
-                            </div>
-                            <span class="text-purple-400 font-semibold text-xs md:text-sm group-hover:text-purple-300">Browse Properties ↓</span>
-                        </div>
-                        
-                        <div onclick="listYourProperty()" class="bg-cyan-600/20 border border-cyan-500/50 hover:border-cyan-400 rounded-lg p-3 cursor-pointer transition group text-left">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-xl">🏢</span>
-                                <span class="text-white font-bold text-sm md:text-base">Own Property?</span>
-                            </div>
-                            <span class="text-cyan-400 font-semibold text-xs md:text-sm group-hover:text-cyan-300">List With Us →</span>
-                        </div>
+                    <!-- Compact CTAs - inline -->
+                    <div class="flex flex-wrap justify-center gap-3">
+                        <button onclick="browseProperties()" class="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
+                            🏠 Browse Properties <span>↓</span>
+                        </button>
+                        <button onclick="listYourProperty()" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
+                            🏢 List Your Property <span>→</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+        <section id="properties" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
             <div class="flex flex-col gap-4">
                 <!-- Filter Buttons - Horizontal Scrollable -->
                 <div class="relative">
@@ -2040,7 +2033,7 @@
             </div>
         </section>
 
-        <section id="properties" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
             <h3 class="text-3xl md:text-4xl font-black text-white mb-8 md:mb-10">Featured Properties <span id="propertyCount" class="text-purple-400">(0)</span></h3>
             <div id="propertiesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
         </section>
