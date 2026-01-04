@@ -264,10 +264,13 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
         // Add agent
         currentAgents.push(agentEmail.toLowerCase());
         
-        // Get agent display name for public viewing (anonymous users can't query users collection)
+        // Get agent display name AND phone for public viewing (anonymous users can't query users collection)
         var agentDisplayName = 'Agent';
+        var agentPhone = '2057028233'; // Default to Pauly's number
+        
         if (agentEmail.toLowerCase() === 'richard2019201900@gmail.com') {
             agentDisplayName = 'Pauly Amato';
+            agentPhone = '2057028233';
         } else {
             // Try to get from cache
             await loadAgents();
@@ -276,16 +279,20 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
             });
             if (agent) {
                 agentDisplayName = agent.username;
+                agentPhone = agent.phone || '2057028233';
             }
         }
         
-        // Store agent display names map for public view
+        // Store agent display names AND phones map for public view
         var agentDisplayNames = properties[propKey].agentDisplayNames || {};
+        var agentPhones = properties[propKey].agentPhones || {};
         agentDisplayNames[agentEmail.toLowerCase()] = agentDisplayName;
+        agentPhones[agentEmail.toLowerCase()] = agentPhone;
         
         await db.collection('settings').doc('properties').update({
             [propKey + '.agents']: currentAgents,
-            [propKey + '.agentDisplayNames']: agentDisplayNames
+            [propKey + '.agentDisplayNames']: agentDisplayNames,
+            [propKey + '.agentPhones']: agentPhones
         });
         
         // Update local cache
@@ -293,6 +300,7 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
         if (localProp) {
             localProp.agents = currentAgents;
             localProp.agentDisplayNames = agentDisplayNames;
+            localProp.agentPhones = agentPhones;
         }
         
         // Log activity
@@ -380,6 +388,7 @@ window.getPropertyAgents = function(propertyId) {
 /**
  * Get agent contact info for Make an Offer modal
  * Returns array of {email, phone, username} for all assigned agents
+ * Works for both authenticated AND anonymous users
  */
 window.getAgentContactsForProperty = async function(propertyId) {
     var agentEmails = getPropertyAgents(propertyId);
@@ -387,24 +396,65 @@ window.getAgentContactsForProperty = async function(propertyId) {
     
     var contacts = [];
     
-    try {
-        // Load agents if not cached
-        await loadAgents();
-        
+    // First, try to get from property data (works for anonymous users)
+    var prop = window.properties?.find(function(p) { 
+        return p.id == propertyId || p.id === parseInt(propertyId); 
+    });
+    
+    if (prop && prop.agentDisplayNames && prop.agentPhones) {
+        // Use stored agent data from property (no auth required)
         agentEmails.forEach(function(email) {
-            var agent = agentsCache.find(function(a) {
-                return a.email.toLowerCase() === email.toLowerCase();
-            });
-            if (agent && agent.phone) {
+            var emailLower = email.toLowerCase();
+            var displayName = prop.agentDisplayNames[emailLower];
+            var phone = prop.agentPhones[emailLower];
+            
+            if (displayName && phone) {
                 contacts.push({
-                    email: agent.email,
-                    phone: agent.phone,
-                    username: agent.username
+                    email: emailLower,
+                    phone: phone,
+                    username: displayName
                 });
             }
         });
+        
+        if (contacts.length > 0) {
+            return contacts;
+        }
+    }
+    
+    // Fallback: Try to load from users collection (requires auth)
+    try {
+        if (auth?.currentUser) {
+            await loadAgents();
+            
+            agentEmails.forEach(function(email) {
+                var agent = agentsCache.find(function(a) {
+                    return a.email.toLowerCase() === email.toLowerCase();
+                });
+                if (agent && agent.phone) {
+                    contacts.push({
+                        email: agent.email,
+                        phone: agent.phone,
+                        username: agent.username
+                    });
+                }
+            });
+        }
     } catch (error) {
-        console.error('[Agents] Error getting agent contacts:', error);
+        // Silent fail for anonymous users
+    }
+    
+    // Last resort: Check for master admin email
+    if (contacts.length === 0) {
+        agentEmails.forEach(function(email) {
+            if (email.toLowerCase() === 'richard2019201900@gmail.com') {
+                contacts.push({
+                    email: email,
+                    phone: '2057028233',
+                    username: 'Pauly Amato'
+                });
+            }
+        });
     }
     
     return contacts;
@@ -816,31 +866,44 @@ window.migrateAgentDisplayNames = async function() {
         Object.entries(allProperties).forEach(function([propId, prop]) {
             if (!prop || !prop.agents || prop.agents.length === 0) return;
             
-            // Check if already has agentDisplayNames
-            if (prop.agentDisplayNames && Object.keys(prop.agentDisplayNames).length > 0) {
-                console.log('[Agents] Property', propId, 'already has agentDisplayNames');
+            // Check if already has BOTH agentDisplayNames AND agentPhones
+            var hasDisplayNames = prop.agentDisplayNames && Object.keys(prop.agentDisplayNames).length > 0;
+            var hasPhones = prop.agentPhones && Object.keys(prop.agentPhones).length > 0;
+            
+            if (hasDisplayNames && hasPhones) {
+                console.log('[Agents] Property', propId, 'already has agentDisplayNames and agentPhones');
                 return;
             }
             
-            var displayNames = {};
+            var displayNames = prop.agentDisplayNames || {};
+            var phones = prop.agentPhones || {};
+            
             prop.agents.forEach(function(agentEmail) {
                 var emailLower = agentEmail.toLowerCase();
                 
                 // Master admin special case
                 if (emailLower === 'richard2019201900@gmail.com') {
                     displayNames[emailLower] = 'Pauly Amato';
+                    phones[emailLower] = '2057028233';
                 } else {
                     // Find in cache
                     var agent = agentsCache.find(function(a) {
                         return a.email.toLowerCase() === emailLower;
                     });
-                    displayNames[emailLower] = agent ? agent.username : 'Agent';
+                    if (agent) {
+                        displayNames[emailLower] = agent.username;
+                        phones[emailLower] = agent.phone || '2057028233';
+                    } else {
+                        displayNames[emailLower] = 'Agent';
+                        phones[emailLower] = '2057028233'; // Fallback to Pauly
+                    }
                 }
             });
             
             updates[propId + '.agentDisplayNames'] = displayNames;
+            updates[propId + '.agentPhones'] = phones;
             migratedCount++;
-            console.log('[Agents] Will migrate property', propId, ':', displayNames);
+            console.log('[Agents] Will migrate property', propId, ':', { displayNames, phones });
         });
         
         if (Object.keys(updates).length === 0) {

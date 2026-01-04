@@ -141,9 +141,9 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     $('modalPhone').value = defaultPhone;
     usedFallback = true; // Assume fallback until we find a better contact
     
-    // Check for assigned agents first (for purchase offers)
+    // Check for assigned agents first (for BOTH rent and purchase offers)
     let agentContacts = [];
-    if (!isRent && typeof getAgentContactsForProperty === 'function') {
+    if (typeof getAgentContactsForProperty === 'function') {
         try {
             agentContacts = await getAgentContactsForProperty(propertyId);
         } catch (e) {
