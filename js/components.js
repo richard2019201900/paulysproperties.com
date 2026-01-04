@@ -105,6 +105,7 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     const isRent = type === 'rent';
     const colors = isRent ? ['purple', 'blue'] : ['amber', 'orange'];
     const defaultPhone = '2057028233'; // Pauly's number as fallback
+    let usedFallback = false; // Track if we had to use fallback
     
     $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer to Purchase';
     $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
@@ -138,6 +139,7 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     
     // Reset to default phone first
     $('modalPhone').value = defaultPhone;
+    usedFallback = true; // Assume fallback until we find a better contact
     
     // Check for assigned agents first (for purchase offers)
     let agentContacts = [];
@@ -151,6 +153,7 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     
     // If agents are assigned, show their contact info
     if (agentContacts.length > 0) {
+        usedFallback = false;
         if (agentContacts.length === 1) {
             // Single agent
             $('modalPhone').value = agentContacts[0].phone.replace(/\D/g, '');
@@ -193,11 +196,13 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
                         // Check ownerContactPhone first (synced from user profile)
                         if (property.ownerContactPhone) {
                             $('modalPhone').value = property.ownerContactPhone.replace(/\D/g, '');
+                            usedFallback = false;
                             console.log('[Contact] Using property ownerContactPhone');
                         }
                         // Then check legacy ownerPhone field
                         else if (property.ownerPhone) {
                             $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
+                            usedFallback = false;
                             console.log('[Contact] Using property ownerPhone');
                         }
                         // Finally try user doc (may fail for non-admins due to permissions)
@@ -212,12 +217,13 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
                                     const userData = usersSnapshot.docs[0].data();
                                     if (userData.phone) {
                                         $('modalPhone').value = userData.phone.replace(/\D/g, '');
+                                        usedFallback = false;
                                         console.log('[Contact] Using phone from user doc');
                                     }
                                 }
                             } catch (permError) {
                                 // Permission denied - expected for non-admins
-                                console.log('[Contact] Cannot read user doc (permission denied), using default');
+                                console.log('[Contact] Cannot read user doc (permission denied), using fallback');
                             }
                         }
                     }
@@ -225,6 +231,34 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
             }
         } catch (error) {
             console.warn('[Contact] Could not fetch owner phone, using default:', error);
+        }
+    }
+    
+    // If we used the fallback, notify admin via activity log
+    if (usedFallback) {
+        console.warn('[Contact] FALLBACK USED: Property', propertyId, '(' + propertyTitle + ') - Missing owner contact info');
+        
+        // Log to activity log if admin is logged in
+        if (typeof logActivity === 'function' && auth.currentUser) {
+            logActivity('contact_fallback', 'Fallback phone used for: ' + propertyTitle + ' (ID: ' + propertyId + ') - Owner contact info missing');
+        }
+        
+        // Also create an admin notification in Firestore
+        try {
+            if (typeof db !== 'undefined') {
+                await db.collection('adminNotifications').add({
+                    type: 'missing_contact',
+                    propertyId: propertyId,
+                    propertyTitle: propertyTitle,
+                    message: 'Property is using fallback contact number - owner phone/agent not configured',
+                    timestamp: new Date().toISOString(),
+                    resolved: false
+                });
+                console.log('[Contact] Admin notification created for missing contact info');
+            }
+        } catch (notifError) {
+            // Non-critical, just log it
+            console.log('[Contact] Could not create admin notification:', notifError);
         }
     }
     

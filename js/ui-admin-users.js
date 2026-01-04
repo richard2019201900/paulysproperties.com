@@ -761,9 +761,39 @@ window.confirmReassignProperty = async function() {
         // Handle "unassigned" selection
         const actualNewEmail = newOwnerEmail === 'unassigned' ? null : newOwnerEmail.toLowerCase();
         
+        // Fetch new owner's display name and phone for public display
+        let ownerDisplayName = null;
+        let ownerContactPhone = null;
+        
+        if (actualNewEmail) {
+            try {
+                const userSnapshot = await db.collection('users')
+                    .where('email', '==', actualNewEmail)
+                    .limit(1)
+                    .get();
+                
+                if (!userSnapshot.empty) {
+                    const userData = userSnapshot.docs[0].data();
+                    // Prefer firstName + lastName, fallback to username
+                    if (userData.firstName && userData.lastName) {
+                        ownerDisplayName = userData.firstName + ' ' + userData.lastName;
+                    } else if (userData.username) {
+                        ownerDisplayName = userData.username;
+                    } else {
+                        ownerDisplayName = actualNewEmail.split('@')[0];
+                    }
+                    ownerContactPhone = userData.phone || null;
+                }
+            } catch (e) {
+                console.log('[Reassign] Could not fetch new owner details:', e);
+            }
+        }
+        
         // Update property in memory
         if (prop) {
             prop.ownerEmail = actualNewEmail;
+            prop.ownerDisplayName = ownerDisplayName;
+            prop.ownerContactPhone = ownerContactPhone;
         }
         
         // Update in Firestore
@@ -772,6 +802,8 @@ window.confirmReassignProperty = async function() {
             const propsData = propsDoc.data();
             if (propsData[propertyId]) {
                 propsData[propertyId].ownerEmail = actualNewEmail;
+                propsData[propertyId].ownerDisplayName = ownerDisplayName;
+                propsData[propertyId].ownerContactPhone = ownerContactPhone;
                 await db.collection('settings').doc('properties').set(propsData);
             }
         }
@@ -807,6 +839,11 @@ window.confirmReassignProperty = async function() {
         if (window.ownerUsernameCache && oldOwnerEmail) {
             delete window.ownerUsernameCache[oldOwnerEmail.toLowerCase()];
         }
+        if (window.ownerUsernameCache && actualNewEmail) {
+            // Update cache with new display name
+            window.ownerUsernameCache[actualNewEmail] = ownerDisplayName;
+        }
+        
         successDiv.textContent = '✓ Property reassigned successfully!';
         showElement(successDiv);
         btn.textContent = '✓ Done!';
@@ -1778,8 +1815,18 @@ window.previewBatchSync = async function() {
         usersSnapshot.docs.forEach(doc => {
             const data = doc.data();
             if (data.email) {
+                // Build display name: prefer firstName + lastName, fallback to username, then email prefix
+                let displayName;
+                if (data.firstName && data.lastName) {
+                    displayName = data.firstName + ' ' + data.lastName;
+                } else if (data.username) {
+                    displayName = data.username;
+                } else {
+                    displayName = data.email.split('@')[0];
+                }
+                
                 users[data.email.toLowerCase()] = {
-                    displayName: data.username || null,
+                    displayName: displayName,
                     phone: data.phone || null
                 };
             }
@@ -1854,8 +1901,18 @@ window.batchSyncOwnerProfiles = async function() {
         usersSnapshot.docs.forEach(doc => {
             const data = doc.data();
             if (data.email) {
+                // Build display name: prefer firstName + lastName, fallback to username, then email prefix
+                let displayName;
+                if (data.firstName && data.lastName) {
+                    displayName = data.firstName + ' ' + data.lastName;
+                } else if (data.username) {
+                    displayName = data.username;
+                } else {
+                    displayName = data.email.split('@')[0];
+                }
+                
                 users[data.email.toLowerCase()] = {
-                    displayName: data.username || null,
+                    displayName: displayName,
                     phone: data.phone || null
                 };
             }

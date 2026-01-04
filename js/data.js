@@ -81,14 +81,39 @@ async function getUsernameByEmail(email) {
         const querySnapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
         if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
-            const username = userData.username || email.split('@')[0];
-            window.ownerUsernameCache[normalizedEmail] = username; // Cache it
-            return username;
+            // Prefer firstName + lastName, then username, then email prefix
+            let displayName;
+            if (userData.firstName && userData.lastName) {
+                displayName = userData.firstName + ' ' + userData.lastName;
+            } else {
+                displayName = userData.username || email.split('@')[0];
+            }
+            window.ownerUsernameCache[normalizedEmail] = displayName;
+            return displayName;
         }
     } catch (error) {
         // Permission denied (user can only read own doc) - try getting from property data
         if (error.code === 'permission-denied') {
-            // Check if we have ownerDisplayName stored on any property
+            // Check if we have ownerDisplayName stored on any property in Firestore settings
+            try {
+                const propsDoc = await db.collection('settings').doc('properties').get();
+                if (propsDoc.exists) {
+                    const propsData = propsDoc.data();
+                    for (const propId in propsData) {
+                        const prop = propsData[propId];
+                        if (prop.ownerEmail && prop.ownerEmail.toLowerCase() === normalizedEmail) {
+                            if (prop.ownerDisplayName) {
+                                window.ownerUsernameCache[normalizedEmail] = prop.ownerDisplayName;
+                                return prop.ownerDisplayName;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // Can't read settings either, fall through to other fallbacks
+            }
+            
+            // Check local OwnershipService for ownerDisplayName
             const userProperties = typeof OwnershipService !== 'undefined' 
                 ? OwnershipService.getPropertiesForOwner(normalizedEmail)
                 : [];
@@ -104,7 +129,7 @@ async function getUsernameByEmail(email) {
             // Check if master admin (we can do this without querying)
             if (typeof TierService !== 'undefined' && TierService.isMasterAdmin(normalizedEmail)) {
                 // For master admin, use a nice default
-                const fallback = email.split('@')[0];
+                const fallback = 'Pauly Amato';
                 window.ownerUsernameCache[normalizedEmail] = fallback;
                 return fallback;
             }

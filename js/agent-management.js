@@ -56,9 +56,19 @@ window.loadAgents = async function(forceRefresh) {
     try {
         var snapshot = await db.collection('users').where('isAgent', '==', true).get();
         agentsCache = [];
+        var seenEmails = {}; // Track emails to prevent duplicates
         
         snapshot.forEach(function(doc) {
             var data = doc.data();
+            var emailLower = (data.email || '').toLowerCase();
+            
+            // Skip if we've already seen this email (case-insensitive)
+            if (seenEmails[emailLower]) {
+                console.log('[Agents] Skipping duplicate agent:', emailLower);
+                return;
+            }
+            seenEmails[emailLower] = true;
+            
             agentsCache.push({
                 odId: doc.id,
                 email: data.email,
@@ -70,13 +80,11 @@ window.loadAgents = async function(forceRefresh) {
             });
         });
         
-        // Always include master admin as agent
+        // Always include master admin as agent (if not already found)
         var masterAdminEmail = 'richard2019201900@gmail.com';
-        var hasMasterAdmin = agentsCache.some(function(a) { 
-            return a.email.toLowerCase() === masterAdminEmail.toLowerCase(); 
-        });
+        var masterAdminLower = masterAdminEmail.toLowerCase();
         
-        if (!hasMasterAdmin) {
+        if (!seenEmails[masterAdminLower]) {
             // Try to find master admin in users collection
             var masterSnapshot = await db.collection('users')
                 .where('email', '==', masterAdminEmail)
@@ -94,11 +102,12 @@ window.loadAgents = async function(forceRefresh) {
                     isAgent: true,
                     agentSince: 'System Default'
                 });
+                seenEmails[masterAdminLower] = true;
             }
         }
         
         agentsCacheTime = Date.now();
-        console.log('[Agents] Loaded', agentsCache.length, 'agents');
+        console.log('[Agents] Loaded', agentsCache.length, 'agents (deduplicated)');
         return agentsCache;
     } catch (error) {
         console.error('[Agents] Error loading agents:', error);
