@@ -19,18 +19,6 @@ function getPropertyValue(property, field) {
 }
 
 /**
- * Format price for display
- */
-function formatPrice(price) {
-    if (price >= 1000000) {
-        return '$' + (price / 1000000).toFixed(1) + 'M';
-    } else if (price >= 1000) {
-        return '$' + Math.round(price / 1000) + 'k';
-    }
-    return '$' + price;
-}
-
-/**
  * Get pool of premium available properties
  */
 function getFeaturedPool() {
