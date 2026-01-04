@@ -423,7 +423,7 @@ window.viewPropertyStats = async function(id) {
         const freshData = await PropertyDataService.read(id);
         if (freshData.exists) {
             // Data is automatically synced to properties array by PropertyDataService.read()
-            console.log('[ViewPropertyStats] Fresh data loaded for property', id);
+            // Debug log removed
         }
     } catch (error) {
         console.error('Error fetching property data:', error);
@@ -541,7 +541,7 @@ function renderPropertyStatsContent(id) {
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
     // DEBUG: Log property render (without sensitive renter data)
-    console.log('[PropertyStats] Rendering property', id, '- hasRenter:', !!renterName, '- available:', state.availability[id]);
+    // Debug log removed
     
     // NOTE: Removed AUTO-FIX logic that was causing race conditions with lease completion
     // The availability status should be explicitly managed via toggleAvailability/saveAvailability

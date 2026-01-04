@@ -786,17 +786,9 @@ function renderOwnerDashboard() {
     loadUserNotifications();
     
     // Initialize NotificationManager (handles rent alerts, badges, etc.)
-    // Must check auth.currentUser directly since it may have become available
-    if (typeof NotificationManager !== 'undefined') {
-        const currentUser = auth?.currentUser;
-        if (currentUser) {
-            if (!NotificationManager.state.initialized) {
-                NotificationManager.init();
-            } else {
-                // Already initialized, just refresh rent check and badges
-                NotificationManager.checkRentDue();
-            }
-        }
+    // Only init once - the init function handles all setup including rent checks
+    if (typeof NotificationManager !== 'undefined' && auth?.currentUser) {
+        NotificationManager.init(); // Safe to call - has internal guard against duplicates
     }
     
     // Initialize dashboard tabs (shows tabs for admin, handles tab switching)

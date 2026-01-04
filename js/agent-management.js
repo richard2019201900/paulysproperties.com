@@ -77,7 +77,6 @@ window.loadAgents = async function(forceRefresh) {
                 agentSince: 'System Default'
             });
             seenEmails[masterAdminLower] = true;
-            console.log('[Agents] Added master admin: Pauly Amato');
         }
         
         // Then fetch all other agents
@@ -90,7 +89,6 @@ window.loadAgents = async function(forceRefresh) {
             // Skip if we've already seen this email (case-insensitive)
             // This will skip master admin if they have isAgent: true
             if (seenEmails[emailLower]) {
-                console.log('[Agents] Skipping duplicate agent:', emailLower);
                 return;
             }
             seenEmails[emailLower] = true;
@@ -108,7 +106,7 @@ window.loadAgents = async function(forceRefresh) {
         
         agentsCache = tempAgents;
         agentsCacheTime = Date.now();
-        console.log('[Agents] Loaded', agentsCache.length, 'agents (deduplicated). Emails:', Object.keys(seenEmails).join(', '));
+        console.log('[Agents] Loaded', agentsCache.length, 'agents');
         return agentsCache;
     } catch (error) {
         console.error('[Agents] Error loading agents:', error);

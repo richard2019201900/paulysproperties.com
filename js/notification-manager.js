@@ -514,8 +514,6 @@
         const mobileAdminTotal = counts.user + counts.listing + counts.photo + counts.premium;
         updateBadge('mobileAdminBadge', 'mobileAdminCount', mobileAdminTotal);
         updateBadge('mobileRentBadge', 'mobileRentCount', counts.rent);
-        
-        console.log('[NotificationManager] Badges refreshed:', counts);
     }
     
     function updateBadge(badgeId, countId, count) {
@@ -818,54 +816,70 @@
     // DATA FETCHING & LISTENERS
     // =========================================================================
     
+    let initPromise = null; // Prevent concurrent initialization
+    
     async function init() {
+        // If already initialized, skip
         if (state.initialized) {
-            console.log('[NotificationManager] Already initialized');
             return;
+        }
+        
+        // If initialization is in progress, wait for it
+        if (initPromise) {
+            return initPromise;
         }
         
         const currentUser = auth?.currentUser;
         if (!currentUser) {
-            console.log('[NotificationManager] No user logged in, skipping init');
             return;
         }
         
-        console.log('[NotificationManager] Initializing for:', currentUser.email);
-        
-        // Load preferences from Firestore via UserPreferencesService
-        if (window.UserPreferencesService) {
-            await UserPreferencesService.load();
-            
-            // Load dismissed notifications into local Set for fast lookups
-            const dismissedList = UserPreferencesService.getAll().dismissedNotifications || [];
-            state.dismissed = new Set(dismissedList);
-            
-            // Load last admin visit time
-            state.lastAdminVisit = UserPreferencesService.getAdminLastVisit();
-        }
-        
-        state.sessionStart = new Date();
-        
-        const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
-        
-        if (isAdmin) {
-            startUserListener();
-            startListingListener();
-            
-            // Update admin visit time in Firestore
-            if (window.UserPreferencesService) {
-                UserPreferencesService.updateAdminLastVisit();
+        // Create promise to prevent concurrent calls
+        initPromise = (async () => {
+            try {
+                console.log('[NotificationManager] Initializing for:', currentUser.email);
+                
+                // Load preferences from Firestore via UserPreferencesService
+                if (window.UserPreferencesService) {
+                    await UserPreferencesService.load();
+                    
+                    // Load dismissed notifications into local Set for fast lookups
+                    const dismissedList = UserPreferencesService.getAll().dismissedNotifications || [];
+                    state.dismissed = new Set(dismissedList);
+                    
+                    // Load last admin visit time
+                    state.lastAdminVisit = UserPreferencesService.getAdminLastVisit();
+                }
+                
+                state.sessionStart = new Date();
+                
+                const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
+                
+                if (isAdmin) {
+                    startUserListener();
+                    startListingListener();
+                    
+                    // Update admin visit time in Firestore
+                    if (window.UserPreferencesService) {
+                        UserPreferencesService.updateAdminLastVisit();
+                    }
+                }
+                
+                // All users get rent checks
+                await checkRentDue();
+                state.listeners.rentInterval = setInterval(checkRentDue, CONFIG.RENT_CHECK_INTERVAL);
+                
+                state.initialized = true;
+                refreshUI();
+                
+                console.log('[NotificationManager] Initialization complete');
+            } catch (error) {
+                console.error('[NotificationManager] Init error:', error);
+                initPromise = null; // Allow retry on error
             }
-        }
+        })();
         
-        // All users get rent checks
-        await checkRentDue();
-        state.listeners.rentInterval = setInterval(checkRentDue, CONFIG.RENT_CHECK_INTERVAL);
-        
-        state.initialized = true;
-        refreshUI();
-        
-        console.log('[NotificationManager] Initialization complete');
+        return initPromise;
     }
     
     function destroy() {
@@ -1001,26 +1015,11 @@
             
             const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
             
-            console.log('[NotificationManager] Checking rent due. isAdmin:', isAdmin, 'todayStr:', todayStr, 'tomorrowStr:', tomorrowStr);
-            
             Object.entries(properties).forEach(([propId, prop]) => {
                 if (!prop) return;
                 
-                // Debug: Log ALL properties with renters to see what fields they have
-                if (prop.renterName) {
-                    console.log('[NotificationManager] Property with renter:', propId, {
-                        renterName: prop.renterName,
-                        lastPaymentDate: prop.lastPaymentDate || 'NOT SET',
-                        paymentFrequency: prop.paymentFrequency || 'NOT SET',
-                        ownerEmail: prop.ownerEmail
-                    });
-                }
-                
                 // Must have renterName, lastPaymentDate, and paymentFrequency to calculate due date
                 if (!prop.renterName || !prop.lastPaymentDate || !prop.paymentFrequency) {
-                    if (prop.renterName) {
-                        console.log('[NotificationManager] SKIPPED - missing required fields:', propId);
-                    }
                     return;
                 }
                 
@@ -1068,15 +1067,6 @@
                 } else if (prop.paymentFrequency === 'monthly') {
                     rentAmount = (prop.weeklyPrice || 0) * 4;
                 }
-                
-                console.log('[NotificationManager] Property rent check:', propId, {
-                    renterName: prop.renterName,
-                    lastPaymentDate: prop.lastPaymentDate,
-                    paymentFrequency: prop.paymentFrequency,
-                    calculatedDueDate: dueDate,
-                    daysUntilDue,
-                    rentAmount
-                });
                 
                 const rentData = {
                     propId,
