@@ -153,7 +153,60 @@ async function getPropertyOwnerUsername(propertyId) {
 }
 
 // Get owner username with tier badge for display
-async function getPropertyOwnerWithTier(propertyId) {
+async function getPropertyOwnerWithTier(propertyId, options = {}) {
+    const { forceShowOwner = false } = options; // For Owner Stats page
+    
+    // Check if property has agents assigned (anonymize owner on public views)
+    if (!forceShowOwner && typeof getPropertyAgents === 'function') {
+        const agents = getPropertyAgents(propertyId);
+        if (agents && agents.length > 0) {
+            // Property is managed by agent(s) - anonymize owner
+            if (agents.length === 1) {
+                // Single agent - show their name
+                const agentEmail = agents[0];
+                let agentName = 'Agent';
+                
+                // Try to get agent name from cache
+                if (typeof agentsCache !== 'undefined' && agentsCache.length > 0) {
+                    const agent = agentsCache.find(a => a.email.toLowerCase() === agentEmail.toLowerCase());
+                    if (agent) {
+                        agentName = agent.username;
+                    }
+                } else if (typeof loadAgents === 'function') {
+                    // Try to load agents
+                    try {
+                        const loadedAgents = await loadAgents();
+                        const agent = loadedAgents.find(a => a.email.toLowerCase() === agentEmail.toLowerCase());
+                        if (agent) {
+                            agentName = agent.username;
+                        }
+                    } catch (e) {
+                        console.warn('[getPropertyOwnerWithTier] Could not load agents:', e);
+                    }
+                }
+                
+                return {
+                    username: agentName,
+                    tier: 'agent',
+                    tierData: { icon: '🏢', name: 'Agent' },
+                    display: `🏢 Managed by: ${agentName}`,
+                    isManaged: true,
+                    agentCount: 1
+                };
+            } else {
+                // Multiple agents
+                return {
+                    username: `${agents.length} Agents`,
+                    tier: 'agent',
+                    tierData: { icon: '🏢', name: 'Agents' },
+                    display: `🏢 Managed by: ${agents.length} Agents`,
+                    isManaged: true,
+                    agentCount: agents.length
+                };
+            }
+        }
+    }
+    
     const email = getPropertyOwnerEmail(propertyId);
     const username = await getUsernameByEmail(email);
     

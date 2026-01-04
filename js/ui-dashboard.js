@@ -1392,7 +1392,12 @@ async function renderProperties(list) {
         const ownerInfo = await getPropertyOwnerWithTier(p.id);
         const ownerEl = $(`owner-${p.id}`);
         if (ownerEl) {
-            ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display}`;
+            // Use different label based on whether property is managed by agent
+            if (ownerInfo.isManaged) {
+                ownerEl.innerHTML = ownerInfo.display;
+            } else {
+                ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display}`;
+            }
         }
     }
 }

@@ -650,8 +650,8 @@ window.renderPropertyAgentSection = async function(propertyId) {
                 '</div>' +
                 (canRemove ? 
                     '<button onclick="promptRemoveAgentFromProperty(' + propertyId + ', \'' + agentEmail + '\', ' + isSelf + ')" ' +
-                        'class="text-red-400 hover:text-red-300 text-sm">' +
-                        (isSelf ? 'Leave' : 'Remove') +
+                        'class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition">' +
+                        '✕ Remove Agent' +
                     '</button>' 
                 : '') +
             '</div>';

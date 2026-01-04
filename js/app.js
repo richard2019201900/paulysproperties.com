@@ -336,10 +336,22 @@ window.viewProperty = function(id) {
         const ownerEl = $('propertyOwnerDisplay');
         if (ownerEl) {
             const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
-            if (isAdmin) {
-                ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display} <button onclick="openReassignModal(${id})" class="ml-2 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded transition">✏️ Change</button>`;
+            
+            // Use different label based on whether property is managed by agent
+            if (ownerInfo.isManaged) {
+                // Managed by agent - show agent info, hide actual owner from public
+                if (isAdmin) {
+                    ownerEl.innerHTML = `${ownerInfo.display} <button onclick="openReassignModal(${id})" class="ml-2 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded transition">✏️ Change Owner</button>`;
+                } else {
+                    ownerEl.innerHTML = ownerInfo.display;
+                }
             } else {
-                ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display}`;
+                // No agent - show owner
+                if (isAdmin) {
+                    ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display} <button onclick="openReassignModal(${id})" class="ml-2 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded transition">✏️ Change</button>`;
+                } else {
+                    ownerEl.innerHTML = `👤 Owner: ${ownerInfo.display}`;
+                }
             }
         }
     });
@@ -454,14 +466,14 @@ window.viewPropertyStats = async function(id) {
     }
 };
 
-// Load owner name for stats page
+// Load owner name for stats page (always shows real owner, not anonymized)
 async function loadStatsOwnerName(propertyId) {
     const ownerEl = $(`stats-owner-${propertyId}`);
     if (!ownerEl) return;
     
     try {
-        // Use tier-aware username lookup
-        const ownerInfo = await getPropertyOwnerWithTier(propertyId);
+        // Use tier-aware username lookup with forceShowOwner to bypass agent anonymization
+        const ownerInfo = await getPropertyOwnerWithTier(propertyId, { forceShowOwner: true });
         const spanEl = ownerEl.querySelector('span');
         if (spanEl) {
             spanEl.textContent = ownerInfo.display;
