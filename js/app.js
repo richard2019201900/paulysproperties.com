@@ -662,7 +662,14 @@ function renderPropertyStatsContent(id) {
         
         <!-- Property Header -->
         <div class="relative">
-            <img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover cursor-pointer hover:opacity-90 transition" onclick="scrollToImagesSection(${id})" title="Click to view all images">
+            ${p.images && p.images.length > 0 && p.images[0] 
+                ? `<img src="${p.images[0]}" alt="${sanitize(p.title)}" class="w-full h-64 md:h-80 object-cover cursor-pointer hover:opacity-90 transition" onclick="scrollToImagesSection(${id})" title="Click to view all images" onerror="this.onerror=null; this.parentElement.querySelector('.stats-img-container').innerHTML=this.parentElement.querySelector('.stats-img-container').dataset.placeholder;" >
+                   <div class="stats-img-container hidden" data-placeholder="<div class='w-full h-64 md:h-80 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center'><span class='text-8xl mb-4'>🏠</span><span class='text-gray-400 font-semibold text-xl'>Photos Coming Soon</span><span class='text-gray-500 text-sm mt-2'>Check back later for property images</span></div>"></div>`
+                : `<div class="w-full h-64 md:h-80 bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex flex-col items-center justify-center">
+                       <span class="text-8xl mb-4">🏠</span>
+                       <span class="text-gray-400 font-semibold text-xl">Photos Coming Soon</span>
+                       <span class="text-gray-500 text-sm mt-2">Check back later for property images</span>
+                   </div>`}
             <div class="absolute top-4 right-4 bg-gradient-to-r ${statusClass} text-white px-4 py-2 rounded-xl font-bold shadow-lg">
                 ${statusText}
             </div>

@@ -54,22 +54,48 @@ window.loadAgents = async function(forceRefresh) {
     }
     
     try {
-        var snapshot = await db.collection('users').where('isAgent', '==', true).get();
-        agentsCache = [];
+        var masterAdminEmail = 'richard2019201900@gmail.com';
+        var masterAdminLower = masterAdminEmail.toLowerCase();
         var seenEmails = {}; // Track emails to prevent duplicates
+        var tempAgents = [];
+        
+        // First, always fetch and add master admin at the top
+        var masterSnapshot = await db.collection('users')
+            .where('email', '==', masterAdminEmail)
+            .limit(1)
+            .get();
+        
+        if (!masterSnapshot.empty) {
+            var masterData = masterSnapshot.docs[0].data();
+            tempAgents.push({
+                odId: masterSnapshot.docs[0].id,
+                email: masterAdminEmail,
+                username: 'Pauly Amato', // Always use consistent name for master admin
+                phone: masterData.phone || '2057028233',
+                tier: 'owner',
+                isAgent: true,
+                agentSince: 'System Default'
+            });
+            seenEmails[masterAdminLower] = true;
+            console.log('[Agents] Added master admin: Pauly Amato');
+        }
+        
+        // Then fetch all other agents
+        var snapshot = await db.collection('users').where('isAgent', '==', true).get();
         
         snapshot.forEach(function(doc) {
             var data = doc.data();
             var emailLower = (data.email || '').toLowerCase();
             
             // Skip if we've already seen this email (case-insensitive)
+            // This will skip master admin if they have isAgent: true
             if (seenEmails[emailLower]) {
                 console.log('[Agents] Skipping duplicate agent:', emailLower);
                 return;
             }
             seenEmails[emailLower] = true;
             
-            agentsCache.push({
+            tempAgents.push({
                 odId: doc.id,
                 email: data.email,
                 username: data.username || data.email.split('@')[0],
@@ -80,34 +106,9 @@ window.loadAgents = async function(forceRefresh) {
             });
         });
         
-        // Always include master admin as agent (if not already found)
-        var masterAdminEmail = 'richard2019201900@gmail.com';
-        var masterAdminLower = masterAdminEmail.toLowerCase();
-        
-        if (!seenEmails[masterAdminLower]) {
-            // Try to find master admin in users collection
-            var masterSnapshot = await db.collection('users')
-                .where('email', '==', masterAdminEmail)
-                .limit(1)
-                .get();
-            
-            if (!masterSnapshot.empty) {
-                var masterData = masterSnapshot.docs[0].data();
-                agentsCache.unshift({
-                    odId: masterSnapshot.docs[0].id,
-                    email: masterAdminEmail,
-                    username: masterData.username || 'Pauly Amato',
-                    phone: masterData.phone || '2057028233',
-                    tier: 'owner',
-                    isAgent: true,
-                    agentSince: 'System Default'
-                });
-                seenEmails[masterAdminLower] = true;
-            }
-        }
-        
+        agentsCache = tempAgents;
         agentsCacheTime = Date.now();
-        console.log('[Agents] Loaded', agentsCache.length, 'agents (deduplicated)');
+        console.log('[Agents] Loaded', agentsCache.length, 'agents (deduplicated). Emails:', Object.keys(seenEmails).join(', '));
         return agentsCache;
     } catch (error) {
         console.error('[Agents] Error loading agents:', error);
