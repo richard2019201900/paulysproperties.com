@@ -1959,39 +1959,30 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
                 <h2 class="text-4xl md:text-6xl font-black mb-6">Live Like You Mean It.</h2>
                 <p class="text-xl md:text-2xl mb-12 font-light max-w-4xl mx-auto">Pauly's exclusive collection. Premium rentals. Professionally managed. Scroll down and find your next home — or make an offer to own it.</p>
-                <div class="max-w-6xl mx-auto glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
-                    <!-- Featured Property Spotlight -->
-                    <div id="featuredSpotlight" class="mb-6 bg-gray-800/50 rounded-xl p-4 border border-amber-400/30">
-                        <!-- Content populated by initFeaturedRotator() -->
-                        <div class="text-center py-4">
-                            <div class="animate-pulse text-gray-400">Loading featured properties...</div>
+                <div class="max-w-4xl mx-auto glass-effect rounded-2xl shadow-2xl p-4 md:p-6">
+                    <!-- Featured Property Spotlight (compact) -->
+                    <div id="featuredSpotlight" class="mb-4 bg-gray-800/50 rounded-lg p-3 border border-amber-400/30">
+                        <div class="text-center py-2">
+                            <div class="animate-pulse text-gray-400 text-sm">Loading featured properties...</div>
                         </div>
                     </div>
                     
-                    <!-- CTA Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <!-- Browse Properties CTA -->
-                        <div onclick="browseProperties()" class="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-2 border-purple-500/50 hover:border-purple-400 rounded-xl p-5 cursor-pointer transition group">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="text-3xl">🏠</span>
-                                <h3 class="text-white font-bold text-lg">Looking to Rent?</h3>
+                    <!-- CTA Cards (compact, side by side) -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="browseProperties()" class="bg-purple-600/20 border border-purple-500/50 hover:border-purple-400 rounded-lg p-3 cursor-pointer transition group text-left">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xl">🏠</span>
+                                <span class="text-white font-bold text-sm md:text-base">Looking to Rent?</span>
                             </div>
-                            <p class="text-gray-300 text-sm mb-3">Browse our exclusive collection of premium properties</p>
-                            <span class="inline-flex items-center text-purple-400 font-semibold group-hover:text-purple-300 transition">
-                                Browse Properties <span class="ml-2 group-hover:translate-y-1 transition-transform">↓</span>
-                            </span>
+                            <span class="text-purple-400 font-semibold text-xs md:text-sm group-hover:text-purple-300">Browse Properties ↓</span>
                         </div>
                         
-                        <!-- List Property CTA -->
-                        <div onclick="listYourProperty()" class="bg-gradient-to-br from-cyan-600/20 to-blue-600/20 border-2 border-cyan-500/50 hover:border-cyan-400 rounded-xl p-5 cursor-pointer transition group">
-                            <div class="flex items-center gap-3 mb-2">
-                                <span class="text-3xl">🏢</span>
-                                <h3 class="text-white font-bold text-lg">Own Property?</h3>
+                        <div onclick="listYourProperty()" class="bg-cyan-600/20 border border-cyan-500/50 hover:border-cyan-400 rounded-lg p-3 cursor-pointer transition group text-left">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xl">🏢</span>
+                                <span class="text-white font-bold text-sm md:text-base">Own Property?</span>
                             </div>
-                            <p class="text-gray-300 text-sm mb-3">List with Pauly's and reach premium tenants</p>
-                            <span class="inline-flex items-center text-cyan-400 font-semibold group-hover:text-cyan-300 transition">
-                                List Your Property <span class="ml-2 group-hover:translate-x-1 transition-transform">→</span>
-                            </span>
+                            <span class="text-cyan-400 font-semibold text-xs md:text-sm group-hover:text-cyan-300">List With Us →</span>
                         </div>
                     </div>
                 </div>
