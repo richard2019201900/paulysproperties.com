@@ -111,8 +111,8 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
     $('modalPropertyName').textContent = (isRent ? 'Rent: ' : 'Purchase: ') + propertyTitle;
     $('modalMessage').value = isRent 
-        ? `Hi! I'm interested in renting ${propertyTitle}. Please contact me ASAP to discuss availability and next steps.`
-        : `Hi! I'm interested in making an offer on ${propertyTitle}. Please contact me ASAP to discuss further.`;
+        ? `Hello! I came across your listing for ${propertyTitle} on PaulysProperties.com and I'm interested in renting it. Please contact me ASAP to discuss availability and next steps.`
+        : `Hello! I came across your listing for ${propertyTitle} on PaulysProperties.com and I'm interested in purchasing it. Please contact me ASAP to discuss further.`;
     
     const accent = $('modalAccent');
     accent.className = `bg-gradient-to-r from-${colors[0]}-900 to-${colors[1]}-900 p-4 rounded-xl mb-6 text-center border border-${colors[0]}-700`;
