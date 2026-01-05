@@ -874,6 +874,14 @@ window.goBack = function() {
         applyAllFilters();
     }
     
-    $('properties').scrollIntoView({ behavior: 'smooth' });
+    // Restore scroll position (saved when user clicked on a property)
+    if (typeof window.savedScrollPosition === 'number') {
+        // Small delay to ensure DOM is ready after showing renterSection
+        setTimeout(() => {
+            window.scrollTo(0, window.savedScrollPosition);
+        }, 50);
+    } else {
+        $('properties').scrollIntoView({ behavior: 'smooth' });
+    }
 };
 

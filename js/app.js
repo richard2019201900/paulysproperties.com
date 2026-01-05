@@ -69,6 +69,9 @@ window.viewProperty = function(id) {
     const p = properties.find(prop => prop.id === id);
     if (!p) return;
     
+    // Save scroll position before navigating away
+    window.savedScrollPosition = window.scrollY || window.pageYOffset;
+    
     state.currentPropertyId = id;
     state.currentImages = p.images || [];
     
@@ -327,8 +330,8 @@ window.viewProperty = function(id) {
                     return html;
                 })()}
             </div>
-            <button id="offerRentBtn" onclick="openContactModal('rent', '${sanitize(p.title)}', ${id})" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">Make an Offer to Rent</button>
-            <button id="offerPurchaseBtn" onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">Make an Offer to Purchase</button>
+            <button id="offerRentBtn" onclick="openContactModal('rent', '${sanitize(p.title)}', ${id})" class="w-full gradient-bg text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg mb-4">📞 Contact Owner to Rent</button>
+            <button id="offerPurchaseBtn" onclick="openContactModal('offer', '${sanitize(p.title)}', ${id})" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-lg md:text-xl hover:opacity-90 transition shadow-lg">📞 Contact Owner to Purchase</button>
         </div>`;
     
     // Load and display owner username with tier badge

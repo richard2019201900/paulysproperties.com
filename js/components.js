@@ -107,7 +107,7 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
     const defaultPhone = '2057028233'; // Pauly's number as fallback
     let usedFallback = false; // Track if we had to use fallback
     
-    $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Make an Offer to Purchase';
+    $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Purchase This Property';
     $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
     $('modalPropertyName').textContent = (isRent ? 'Rent: ' : 'Purchase: ') + propertyTitle;
     $('modalMessage').value = isRent 
