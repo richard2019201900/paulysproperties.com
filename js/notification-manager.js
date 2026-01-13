@@ -533,6 +533,10 @@
     function refreshPanels() {
         renderNotificationStack();
         renderRentAlertsPanel();
+        // Also render subscription alerts for admin
+        if (typeof window.renderSubscriptionAlertsPanel === 'function') {
+            window.renderSubscriptionAlertsPanel();
+        }
     }
     
     function renderNotificationStack() {

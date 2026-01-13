@@ -3302,3 +3302,234 @@ window.filterAdminUsers = function() {
     renderAdminUsersList(filtered);
 };
 
+
+// ==================== SUBSCRIPTION COLLECTION ALERTS ====================
+/**
+ * Render subscription collection alerts panel
+ * Shows Pro and Elite users whose subscriptions are due for payment
+ * Admin-only feature to track tier subscription payments
+ */
+window.renderSubscriptionAlertsPanel = async function() {
+    const panel = $('subscriptionNotificationsPanel');
+    if (!panel) return;
+    
+    // Only show for master admin
+    if (!TierService.isMasterAdmin(auth?.currentUser?.email)) {
+        panel.classList.add('hidden');
+        return;
+    }
+    
+    try {
+        // Get all users
+        const usersSnapshot = await db.collection('users').get();
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const overdue = [];
+        const dueToday = [];
+        const dueTomorrow = [];
+        
+        usersSnapshot.forEach(doc => {
+            const user = doc.data();
+            if (!user.tier || user.tier === 'starter' || user.tier === 'owner') return;
+            if (user.isTrial) return; // Skip trial users
+            
+            // Check subscriptionDueDate
+            let dueDate = null;
+            if (user.subscriptionDueDate) {
+                if (user.subscriptionDueDate.toDate) {
+                    dueDate = user.subscriptionDueDate.toDate();
+                } else if (typeof user.subscriptionDueDate === 'string') {
+                    dueDate = new Date(user.subscriptionDueDate);
+                }
+            }
+            
+            if (!dueDate) return;
+            
+            const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+            const daysUntilDue = Math.floor((dueDateOnly - today) / (1000 * 60 * 60 * 24));
+            
+            const subInfo = {
+                odId: doc.id,
+                email: user.email,
+                username: user.username || user.email.split('@')[0],
+                tier: user.tier,
+                amount: user.tier === 'elite' ? 50000 : 25000,
+                dueDate: dueDate,
+                dueDateFormatted: dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                daysUntilDue: daysUntilDue
+            };
+            
+            if (daysUntilDue < 0) {
+                overdue.push(subInfo);
+            } else if (daysUntilDue === 0) {
+                dueToday.push(subInfo);
+            } else if (daysUntilDue === 1) {
+                dueTomorrow.push(subInfo);
+            }
+        });
+        
+        const total = overdue.length + dueToday.length + dueTomorrow.length;
+        
+        if (total === 0) {
+            panel.classList.add('hidden');
+            return;
+        }
+        
+        panel.classList.remove('hidden');
+        
+        const isUrgent = overdue.length > 0;
+        const isWarning = dueToday.length > 0;
+        
+        const borderColor = isUrgent ? 'border-red-500/70' : isWarning ? 'border-orange-500/70' : 'border-cyan-500/70';
+        const headerGradient = isUrgent ? 'from-red-600 to-red-700' : isWarning ? 'from-orange-500 to-red-500' : 'from-cyan-500 to-blue-500';
+        const headerIcon = isUrgent ? '🚨' : isWarning ? '⏰' : '📅';
+        
+        let html = `
+            <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 ${borderColor}">
+                <div class="bg-gradient-to-r ${headerGradient} px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">${headerIcon}</span>
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Subscription Collection Alert</h3>
+                                <p class="text-white/80 text-sm">${total} subscription${total !== 1 ? 's' : ''} need${total === 1 ? 's' : ''} attention</p>
+                            </div>
+                        </div>
+                        <button onclick="toggleSubscriptionPanel()" id="subscriptionPanelToggle" class="text-white/80 hover:text-white transition">
+                            <svg class="w-6 h-6 transform transition-transform" id="subscriptionPanelArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="subscriptionPanelContent" class="p-4 space-y-4">
+        `;
+        
+        if (overdue.length > 0) {
+            html += `
+                <div class="bg-red-900/30 rounded-xl p-4 border border-red-500/50">
+                    <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                        <span>🚨</span> OVERDUE (${overdue.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${overdue.map(sub => renderSubscriptionItem(sub, 'overdue')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (dueToday.length > 0) {
+            html += `
+                <div class="bg-orange-900/30 rounded-xl p-4 border border-orange-500/50">
+                    <h4 class="text-orange-400 font-bold mb-3 flex items-center gap-2">
+                        <span>⏰</span> DUE TODAY (${dueToday.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${dueToday.map(sub => renderSubscriptionItem(sub, 'today')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (dueTomorrow.length > 0) {
+            html += `
+                <div class="bg-cyan-900/30 rounded-xl p-4 border border-cyan-500/50">
+                    <h4 class="text-cyan-400 font-bold mb-3 flex items-center gap-2">
+                        <span>📅</span> DUE TOMORROW (${dueTomorrow.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${dueTomorrow.map(sub => renderSubscriptionItem(sub, 'tomorrow')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        panel.innerHTML = html;
+        
+    } catch (error) {
+        console.error('[SubscriptionAlerts] Error:', error);
+        panel.classList.add('hidden');
+    }
+};
+
+function renderSubscriptionItem(sub, urgency) {
+    const statusColor = urgency === 'overdue' ? 'text-red-400' 
+                      : urgency === 'today' ? 'text-orange-400' 
+                      : 'text-cyan-400';
+    
+    const tierIcon = sub.tier === 'elite' ? '👑' : '⭐';
+    const tierColor = sub.tier === 'elite' ? 'text-yellow-400' : 'text-purple-400';
+    
+    const daysText = sub.daysUntilDue < 0 
+        ? `${Math.abs(sub.daysUntilDue)}d overdue`
+        : sub.daysUntilDue === 0 
+        ? 'TODAY'
+        : 'Tomorrow';
+    
+    // Generate reminder message
+    let reminderMsg = '';
+    if (sub.daysUntilDue === 1) {
+        reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${sub.tier.toUpperCase()} subscription payment of $${sub.amount.toLocaleString()} is due tomorrow (${sub.dueDateFormatted}). Let me know if you have any questions!`;
+    } else if (sub.daysUntilDue === 0) {
+        reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${sub.tier.toUpperCase()} subscription payment of $${sub.amount.toLocaleString()} is due today (${sub.dueDateFormatted}). Let me know if you have any questions!`;
+    } else if (sub.daysUntilDue < 0) {
+        const daysOverdue = Math.abs(sub.daysUntilDue);
+        reminderMsg = `Hey ${sub.username}, your ${sub.tier.toUpperCase()} subscription payment of $${sub.amount.toLocaleString()} was due on ${sub.dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible to maintain your ${sub.tier} benefits!`;
+    }
+    
+    const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    
+    return `
+        <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 transition group">
+            <div class="flex-1 min-w-0">
+                <div class="font-semibold text-white truncate flex items-center gap-2">
+                    <span class="${tierColor}">${tierIcon}</span>
+                    ${sub.username}
+                    <span class="text-xs ${tierColor} font-bold uppercase">${sub.tier}</span>
+                </div>
+                <div class="text-sm text-gray-400">
+                    ${sub.email} • Due: ${sub.dueDateFormatted}
+                </div>
+            </div>
+            <div class="flex items-center gap-2 ml-2">
+                <div class="text-right">
+                    <div class="text-green-400 font-bold">$${sub.amount.toLocaleString()}</div>
+                    <div class="${statusColor} text-xs font-bold">${daysText}</div>
+                </div>
+                ${reminderMsg ? `
+                    <button onclick="copySubscriptionReminder('${escapedReminder}')" 
+                            class="opacity-0 group-hover:opacity-100 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs px-2 py-1 rounded-lg font-semibold hover:opacity-80 transition flex items-center gap-1"
+                            title="Copy reminder message">
+                        📋 Copy
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+window.toggleSubscriptionPanel = function() {
+    const content = $('subscriptionPanelContent');
+    const arrow = $('subscriptionPanelArrow');
+    if (content && arrow) {
+        content.classList.toggle('hidden');
+        arrow.classList.toggle('rotate-180');
+    }
+};
+
+window.copySubscriptionReminder = function(message) {
+    navigator.clipboard.writeText(message).then(() => {
+        showToast('📋 Reminder copied to clipboard!', 'success');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showToast('Failed to copy message', 'error');
+    });
+};
