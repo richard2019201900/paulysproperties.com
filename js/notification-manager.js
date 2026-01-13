@@ -510,6 +510,10 @@
         updateBadge('dropdownPremiumBadge', 'dropdownPremiumCount', counts.premium);
         updateBadge('dropdownRentBadge', 'dropdownRentCount', counts.rent);
         
+        // Nav username badge (total count for admin)
+        const totalAdmin = counts.user + counts.listing + counts.photo + counts.premium + counts.rent;
+        updateBadge('navNotificationBadge', 'navNotificationCount', totalAdmin);
+        
         // Mobile badges
         const mobileAdminTotal = counts.user + counts.listing + counts.photo + counts.premium;
         updateBadge('mobileAdminBadge', 'mobileAdminCount', mobileAdminTotal);

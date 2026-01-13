@@ -3336,17 +3336,49 @@ window.renderSubscriptionAlertsPanel = async function() {
             if (!user.tier || user.tier === 'starter' || user.tier === 'owner') return;
             if (user.isTrial) return; // Skip trial users
             
-            // Check subscriptionDueDate
+            // Check subscriptionDueDate first, then calculate from tierChangeDate
             let dueDate = null;
+            
             if (user.subscriptionDueDate) {
                 if (user.subscriptionDueDate.toDate) {
                     dueDate = user.subscriptionDueDate.toDate();
                 } else if (typeof user.subscriptionDueDate === 'string') {
                     dueDate = new Date(user.subscriptionDueDate);
                 }
+            } else if (user.tierChangeDate) {
+                // Calculate next due date: tierChangeDate + 7 days (weekly subscription)
+                let changeDate;
+                if (user.tierChangeDate.toDate) {
+                    changeDate = user.tierChangeDate.toDate();
+                } else if (typeof user.tierChangeDate === 'string') {
+                    changeDate = new Date(user.tierChangeDate);
+                }
+                
+                if (changeDate) {
+                    // Find next weekly due date from tier change
+                    dueDate = new Date(changeDate);
+                    while (dueDate < today) {
+                        dueDate.setDate(dueDate.getDate() + 7);
+                    }
+                }
+            } else if (user.tierStartDate) {
+                // Fallback to tierStartDate
+                let startDate;
+                if (user.tierStartDate.toDate) {
+                    startDate = user.tierStartDate.toDate();
+                } else if (typeof user.tierStartDate === 'string') {
+                    startDate = new Date(user.tierStartDate);
+                }
+                
+                if (startDate) {
+                    dueDate = new Date(startDate);
+                    while (dueDate < today) {
+                        dueDate.setDate(dueDate.getDate() + 7);
+                    }
+                }
             }
             
-            if (!dueDate) return;
+            if (!dueDate || isNaN(dueDate.getTime())) return;
             
             const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
             const daysUntilDue = Math.floor((dueDateOnly - today) / (1000 * 60 * 60 * 24));
@@ -3356,7 +3388,7 @@ window.renderSubscriptionAlertsPanel = async function() {
                 email: user.email,
                 username: user.username || user.email.split('@')[0],
                 tier: user.tier,
-                amount: user.tier === 'elite' ? 50000 : 25000,
+                amount: user.tier === 'elite' ? 50000 : 25000, // $10k/week elite, $5k/week pro
                 dueDate: dueDate,
                 dueDateFormatted: dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                 daysUntilDue: daysUntilDue
