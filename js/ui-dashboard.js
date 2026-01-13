@@ -781,7 +781,7 @@ function renderPremiumList(properties) {
 }
 
 // ==================== RENDER FUNCTIONS ====================
-function renderOwnerDashboard() {
+window.renderOwnerDashboard = function() {
     // Load user notifications
     loadUserNotifications();
     

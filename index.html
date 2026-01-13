@@ -2236,19 +2236,31 @@
         </div>
     </footer>
 
-    <!-- JavaScript Files -->
+    <!-- JavaScript Files - Modular Architecture -->
+    <!-- Load order is critical - dependencies must load before dependents -->
     <script src="js/config.js"></script>
     <script src="js/data.js"></script>
     <script src="js/state.js"></script>
     <script src="js/services.js"></script>
+    <script src="js/user-preferences.js"></script>
     <script src="js/notification-manager.js"></script>
     <script src="js/gamification.js"></script>
     <script src="js/ui-leaderboard.js"></script>
-    <!-- notifications-v2.js removed - replaced by notification-manager.js -->
     <script src="js/components.js"></script>
-    <script src="js/ui.js"></script>
+    <script src="js/ui-core.js"></script>
+    <script src="js/ui-navigation.js"></script>
+    <script src="js/ui-profile.js"></script>
+    <script src="js/ui-dashboard.js"></script>
+    <script src="js/ui-tier-upgrade.js"></script>
+    <script src="js/ui-admin.js"></script>
+    <script src="js/ui-admin-users.js"></script>
+    <script src="js/ui-property-management.js"></script>
+    <script src="js/ui-rent-notifications.js"></script>
+    <script src="js/ui-reports.js"></script>
+    <script src="js/ui-sales.js"></script>
     <script src="js/filters.js"></script>
     <script src="js/app.js"></script>
+
 
     <!-- Elite Reports Modal -->
     <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center hidden overflow-y-auto" role="dialog" aria-modal="true">
