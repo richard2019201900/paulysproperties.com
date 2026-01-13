@@ -3543,9 +3543,18 @@ window.renderSubscriptionAlertsPanel = async function() {
         
         panel.innerHTML = html;
         
+        // Set global subscription alert count for notification badges
+        window.subscriptionAlertCount = total;
+        
+        // Refresh notification badges to show subscription count
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+            NotificationManager.refreshUI();
+        }
+        
     } catch (error) {
         console.error('[SubscriptionAlerts] Error:', error);
         panel.classList.add('hidden');
+        window.subscriptionAlertCount = 0;
     }
 };
 
@@ -3609,10 +3618,10 @@ function renderSubscriptionItem(sub, urgency) {
 window.goToAdminUserByEmail = function(email) {
     console.log('[SubscriptionAlerts] Navigating to user:', email);
     
-    // Switch to admin panel tab
+    // Switch to admin panel tab (use 'admin' not 'adminPanel')
     if (typeof switchDashboardTab === 'function') {
-        console.log('[SubscriptionAlerts] Calling switchDashboardTab(adminPanel)');
-        switchDashboardTab('adminPanel');
+        console.log('[SubscriptionAlerts] Calling switchDashboardTab(admin)');
+        switchDashboardTab('admin');
     } else {
         console.warn('[SubscriptionAlerts] switchDashboardTab function not found');
     }
@@ -3624,16 +3633,27 @@ window.goToAdminUserByEmail = function(email) {
         
         if (searchInput) {
             searchInput.value = email;
+            // Trigger the search
             if (typeof filterAdminUsers === 'function') {
                 console.log('[SubscriptionAlerts] Filtering users...');
                 filterAdminUsers();
             }
-        }
-        
-        // Scroll to the user section
-        const usersSection = document.querySelector('#adminUsersContainer');
-        if (usersSection) {
-            usersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Scroll to users section and highlight
+            setTimeout(function() {
+                // Find and highlight the user card using data-email attribute
+                const userCard = document.querySelector(`.admin-user-card[data-email="${email}"]`);
+                console.log('[SubscriptionAlerts] User card found:', !!userCard);
+                
+                if (userCard) {
+                    userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    userCard.classList.add('ring-2', 'ring-yellow-400', 'ring-offset-2', 'ring-offset-gray-900');
+                    // Remove highlight after 3 seconds
+                    setTimeout(() => {
+                        userCard.classList.remove('ring-2', 'ring-yellow-400', 'ring-offset-2', 'ring-offset-gray-900');
+                    }, 3000);
+                }
+            }, 300);
         }
     }, 500);
 };

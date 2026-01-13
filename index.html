@@ -239,12 +239,13 @@
                             class="bg-gray-800/70 rounded-xl p-5 text-center border-2 border-gray-600 hover:border-green-500 transition cursor-pointer relative">
                             <div id="photoSingleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
                             <div class="text-green-400 text-xs font-bold mb-2">📷 PER PHOTO</div>
-                            <div class="text-3xl font-black text-white mb-2">$10,000</div>
-                            <div class="text-gray-400 text-sm mb-3">Per HD Photo</div>
+                            <div class="text-3xl font-black text-white mb-2">$5,000</div>
+                            <div class="text-gray-400 text-sm mb-3">Per HD Photo (min 10)</div>
                             <ul class="text-left text-xs text-gray-300 space-y-1">
                                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Professional HD shot</li>
                                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Edited & optimized</li>
                                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Same-day delivery</li>
+                                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Extra photos after 10 FREE</li>
                             </ul>
                         </div>
                         
@@ -254,10 +255,10 @@
                             <div id="photoBundleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
                             <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full">⭐ BEST VALUE</div>
                             <div class="text-amber-400 text-xs font-bold mb-2 mt-2">🎬 PREMIUM BUNDLE</div>
-                            <div class="text-3xl font-black text-amber-400 mb-2">$125,000</div>
-                            <div class="text-amber-300/80 text-sm mb-3">Complete Package</div>
+                            <div class="text-3xl font-black text-amber-400 mb-2">$75,000</div>
+                            <div class="text-amber-300/80 text-sm mb-3">Complete Package - Save $25k!</div>
                             <ul class="text-left text-xs text-gray-200 space-y-1">
-                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> 6-7 HD Photos</li>
+                                <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> 10+ HD Photos</li>
                                 <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> Professional Video Tour</li>
                                 <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> <span class="text-amber-400 font-bold">4 Weeks Premium Listing!</span></li>
                                 <li class="flex items-center gap-2"><span class="text-amber-400">✓</span> Priority placement</li>
@@ -266,19 +267,46 @@
                     </div>
                 </div>
                 
-                <!-- Coming Soon: Managed Services Teaser -->
+                <!-- Full Property Management (Live - Not Coming Soon) -->
                 <div class="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-5 border border-purple-500/30">
                     <div class="flex items-center gap-2 mb-3">
-                        <span class="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">COMING SOON</span>
+                        <span class="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">🔥 HOT</span>
                         <h3 class="text-lg font-bold text-purple-400">🏠 Full Property Management</h3>
                     </div>
-                    <p class="text-gray-300 text-sm mb-4">Too busy to manage your rentals? We're launching a complete managed services offering — from photography to tenant placement to key management. Be the first to know!</p>
+                    <p class="text-gray-300 text-sm mb-4">Too busy to manage your rentals? Let <span class="text-purple-400 font-bold">Pauly handle everything</span> — from photography to tenant placement to key management. Just hand over the keys and collect your money!</p>
                     
-                    <!-- Opt-in Section -->
-                    <div id="managedServicesOptIn" class="bg-purple-900/30 rounded-lg p-4 border border-purple-500/50">
-                        <div id="optInContent">
-                            <!-- Will be populated by JS based on login status and opt-in status -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <!-- For Rentals -->
+                        <div id="managedOptionRental" class="bg-gray-800/70 rounded-xl p-4 border-2 border-gray-600 hover:border-purple-500 transition cursor-pointer relative">
+                            <div id="managedRentalCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
+                            <div class="text-purple-400 text-xs font-bold mb-2">🏘️ FOR RENTALS</div>
+                            <div class="text-2xl font-black text-white mb-1">$25,000 <span class="text-sm text-gray-400">one-time</span></div>
+                            <div class="text-purple-300 text-sm mb-3">+ 10% of rental income</div>
+                            <ul class="text-left text-xs text-gray-300 space-y-1">
+                                <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Professional photos & video</li>
+                                <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Premium listing included</li>
+                                <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Tenant screening & tours</li>
+                                <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Key & rent management</li>
+                            </ul>
                         </div>
+                        
+                        <!-- For Sales -->
+                        <div id="managedOptionSale" class="bg-gray-800/70 rounded-xl p-4 border-2 border-gray-600 hover:border-pink-500 transition cursor-pointer relative">
+                            <div id="managedSaleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
+                            <div class="text-pink-400 text-xs font-bold mb-2">🏆 FOR SALES</div>
+                            <div class="text-2xl font-black text-white mb-1">$50,000 <span class="text-sm text-gray-400">one-time</span></div>
+                            <div class="text-pink-300 text-sm mb-3">+ 10% of sale price</div>
+                            <ul class="text-left text-xs text-gray-300 space-y-1">
+                                <li class="flex items-center gap-2"><span class="text-pink-400">✓</span> Professional photos & video</li>
+                                <li class="flex items-center gap-2"><span class="text-pink-400">✓</span> Premium listing included</li>
+                                <li class="flex items-center gap-2"><span class="text-pink-400">✓</span> Buyer screening & tours</li>
+                                <li class="flex items-center gap-2"><span class="text-pink-400">✓</span> Negotiation & closing</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-900/40 rounded-lg p-3 border border-purple-500/30">
+                        <p class="text-purple-200 text-xs text-center">💎 <strong>Pauly is the best salesman in the city</strong> — your property will be treated like his own. Turn-key solution for busy owners!</p>
                     </div>
                 </div>
                 
@@ -905,8 +933,11 @@
                                     </div>
                                     <!-- Notification badges inline - each clickable separately -->
                                     <div id="dropdownNotifBadges" class="flex items-center gap-1" onclick="event.stopPropagation()">
-                                        <span id="dropdownRentBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-red-500" title="Rent due - Click to view" onclick="NotificationManager.handleBadgeClick('rent'); closeUserDropdown()">
+                                        <span id="dropdownRentBadge" class="hidden bg-amber-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-amber-400" title="Rent due - Click to view" onclick="NotificationManager.handleBadgeClick('rent'); closeUserDropdown()">
                                             <span id="dropdownRentCount">0</span>
+                                        </span>
+                                        <span id="dropdownSubscriptionBadge" class="hidden bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-red-500" title="Subscription payments due - Click to view" onclick="NotificationManager.handleBadgeClick('subscription'); closeUserDropdown()">
+                                            <span id="dropdownSubscriptionCount">0</span>
                                         </span>
                                         <span id="dropdownUserBadge" class="hidden bg-blue-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse cursor-pointer hover:bg-blue-400" title="New users" onclick="NotificationManager.handleBadgeClick('user'); closeUserDropdown()">
                                             <span id="dropdownUserCount">0</span>

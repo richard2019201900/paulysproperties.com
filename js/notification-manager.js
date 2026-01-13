@@ -277,6 +277,7 @@
             photo: 0,
             premium: 0,
             rent: 0,
+            subscription: 0,
             total: 0
         };
         
@@ -291,6 +292,10 @@
                       (state.rentAlerts.today?.length || 0) +
                       (state.rentAlerts.tomorrow?.length || 0);
         counts.total += counts.rent;
+        
+        // Get subscription count from global state (set by ui-admin.js)
+        counts.subscription = window.subscriptionAlertCount || 0;
+        counts.total += counts.subscription;
         
         return counts;
     }
@@ -412,6 +417,15 @@
                 await scrollToAndHighlight('#rentNotificationsPanel', type);
                 break;
                 
+            case 'subscription':
+                // Navigate to My Properties tab (where subscription alerts are shown), scroll to subscription panel
+                if (typeof window.switchDashboardTab === 'function') {
+                    window.switchDashboardTab('myProperties');
+                    await sleep(200);
+                }
+                await scrollToAndHighlight('#subscriptionNotificationsPanel', 'rent'); // Use rent colors (red)
+                break;
+                
             default:
                 console.warn('[NotificationManager] Unknown badge type:', type);
         }
@@ -509,9 +523,10 @@
         updateBadge('dropdownPhotoBadge', 'dropdownPhotoCount', counts.photo);
         updateBadge('dropdownPremiumBadge', 'dropdownPremiumCount', counts.premium);
         updateBadge('dropdownRentBadge', 'dropdownRentCount', counts.rent);
+        updateBadge('dropdownSubscriptionBadge', 'dropdownSubscriptionCount', counts.subscription);
         
         // Nav username badge (total count for admin)
-        const totalAdmin = counts.user + counts.listing + counts.photo + counts.premium + counts.rent;
+        const totalAdmin = counts.user + counts.listing + counts.photo + counts.premium + counts.rent + counts.subscription;
         updateBadge('navNotificationBadge', 'navNotificationCount', totalAdmin);
         
         // Mobile badges
