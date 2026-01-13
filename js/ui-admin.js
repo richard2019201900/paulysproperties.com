@@ -3348,8 +3348,18 @@ window.renderSubscriptionAlertsPanel = async function() {
             proEliteCount++;
             console.log('[SubscriptionAlerts] Checking user:', user.email, 'tier:', user.tier, 'tierChangeDate:', user.tierChangeDate, 'subscriptionDueDate:', user.subscriptionDueDate);
             
-            // Check subscriptionDueDate first, then calculate from tierChangeDate
+            // Check subscriptionDueDate first, then calculate from tierChangeDate, createdAt
             let dueDate = null;
+            let dateSource = 'none';
+            
+            // Log all available date fields for debugging
+            console.log('[SubscriptionAlerts] User date fields:', {
+                email: user.email,
+                subscriptionDueDate: user.subscriptionDueDate,
+                tierChangeDate: user.tierChangeDate,
+                tierStartDate: user.tierStartDate,
+                createdAt: user.createdAt
+            });
             
             if (user.subscriptionDueDate) {
                 if (user.subscriptionDueDate.toDate) {
@@ -3357,6 +3367,7 @@ window.renderSubscriptionAlertsPanel = async function() {
                 } else if (typeof user.subscriptionDueDate === 'string') {
                     dueDate = new Date(user.subscriptionDueDate);
                 }
+                dateSource = 'subscriptionDueDate';
             } else if (user.tierChangeDate) {
                 // Calculate next due date: tierChangeDate + 7 days (weekly subscription)
                 let changeDate;
@@ -3372,6 +3383,7 @@ window.renderSubscriptionAlertsPanel = async function() {
                     while (dueDate < today) {
                         dueDate.setDate(dueDate.getDate() + 7);
                     }
+                    dateSource = 'tierChangeDate';
                 }
             } else if (user.tierStartDate) {
                 // Fallback to tierStartDate
@@ -3387,10 +3399,34 @@ window.renderSubscriptionAlertsPanel = async function() {
                     while (dueDate < today) {
                         dueDate.setDate(dueDate.getDate() + 7);
                     }
+                    dateSource = 'tierStartDate';
+                }
+            } else if (user.createdAt) {
+                // Last fallback: use createdAt (when user signed up)
+                let createdDate;
+                if (user.createdAt.toDate) {
+                    createdDate = user.createdAt.toDate();
+                } else if (typeof user.createdAt === 'string') {
+                    createdDate = new Date(user.createdAt);
+                } else if (user.createdAt.seconds) {
+                    createdDate = new Date(user.createdAt.seconds * 1000);
+                }
+                
+                if (createdDate) {
+                    dueDate = new Date(createdDate);
+                    while (dueDate < today) {
+                        dueDate.setDate(dueDate.getDate() + 7);
+                    }
+                    dateSource = 'createdAt';
                 }
             }
             
-            if (!dueDate || isNaN(dueDate.getTime())) return;
+            if (!dueDate || isNaN(dueDate.getTime())) {
+                console.log('[SubscriptionAlerts] No valid date for user:', user.email);
+                return;
+            }
+            
+            console.log('[SubscriptionAlerts] Calculated due date for', user.email, ':', dueDate, 'from', dateSource);
             
             const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
             const daysUntilDue = Math.floor((dueDateOnly - today) / (1000 * 60 * 60 * 24));
