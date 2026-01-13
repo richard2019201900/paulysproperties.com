@@ -892,3 +892,39 @@ window.goBack = function() {
     }
 };
 
+// ==================== SITE SWITCHER ====================
+/**
+ * Toggle the site switcher dropdown (PaulysProperties / PaulysAutos)
+ */
+window.toggleSiteSwitcher = function() {
+    const dropdown = $('siteSwitcherDropdown');
+    const arrow = $('siteSwitcherArrow');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+        if (arrow) {
+            arrow.classList.toggle('rotate-180');
+        }
+    }
+};
+
+/**
+ * Close the site switcher dropdown
+ */
+window.closeSiteSwitcher = function() {
+    const dropdown = $('siteSwitcherDropdown');
+    const arrow = $('siteSwitcherArrow');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+        dropdown.classList.add('hidden');
+        if (arrow) {
+            arrow.classList.remove('rotate-180');
+        }
+    }
+};
+
+// Close site switcher when clicking outside
+document.addEventListener('click', function(e) {
+    const container = $('siteSwitcherContainer');
+    if (container && !container.contains(e.target)) {
+        closeSiteSwitcher();
+    }
+});

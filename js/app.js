@@ -69,6 +69,12 @@ window.viewProperty = function(id) {
     const p = properties.find(prop => prop.id === id);
     if (!p) return;
     
+    // If logged-in user owns this property, redirect to stats page instead
+    if (auth.currentUser && ownsProperty(id)) {
+        viewPropertyStats(id);
+        return;
+    }
+    
     // Save scroll position before navigating away
     window.savedScrollPosition = window.scrollY || window.pageYOffset;
     
