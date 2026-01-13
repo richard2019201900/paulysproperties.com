@@ -44,26 +44,29 @@ window.listYourProperty = function() {
  * Update button visual states
  */
 function updateFilterButtonStates() {
-    // Interior buttons (cyan)
+    // Interior buttons - use data-interior attribute
     document.querySelectorAll('.interior-filter-btn').forEach(function(btn) {
-        var filterValue = btn.dataset.filter;
-        var isActive = activeInteriorFilter === filterValue;
+        var filterValue = btn.dataset.interior;
+        var isAll = filterValue === 'all';
+        var isActive = isAll 
+            ? (activeInteriorFilter === null || activeInteriorFilter === 'all')
+            : activeInteriorFilter === filterValue;
         
         if (isActive) {
-            btn.classList.add('border-cyan-400', 'bg-cyan-500/20', 'text-cyan-300');
-            btn.classList.remove('border-gray-600', 'bg-gray-700', 'text-gray-200');
+            btn.classList.add('bg-purple-600', 'text-white');
+            btn.classList.remove('bg-gray-700', 'text-gray-200');
         } else {
-            btn.classList.remove('border-cyan-400', 'bg-cyan-500/20', 'text-cyan-300');
-            btn.classList.add('border-gray-600', 'bg-gray-700', 'text-gray-200');
+            btn.classList.remove('bg-purple-600', 'text-white');
+            btn.classList.add('bg-gray-700', 'text-gray-200');
         }
     });
     
-    // Type buttons (purple/gradient)
-    document.querySelectorAll('.type-filter-btn').forEach(function(btn) {
+    // Type buttons - use data-filter attribute and .filter-btn class
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
         var filterValue = btn.dataset.filter;
         var isAll = filterValue === 'all';
         var isActive = isAll 
-            ? (activeTypeFilter === null && activeInteriorFilter === null)
+            ? (activeTypeFilter === null || activeTypeFilter === 'all')
             : activeTypeFilter === filterValue;
         
         if (isActive) {
@@ -80,7 +83,9 @@ function updateFilterButtonStates() {
  * Filter by interior type (Walk-in/Instance)
  */
 window.filterByInterior = function(interiorType, btn) {
-    if (activeInteriorFilter === interiorType) {
+    if (interiorType === 'all') {
+        activeInteriorFilter = null;
+    } else if (activeInteriorFilter === interiorType) {
         activeInteriorFilter = null;
     } else {
         activeInteriorFilter = interiorType;
