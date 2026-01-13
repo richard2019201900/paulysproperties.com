@@ -65,12 +65,13 @@ window.formatDate = function(dateStr, options = { month: 'short', day: 'numeric'
 }
 
 // ==================== VIEW PROPERTY ====================
-window.viewProperty = function(id) {
+window.viewProperty = function(id, forcePropertyView = false) {
     const p = properties.find(prop => prop.id === id);
     if (!p) return;
     
     // If logged-in user owns this property, redirect to stats page instead
-    if (auth.currentUser && ownsProperty(id)) {
+    // UNLESS they explicitly clicked the Property View tab (forcePropertyView = true)
+    if (!forcePropertyView && auth.currentUser && ownsProperty(id)) {
         viewPropertyStats(id);
         return;
     }
@@ -140,7 +141,7 @@ window.viewProperty = function(id) {
     // Generate owner tabs if user is owner of this property
     const ownerTabs = (state.currentUser === 'owner' && ownsProperty(id)) ? `
         <div class="flex border-b border-gray-700">
-            <button onclick="viewProperty(${id})" class="flex-1 py-4 px-6 text-center font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 border-b-2 border-purple-400">
+            <button onclick="viewProperty(${id}, true)" class="flex-1 py-4 px-6 text-center font-bold text-white bg-gradient-to-r from-purple-600 to-blue-600 border-b-2 border-purple-400">
                 <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
                 Property View
             </button>
@@ -671,7 +672,7 @@ function renderPropertyStatsContent(id) {
         ${premiumBanner}
         <!-- View Toggle Tabs - full width, no padding needed -->
         <div class="flex border-b border-gray-700">
-            <button onclick="viewProperty(${id})" class="flex-1 py-4 px-6 text-center font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+            <button onclick="viewProperty(${id}, true)" class="flex-1 py-4 px-6 text-center font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
                 <svg class="w-5 h-5 inline-block mr-2 -mt-1" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
                 Property View
             </button>
