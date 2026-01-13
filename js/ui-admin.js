@@ -3310,11 +3310,17 @@ window.filterAdminUsers = function() {
  * Admin-only feature to track tier subscription payments
  */
 window.renderSubscriptionAlertsPanel = async function() {
+    console.log('[SubscriptionAlerts] Starting render...');
+    
     const panel = $('subscriptionNotificationsPanel');
-    if (!panel) return;
+    if (!panel) {
+        console.log('[SubscriptionAlerts] Panel element not found');
+        return;
+    }
     
     // Only show for master admin
     if (!TierService.isMasterAdmin(auth?.currentUser?.email)) {
+        console.log('[SubscriptionAlerts] Not master admin, hiding panel');
         panel.classList.add('hidden');
         return;
     }
@@ -3322,6 +3328,8 @@ window.renderSubscriptionAlertsPanel = async function() {
     try {
         // Get all users
         const usersSnapshot = await db.collection('users').get();
+        console.log('[SubscriptionAlerts] Loaded', usersSnapshot.size, 'users');
+        
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const tomorrow = new Date(today);
@@ -3330,11 +3338,15 @@ window.renderSubscriptionAlertsPanel = async function() {
         const overdue = [];
         const dueToday = [];
         const dueTomorrow = [];
+        let proEliteCount = 0;
         
         usersSnapshot.forEach(doc => {
             const user = doc.data();
             if (!user.tier || user.tier === 'starter' || user.tier === 'owner') return;
             if (user.isTrial) return; // Skip trial users
+            
+            proEliteCount++;
+            console.log('[SubscriptionAlerts] Checking user:', user.email, 'tier:', user.tier, 'tierChangeDate:', user.tierChangeDate, 'subscriptionDueDate:', user.subscriptionDueDate);
             
             // Check subscriptionDueDate first, then calculate from tierChangeDate
             let dueDate = null;
@@ -3404,12 +3416,21 @@ window.renderSubscriptionAlertsPanel = async function() {
         });
         
         const total = overdue.length + dueToday.length + dueTomorrow.length;
+        console.log('[SubscriptionAlerts] Results:', {
+            proEliteUsers: proEliteCount,
+            overdue: overdue.length,
+            dueToday: dueToday.length,
+            dueTomorrow: dueTomorrow.length,
+            total: total
+        });
         
         if (total === 0) {
+            console.log('[SubscriptionAlerts] No alerts to show, hiding panel');
             panel.classList.add('hidden');
             return;
         }
         
+        console.log('[SubscriptionAlerts] Showing panel with', total, 'alerts');
         panel.classList.remove('hidden');
         
         const isUrgent = overdue.length > 0;
