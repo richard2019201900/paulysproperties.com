@@ -1759,9 +1759,9 @@
                 </div>
             </div>
 
-            <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
-                <div class="flex flex-wrap justify-between items-center mb-6 gap-2">
-                    <h3 class="text-2xl md:text-3xl font-bold text-gray-200">🏠 Your Properties</h3>
+            <div class="glass-effect rounded-2xl shadow-2xl p-4 md:p-6">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h3 class="text-xl md:text-2xl font-bold text-gray-200">🏠 Your Rented Properties</h3>
                     <div class="flex items-center gap-3">
                         <!-- Elite Reports Button -->
                         <button id="eliteReportsBtn" onclick="openReportsModal()" 
@@ -1769,28 +1769,35 @@
                             <span>📊</span> Reports
                             <span class="bg-yellow-300 text-yellow-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">ELITE</span>
                         </button>
-                        <span class="text-sm text-purple-400 font-medium">💡 Click any value to edit</span>
                     </div>
                 </div>
-                <div class="overflow-x-auto rounded-xl border border-gray-700">
-                    <table class="w-full text-gray-300 text-sm md:text-base" id="dashboardTable" style="border-collapse: separate; border-spacing: 0;">
-                        <thead>
-                            <tr class="bg-gray-900 text-left text-gray-200 border-b-2 border-gray-600">
-                                <th class="px-3 py-4 font-bold text-center w-12">#</th>
-                                <th class="px-4 py-4 font-bold">Available</th>
-                                <th class="px-4 py-4 font-bold">Property</th>
-                                <th class="px-4 py-4 font-bold hidden md:table-cell">Type</th>
-                                <th class="px-4 py-4 font-bold hidden lg:table-cell text-center">Bed</th>
-                                <th class="px-4 py-4 font-bold hidden lg:table-cell text-center">Bath</th>
-                                <th class="px-4 py-4 font-bold hidden lg:table-cell text-center">Interior</th>
-                                <th class="px-4 py-4 font-bold hidden lg:table-cell text-center">Storage</th>
-                                <th class="px-4 py-4 font-bold text-center">Weekly</th>
-                                <th class="px-4 py-4 font-bold text-center">Monthly</th>
-                                <th class="px-3 py-4 font-bold text-center w-12"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="ownerPropertiesTable"></tbody>
-                    </table>
+                
+                <!-- Rented Properties List -->
+                <div id="rentedPropertiesList" class="space-y-2">
+                    <!-- Properties rendered by JS -->
+                </div>
+                
+                <!-- No Rented Properties Message -->
+                <div id="noRentedPropertiesMsg" class="hidden text-center py-8 text-gray-400">
+                    <div class="text-3xl mb-2">✨</div>
+                    <p>No rented properties yet</p>
+                </div>
+            </div>
+            
+            <!-- Available Properties (Collapsible Accordion) -->
+            <div id="availablePropertiesSection" class="hidden glass-effect rounded-2xl shadow-2xl p-4 md:p-6 mt-6">
+                <button onclick="toggleAvailableProperties()" class="w-full flex items-center justify-between text-left">
+                    <h3 class="text-lg md:text-xl font-bold text-gray-400">
+                        <span id="availablePropertiesIcon">▶</span> 
+                        Available Properties 
+                        <span id="availablePropertiesCount" class="text-gray-500">(0)</span>
+                    </h3>
+                    <span class="text-gray-500 text-sm">Click to expand</span>
+                </button>
+                
+                <!-- Available Properties List (hidden by default) -->
+                <div id="availablePropertiesList" class="hidden mt-4 space-y-2">
+                    <!-- Properties rendered by JS -->
                 </div>
             </div>
             </div>

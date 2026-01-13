@@ -3556,6 +3556,12 @@ function renderSubscriptionItem(sub, urgency) {
         tomorrow: 'text-yellow-300'
     };
     
+    const borderColors = {
+        overdue: 'border-l-red-500',
+        today: 'border-l-orange-500',
+        tomorrow: 'border-l-yellow-500'
+    };
+    
     const tierIcon = sub.tier === 'elite' ? '👑' : '⭐';
     const tierColor = sub.tier === 'elite' ? 'text-yellow-400' : 'text-purple-400';
     const tierLabel = sub.tier.toUpperCase();
@@ -3572,9 +3578,10 @@ function renderSubscriptionItem(sub, urgency) {
     }
     
     const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const escapedEmail = sub.email.replace(/'/g, "\\'");
     
     return `
-        <div class="bg-gray-800/50 rounded-lg p-3 flex items-center justify-between gap-3">
+        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency]} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="goToAdminUserByEmail('${escapedEmail}')">
             <div class="flex-1 min-w-0">
                 <div class="text-white font-medium truncate flex items-center gap-2">
                     <span class="${tierColor}">${tierIcon}</span>
@@ -3595,6 +3602,33 @@ function renderSubscriptionItem(sub, urgency) {
         </div>
     `;
 }
+
+/**
+ * Navigate to admin panel and highlight a user by email
+ */
+window.goToAdminUserByEmail = function(email) {
+    // Switch to admin panel tab
+    if (typeof switchDashboardTab === 'function') {
+        switchDashboardTab('adminPanel');
+    }
+    
+    // Wait for admin panel to render, then search for and highlight the user
+    setTimeout(() => {
+        const searchInput = $('adminUserSearch');
+        if (searchInput) {
+            searchInput.value = email;
+            if (typeof filterAdminUsers === 'function') {
+                filterAdminUsers();
+            }
+        }
+        
+        // Scroll to the user section
+        const usersSection = document.querySelector('#adminUsersContainer');
+        if (usersSection) {
+            usersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 300);
+};
 
 window.toggleSubscriptionPanel = function() {
     const content = $('subscriptionPanelContent');

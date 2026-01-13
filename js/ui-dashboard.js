@@ -829,210 +829,321 @@ window.renderOwnerDashboard = function() {
     // Check for active celebration banners
     checkCelebrationBanners();
     
-    if (ownedProps.length === 0) {
-        $('ownerPropertiesTable').innerHTML = `
-            <tr>
-                <td colspan="11" class="px-6 py-12 text-center text-gray-400">
-                    <div class="text-4xl mb-4">🏠</div>
-                    <p class="text-xl font-semibold">No properties assigned to this account</p>
-                    <p class="text-sm mt-2">Contact the administrator to get properties assigned to your account.</p>
-                </td>
-            </tr>
-        `;
-        return;
-    }
+    // Separate properties into rented and available
+    const rentedProps = [];
+    const availableProps = [];
     
-    // AUTO-FIX: Check all properties for inconsistent renter/availability status
     ownedProps.forEach(p => {
         const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const isAvailable = state.availability[p.id] !== false && !renterName;
+        
+        // AUTO-FIX: Check all properties for inconsistent renter/availability status
         const renterPhone = PropertyDataService.getValue(p.id, 'renterPhone', p.renterPhone || '');
         const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
         if ((renterName || renterPhone || lastPaymentDate) && state.availability[p.id] !== false) {
             state.availability[p.id] = false;
             saveAvailability(p.id, false);
         }
+        
+        if (isAvailable) {
+            availableProps.push(p);
+        } else {
+            rentedProps.push(p);
+        }
     });
     
-    $('ownerPropertiesTable').innerHTML = ownedProps.map((p, index) => {
-        // Get renter and payment info
-        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
-        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
-        const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
-        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
-        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
-        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
-        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+    // Sort rented properties by due date (most urgent first)
+    rentedProps.sort((a, b) => {
+        const daysA = calculateDaysUntilDue(a);
+        const daysB = calculateDaysUntilDue(b);
+        if (daysA === null && daysB === null) return 0;
+        if (daysA === null) return 1;
+        if (daysB === null) return -1;
+        return daysA - daysB;
+    });
+    
+    // Render rented properties
+    const rentedList = $('rentedPropertiesList');
+    const noRentedMsg = $('noRentedPropertiesMsg');
+    
+    if (rentedProps.length === 0) {
+        if (rentedList) rentedList.innerHTML = '';
+        if (noRentedMsg) noRentedMsg.classList.remove('hidden');
+    } else {
+        if (noRentedMsg) noRentedMsg.classList.add('hidden');
+        if (rentedList) {
+            rentedList.innerHTML = rentedProps.map(p => renderPropertyRow(p, false)).join('');
+        }
+    }
+    
+    // Render available properties section
+    const availableSection = $('availablePropertiesSection');
+    const availableList = $('availablePropertiesList');
+    const availableCount = $('availablePropertiesCount');
+    
+    if (availableProps.length === 0) {
+        if (availableSection) availableSection.classList.add('hidden');
+    } else {
+        if (availableSection) availableSection.classList.remove('hidden');
+        if (availableCount) availableCount.textContent = `(${availableProps.length})`;
+        if (availableList) {
+            availableList.innerHTML = availableProps.map(p => renderPropertyRow(p, true)).join('');
+        }
+    }
+    
+    // Handle empty state (no properties at all)
+    if (ownedProps.length === 0) {
+        if (rentedList) {
+            rentedList.innerHTML = `
+                <div class="text-center py-12 text-gray-400">
+                    <div class="text-4xl mb-4">🏠</div>
+                    <p class="text-xl font-semibold">No properties assigned to this account</p>
+                    <p class="text-sm mt-2">Contact the administrator to get properties assigned to your account.</p>
+                </div>
+            `;
+        }
+        if (noRentedMsg) noRentedMsg.classList.add('hidden');
+    }
+};
+
+/**
+ * Calculate days until due for a property
+ */
+function calculateDaysUntilDue(property) {
+    const paymentFrequency = PropertyDataService.getValue(property.id, 'paymentFrequency', property.paymentFrequency || '');
+    const lastPaymentDate = PropertyDataService.getValue(property.id, 'lastPaymentDate', property.lastPaymentDate || '');
+    
+    if (!lastPaymentDate || !paymentFrequency) return null;
+    
+    const lastDate = parseLocalDate(lastPaymentDate);
+    const nextDate = new Date(lastDate);
+    
+    if (paymentFrequency === 'daily') {
+        nextDate.setDate(nextDate.getDate() + 1);
+    } else if (paymentFrequency === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7);
+    } else if (paymentFrequency === 'biweekly') {
+        nextDate.setDate(nextDate.getDate() + 14);
+    } else {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    nextDate.setHours(0, 0, 0, 0);
+    
+    return Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Render a single property row in the new compact list format
+ */
+function renderPropertyRow(property, isAvailable) {
+    const p = property;
+    const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+    const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
+    const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
+    const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
+    const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+    const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+    const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+    const propertyType = PropertyDataService.getValue(p.id, 'type', p.type || '');
+    const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
+    
+    // Calculate next due date and status
+    let nextDueDate = '';
+    let daysUntilDue = null;
+    let dueDateDisplay = '';
+    let statusColor = 'border-l-gray-600'; // Default for available
+    let reminderScript = '';
+    
+    if (lastPaymentDate && paymentFrequency) {
+        const lastDate = parseLocalDate(lastPaymentDate);
+        const nextDate = new Date(lastDate);
         
-        // Check if property is sold
-        const isSold = PropertyDataService.getValue(p.id, 'isSold', p.isSold || false);
-        const soldTo = PropertyDataService.getValue(p.id, 'soldTo', p.soldTo || '');
+        if (paymentFrequency === 'daily') {
+            nextDate.setDate(nextDate.getDate() + 1);
+        } else if (paymentFrequency === 'weekly') {
+            nextDate.setDate(nextDate.getDate() + 7);
+        } else if (paymentFrequency === 'biweekly') {
+            nextDate.setDate(nextDate.getDate() + 14);
+        } else {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+        }
         
-        // Calculate next due date
-        let nextDueDate = '';
-        let daysUntilDue = null;
-        let reminderScript = '';
-        let dueDateDisplay = '';
+        nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         
-        if (lastPaymentDate) {
-            const lastDate = parseLocalDate(lastPaymentDate);
-            const nextDate = new Date(lastDate);
-            if (paymentFrequency === 'daily') {
-                nextDate.setDate(nextDate.getDate() + 1);
-            } else if (paymentFrequency === 'weekly') {
-                nextDate.setDate(nextDate.getDate() + 7);
-            } else if (paymentFrequency === 'biweekly') {
-                nextDate.setDate(nextDate.getDate() + 14);
-            } else {
-                nextDate.setMonth(nextDate.getMonth() + 1);
-            }
-            nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            nextDate.setHours(0, 0, 0, 0);
-            daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
-            
-            if (daysUntilDue < 0) {
-                dueDateDisplay = `<span class="text-red-400 font-bold">${Math.abs(daysUntilDue)}d overdue</span>`;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        nextDate.setHours(0, 0, 0, 0);
+        daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        
+        // Status color based on due date
+        if (daysUntilDue < 0) {
+            statusColor = 'border-l-red-500';
+            dueDateDisplay = `<span class="text-red-400 font-bold text-xs">${Math.abs(daysUntilDue)}d overdue</span>`;
+        } else if (daysUntilDue === 0) {
+            statusColor = 'border-l-orange-500';
+            dueDateDisplay = `<span class="text-orange-400 font-bold text-xs">Due today</span>`;
+        } else if (daysUntilDue === 1) {
+            statusColor = 'border-l-yellow-500';
+            dueDateDisplay = `<span class="text-yellow-400 font-bold text-xs">Due tomorrow</span>`;
+        } else if (daysUntilDue <= 3) {
+            statusColor = 'border-l-yellow-500';
+            dueDateDisplay = `<span class="text-yellow-400 text-xs">${daysUntilDue}d left</span>`;
+        } else {
+            statusColor = 'border-l-green-500';
+            dueDateDisplay = `<span class="text-green-400 text-xs">${daysUntilDue}d left</span>`;
+        }
+        
+        // Generate reminder script
+        let amountDue = weeklyPrice;
+        if (paymentFrequency === 'daily' && dailyPrice > 0) {
+            amountDue = dailyPrice;
+        } else if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
+            amountDue = biweeklyPrice;
+        } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
+            amountDue = monthlyPrice;
+        } else if (paymentFrequency === 'daily') {
+            amountDue = Math.round(weeklyPrice / 7);
+        } else if (paymentFrequency === 'biweekly') {
+            amountDue = weeklyPrice * 2;
+        } else if (paymentFrequency === 'monthly') {
+            amountDue = weeklyPrice * 4;
+        }
+        
+        if (renterName && daysUntilDue <= 1) {
+            const fullNextDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            if (daysUntilDue === 1) {
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
             } else if (daysUntilDue === 0) {
-                dueDateDisplay = `<span class="text-red-400 font-bold">Due today</span>`;
-            } else if (daysUntilDue === 1) {
-                dueDateDisplay = `<span class="text-orange-400 font-bold">Due tomorrow</span>`;
-            } else if (daysUntilDue <= 3) {
-                dueDateDisplay = `<span class="text-yellow-400">${daysUntilDue}d left</span>`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
             } else {
-                dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
-            }
-            
-            // Generate reminder script - determine amount based on frequency
-            let amountDue = weeklyPrice;
-            if (paymentFrequency === 'daily' && dailyPrice > 0) {
-                amountDue = dailyPrice;
-            } else if (paymentFrequency === 'biweekly' && biweeklyPrice > 0) {
-                amountDue = biweeklyPrice;
-            } else if (paymentFrequency === 'monthly' && monthlyPrice > 0) {
-                amountDue = monthlyPrice;
-            } else if (paymentFrequency === 'daily') {
-                amountDue = Math.round(weeklyPrice / 7);
-            } else if (paymentFrequency === 'biweekly') {
-                // If no biweekly price set, use weekly * 2
-                amountDue = weeklyPrice * 2;
-            } else if (paymentFrequency === 'monthly') {
-                // If no monthly price set, use weekly * 4
-                amountDue = weeklyPrice * 4;
-            }
-            
-            if (renterName && daysUntilDue <= 1) {
-                const fullNextDate = nextDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                if (daysUntilDue === 1) {
-                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due tomorrow (${fullNextDate}). Let me know if you have any questions!`;
-                } else if (daysUntilDue === 0) {
-                    reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} is due today (${fullNextDate}). Let me know if you have any questions!`;
+                const daysOverdue = Math.abs(daysUntilDue);
+                if (daysOverdue >= 3) {
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
                 } else {
-                    const daysOverdue = Math.abs(daysUntilDue);
-                    if (daysOverdue >= 3) {
-                        // 3+ days overdue - eviction warning
-                        reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
-                    } else {
-                        reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
-                    }
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()} was due on ${fullNextDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
                 }
             }
         }
-        
-        const lastPaidDisplay = lastPaymentDate ? formatDate(lastPaymentDate, { month: 'short', day: 'numeric' }) : '-';
-        
-        // Store reminder for this property
-        if (reminderScript) {
-            window.dashboardReminders = window.dashboardReminders || {};
-            window.dashboardReminders[p.id] = reminderScript;
-        }
-        
-        // Alternating color scheme - solid backgrounds for clarity
-        const isEven = index % 2 === 0;
-        const mainBg = isEven ? 'bg-slate-800' : 'bg-gray-800';
-        const subBg = isEven ? 'bg-slate-900/80' : 'bg-gray-900/80';
-        const accentColor = isEven ? 'border-l-purple-500' : 'border-l-blue-500';
-        
+    }
+    
+    // Store reminder for this property
+    if (reminderScript) {
+        window.dashboardReminders = window.dashboardReminders || {};
+        window.dashboardReminders[p.id] = reminderScript;
+    }
+    
+    // Get rent amount for display
+    let displayAmount = weeklyPrice;
+    let frequencyLabel = '/wk';
+    if (paymentFrequency === 'daily') {
+        displayAmount = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+        frequencyLabel = '/day';
+    } else if (paymentFrequency === 'biweekly') {
+        displayAmount = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
+        frequencyLabel = '/2wk';
+    } else if (paymentFrequency === 'monthly') {
+        displayAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
+        frequencyLabel = '/mo';
+    }
+    
+    const escapedTitle = sanitize(p.title).replace(/'/g, "\\'");
+    
+    if (isAvailable) {
+        // Available property - simpler row
         return `
-        <tbody class="property-group">
-            <tr class="${mainBg} border-l-4 ${accentColor}">
-                <td class="px-3 py-4 text-center text-white font-bold text-lg" rowspan="2">${index + 1}</td>
-                <td class="px-4 py-4"><div class="toggle-switch ${state.availability[p.id] !== false ? 'active' : ''}" onclick="toggleAvailability(${p.id})" role="switch" aria-checked="${state.availability[p.id] !== false}" tabindex="0"></div></td>
-                <td class="px-4 py-4">
-                    <span class="property-name-link font-bold text-white text-base" onclick="viewPropertyStats(${p.id})" role="button" tabindex="0" title="Click to view property stats">${sanitize(p.title)}</span>
-                    ${isSold ? `<span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg shadow-rose-500/30 animate-pulse">🏆 SOLD</span>` : ''}
-                </td>
-                <td class="px-4 py-4 text-gray-300 capitalize hidden md:table-cell editable-cell" onclick="startCellEdit(${p.id}, 'type', this, 'propertyType')" title="Click to edit">
-                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'type', p.type)}</span>
-                </td>
-                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'bedrooms', this, 'number')" title="Click to edit">
-                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'bedrooms', p.bedrooms)}</span>
-                </td>
-                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'bathrooms', this, 'number')" title="Click to edit">
-                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'bathrooms', p.bathrooms)}</span>
-                </td>
-                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'interiorType', this, 'select')" title="Click to edit">
-                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'interiorType', p.interiorType)}</span>
-                </td>
-                <td class="px-4 py-4 text-gray-300 hidden lg:table-cell editable-cell text-center" onclick="startCellEdit(${p.id}, 'storage', this, 'number')" title="Click to edit">
-                    <span class="cell-value">${PropertyDataService.getValue(p.id, 'storage', p.storage).toLocaleString()}</span>
-                </td>
-                <td class="px-4 py-4 text-green-400 font-bold editable-cell text-center" onclick="startCellEdit(${p.id}, 'weeklyPrice', this, 'number')" title="Click to edit">
-                    <span class="cell-value">${weeklyPrice.toLocaleString()}</span>
-                </td>
-                <td class="px-4 py-4 text-purple-400 font-bold editable-cell text-center" onclick="startCellEdit(${p.id}, 'monthlyPrice', this, 'number')" title="Click to edit">
-                    <span class="cell-value">${monthlyPrice.toLocaleString()}</span>
-                </td>
-                <td class="px-3 py-4 text-center" rowspan="2">
-                    <button onclick="confirmDeleteProperty(${p.id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded-lg transition" title="Delete property">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </td>
-            </tr>
-            <tr class="${subBg} border-l-4 ${accentColor}">
-                <td colspan="9" class="px-4 py-3">
-                    <div class="flex flex-wrap items-center text-sm gap-x-6 gap-y-2">
-                        <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg min-w-[280px] border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'renterName', this, 'text')" title="Click to edit renter name">
-                            <svg class="w-4 h-4 text-sky-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            <span class="text-gray-500">Renter:</span>
-                            <span class="cell-value text-white font-medium">${renterName || '<span class="text-gray-600 italic">Not set</span>'}</span>
-                            <svg class="w-3 h-3 text-gray-600 flex-shrink-0 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                        </div>
-                        <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'paymentFrequency', this, 'frequency')" title="Click to edit payment frequency">
-                            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            <span class="text-gray-500">Frequency:</span>
-                            <span class="cell-value text-white font-medium capitalize">${paymentFrequency || '<span class="text-orange-400 italic">⚠️ Not set</span>'}</span>
-                            <svg class="w-3 h-3 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
-                        <div class="flex items-center gap-2 cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg border border-transparent hover:border-gray-600" onclick="startCellEdit(${p.id}, 'lastPaymentDate', this, 'date')" title="Click to edit last payment date">
-                            <svg class="w-4 h-4 text-lime-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                            <span class="text-gray-500">Paid:</span>
-                            <span class="cell-value text-white font-medium">${lastPaidDisplay !== '-' ? lastPaidDisplay : '<span class="text-gray-600 italic">-</span>'}</span>
-                            <svg class="w-3 h-3 text-gray-600 flex-shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                        </div>
-                        <div class="flex items-center gap-2 px-3 py-1.5">
-                            <svg class="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            <span class="text-gray-500">Due:</span>
-                            <span class="font-medium text-white">${nextDueDate || '<span class="text-gray-600">-</span>'}</span>
-                            ${dueDateDisplay ? `<span class="ml-1">(${dueDateDisplay})</span>` : ''}
+            <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${statusColor} hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${p.id})">
+                <div class="p-3 flex items-center justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium text-gray-300 truncate">${sanitize(p.title)}</div>
+                        <div class="text-xs text-gray-500 capitalize">${propertyType}</div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-gray-400 font-medium text-sm">$${displayAmount.toLocaleString()}<span class="text-gray-500 text-xs">${frequencyLabel}</span></div>
+                        <div class="text-gray-500 text-xs">Available</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Rented property - full row with renter info
+    // Desktop: single line | Mobile: stacked
+    return `
+        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${statusColor} hover:bg-gray-700/50 transition">
+            <!-- Desktop Layout (md+) -->
+            <div class="hidden md:flex items-center justify-between gap-3 p-3">
+                <div class="flex-1 min-w-0 cursor-pointer" onclick="viewPropertyStats(${p.id})">
+                    <span class="font-medium text-white truncate">${sanitize(p.title)}</span>
+                    ${isSold ? `<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-rose-500 text-white font-bold">SOLD</span>` : ''}
+                    ${propertyType ? `<span class="text-gray-500 text-xs ml-2 capitalize">${propertyType}</span>` : ''}
+                </div>
+                <div class="text-gray-300 truncate max-w-[150px]" title="${renterName}">
+                    ${renterName || '<span class="text-gray-600">No renter</span>'}
+                </div>
+                <div class="text-center w-24 flex-shrink-0">
+                    <div class="text-white text-sm">${nextDueDate || '-'}</div>
+                    ${dueDateDisplay}
+                </div>
+                <div class="text-right w-20 flex-shrink-0">
+                    <div class="text-green-400 font-bold text-sm">$${displayAmount.toLocaleString()}</div>
+                    <div class="text-gray-500 text-xs">${frequencyLabel.replace('/', '')}</div>
+                </div>
+                <div class="flex-shrink-0 w-10">
+                    ${reminderScript ? `
+                        <button onclick="event.stopPropagation(); copyDashboardReminder(${p.id}, this)" class="text-cyan-400 hover:text-cyan-300 p-1" title="Copy reminder">
+                            📋
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+            
+            <!-- Mobile Layout (below md) -->
+            <div class="md:hidden p-3 cursor-pointer" onclick="viewPropertyStats(${p.id})">
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-medium text-white truncate">${sanitize(p.title)}</div>
+                        ${isSold ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500 text-white font-bold">SOLD</span>` : ''}
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-green-400 font-bold text-sm">$${displayAmount.toLocaleString()}</div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <div class="text-gray-400 truncate">
+                        ${renterName || '<span class="text-gray-600">No renter</span>'}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="text-right">
+                            <span class="text-gray-400 text-xs">${nextDueDate || ''}</span>
+                            ${dueDateDisplay ? `<span class="ml-1">${dueDateDisplay}</span>` : ''}
                         </div>
                         ${reminderScript ? `
-                        <div class="ml-auto">
-                            <button onclick="copyDashboardReminder(${p.id}, this)" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1.5 rounded-lg font-bold text-xs hover:opacity-90 transition flex items-center gap-1 shadow-lg" title="Copy reminder - text in city for fastest response">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                                📋 Copy Text
+                            <button onclick="event.stopPropagation(); copyDashboardReminder(${p.id}, this)" class="text-cyan-400 hover:text-cyan-300 p-1" title="Copy reminder">
+                                📋
                             </button>
-                        </div>
                         ` : ''}
                     </div>
-                </td>
-            </tr>
-        </tbody>
-        <tbody><tr class="h-2"><td colspan="11"></td></tr></tbody>
+                </div>
+            </div>
+        </div>
     `;
-    }).join('');
 }
+
+/**
+ * Toggle available properties accordion
+ */
+window.toggleAvailableProperties = function() {
+    const list = $('availablePropertiesList');
+    const icon = $('availablePropertiesIcon');
+    
+    if (list && icon) {
+        list.classList.toggle('hidden');
+        icon.textContent = list.classList.contains('hidden') ? '▶' : '▼';
+    }
+};
 
 // ==================== INLINE CELL EDITING ====================
 window.startCellEdit = function(propertyId, field, cell, type) {
