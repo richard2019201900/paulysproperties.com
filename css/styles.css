@@ -6,6 +6,25 @@
     font-family: 'Inter', sans-serif; 
 }
 
+/* ==================== SITE SWITCHER GLOW ==================== */
+.site-switcher-glow {
+    animation: siteSwitcherPulse 3s ease-in-out infinite;
+}
+
+@keyframes siteSwitcherPulse {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(139, 92, 246, 0.3), 0 0 10px rgba(139, 92, 246, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(139, 92, 246, 0.5), 0 0 25px rgba(139, 92, 246, 0.3);
+    }
+}
+
+.site-switcher-glow:hover {
+    animation: none;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.6), 0 0 30px rgba(139, 92, 246, 0.4);
+}
+
 /* ==================== REUSABLE GRADIENTS ==================== */
 .gradient-bg, 
 .badge { 
