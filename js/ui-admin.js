@@ -3550,56 +3550,47 @@ window.renderSubscriptionAlertsPanel = async function() {
 };
 
 function renderSubscriptionItem(sub, urgency) {
-    const statusColor = urgency === 'overdue' ? 'text-red-400' 
-                      : urgency === 'today' ? 'text-orange-400' 
-                      : 'text-cyan-400';
+    const statusColors = {
+        overdue: 'text-red-300',
+        today: 'text-orange-300',
+        tomorrow: 'text-yellow-300'
+    };
     
     const tierIcon = sub.tier === 'elite' ? '👑' : '⭐';
     const tierColor = sub.tier === 'elite' ? 'text-yellow-400' : 'text-purple-400';
-    
-    const daysText = sub.daysUntilDue < 0 
-        ? `${Math.abs(sub.daysUntilDue)}d overdue`
-        : sub.daysUntilDue === 0 
-        ? 'TODAY'
-        : 'Tomorrow';
+    const tierLabel = sub.tier.toUpperCase();
     
     // Generate reminder message
     let reminderMsg = '';
     if (sub.daysUntilDue === 1) {
-        reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${sub.tier.toUpperCase()} subscription payment of $${sub.amount.toLocaleString()} is due tomorrow (${sub.dueDateFormatted}). Let me know if you have any questions!`;
+        reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${tierLabel} subscription payment of $${sub.amount.toLocaleString()} is due tomorrow (${sub.dueDateFormatted}). Let me know if you have any questions!`;
     } else if (sub.daysUntilDue === 0) {
-        reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${sub.tier.toUpperCase()} subscription payment of $${sub.amount.toLocaleString()} is due today (${sub.dueDateFormatted}). Let me know if you have any questions!`;
+        reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${tierLabel} subscription payment of $${sub.amount.toLocaleString()} is due today (${sub.dueDateFormatted}). Let me know if you have any questions!`;
     } else if (sub.daysUntilDue < 0) {
         const daysOverdue = Math.abs(sub.daysUntilDue);
-        reminderMsg = `Hey ${sub.username}, your ${sub.tier.toUpperCase()} subscription payment of $${sub.amount.toLocaleString()} was due on ${sub.dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible to maintain your ${sub.tier} benefits!`;
+        reminderMsg = `Hey ${sub.username}, your ${tierLabel} subscription payment of $${sub.amount.toLocaleString()} was due on ${sub.dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible to maintain your ${sub.tier} benefits!`;
     }
     
     const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
     
     return `
-        <div class="flex items-center justify-between bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 transition group">
+        <div class="bg-gray-800/50 rounded-lg p-3 flex items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
-                <div class="font-semibold text-white truncate flex items-center gap-2">
+                <div class="text-white font-medium truncate flex items-center gap-2">
                     <span class="${tierColor}">${tierIcon}</span>
                     ${sub.username}
-                    <span class="text-xs ${tierColor} font-bold uppercase">${sub.tier}</span>
+                    <span class="text-xs ${tierColor} font-bold uppercase">${tierLabel}</span>
                 </div>
-                <div class="text-sm text-gray-400">
-                    ${sub.email} • Due: ${sub.dueDateFormatted}
-                </div>
+                <div class="text-gray-400 text-sm">${sub.email}</div>
+                <div class="${statusColors[urgency]} text-xs">Due: ${sub.dueDateFormatted}</div>
             </div>
-            <div class="flex items-center gap-2 ml-2">
-                <div class="text-right">
-                    <div class="text-green-400 font-bold">$${sub.amount.toLocaleString()}</div>
-                    <div class="${statusColor} text-xs font-bold">${daysText}</div>
-                </div>
-                ${reminderMsg ? `
-                    <button onclick="copySubscriptionReminder('${escapedReminder}')" 
-                            class="opacity-0 group-hover:opacity-100 bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-xs px-2 py-1 rounded-lg font-semibold hover:opacity-80 transition flex items-center gap-1"
-                            title="Copy reminder message">
-                        📋 Copy
-                    </button>
-                ` : ''}
+            <div class="text-right">
+                <div class="text-white font-bold">$${sub.amount.toLocaleString()}</div>
+                <button onclick="event.stopPropagation(); copySubscriptionReminder('${escapedReminder}')" 
+                        class="text-cyan-400 hover:text-cyan-300 text-xs mt-1 flex items-center gap-1"
+                        style="outline: none;">
+                    📋 Copy Reminder
+                </button>
             </div>
         </div>
     `;
