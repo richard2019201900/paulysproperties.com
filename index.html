@@ -1804,6 +1804,10 @@
             <div class="text-center mb-8">
                 <h2 class="text-4xl md:text-5xl font-black bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">🏆 Leaderboard</h2>
                 <p class="text-gray-400 mt-2">Top property owners in Los Santos</p>
+                <button onclick="renderLeaderboardPage()" class="mt-4 text-amber-400 hover:text-amber-300 text-sm font-semibold flex items-center gap-2 mx-auto">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Refresh Leaderboard
+                </button>
             </div>
             
             <!-- User's Rank Card (shown when logged in) -->
@@ -2025,8 +2029,8 @@
         
         <section id="home" class="gradient-bg text-white py-16 md:py-24">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-                <h2 class="text-4xl md:text-6xl font-black mb-6">Live Like You Mean It.</h2>
-                <p class="text-xl md:text-2xl mb-12 font-light max-w-4xl mx-auto">Pauly's exclusive collection. Premium rentals. Professionally managed. Scroll down and find your next home — or make an offer to own it.</p>
+                <h2 class="text-4xl md:text-6xl font-black mb-6">Find Your Perfect Place.</h2>
+                <p class="text-xl md:text-2xl mb-12 font-light max-w-4xl mx-auto">The city's premier property portal — browse rentals and purchases from multiple owners, all in one place. Free to explore, with the most intuitive rental management dashboard Los Santos has ever seen.</p>
                 <div class="max-w-6xl mx-auto glass-effect rounded-2xl shadow-2xl p-6 md:p-8">
                     <!-- Row 1: Listing Type, Property Type, Interior -->
                     <div class="grid grid-cols-3 gap-2 md:gap-4 mb-3">
@@ -2245,6 +2249,7 @@
     <script src="js/user-preferences.js"></script>
     <script src="js/notification-manager.js"></script>
     <script src="js/gamification.js"></script>
+    <script src="js/agent-management.js"></script>
     <script src="js/ui-leaderboard.js"></script>
     <script src="js/components.js"></script>
     <script src="js/ui-core.js"></script>
@@ -2260,7 +2265,6 @@
     <script src="js/ui-sales.js"></script>
     <script src="js/filters.js"></script>
     <script src="js/app.js"></script>
-
 
     <!-- Elite Reports Modal -->
     <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center hidden overflow-y-auto" role="dialog" aria-modal="true">
