@@ -832,6 +832,13 @@ window.navigateTo = function(section) {
     hideElement($('blogPage'));
     hideElement($('leaderboardPage'));
     
+    // Handle home - scroll to absolute top
+    if (section === 'home') {
+        showElement($('renterSection'));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+    }
+    
     // Handle blog page specially
     if (section === 'blog') {
         hideElement($('renterSection'));
