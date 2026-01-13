@@ -937,6 +937,7 @@ function calculateDaysUntilDue(property) {
 
 /**
  * Render a single property row in the new compact list format
+ * Single unified row that works on both desktop and mobile
  */
 function renderPropertyRow(property, isAvailable) {
     const p = property;
@@ -954,7 +955,7 @@ function renderPropertyRow(property, isAvailable) {
     let nextDueDate = '';
     let daysUntilDue = null;
     let dueDateDisplay = '';
-    let statusColor = 'border-l-gray-600'; // Default for available
+    let borderColor = 'border-l-gray-600'; // Default for available
     let reminderScript = '';
     
     if (lastPaymentDate && paymentFrequency) {
@@ -980,20 +981,20 @@ function renderPropertyRow(property, isAvailable) {
         
         // Status color based on due date
         if (daysUntilDue < 0) {
-            statusColor = 'border-l-red-500';
-            dueDateDisplay = `<span class="text-red-400 font-bold text-xs">${Math.abs(daysUntilDue)}d overdue</span>`;
+            borderColor = 'border-l-red-500';
+            dueDateDisplay = `<span class="text-red-400 font-bold">${Math.abs(daysUntilDue)}d overdue</span>`;
         } else if (daysUntilDue === 0) {
-            statusColor = 'border-l-orange-500';
-            dueDateDisplay = `<span class="text-orange-400 font-bold text-xs">Due today</span>`;
+            borderColor = 'border-l-orange-500';
+            dueDateDisplay = `<span class="text-orange-400 font-bold">Due today</span>`;
         } else if (daysUntilDue === 1) {
-            statusColor = 'border-l-yellow-500';
-            dueDateDisplay = `<span class="text-yellow-400 font-bold text-xs">Due tomorrow</span>`;
+            borderColor = 'border-l-yellow-500';
+            dueDateDisplay = `<span class="text-yellow-400 font-bold">Due tomorrow</span>`;
         } else if (daysUntilDue <= 3) {
-            statusColor = 'border-l-yellow-500';
-            dueDateDisplay = `<span class="text-yellow-400 text-xs">${daysUntilDue}d left</span>`;
+            borderColor = 'border-l-yellow-600';
+            dueDateDisplay = `<span class="text-yellow-400">${daysUntilDue}d left</span>`;
         } else {
-            statusColor = 'border-l-green-500';
-            dueDateDisplay = `<span class="text-green-400 text-xs">${daysUntilDue}d left</span>`;
+            borderColor = 'border-l-green-500';
+            dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
         }
         
         // Generate reminder script
@@ -1049,13 +1050,11 @@ function renderPropertyRow(property, isAvailable) {
         frequencyLabel = '/mo';
     }
     
-    const escapedTitle = sanitize(p.title).replace(/'/g, "\\'");
-    
     if (isAvailable) {
         // Available property - simpler row
         return `
-            <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${statusColor} hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${p.id})">
-                <div class="p-3 flex items-center justify-between gap-2">
+            <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColor} p-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${p.id})">
+                <div class="flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
                         <div class="font-medium text-gray-300 truncate">${sanitize(p.title)}</div>
                         <div class="text-xs text-gray-500 capitalize">${propertyType}</div>
@@ -1069,63 +1068,38 @@ function renderPropertyRow(property, isAvailable) {
         `;
     }
     
-    // Rented property - full row with renter info
-    // Desktop: single line | Mobile: stacked
+    // Rented property - single unified row
     return `
-        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${statusColor} hover:bg-gray-700/50 transition">
-            <!-- Desktop Layout (md+) -->
-            <div class="hidden md:flex items-center justify-between gap-3 p-3">
-                <div class="flex-1 min-w-0 cursor-pointer" onclick="viewPropertyStats(${p.id})">
-                    <span class="font-medium text-white truncate">${sanitize(p.title)}</span>
-                    ${isSold ? `<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-rose-500 text-white font-bold">SOLD</span>` : ''}
-                    ${propertyType ? `<span class="text-gray-500 text-xs ml-2 capitalize">${propertyType}</span>` : ''}
-                </div>
-                <div class="text-gray-300 truncate max-w-[150px]" title="${renterName}">
-                    ${renterName || '<span class="text-gray-600">No renter</span>'}
-                </div>
-                <div class="text-center w-24 flex-shrink-0">
-                    <div class="text-white text-sm">${nextDueDate || '-'}</div>
-                    ${dueDateDisplay}
-                </div>
-                <div class="text-right w-20 flex-shrink-0">
-                    <div class="text-green-400 font-bold text-sm">$${displayAmount.toLocaleString()}</div>
-                    <div class="text-gray-500 text-xs">${frequencyLabel.replace('/', '')}</div>
-                </div>
-                <div class="flex-shrink-0 w-10">
-                    ${reminderScript ? `
-                        <button onclick="event.stopPropagation(); copyDashboardReminder(${p.id}, this)" class="text-cyan-400 hover:text-cyan-300 p-1" title="Copy reminder">
-                            📋
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-            
-            <!-- Mobile Layout (below md) -->
-            <div class="md:hidden p-3 cursor-pointer" onclick="viewPropertyStats(${p.id})">
-                <div class="flex items-start justify-between gap-2 mb-2">
-                    <div class="flex-1 min-w-0">
-                        <div class="font-medium text-white truncate">${sanitize(p.title)}</div>
+        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColor} p-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${p.id})">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <!-- Property info -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-medium text-white truncate">${sanitize(p.title)}</span>
                         ${isSold ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500 text-white font-bold">SOLD</span>` : ''}
+                        ${propertyType ? `<span class="text-gray-500 text-xs capitalize hidden sm:inline">${propertyType}</span>` : ''}
                     </div>
-                    <div class="text-right flex-shrink-0">
-                        <div class="text-green-400 font-bold text-sm">$${displayAmount.toLocaleString()}</div>
+                    <div class="text-gray-400 text-sm mt-0.5">
+                        ${renterName || '<span class="text-gray-600">No renter</span>'}
+                        <span class="text-gray-600 mx-1">•</span>
+                        <span class="text-gray-500">${nextDueDate || '-'}</span>
+                        ${dueDateDisplay ? `<span class="ml-1">${dueDateDisplay}</span>` : ''}
                     </div>
                 </div>
-                <div class="flex items-center justify-between text-sm">
-                    <div class="text-gray-400 truncate">
-                        ${renterName || '<span class="text-gray-600">No renter</span>'}
+                
+                <!-- Amount and Copy button -->
+                <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+                    <div class="text-right">
+                        <div class="text-green-400 font-bold">$${displayAmount.toLocaleString()}</div>
+                        <div class="text-gray-500 text-xs">${frequencyLabel.replace('/', '')}</div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <div class="text-right">
-                            <span class="text-gray-400 text-xs">${nextDueDate || ''}</span>
-                            ${dueDateDisplay ? `<span class="ml-1">${dueDateDisplay}</span>` : ''}
-                        </div>
-                        ${reminderScript ? `
-                            <button onclick="event.stopPropagation(); copyDashboardReminder(${p.id}, this)" class="text-cyan-400 hover:text-cyan-300 p-1" title="Copy reminder">
-                                📋
-                            </button>
-                        ` : ''}
-                    </div>
+                    ${reminderScript ? `
+                        <button onclick="event.stopPropagation(); copyDashboardReminder(${p.id}, this)" 
+                                class="text-cyan-400 hover:text-cyan-300 text-sm p-1" 
+                                title="Copy reminder">
+                            📋 Copy Reminder
+                        </button>
+                    ` : '<div class="w-24"></div>'}
                 </div>
             </div>
         </div>

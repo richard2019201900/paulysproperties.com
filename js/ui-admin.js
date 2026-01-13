@@ -3607,17 +3607,25 @@ function renderSubscriptionItem(sub, urgency) {
  * Navigate to admin panel and highlight a user by email
  */
 window.goToAdminUserByEmail = function(email) {
+    console.log('[SubscriptionAlerts] Navigating to user:', email);
+    
     // Switch to admin panel tab
     if (typeof switchDashboardTab === 'function') {
+        console.log('[SubscriptionAlerts] Calling switchDashboardTab(adminPanel)');
         switchDashboardTab('adminPanel');
+    } else {
+        console.warn('[SubscriptionAlerts] switchDashboardTab function not found');
     }
     
     // Wait for admin panel to render, then search for and highlight the user
-    setTimeout(() => {
+    setTimeout(function() {
         const searchInput = $('adminUserSearch');
+        console.log('[SubscriptionAlerts] Search input found:', !!searchInput);
+        
         if (searchInput) {
             searchInput.value = email;
             if (typeof filterAdminUsers === 'function') {
+                console.log('[SubscriptionAlerts] Filtering users...');
                 filterAdminUsers();
             }
         }
@@ -3627,7 +3635,7 @@ window.goToAdminUserByEmail = function(email) {
         if (usersSection) {
             usersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-    }, 300);
+    }, 500);
 };
 
 window.toggleSubscriptionPanel = function() {
