@@ -1974,50 +1974,71 @@
 
     <!-- Renter Section -->
     <div id="renterSection">
-        <!-- Photo Services Promo Banner (floating left side) - positioned higher -->
+        <!-- Photo Services Promo Widget (floating left side) -->
         <div id="photoPromoBar" class="hidden lg:block fixed left-0 top-1/4 z-40">
-            <!-- Expanded state - compact -->
+            <!-- Expanded state -->
             <div id="photoPromoExpanded" class="relative">
-                <!-- Collapse button -->
+                <!-- Collapse button - positioned outside -->
                 <button onclick="event.stopPropagation(); collapsePhotoPromoBar()" 
-                    class="absolute -top-1 -right-1 z-50 bg-gray-900 hover:bg-gray-700 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg border border-gray-700"
+                    class="absolute -top-2 -right-2 z-50 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-lg border border-gray-600"
                     title="Collapse">
-                    ‹
+                    ×
                 </button>
-                <!-- Main promo button - smaller -->
-                <div class="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white p-3 rounded-r-xl shadow-xl cursor-pointer hover:scale-105 transition-transform duration-300" onclick="openPhotoServicesModal()">
-                    <div class="flex flex-col items-center gap-1 w-12">
-                        <div class="text-xl">📸</div>
-                        <div class="text-[8px] font-bold uppercase text-center leading-tight opacity-90">Services</div>
+                
+                <!-- Main widget -->
+                <div class="bg-gray-900/95 backdrop-blur-sm rounded-r-2xl shadow-2xl cursor-pointer hover:bg-gray-800/95 transition border-r-4 border-amber-500 overflow-hidden" onclick="openPhotoServicesModal()">
+                    <!-- Photos section -->
+                    <div class="px-4 py-3 border-b border-gray-700/50">
+                        <div class="text-2xl text-center mb-1">📸</div>
+                        <div class="text-xs font-bold text-amber-400 text-center">Photos</div>
+                    </div>
+                    
+                    <!-- Turn-Key section -->
+                    <div class="px-4 py-3">
+                        <div class="text-2xl text-center mb-1">🔑</div>
+                        <div class="text-xs font-bold text-purple-400 text-center">Turn-Key</div>
+                    </div>
+                    
+                    <!-- Click hint -->
+                    <div class="bg-gradient-to-r from-amber-500 to-purple-500 py-1.5">
+                        <div class="text-[10px] font-bold text-white text-center">Click →</div>
                     </div>
                 </div>
             </div>
-            <!-- Collapsed state (minimal tab) -->
+            
+            <!-- Collapsed state -->
             <div id="photoPromoCollapsed" class="hidden">
                 <div onclick="expandPhotoPromoBar()" 
-                    class="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white p-2 rounded-r-lg shadow-lg cursor-pointer hover:scale-110 transition-transform duration-300"
-                    title="Photo & Property Services">
-                    <span class="text-sm">📸</span>
+                    class="bg-gradient-to-b from-amber-500 to-purple-500 text-white p-2 rounded-r-xl shadow-xl cursor-pointer hover:scale-105 transition-transform"
+                    title="Photos & Turn-Key Services">
+                    <div class="flex flex-col items-center gap-1">
+                        <span class="text-lg">📸</span>
+                        <span class="text-lg">🔑</span>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <!-- Mobile Photo Services Banner (top of hero) - more compact -->
-        <div id="mobilePhotoPromoBar" class="lg:hidden bg-gradient-to-r from-amber-500 via-orange-500 to-pink-600 text-white py-2 px-4 cursor-pointer relative">
+        <!-- Mobile Photo Services Banner (top of hero) -->
+        <div id="mobilePhotoPromoBar" class="lg:hidden bg-gradient-to-r from-amber-600 to-purple-600 text-white py-2 px-4 cursor-pointer relative">
             <button onclick="event.stopPropagation(); collapseMobilePhotoPromoBar()" 
-                class="absolute top-1/2 -translate-y-1/2 right-2 text-white/80 hover:text-white bg-white/20 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">×</button>
-            <div class="max-w-7xl mx-auto flex items-center justify-center gap-2 pr-6" onclick="openPhotoServicesModal()">
-                <span class="text-base">📸</span>
-                <span class="font-bold text-xs">Pro Photos & Property Management</span>
-                <span class="text-[10px] opacity-80">→</span>
+                class="absolute top-1/2 -translate-y-1/2 right-2 text-white/70 hover:text-white w-5 h-5 flex items-center justify-center text-sm">×</button>
+            <div class="max-w-7xl mx-auto flex items-center justify-center gap-3 pr-6" onclick="openPhotoServicesModal()">
+                <span>📸 Photos</span>
+                <span class="text-white/50">|</span>
+                <span>🔑 Turn-Key Services</span>
             </div>
         </div>
+        
         <!-- Mobile collapsed tab -->
         <div id="mobilePhotoPromoCollapsed" class="lg:hidden hidden fixed top-20 right-0 z-40">
             <div onclick="expandMobilePhotoPromoBar()" 
-                class="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white p-2 rounded-l-lg shadow-lg cursor-pointer"
-                title="Photo & Property Services">
-                <span class="text-sm">📸</span>
+                class="bg-gradient-to-b from-amber-500 to-purple-500 text-white p-2 rounded-l-xl shadow-xl cursor-pointer"
+                title="Photos & Turn-Key Services">
+                <div class="flex flex-col gap-0.5">
+                    <span class="text-sm">📸</span>
+                    <span class="text-sm">🔑</span>
+                </div>
             </div>
         </div>
         
