@@ -585,12 +585,12 @@ window.selectPhotoServiceOption = function(optionType) {
     
     const btnText = document.getElementById('photoServicesBtnText');
     
-    // Button text and package info for each option
+    // Button text for each option (no prices for managed - they see it on the card)
     const buttonInfo = {
-        single: { text: 'Copy & Notify: Per Photo ($5k)', emoji: '📷', name: 'Per Photo ($5k min 10)' },
-        bundle: { text: 'Copy & Notify: Premium Bundle ($75k)', emoji: '🎬', name: 'Premium Bundle ($75k)' },
-        rental: { text: 'Copy & Notify: Managed Rental ($25k + 10%)', emoji: '🏘️', name: 'Managed Rental ($25k + 10%)' },
-        sale: { text: 'Copy & Notify: Managed Sale ($50k + 10%)', emoji: '🏆', name: 'Managed Sale ($50k + 10%)' }
+        single: { text: 'Copy & Notify: Per Photo', emoji: '📷', name: 'Per Photo ($5k min 10)' },
+        bundle: { text: 'Copy & Notify: Premium Bundle', emoji: '🎬', name: 'Premium Bundle ($75k)' },
+        rental: { text: 'Copy & Notify: Managed Rental', emoji: '🏘️', name: 'Managed Rental ($25k + 10%)' },
+        sale: { text: 'Copy & Notify: Managed Sale', emoji: '🏆', name: 'Managed Sale ($50k + 10%)' }
     };
     
     // Reset all options, then select the chosen one
