@@ -3449,7 +3449,7 @@ window.renderSubscriptionAlertsPanel = async function() {
         
         let html = `
             <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 ${borderColor}">
-                <div class="bg-gradient-to-r ${headerGradient} px-6 py-4">
+                <div class="bg-gradient-to-r ${headerGradient} px-6 py-4 cursor-pointer" onclick="toggleSubscriptionPanel()">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <span class="text-2xl">${headerIcon}</span>
@@ -3458,11 +3458,11 @@ window.renderSubscriptionAlertsPanel = async function() {
                                 <p class="text-white/80 text-sm">${total} subscription${total !== 1 ? 's' : ''} need${total === 1 ? 's' : ''} attention</p>
                             </div>
                         </div>
-                        <button onclick="toggleSubscriptionPanel()" id="subscriptionPanelToggle" class="text-white/80 hover:text-white transition">
+                        <div id="subscriptionPanelToggle" class="text-white/80 hover:text-white transition">
                             <svg class="w-6 h-6 transform transition-transform" id="subscriptionPanelArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
-                        </button>
+                        </div>
                     </div>
                 </div>
                 <div id="subscriptionPanelContent" class="p-4 space-y-4">
