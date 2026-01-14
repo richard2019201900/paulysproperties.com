@@ -3587,6 +3587,7 @@ function renderSubscriptionItem(sub, urgency) {
  * Navigate to admin panel and highlight a user by email
  */
 window.goToAdminUserByEmail = function(email) {
+    console.log('[DEBUG goToAdminUserByEmail] Called with email:', email);
     
     // Switch to admin panel tab (use 'admin' not 'adminPanel')
     if (typeof switchDashboardTab === 'function') {
@@ -3625,8 +3626,10 @@ window.goToAdminUserByEmail = function(email) {
 };
 
 window.toggleSubscriptionPanel = function() {
+    console.log('[DEBUG toggleSubscriptionPanel] Called');
     const content = $('subscriptionPanelContent');
     const arrow = $('subscriptionPanelArrow');
+    console.log('[DEBUG toggleSubscriptionPanel] content:', content, 'arrow:', arrow);
     if (content && arrow) {
         content.classList.toggle('hidden');
         arrow.classList.toggle('rotate-180');
@@ -3634,6 +3637,7 @@ window.toggleSubscriptionPanel = function() {
 };
 
 window.copySubscriptionReminder = function(message) {
+    console.log('[DEBUG copySubscriptionReminder] Called with message length:', message?.length);
     navigator.clipboard.writeText(message).then(() => {
         showToast('📋 Reminder copied to clipboard!', 'success');
     }).catch(err => {

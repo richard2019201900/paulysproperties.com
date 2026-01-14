@@ -782,8 +782,10 @@
     }
     
     function toggleRentPanel() {
+        console.log('[DEBUG toggleRentPanel] Called');
         const content = document.getElementById('rentPanelContent');
         const arrow = document.getElementById('rentPanelArrow');
+        console.log('[DEBUG toggleRentPanel] content:', content, 'arrow:', arrow);
         
         if (content && arrow) {
             content.classList.toggle('hidden');
@@ -792,6 +794,7 @@
     }
     
     function copyRentReminder(propertyId, renterName, propertyTitle, amount) {
+        console.log('[DEBUG copyRentReminder] Called with:', { propertyId, renterName, propertyTitle, amount });
         // Find the rent data to get full details (frequency, due date, days overdue)
         const allRents = [...state.rentAlerts.overdue, ...state.rentAlerts.today, ...state.rentAlerts.tomorrow];
         const rentData = allRents.find(r => String(r.propId) === String(propertyId) || String(r.id) === String(propertyId));

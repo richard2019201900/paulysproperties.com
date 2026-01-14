@@ -412,13 +412,25 @@ window.viewPropertyAndHighlightOffers = function(id) {
  * All editable fields sync in real-time with Firestore
  */
 window.viewPropertyStats = async function(id) {
+    console.log('[DEBUG viewPropertyStats] Called with id:', id, 'type:', typeof id);
+    
     // Convert to number if it's a numeric string for consistent comparison
     const numericId = typeof id === 'string' && !isNaN(id) ? parseInt(id, 10) : id;
-    const p = properties.find(prop => prop.id === numericId || prop.id === id || String(prop.id) === String(id));
+    console.log('[DEBUG viewPropertyStats] numericId:', numericId, 'type:', typeof numericId);
+    console.log('[DEBUG viewPropertyStats] properties count:', properties?.length);
+    
+    const p = properties.find(prop => {
+        const match = prop.id === numericId || prop.id === id || String(prop.id) === String(id);
+        if (match) console.log('[DEBUG viewPropertyStats] Found match:', prop.id);
+        return match;
+    });
+    
     if (!p) {
-        console.error('[viewPropertyStats] Property not found:', id);
+        console.error('[DEBUG viewPropertyStats] Property not found. Looking for:', id, 'Available IDs:', properties?.slice(0, 5).map(p => p.id));
         return;
     }
+    
+    console.log('[DEBUG viewPropertyStats] Found property:', p.title);
     
     // Use the actual property ID from the found property
     const propId = p.id;
