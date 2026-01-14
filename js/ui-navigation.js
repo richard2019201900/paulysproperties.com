@@ -848,8 +848,38 @@ window.goToAdminNotifications = async function(type) {
 window.backToDashboard = function() {
     hideElement($('propertyStatsPage'));
     hideElement($('blogPage'));
-    showElement($('ownerDashboard'));
-    window.scrollTo(0, 0);
+    
+    // Return to the page user came from
+    if (window.navigationSource === 'properties') {
+        hideElement($('ownerDashboard'));
+        showElement($('renterSection'));
+        
+        // Re-apply filters
+        if (typeof applyAllFilters === 'function') {
+            applyAllFilters();
+        }
+        
+        // Restore scroll position
+        if (typeof window.savedScrollPosition === 'number') {
+            setTimeout(() => {
+                window.scrollTo(0, window.savedScrollPosition);
+            }, 50);
+        } else {
+            $('properties')?.scrollIntoView({ behavior: 'smooth' });
+        }
+    } else {
+        // Default: go to dashboard
+        showElement($('ownerDashboard'));
+        
+        // Restore scroll position if available
+        if (typeof window.savedScrollPosition === 'number') {
+            setTimeout(() => {
+                window.scrollTo(0, window.savedScrollPosition);
+            }, 50);
+        } else {
+            window.scrollTo(0, 0);
+        }
+    }
 };
 
 window.goHome = function() {

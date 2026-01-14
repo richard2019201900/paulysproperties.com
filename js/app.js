@@ -68,15 +68,24 @@ window.viewProperty = function(id, forcePropertyView = false) {
     const p = properties.find(prop => prop.id === id);
     if (!p) return;
     
+    // Save scroll position and navigation source BEFORE any navigation
+    window.savedScrollPosition = window.scrollY || window.pageYOffset;
+    
+    // Track where user came from
+    if (!$('ownerDashboard')?.classList.contains('hidden')) {
+        window.navigationSource = 'dashboard';
+    } else if (!$('renterSection')?.classList.contains('hidden')) {
+        window.navigationSource = 'properties';
+    } else {
+        window.navigationSource = 'properties'; // Default to properties
+    }
+    
     // If logged-in user owns this property, redirect to stats page instead
     // UNLESS they explicitly clicked the Property View tab (forcePropertyView = true)
     if (!forcePropertyView && auth.currentUser && ownsProperty(id)) {
-        viewPropertyStats(id);
+        viewPropertyStats(id, true); // Pass skipTrack=true since we already tracked
         return;
     }
-    
-    // Save scroll position before navigating away
-    window.savedScrollPosition = window.scrollY || window.pageYOffset;
     
     state.currentPropertyId = id;
     state.currentImages = p.images || [];
@@ -411,8 +420,27 @@ window.viewPropertyAndHighlightOffers = function(id) {
  * Renders the property stats page with EDITABLE tiles
  * All editable fields sync in real-time with Firestore
  */
-window.viewPropertyStats = async function(id) {
+window.viewPropertyStats = async function(id, skipTrack = false) {
     console.log('[DEBUG viewPropertyStats] Called with id:', id, 'type:', typeof id);
+    
+    // Track where user came from for back navigation (unless already tracked)
+    if (!skipTrack) {
+        if (!$('ownerDashboard')?.classList.contains('hidden')) {
+            window.navigationSource = 'dashboard';
+            window.savedScrollPosition = window.scrollY;
+        } else if (!$('renterSection')?.classList.contains('hidden')) {
+            window.navigationSource = 'properties';
+            window.savedScrollPosition = window.scrollY;
+        } else {
+            window.navigationSource = 'dashboard'; // Default fallback
+        }
+    }
+    
+    // Update back button text based on source
+    const backBtnText = $('statsBackBtnText');
+    if (backBtnText) {
+        backBtnText.textContent = window.navigationSource === 'properties' ? 'Back to Properties' : 'Back to Dashboard';
+    }
     
     // Convert to number if it's a numeric string for consistent comparison
     const numericId = typeof id === 'string' && !isNaN(id) ? parseInt(id, 10) : id;
