@@ -7391,3 +7391,36 @@ window.deleteRTODeposit = async function(propertyId, contractId) {
 
 // Start the app
 init();
+
+// Setup click handlers for notification panels after DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[DEBUG] DOMContentLoaded - setting up panel click handlers');
+    
+    // Rent panel
+    const rentPanel = document.getElementById('rentNotificationsPanel');
+    if (rentPanel) {
+        console.log('[DEBUG] Found rentNotificationsPanel, adding click listener');
+        rentPanel.addEventListener('click', function(e) {
+            console.log('[DEBUG RENT CLICK] Event fired!', e.target);
+            if (typeof handleRentPanelClick === 'function') {
+                handleRentPanelClick(e);
+            }
+        });
+    } else {
+        console.log('[DEBUG] rentNotificationsPanel NOT found');
+    }
+    
+    // Subscription panel
+    const subPanel = document.getElementById('subscriptionNotificationsPanel');
+    if (subPanel) {
+        console.log('[DEBUG] Found subscriptionNotificationsPanel, adding click listener');
+        subPanel.addEventListener('click', function(e) {
+            console.log('[DEBUG SUB CLICK] Event fired!', e.target);
+            if (typeof handleSubscriptionPanelClick === 'function') {
+                handleSubscriptionPanelClick(e);
+            }
+        });
+    } else {
+        console.log('[DEBUG] subscriptionNotificationsPanel NOT found');
+    }
+});
