@@ -3517,9 +3517,9 @@ window.renderSubscriptionAlertsPanel = async function() {
         // Set global subscription alert count for notification badges
         window.subscriptionAlertCount = total;
         
-        // Refresh notification badges to show subscription count
-        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
-            NotificationManager.refreshUI();
+        // Only refresh badges, NOT panels (to avoid infinite loop)
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshBadges) {
+            NotificationManager.refreshBadges();
         }
         
     } catch (error) {
