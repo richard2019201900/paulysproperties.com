@@ -289,8 +289,8 @@ window.renderBlogPage = function() {
         {
             date: 'January 14, 2025',
             title: '🏠 Property Management Just Got Easier',
-            category: 'New Feature',
-            categoryColor: 'bg-cyan-500',
+            category: 'Major Update',
+            categoryColor: 'bg-purple-500',
             content: `
                 <p class="mb-4">This update focuses on making your day-to-day property management smoother. We've improved how you track rent, added professional services, and cleaned up the interface. We also connected PaulysAutos.com via a dropdown in the top-left corner to make switching between car and property sales as seamless as possible.</p>
                 
@@ -328,7 +328,7 @@ window.renderBlogPage = function() {
                 
                 <p class="mt-6 text-gray-300">We're building a connected network of services for Los Santos. Whether you need a place to live or a car to drive, Pauly's got you covered.</p>
                 
-                <p class="mt-4 text-gray-400 italic">Questions or ideas? <strong class="text-green-400">Text Pauly in city.</strong> Your feedback shapes everything we build.</p>
+                <p class="mt-4 text-gray-400 italic">Questions or ideas? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city.</strong> Your feedback shapes everything we build.</p>
             `
         },
         {
@@ -406,7 +406,7 @@ window.renderBlogPage = function() {
                 
                 <p class="mt-6 text-gray-300">We're going all-in on the phone browser experience. Our goal is to make PaulysProperties.com the smoothest, most useful tool you can access without ever leaving the city.</p>
                 
-                <p class="mt-4 text-gray-400 italic">Questions, ideas, or feedback? <strong class="text-green-400">Text Pauly in city</strong> — everything you tell us shapes what we build next.</p>
+                <p class="mt-4 text-gray-400 italic">Questions, ideas, or feedback? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city</strong> — everything you tell us shapes what we build next.</p>
             `
         },
         {
@@ -472,7 +472,7 @@ window.renderBlogPage = function() {
                     <li>Activity logging and VIP leads tracking</li>
                 </ul>
                 
-                <p class="mt-6 text-gray-300">This is just the beginning. We're releasing updates weekly based on your feedback. Have a feature request or question? <strong class="text-green-400">Text Pauly in city</strong> for the fastest response.</p>
+                <p class="mt-6 text-gray-300">This is just the beginning. We're releasing updates weekly based on your feedback. Have a feature request or question? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city</strong> for the fastest response.</p>
                 
                 <p class="mt-4 text-gray-400 italic">Thank you to everyone who's joined us in these first two weeks. Here's to building something great together.</p>
             `
@@ -510,7 +510,7 @@ window.renderBlogPage = function() {
             <!-- Footer -->
             <div class="text-center mt-12 py-8 border-t border-gray-700">
                 <p class="text-gray-500 text-sm">
-                    Updates posted weekly. Text Pauly in city with questions or feedback.
+                    Updates posted weekly. <span class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city</span> with questions or feedback.
                 </p>
                 <button onclick="navigateTo('home')" class="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-xl font-bold hover:opacity-90 transition">
                     ← Back to Home
