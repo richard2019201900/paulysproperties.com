@@ -235,7 +235,7 @@
                     <p class="text-gray-400 text-xs mb-4">Select a package below, then click "Copy & Notify" to express interest</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Per Photo Option -->
-                        <div id="photoOptionSingle" 
+                        <div id="photoOptionSingle" onclick="selectPhotoServiceOption('single')"
                             class="bg-gray-800/70 rounded-xl p-5 text-center border-2 border-gray-600 hover:border-green-500 transition cursor-pointer relative">
                             <div id="photoSingleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
                             <div class="text-green-400 text-xs font-bold mb-2">📷 PER PHOTO</div>
@@ -250,7 +250,7 @@
                         </div>
                         
                         <!-- Premium Bundle -->
-                        <div id="photoOptionBundle"
+                        <div id="photoOptionBundle" onclick="selectPhotoServiceOption('bundle')"
                             class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-xl p-5 text-center border-2 border-amber-500 relative cursor-pointer hover:border-amber-400 transition">
                             <div id="photoBundleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
                             <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-1 rounded-full">⭐ BEST VALUE</div>
@@ -277,7 +277,7 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <!-- For Rentals -->
-                        <div id="managedOptionRental" class="bg-gray-800/70 rounded-xl p-4 border-2 border-gray-600 hover:border-purple-500 transition cursor-pointer relative">
+                        <div id="managedOptionRental" onclick="selectPhotoServiceOption('rental')" class="bg-gray-800/70 rounded-xl p-4 border-2 border-gray-600 hover:border-purple-500 transition cursor-pointer relative">
                             <div id="managedRentalCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
                             <div class="text-purple-400 text-xs font-bold mb-2">🏘️ FOR RENTALS</div>
                             <div class="text-2xl font-black text-white mb-1">$25,000 <span class="text-sm text-gray-400">one-time</span></div>
@@ -291,7 +291,7 @@
                         </div>
                         
                         <!-- For Sales -->
-                        <div id="managedOptionSale" class="bg-gray-800/70 rounded-xl p-4 border-2 border-gray-600 hover:border-pink-500 transition cursor-pointer relative">
+                        <div id="managedOptionSale" onclick="selectPhotoServiceOption('sale')" class="bg-gray-800/70 rounded-xl p-4 border-2 border-gray-600 hover:border-pink-500 transition cursor-pointer relative">
                             <div id="managedSaleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">✓</div>
                             <div class="text-pink-400 text-xs font-bold mb-2">🏆 FOR SALES</div>
                             <div class="text-2xl font-black text-white mb-1">$50,000 <span class="text-sm text-gray-400">one-time</span></div>
@@ -312,16 +312,16 @@
                 
                 <!-- Contact CTA -->
                 <div class="text-center pt-4">
-                    <p class="text-gray-400 text-sm mb-4">Ready to showcase your property? Contact Pauly in-city!</p>
+                    <p class="text-gray-400 text-sm mb-4">Select an option above, then contact Pauly in-city!</p>
                     <div class="flex gap-4 justify-center flex-wrap">
                         <button id="photoServicesCopyBtn" onclick="copyAndNotifyPhotoServices()" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
-                            <span>📱</span> Copy & Notify: 2057028233
+                            <span>📱</span> <span id="photoServicesBtnText">Select an option above</span>
                         </button>
                         <button onclick="closeModal('photoServicesModal')" class="bg-gray-700 text-gray-200 px-6 py-3 rounded-xl font-bold hover:bg-gray-600 transition">
                             Close
                         </button>
                     </div>
-                    <p class="text-gray-500 text-xs mt-3">Clicking "Copy & Notify" copies the phone number and alerts our team</p>
+                    <p class="text-gray-500 text-xs mt-3">Clicking copies the phone number and alerts our team with your selection</p>
                 </div>
             </div>
         </div>
@@ -2031,12 +2031,12 @@
                 <!-- Main promo button -->
                 <div class="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white p-5 rounded-r-2xl shadow-2xl cursor-pointer hover:scale-105 transition-transform duration-300 border-r-4 border-white/30" onclick="openPhotoServicesModal()">
                     <div class="flex flex-col items-center gap-3 w-20">
-                        <div class="text-4xl animate-bounce">📸</div>
+                        <div class="text-3xl animate-bounce">📸🏠</div>
                         <div class="text-xs font-black uppercase tracking-wider text-center leading-tight">
-                            Photo<br>Services
+                            Photos &<br>Services
                         </div>
                         <div class="w-10 h-0.5 bg-white/50 rounded-full"></div>
-                        <div class="text-[10px] opacity-90 text-center font-semibold bg-white/20 px-2 py-1 rounded-full">Click for info</div>
+                        <div class="text-[9px] opacity-90 text-center font-semibold bg-white/20 px-2 py-1 rounded-full leading-tight">Pro Photos or<br>Turn-Key</div>
                     </div>
                 </div>
             </div>
@@ -2044,9 +2044,9 @@
             <div id="photoPromoCollapsed" class="hidden">
                 <div onclick="expandPhotoPromoBar()" 
                     class="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white p-2 rounded-r-xl shadow-xl cursor-pointer hover:scale-110 transition-transform duration-300 border-r-2 border-white/30"
-                    title="Photo Services - Click to expand">
+                    title="Photos & Services - Click to expand">
                     <div class="flex flex-col items-center gap-1 w-8">
-                        <span class="text-lg">📸</span>
+                        <span class="text-lg">📸🏠</span>
                         <span class="text-white font-bold">›</span>
                     </div>
                 </div>
@@ -2058,8 +2058,8 @@
             <button onclick="event.stopPropagation(); collapseMobilePhotoPromoBar()" 
                 class="absolute top-1/2 -translate-y-1/2 right-2 text-white/80 hover:text-white bg-white/20 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">‹</button>
             <div class="max-w-7xl mx-auto flex items-center justify-center gap-3 pr-8" onclick="openPhotoServicesModal()">
-                <span class="text-xl">📸</span>
-                <span class="font-bold text-sm">Need HD property photos? Let Pauly handle it!</span>
+                <span class="text-xl">📸🏠</span>
+                <span class="font-bold text-sm">Pro Photos or Turn-Key Management!</span>
                 <span class="bg-white/20 px-2 py-1 rounded-full text-xs font-bold">Learn More →</span>
             </div>
         </div>
@@ -2067,7 +2067,7 @@
         <div id="mobilePhotoPromoCollapsed" class="lg:hidden hidden fixed top-20 right-0 z-40">
             <div onclick="expandMobilePhotoPromoBar()" 
                 class="bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white p-2 rounded-l-xl shadow-xl cursor-pointer"
-                title="Photo Services">
+                title="Photos & Services">
                 <span class="text-lg">📸</span>
             </div>
         </div>

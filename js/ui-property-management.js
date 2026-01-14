@@ -338,7 +338,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.classList.remove('from-amber-500', 'to-yellow-500');
                 btn.classList.add('from-green-500', 'to-emerald-500');
                 
-                // Close modal after delay
+                // Show managed services prompt after a short delay
+                setTimeout(() => {
+                    showManagedServicesPrompt(newPropertyId);
+                }, 800);
+                
+                // Close modal after delay (longer to allow prompt to be seen)
                 setTimeout(() => {
                     closeModal('createListingModal');
                     goToDashboard();

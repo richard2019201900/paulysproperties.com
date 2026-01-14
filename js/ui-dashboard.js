@@ -887,7 +887,24 @@ window.renderOwnerDashboard = function() {
         if (availableSection) availableSection.classList.remove('hidden');
         if (availableCount) availableCount.textContent = `(${availableProps.length})`;
         if (availableList) {
-            availableList.innerHTML = availableProps.map(p => renderPropertyRow(p, true)).join('');
+            // Add "Let Pauly Help" banner at the top if there are vacant properties
+            const helpBanner = `
+                <div class="bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-xl p-4 border border-purple-500/30 mb-4">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🏠</span>
+                            <div>
+                                <div class="text-purple-300 font-bold text-sm">Properties sitting vacant?</div>
+                                <div class="text-gray-400 text-xs">Let Pauly handle the photos, listing & tours for you!</div>
+                            </div>
+                        </div>
+                        <button onclick="openPhotoServicesModal()" class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition whitespace-nowrap">
+                            📸 Learn More
+                        </button>
+                    </div>
+                </div>
+            `;
+            availableList.innerHTML = helpBanner + availableProps.map(p => renderPropertyRow(p, true)).join('');
         }
     }
     

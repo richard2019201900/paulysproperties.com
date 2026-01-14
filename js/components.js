@@ -301,26 +301,50 @@ window.openPhotoServicesModal = function() {
     // Reset package selection
     window.selectedPhotoPackage = null;
     
-    // Reset UI state for package options
-    const singleOption = document.getElementById('photoOptionSingle');
-    const bundleOption = document.getElementById('photoOptionBundle');
-    const singleCheck = document.getElementById('photoSingleCheck');
-    const bundleCheck = document.getElementById('photoBundleCheck');
+    // All option elements
+    const options = {
+        single: {
+            el: document.getElementById('photoOptionSingle'),
+            check: document.getElementById('photoSingleCheck'),
+            borderSelected: ['border-green-500', 'ring-2', 'ring-green-500/50'],
+            borderDefault: ['border-gray-600']
+        },
+        bundle: {
+            el: document.getElementById('photoOptionBundle'),
+            check: document.getElementById('photoBundleCheck'),
+            borderSelected: ['border-amber-400', 'ring-2', 'ring-amber-500/50'],
+            borderDefault: ['border-amber-500']
+        },
+        rental: {
+            el: document.getElementById('managedOptionRental'),
+            check: document.getElementById('managedRentalCheck'),
+            borderSelected: ['border-purple-500', 'ring-2', 'ring-purple-500/50'],
+            borderDefault: ['border-gray-600']
+        },
+        sale: {
+            el: document.getElementById('managedOptionSale'),
+            check: document.getElementById('managedSaleCheck'),
+            borderSelected: ['border-pink-500', 'ring-2', 'ring-pink-500/50'],
+            borderDefault: ['border-gray-600']
+        }
+    };
     
-    if (singleOption) {
-        singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
-        singleOption.classList.add('border-gray-600');
-    }
-    if (bundleOption) {
-        bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
-    }
-    if (singleCheck) singleCheck.classList.add('hidden');
-    if (bundleCheck) bundleCheck.classList.add('hidden');
+    // Reset all options to default state
+    Object.keys(options).forEach(key => {
+        const opt = options[key];
+        if (!opt.el) return;
+        opt.borderSelected.forEach(cls => opt.el.classList.remove(cls));
+        opt.borderDefault.forEach(cls => opt.el.classList.add(cls));
+        if (opt.check) opt.check.classList.add('hidden');
+    });
     
     // Reset the copy button state
+    const btnText = document.getElementById('photoServicesBtnText');
     const btn = document.getElementById('photoServicesCopyBtn');
+    if (btnText) {
+        btnText.textContent = 'Select an option above';
+    }
     if (btn) {
-        btn.innerHTML = '<span>📱</span> Select a Package Above';
         btn.disabled = false;
         btn.classList.remove('opacity-50', 'cursor-not-allowed');
     }
@@ -527,65 +551,97 @@ window.optOutManagedServices = async function() {
 // Track selected photo package
 window.selectedPhotoPackage = null;
 
-// Select a photo package
-window.selectPhotoPackage = function(packageType) {
-    window.selectedPhotoPackage = packageType;
+// Select a photo/service option (mutually exclusive)
+window.selectPhotoServiceOption = function(optionType) {
+    window.selectedPhotoPackage = optionType;
     
-    const singleOption = document.getElementById('photoOptionSingle');
-    const bundleOption = document.getElementById('photoOptionBundle');
-    const singleCheck = document.getElementById('photoSingleCheck');
-    const bundleCheck = document.getElementById('photoBundleCheck');
-    const copyBtn = document.getElementById('photoServicesCopyBtn');
-    if (!singleOption || !bundleOption) {
-        console.error('[PhotoServices] Package option elements not found!');
-        return;
-    }
+    // All option elements
+    const options = {
+        single: {
+            el: document.getElementById('photoOptionSingle'),
+            check: document.getElementById('photoSingleCheck'),
+            borderSelected: ['border-green-500', 'ring-2', 'ring-green-500/50'],
+            borderDefault: ['border-gray-600']
+        },
+        bundle: {
+            el: document.getElementById('photoOptionBundle'),
+            check: document.getElementById('photoBundleCheck'),
+            borderSelected: ['border-amber-400', 'ring-2', 'ring-amber-500/50'],
+            borderDefault: ['border-amber-500']
+        },
+        rental: {
+            el: document.getElementById('managedOptionRental'),
+            check: document.getElementById('managedRentalCheck'),
+            borderSelected: ['border-purple-500', 'ring-2', 'ring-purple-500/50'],
+            borderDefault: ['border-gray-600']
+        },
+        sale: {
+            el: document.getElementById('managedOptionSale'),
+            check: document.getElementById('managedSaleCheck'),
+            borderSelected: ['border-pink-500', 'ring-2', 'ring-pink-500/50'],
+            borderDefault: ['border-gray-600']
+        }
+    };
     
-    if (packageType === 'single') {
-        // Select single photo option
-        singleOption.classList.remove('border-gray-600');
-        singleOption.classList.add('border-green-500', 'ring-2', 'ring-green-500/50');
-        if (singleCheck) singleCheck.classList.remove('hidden');
+    const btnText = document.getElementById('photoServicesBtnText');
+    
+    // Button text and package info for each option
+    const buttonInfo = {
+        single: { text: 'Copy & Notify: Per Photo ($5k)', emoji: '📷', name: 'Per Photo ($5k min 10)' },
+        bundle: { text: 'Copy & Notify: Premium Bundle ($75k)', emoji: '🎬', name: 'Premium Bundle ($75k)' },
+        rental: { text: 'Copy & Notify: Managed Rental ($25k + 10%)', emoji: '🏘️', name: 'Managed Rental ($25k + 10%)' },
+        sale: { text: 'Copy & Notify: Managed Sale ($50k + 10%)', emoji: '🏆', name: 'Managed Sale ($50k + 10%)' }
+    };
+    
+    // Reset all options, then select the chosen one
+    Object.keys(options).forEach(key => {
+        const opt = options[key];
+        if (!opt.el) return;
         
-        // Deselect bundle
-        bundleOption.classList.remove('ring-2', 'ring-amber-500/50');
-        bundleOption.classList.add('border-amber-500');
-        if (bundleCheck) bundleCheck.classList.add('hidden');
-        
-        // Update button text
-        if (copyBtn) {
-            copyBtn.innerHTML = '<span>📷</span> Copy & Notify: Per Photo ($10k)';
+        if (key === optionType) {
+            // Select this option
+            opt.borderDefault.forEach(cls => opt.el.classList.remove(cls));
+            opt.borderSelected.forEach(cls => opt.el.classList.add(cls));
+            if (opt.check) opt.check.classList.remove('hidden');
+        } else {
+            // Deselect this option
+            opt.borderSelected.forEach(cls => opt.el.classList.remove(cls));
+            opt.borderDefault.forEach(cls => opt.el.classList.add(cls));
+            if (opt.check) opt.check.classList.add('hidden');
         }
-    } else if (packageType === 'bundle') {
-        // Select bundle option
-        bundleOption.classList.add('ring-2', 'ring-amber-500/50');
-        if (bundleCheck) bundleCheck.classList.remove('hidden');
-        
-        // Deselect single
-        singleOption.classList.remove('border-green-500', 'ring-2', 'ring-green-500/50');
-        singleOption.classList.add('border-gray-600');
-        if (singleCheck) singleCheck.classList.add('hidden');
-        
-        // Update button text
-        if (copyBtn) {
-            copyBtn.innerHTML = '<span>🎬</span> Copy & Notify: Premium Bundle ($125k)';
-        }
+    });
+    
+    // Update button text
+    if (btnText && buttonInfo[optionType]) {
+        btnText.textContent = buttonInfo[optionType].text;
     }
 };
 
+// Legacy alias for old click handlers
+window.selectPhotoPackage = window.selectPhotoServiceOption;
+
 window.copyAndNotifyPhotoServices = async function() {
     const user = auth.currentUser;
+    const btnText = document.getElementById('photoServicesBtnText');
     const btn = document.getElementById('photoServicesCopyBtn');
     
     // Check if package is selected
     if (!window.selectedPhotoPackage) {
-        showToast('⚠️ Please select a package first (Per Photo or Premium Bundle)', 'warning');
+        showToast('⚠️ Please select an option first', 'warning');
         return;
     }
     
     const packageType = window.selectedPhotoPackage;
-    const packageName = packageType === 'bundle' ? 'Premium Bundle ($125k)' : 'Per Photo ($10k)';
-    const packageEmoji = packageType === 'bundle' ? '🎬' : '📷';
+    
+    // Package info for all options
+    const packageInfo = {
+        single: { name: 'Per Photo ($5k min 10)', emoji: '📷', type: 'photo_inquiry' },
+        bundle: { name: 'Premium Bundle ($75k)', emoji: '🎬', type: 'photo_inquiry' },
+        rental: { name: 'Managed Rental ($25k + 10%)', emoji: '🏘️', type: 'managed_rental' },
+        sale: { name: 'Managed Sale ($50k + 10%)', emoji: '🏆', type: 'managed_sale' }
+    };
+    
+    const info = packageInfo[packageType] || packageInfo.single;
     
     // Copy phone number to clipboard
     try {
@@ -611,27 +667,30 @@ window.copyAndNotifyPhotoServices = async function() {
             username: username,
             userId: user?.uid || null,
             requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            type: 'photo_inquiry',
-            packageType: packageType,  // 'single' or 'bundle'
-            packageName: packageName,
+            type: info.type,
+            packageType: packageType,
+            packageName: info.name,
             status: 'pending',
             viewed: false
         });
+        
         // Update button to show success
+        if (btnText) {
+            btnText.textContent = `✅ ${info.emoji} ${info.name} - Team Notified!`;
+        }
         if (btn) {
-            btn.innerHTML = `<span>✅</span> ${packageEmoji} ${packageName} - Team Notified!`;
             btn.disabled = true;
             btn.classList.add('opacity-50', 'cursor-not-allowed');
         }
         
-        showToast(`${packageEmoji} Phone copied! Our team has been notified you want the ${packageName}!`, 'success');
+        showToast(`${info.emoji} Phone copied! Our team has been notified you're interested in ${info.name}!`, 'success');
         
     } catch (error) {
         console.error('[PhotoServices] Error creating notification:', error);
         // Still show success for copy even if notification failed
         showToast('📱 Phone number copied!', 'success');
-        if (btn) {
-            btn.innerHTML = '<span>✅</span> Copied!';
+        if (btnText) {
+            btnText.textContent = '✅ Copied!';
         }
     }
 };
@@ -863,3 +922,68 @@ const EditableStatTile = {
 
 // Make EditableStatTile globally accessible
 window.EditableStatTile = EditableStatTile;
+
+// ==================== MANAGED SERVICES PROMPT ====================
+
+/**
+ * Show a prompt after listing creation asking if user wants managed services
+ */
+window.showManagedServicesPrompt = function(propertyId) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('managedServicesPromptModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'managedServicesPromptModal';
+        modal.className = 'fixed inset-0 bg-black/80 z-[60] flex items-center justify-center hidden';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.innerHTML = `
+            <div class="glass-effect rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border border-purple-500/50 animate-fade-in">
+                <div class="text-center mb-4">
+                    <div class="text-5xl mb-3">🎉</div>
+                    <h2 class="text-xl font-bold text-white mb-2">Listing Created!</h2>
+                    <p class="text-gray-300 text-sm">Want us to handle the rest?</p>
+                </div>
+                
+                <div class="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-4 border border-purple-500/30 mb-4">
+                    <h3 class="text-purple-400 font-bold mb-2 flex items-center gap-2">
+                        <span>🏠</span> Turn-Key Property Management
+                    </h3>
+                    <p class="text-gray-300 text-sm mb-3">Let Pauly handle everything — professional photos, premium listing, tours, tenant screening, and more!</p>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Professional photos & video included</li>
+                        <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Premium listing placement</li>
+                        <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Tenant/buyer screening & tours</li>
+                        <li class="flex items-center gap-2"><span class="text-purple-400">✓</span> Just hand over the keys!</li>
+                    </ul>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="closeManagedServicesPrompt(); openPhotoServicesModal();" class="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        📸 Tell Me More
+                    </button>
+                    <button onclick="closeManagedServicesPrompt();" class="flex-1 bg-gray-700 text-gray-300 py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        I'll Do It Myself
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    
+    // Store property ID for reference
+    modal.dataset.propertyId = propertyId;
+    
+    // Show modal
+    modal.classList.remove('hidden');
+};
+
+/**
+ * Close the managed services prompt
+ */
+window.closeManagedServicesPrompt = function() {
+    const modal = document.getElementById('managedServicesPromptModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
