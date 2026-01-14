@@ -917,6 +917,37 @@
                                     <span class="text-lg">🏆</span>
                                     <span class="font-medium">Leaderboard</span>
                                 </a>
+                                <!-- Services submenu -->
+                                <div class="relative group">
+                                    <a onclick="toggleServicesSubmenu(event)" class="flex items-center justify-between px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                        <div class="flex items-center gap-3">
+                                            <span class="text-lg">🛎️</span>
+                                            <span class="font-medium">Services</span>
+                                        </div>
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                    </a>
+                                    <!-- Services submenu panel -->
+                                    <div id="servicesSubmenu" class="hidden absolute left-full top-0 ml-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                                        <a onclick="openPhotoServicesModal(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                            <span class="text-lg">📸</span>
+                                            <div>
+                                                <div class="font-medium">Photography</div>
+                                                <div class="text-xs text-gray-400">Pro photos from $5k</div>
+                                            </div>
+                                        </a>
+                                        <a onclick="openPhotoServicesModal(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
+                                            <span class="text-lg">🔑</span>
+                                            <div>
+                                                <div class="font-medium">Turn-Key Management</div>
+                                                <div class="text-xs text-gray-400">We handle everything</div>
+                                            </div>
+                                        </a>
+                                        <div class="border-t border-gray-700"></div>
+                                        <div class="px-4 py-2 text-xs text-gray-500">
+                                            More services coming soon
+                                        </div>
+                                    </div>
+                                </div>
                                 <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center justify-between px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
                                     <div class="flex items-center gap-3">
                                         <span class="text-lg">📰</span>
@@ -985,6 +1016,9 @@
             </a>
             <a id="mobileDashboardLink" onclick="goToDashboard(); hideMobileMenu();" class="hidden px-4 py-3 text-purple-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
                 <span>🏠</span> Dashboard
+            </a>
+            <a id="mobileServicesLink" onclick="openPhotoServicesModal(); hideMobileMenu();" class="hidden px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
+                <span>🛎️</span> Services
             </a>
             <a id="mobileCreateListingBtn" onclick="openCreateListingModal(); hideMobileMenu();" class="hidden px-4 py-3 text-green-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
                 <span>➕</span> New Listing
@@ -1974,73 +2008,6 @@
 
     <!-- Renter Section -->
     <div id="renterSection">
-        <!-- Photo Services Promo Widget (floating left side) -->
-        <div id="photoPromoBar" class="hidden lg:block fixed left-0 top-1/4 z-40">
-            <!-- Expanded state -->
-            <div id="photoPromoExpanded" class="relative">
-                <!-- Collapse button - positioned outside -->
-                <button onclick="event.stopPropagation(); collapsePhotoPromoBar()" 
-                    class="absolute -top-2 -right-2 z-50 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white w-6 h-6 rounded-full flex items-center justify-center text-sm shadow-lg border border-gray-600"
-                    title="Collapse">
-                    ×
-                </button>
-                
-                <!-- Main widget -->
-                <div class="bg-gray-900/95 backdrop-blur-sm rounded-r-2xl shadow-2xl cursor-pointer hover:bg-gray-800/95 transition border-r-4 border-amber-500 overflow-hidden" onclick="openPhotoServicesModal()">
-                    <!-- Photos section -->
-                    <div class="px-4 py-3 border-b border-gray-700/50">
-                        <div class="text-2xl text-center mb-1">📸</div>
-                        <div class="text-xs font-bold text-amber-400 text-center">Photos</div>
-                    </div>
-                    
-                    <!-- Turn-Key section -->
-                    <div class="px-4 py-3">
-                        <div class="text-2xl text-center mb-1">🔑</div>
-                        <div class="text-xs font-bold text-purple-400 text-center">Turn-Key</div>
-                    </div>
-                    
-                    <!-- Click hint -->
-                    <div class="bg-gradient-to-r from-amber-500 to-purple-500 py-1.5">
-                        <div class="text-[10px] font-bold text-white text-center">Click →</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Collapsed state -->
-            <div id="photoPromoCollapsed" class="hidden">
-                <div onclick="expandPhotoPromoBar()" 
-                    class="bg-gradient-to-b from-amber-500 to-purple-500 text-white p-2 rounded-r-xl shadow-xl cursor-pointer hover:scale-105 transition-transform"
-                    title="Photos & Turn-Key Services">
-                    <div class="flex flex-col items-center gap-1">
-                        <span class="text-lg">📸</span>
-                        <span class="text-lg">🔑</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Mobile Photo Services Banner (top of hero) -->
-        <div id="mobilePhotoPromoBar" class="lg:hidden bg-gradient-to-r from-amber-600 to-purple-600 text-white py-2 px-4 cursor-pointer relative">
-            <button onclick="event.stopPropagation(); collapseMobilePhotoPromoBar()" 
-                class="absolute top-1/2 -translate-y-1/2 right-2 text-white/70 hover:text-white w-5 h-5 flex items-center justify-center text-sm">×</button>
-            <div class="max-w-7xl mx-auto flex items-center justify-center gap-3 pr-6" onclick="openPhotoServicesModal()">
-                <span>📸 Photos</span>
-                <span class="text-white/50">|</span>
-                <span>🔑 Turn-Key Services</span>
-            </div>
-        </div>
-        
-        <!-- Mobile collapsed tab -->
-        <div id="mobilePhotoPromoCollapsed" class="lg:hidden hidden fixed top-20 right-0 z-40">
-            <div onclick="expandMobilePhotoPromoBar()" 
-                class="bg-gradient-to-b from-amber-500 to-purple-500 text-white p-2 rounded-l-xl shadow-xl cursor-pointer"
-                title="Photos & Turn-Key Services">
-                <div class="flex flex-col gap-0.5">
-                    <span class="text-sm">📸</span>
-                    <span class="text-sm">🔑</span>
-                </div>
-            </div>
-        </div>
         
         <section id="home" class="gradient-bg text-white py-12 md:py-16" style="scroll-margin-top: 70px;">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">

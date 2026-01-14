@@ -1298,6 +1298,21 @@ function renderPropertyStatsContent(id) {
         
         </div><!-- End of padding wrapper for Pricing & Quick Actions sections -->
         
+        <!-- Services Prompt Card -->
+        <div class="px-6 md:px-8 mb-6">
+            <div class="bg-gradient-to-r from-amber-900/30 via-purple-900/30 to-pink-900/30 rounded-xl p-5 border border-purple-500/30">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h4 class="text-lg font-bold text-white mb-1">Need help with this property?</h4>
+                        <p class="text-gray-400 text-sm">Professional photos, premium listings, or full turn-key management</p>
+                    </div>
+                    <button onclick="openPhotoServicesModal()" class="bg-gradient-to-r from-amber-500 to-purple-600 text-white px-5 py-2.5 rounded-xl font-bold hover:opacity-90 transition whitespace-nowrap flex items-center gap-2">
+                        <span>📸</span> View Services
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Analytics and Reviews - continue within main card -->
         <div class="px-6 md:px-8 pb-8">
         
