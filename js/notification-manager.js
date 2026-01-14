@@ -326,7 +326,6 @@
             return;
         }
         
-        console.log('[NotificationManager] Handling click:', notification.type, action);
         
         // Step 1: Ensure dashboard is visible
         if (typeof window.goToDashboard === 'function') {
@@ -357,7 +356,6 @@
      * Used by dropdown and mobile badges
      */
     async function handleBadgeClick(type) {
-        console.log('[NotificationManager] Badge click:', type);
         
         // Ensure dashboard is visible
         if (typeof window.goToDashboard === 'function') {
@@ -866,7 +864,6 @@
         // Create promise to prevent concurrent calls
         initPromise = (async () => {
             try {
-                console.log('[NotificationManager] Initializing for:', currentUser.email);
                 
                 // Load preferences from Firestore via UserPreferencesService
                 if (window.UserPreferencesService) {
@@ -901,7 +898,6 @@
                 state.initialized = true;
                 refreshUI();
                 
-                console.log('[NotificationManager] Initialization complete');
             } catch (error) {
                 console.error('[NotificationManager] Init error:', error);
                 initPromise = null; // Allow retry on error
@@ -922,7 +918,6 @@
         state.knownUserIds.clear();
         state.knownListingIds.clear();
         
-        console.log('[NotificationManager] Destroyed');
     }
     
     function startUserListener() {
@@ -1122,11 +1117,6 @@
                 }
             });
             
-            console.log('[NotificationManager] Rent due results:', {
-                overdue: overdue.length,
-                today: dueToday.length,
-                tomorrow: dueTomorrow.length
-            });
             
             state.rentAlerts = {
                 overdue,
@@ -1228,6 +1218,5 @@
     window.updateMobileRentBadge = refreshBadges;
     window.updateMobileAdminBadges = refreshBadges;
 
-    console.log('[NotificationManager] Module loaded');
 
 })();

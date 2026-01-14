@@ -504,7 +504,6 @@ const PropertyDataService = {
                 prop[field] = value;
             }
             
-            console.log(`[PropertyDataService] Wrote ${field}=${value} for property ${numericId}`);
             return true;
         } catch (error) {
             console.error('[PropertyDataService] WRITE error:', error);
@@ -539,7 +538,6 @@ const PropertyDataService = {
                 Object.assign(prop, fields);
             }
             
-            console.log(`[PropertyDataService] Wrote ${Object.keys(fields).length} fields for property ${numericId}`);
             return true;
         } catch (error) {
             console.error('[PropertyDataService] WRITE MULTIPLE error:', error);
@@ -623,7 +621,6 @@ const PropertyDataService = {
  * Call from console: await viewFirestoreState()
  */
 window.viewFirestoreState = async function() {
-    console.log('========== FIRESTORE STATE (UNIFIED ARCHITECTURE) ==========');
     
     try {
         const [propsDoc, availDoc] = await Promise.all([
@@ -631,37 +628,26 @@ window.viewFirestoreState = async function() {
             db.collection('settings').doc('propertyAvailability').get()
         ]);
         
-        console.log('\n📁 settings/properties (SINGLE SOURCE OF TRUTH):');
         if (propsDoc.exists) {
             const data = propsDoc.data();
             const propIds = Object.keys(data).filter(k => data[k]?.title).sort((a,b) => parseInt(a) - parseInt(b));
-            console.log(`   Total properties: ${propIds.length}`);
             propIds.forEach(id => {
                 const p = data[id];
-                console.log(`   ${id}: ${p.title} | Owner: ${p.ownerEmail || 'master'} | Premium: ${p.isPremium || false}`);
             });
         } else {
-            console.log('   (does not exist - run migration first!)');
         }
         
-        console.log('\n📁 settings/propertyAvailability:');
         if (availDoc.exists) {
             const data = availDoc.data();
-            console.log(`   Entries: ${Object.keys(data).length}`);
             Object.keys(data).sort((a,b) => parseInt(a) - parseInt(b)).forEach(id => {
-                console.log(`   ${id}: ${data[id] ? 'Available' : 'Rented'}`);
             });
         } else {
-            console.log('   (does not exist)');
         }
         
         // Check for old propertyOverrides (should be deleted after migration)
         const overridesDoc = await db.collection('settings').doc('propertyOverrides').get();
         if (overridesDoc.exists) {
-            console.log('\n⚠️  OLD DATA DETECTED: settings/propertyOverrides still exists!');
-            console.log('   Run migration.js deleteOldOverrides() to clean up.');
         } else {
-            console.log('\n✅ Clean: No old propertyOverrides document');
         }
         
     } catch (error) {
@@ -676,28 +662,21 @@ window.viewFirestoreState = async function() {
 window.showPropertyData = async function(propertyId) {
     const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
     
-    console.log(`========== PROPERTY ${numericId} DATA ==========`);
     
     // Local data
     const prop = properties.find(p => p.id === numericId);
-    console.log('\n📦 Local properties array:');
-    console.log(prop ? JSON.stringify(prop, null, 2) : 'Not found');
     
     // Firestore data
     try {
         const doc = await db.collection('settings').doc('properties').get();
         if (doc.exists && doc.data()[numericId]) {
-            console.log('\n☁️  Firestore settings/properties:');
-            console.log(JSON.stringify(doc.data()[numericId], null, 2));
         } else {
-            console.log('\n☁️  Firestore: Not found');
         }
     } catch (error) {
         console.error('Firestore error:', error);
     }
     
     // Availability
-    console.log('\n📊 Availability:', state.availability[numericId] !== false ? 'Available' : 'Rented');
 };
 
 // ==================== FIRESTORE SYNC (UNIFIED ARCHITECTURE) ====================
@@ -796,7 +775,6 @@ function setupRealtimeListener() {
 window.saveAvailability = async function(id, isAvailable) {
     try {
         await db.collection('settings').doc('propertyAvailability').set({ [id]: isAvailable }, { merge: true });
-        console.log('[Availability] Saved to Firestore:', id, isAvailable);
         return true;
     } catch (error) {
         console.error('[Availability] Save error:', error);

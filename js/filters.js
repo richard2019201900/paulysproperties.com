@@ -221,4 +221,3 @@ window.clearFilters = function() {
     applyAllFilters();
 };
 
-console.log('[Filters] Button-based filter system loaded');

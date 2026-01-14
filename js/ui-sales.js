@@ -50,7 +50,6 @@ async function checkCelebrationBanners() {
             showCelebrationBanner(latest);
         }
     } catch (e) {
-        console.log('[Celebrations] Could not check banners:', e.message);
     }
 }
 
@@ -90,7 +89,6 @@ window.createSaleCelebration = async function(sellerDisplayName, vehicleTitle, s
         // Save
         await db.collection('settings').doc('celebrations').set({ active }, { merge: true });
         
-        console.log('[Celebrations] Created vehicle sale celebration:', celebrationId);
         return celebrationId;
     } catch (e) {
         console.error('[Celebrations] Error creating celebration:', e);
@@ -400,7 +398,6 @@ window.submitVehicleSale = async function(vehicleId, saleType, financingContract
         
         // Save to vehicleSales collection
         const saleRef = await db.collection('vehicleSales').add(saleDoc);
-        console.log('[VehicleSale] Created sale record:', saleRef.id);
         
         // Mark vehicle as sold
         await VehicleDataService.writeMultiple(numericId, {
@@ -420,7 +417,6 @@ window.submitVehicleSale = async function(vehicleId, saleType, financingContract
                     saleId: saleRef.id
                 });
             } catch (e) {
-                console.log('[VehicleSale] No Financing contract to update');
             }
         }
         
@@ -478,7 +474,6 @@ async function createOwnershipTransferRequest(vehicleId, newOwnerName, currentOw
         };
         
         await db.collection('ownershipTransfers').add(transferRequest);
-        console.log('[OwnershipTransfer] Created transfer request for vehicle', vehicleId);
         
         showToast('📝 Ownership transfer request submitted for admin review', 'info');
     } catch (e) {
@@ -577,7 +572,6 @@ window.adminAdjustXP = async function(userEmail, xpAmount, reason) {
         const userId = userDoc.id;
         const userData = userDoc.data();
         
-        console.log(`[AdminXP] Adjusting XP for ${userData.displayName || userEmail} by ${xpAmount}`);
         
         if (xpAmount > 0) {
             await GamificationService.awardXP(userId, xpAmount, `Admin adjustment: ${reason}`);
@@ -585,7 +579,6 @@ window.adminAdjustXP = async function(userEmail, xpAmount, reason) {
             await GamificationService.deductXP(userId, Math.abs(xpAmount), `Admin adjustment: ${reason}`);
         }
         
-        console.log(`[AdminXP] Successfully adjusted XP by ${xpAmount} for ${userEmail}`);
         showToast(`XP adjusted by ${xpAmount} for ${userData.displayName || userEmail}`, 'success');
         
         // Log the adjustment
@@ -636,7 +629,6 @@ window.adminRemoveActivityEntry = async function(userEmail, searchText) {
         const removed = originalLength - filteredLog.length;
         
         if (removed === 0) {
-            console.log(`No entries found containing "${searchText}"`);
             return;
         }
         
@@ -644,7 +636,6 @@ window.adminRemoveActivityEntry = async function(userEmail, searchText) {
             'gamification.activityLog': filteredLog
         });
         
-        console.log(`[AdminXP] Removed ${removed} activity entries containing "${searchText}" from ${userEmail}`);
         showToast(`Removed ${removed} activity entries`, 'success');
         
     } catch (e) {
@@ -799,7 +790,6 @@ window.confirmDeleteSale = async function(saleId) {
         if (sale.financingContractId) {
             try {
                 await db.collection('financingContracts').doc(sale.financingContractId).delete();
-                console.log('[DeleteSale] Deleted Financing contract:', sale.financingContractId);
             } catch (rtoErr) {
                 console.warn('[DeleteSale] Could not delete Financing contract:', rtoErr);
             }
@@ -818,7 +808,6 @@ window.confirmDeleteSale = async function(saleId) {
             deletedAt: new Date().toISOString()
         });
         
-        console.log('[DeleteSale] Sale reversed successfully:', saleId);
         showToast('✅ Sale deleted and fully reversed', 'success');
         
         // Refresh dashboard
@@ -1101,7 +1090,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     sellerName = usersSnapshot.docs[0].data().username || p.ownerEmail;
                 }
             } catch (err) {
-                console.log('[Sale] Could not fetch seller name');
             }
             
             // Create contract data with negotiated price
@@ -1264,7 +1252,6 @@ window.downloadContractAsPNG = async function() {
             await cursiveFont.load();
             document.fonts.add(cursiveFont);
         } catch (fontErr) {
-            console.log('[Contract] Using fallback cursive font');
         }
         
         // Create canvas - SQUARE format (1000x1000)
@@ -1695,7 +1682,6 @@ window.completePendingSale = async function(vehicleId) {
                     contractData = contractDoc.data();
                 }
             } catch (e) {
-                console.log('[CompleteSale] Could not fetch contract data');
             }
         }
         
@@ -1954,7 +1940,6 @@ window.submitCompletePendingSale = async function(vehicleId) {
         };
         
         const saleRef = await db.collection('vehicleSales').add(saleDoc);
-        console.log('[CompleteSale] Created sale record:', saleRef.id);
         
         // Mark vehicle as sold
         await VehicleDataService.writeMultiple(numericId, {
@@ -2046,4 +2031,3 @@ window.cancelPendingSale = async function(vehicleId) {
     }
 };
 
-console.log('[UI-Sales] Vehicle sales tracker loaded');

@@ -147,7 +147,6 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
         try {
             agentContacts = await getAgentContactsForProperty(propertyId);
         } catch (e) {
-            console.log('[Contact] Error getting agent contacts:', e);
         }
     }
     
@@ -157,7 +156,6 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
         if (agentContacts.length === 1) {
             // Single agent
             $('modalPhone').value = agentContacts[0].phone.replace(/\D/g, '');
-            console.log('[Contact] Using agent phone:', agentContacts[0].username);
         } else {
             // Multiple agents - show all phones
             const phonesHtml = agentContacts.map(a => 
@@ -180,7 +178,6 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
             
             // Set the first agent's phone in the input
             $('modalPhone').value = agentContacts[0].phone.replace(/\D/g, '');
-            console.log('[Contact] Using multiple agents, first:', agentContacts[0].username);
         }
     } else {
         // No agents - use owner contact (existing behavior)
@@ -197,13 +194,11 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
                         if (property.ownerContactPhone) {
                             $('modalPhone').value = property.ownerContactPhone.replace(/\D/g, '');
                             usedFallback = false;
-                            console.log('[Contact] Using property ownerContactPhone');
                         }
                         // Then check legacy ownerPhone field
                         else if (property.ownerPhone) {
                             $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
                             usedFallback = false;
-                            console.log('[Contact] Using property ownerPhone');
                         }
                         // Finally try user doc (may fail for non-admins due to permissions)
                         else if (property.ownerEmail) {
@@ -218,12 +213,10 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
                                     if (userData.phone) {
                                         $('modalPhone').value = userData.phone.replace(/\D/g, '');
                                         usedFallback = false;
-                                        console.log('[Contact] Using phone from user doc');
                                     }
                                 }
                             } catch (permError) {
                                 // Permission denied - expected for non-admins
-                                console.log('[Contact] Cannot read user doc (permission denied), using fallback');
                             }
                         }
                     }
@@ -254,11 +247,9 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
                     timestamp: new Date().toISOString(),
                     resolved: false
                 });
-                console.log('[Contact] Admin notification created for missing contact info');
             }
         } catch (notifError) {
             // Non-critical, just log it
-            console.log('[Contact] Could not create admin notification:', notifError);
         }
     }
     

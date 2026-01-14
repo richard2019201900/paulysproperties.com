@@ -31,7 +31,6 @@
     
     // Apply FiveM mode if detected
     if (isFiveM || isLbPhone || (isCEF && !hasBackdropFilter)) {
-        console.log('[FiveM Compat] FiveM/lb-phone environment detected, loading compatibility styles');
         
         // Add class to document for CSS targeting
         document.documentElement.classList.add('fivem-mode');
@@ -1682,7 +1681,6 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                             console.warn('[RTO] Could not update contract deposit status:', e);
                         }
                     }
-                    console.log(`[RTO] Deposit of $${rtoDepositAmount.toLocaleString()} recorded for contract ${rtoContractId}`);
                     
                     // Store info for confirmation modal
                     const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p?.rtoTotalPayments || 0);
@@ -1710,7 +1708,6 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
                             console.warn('[RTO] Could not update contract payment number:', e);
                         }
                     }
-                    console.log(`[RTO] Monthly payment ${newPaymentNumber} recorded for contract ${rtoContractId}`);
                     
                     // Store info for confirmation modal
                     const rtoTotalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p?.rtoTotalPayments || 0);
@@ -3371,7 +3368,6 @@ window.reorderPropertyImages = async function(propertyId, fromIndex, toIndex) {
     const prop = properties.find(p => p.id === propertyId);
     if (!prop || !prop.images) return;
     
-    console.log(`[Images] Reordering: moving index ${fromIndex} to ${toIndex}`);
     
     try {
         // Remove from old position and insert at new position
@@ -3644,7 +3640,6 @@ async function init() {
             // Initialize NotificationManager immediately on login for real-time notifications
             // This ensures we start listening for new users/listings right away, not just when dashboard opens
             if (typeof NotificationManager !== 'undefined' && !NotificationManager.state?.initialized) {
-                console.log('[Auth] Initializing NotificationManager on login');
                 NotificationManager.init();
             }
             
@@ -4254,7 +4249,6 @@ window.completeLease = async function(propertyId) {
                 prop.lastPaymentDate = '';
             }
             
-            console.log('[CompleteLease] Pre-refresh state clear done');
             
             // Update all relevant UI components
             renderProperties(state.filteredProperties);
@@ -4361,7 +4355,6 @@ window.deleteTenureRecord = async function(propertyId, tenureId) {
             renderPropertyAnalytics(propertyId);
         }
         
-        console.log('[TenureHistory] Deleted tenure:', tenureId, 'from property:', propertyId);
         
     } catch (error) {
         console.error('[TenureHistory] Error deleting:', error);
@@ -4385,7 +4378,6 @@ async function clearRenterData(propertyId) {
     const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
     const prop = properties.find(p => p.id === numericId);
     
-    console.log('[ClearRenterData] Starting clear for property:', numericId);
     
     // STEP 1: Clear local property object immediately
     if (prop) {
@@ -4396,7 +4388,6 @@ async function clearRenterData(propertyId) {
         prop.lastPaymentDate = '';
     }
     
-    console.log('[ClearRenterData] Local state cleared');
     
     try {
         // UNIFIED: All properties write to settings/properties
@@ -4409,8 +4400,6 @@ async function clearRenterData(propertyId) {
         
         await db.collection('settings').doc('properties').update(updateData);
         
-        console.log('[ClearRenterData] Successfully cleared all renter data for property:', numericId);
-        console.log('[ClearRenterData] property object:', prop ? { renterName: prop.renterName, paymentFrequency: prop.paymentFrequency } : 'not found');
         
     } catch (error) {
         console.error('[ClearRenterData] Error clearing data:', error);
@@ -4634,7 +4623,6 @@ window.showRentToOwnWizard = async function(propertyId) {
     try {
         const ownerInfo = await getPropertyOwnerWithTier(propertyId);
         sellerName = ownerInfo.display || ownerInfo.username || '';
-        console.log('[RTO] Got owner from getPropertyOwnerWithTier:', sellerName);
     } catch (e) {
         console.warn('Could not get seller name from getPropertyOwnerWithTier:', e);
     }
@@ -4653,24 +4641,19 @@ window.showRentToOwnWizard = async function(propertyId) {
     try {
         // Try PropertyDataService first
         propertyDescription = PropertyDataService.getValue(propertyId, 'location', '');
-        console.log('[RTO] Description from PropertyDataService:', propertyDescription);
         
         // Fallback to property object
         if (!propertyDescription) {
             propertyDescription = p.location || '';
-            console.log('[RTO] Description from p.location:', propertyDescription);
         }
         
         // Last fallback - try description field
         if (!propertyDescription) {
             propertyDescription = PropertyDataService.getValue(propertyId, 'description', '') || p.description || '';
-            console.log('[RTO] Description from description field:', propertyDescription);
         }
     } catch (e) {
         propertyDescription = p.location || p.description || '';
-        console.log('[RTO] Description from fallback:', propertyDescription);
     }
-    console.log('[RTO] Final property description:', propertyDescription);
     
     // Get buy price
     let buyPrice = 0;
@@ -4715,13 +4698,6 @@ window.showRentToOwnWizard = async function(propertyId) {
         }
     };
     
-    console.log('[RTO] Wizard initialized:', {
-        seller: sellerName,
-        renter: renterName,
-        buyPrice: buyPrice,
-        finalPayment: finalPaymentBase,
-        category: minPriceInfo.category
-    });
     
     renderRTOWizardStep(1);
 };
@@ -4806,7 +4782,6 @@ function getMinimumBuyPrice(property) {
         }
     }
     
-    console.log('[RTO] Detecting property type:', { interiorType, type, storageSpace, title });
     
     // Check for walk-in house first (highest tier) - $1.5M
     // Case-insensitive check for any variation of "walk-in" or "walkin"
@@ -6304,7 +6279,6 @@ window.deleteRTOContract = async function(propertyId, contractId) {
         // 1. Delete the contract document from Firestore
         if (contractId) {
             await db.collection('rentToOwnContracts').doc(contractId).delete();
-            console.log(`[RTO] Deleted contract document: ${contractId}`);
         }
         
         // 2. Remove last RTO-related payment(s) from payment history
@@ -6324,7 +6298,6 @@ window.deleteRTOContract = async function(propertyId, contractId) {
                         payments: payments,
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    console.log(`[RTO] Removed ${removedCount} RTO payment(s) from history`);
                 }
             }
         } catch (e) {
@@ -6351,7 +6324,6 @@ window.deleteRTOContract = async function(propertyId, contractId) {
         };
         
         await PropertyDataService.writeMultiple(propertyId, rtoFieldsToClear);
-        console.log(`[RTO] Cleared RTO fields and monthlyPrice from property ${propertyId}`);
         
         // 4. Update local properties array
         const prop = properties.find(p => p.id === propertyId);

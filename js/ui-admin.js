@@ -368,7 +368,6 @@ window.markPhotoRequestReviewed = async function(requestId) {
             });
         } catch (e) {
             // Notification may not exist yet, that's OK
-            console.log('[NotifV2] No notification to dismiss for:', notifId);
         }
         
         // Refresh the list
@@ -400,7 +399,6 @@ window.deletePhotoRequest = async function(requestId) {
             });
         } catch (e) {
             // Notification may not exist, that's OK
-            console.log('[NotifV2] No notification to dismiss for:', notifId);
         }
         
         // Refresh the list
@@ -1426,7 +1424,6 @@ window.showNewListingNotification = function(listing, isMissed = false) {
  * Handle click on listing notification - navigate to user who created the listing
  */
 window.handleListingNotificationClick = async function(ownerEmail, listingId) {
-    console.log('[Notification] Listing click - navigating to user:', ownerEmail);
     
     // Ensure we're on the dashboard
     if (typeof goToDashboard === 'function') {
@@ -1701,7 +1698,6 @@ window.showNewUserNotification = function(user, isMissed = false) {
 
 // Handle click on new user notification - navigate and highlight user
 window.handleNewUserNotificationClick = async function(userId) {
-    console.log('[Notification] User click - navigating to user:', userId);
     
     // Ensure we're on the dashboard
     if (typeof goToDashboard === 'function') {
@@ -1790,7 +1786,6 @@ window.scrollToAndHighlightElement = async function(options) {
     const element = await waitForElement(targetSelector, maxWaitMs);
     
     if (!element) {
-        console.log('[ScrollHighlight] Element not found:', targetSelector);
         if (onNotFound) onNotFound();
         return false;
     }
@@ -2536,7 +2531,6 @@ window.loadAllUsers = async function() {
                     const updatedUsers = await TierService.getAllUsers();
                     window.adminUsersData = updatedUsers;
                     users = updatedUsers;
-                    console.log('[Gamification] Migration complete, users refreshed');
                 }
             } catch (migrationError) {
                 console.error('[Gamification] Migration check failed:', migrationError);
@@ -3310,17 +3304,14 @@ window.filterAdminUsers = function() {
  * Admin-only feature to track tier subscription payments
  */
 window.renderSubscriptionAlertsPanel = async function() {
-    console.log('[SubscriptionAlerts] Starting render...');
     
     const panel = $('subscriptionNotificationsPanel');
     if (!panel) {
-        console.log('[SubscriptionAlerts] Panel element not found');
         return;
     }
     
     // Only show for master admin
     if (!TierService.isMasterAdmin(auth?.currentUser?.email)) {
-        console.log('[SubscriptionAlerts] Not master admin, hiding panel');
         panel.classList.add('hidden');
         return;
     }
@@ -3328,7 +3319,6 @@ window.renderSubscriptionAlertsPanel = async function() {
     try {
         // Get all users
         const usersSnapshot = await db.collection('users').get();
-        console.log('[SubscriptionAlerts] Loaded', usersSnapshot.size, 'users');
         
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -3346,20 +3336,12 @@ window.renderSubscriptionAlertsPanel = async function() {
             if (user.isTrial) return; // Skip trial users
             
             proEliteCount++;
-            console.log('[SubscriptionAlerts] Checking user:', user.email, 'tier:', user.tier, 'tierChangeDate:', user.tierChangeDate, 'subscriptionDueDate:', user.subscriptionDueDate);
             
             // Check subscriptionDueDate first, then calculate from tierChangeDate, createdAt
             let dueDate = null;
             let dateSource = 'none';
             
             // Log all available date fields for debugging
-            console.log('[SubscriptionAlerts] User date fields:', {
-                email: user.email,
-                subscriptionDueDate: user.subscriptionDueDate,
-                tierChangeDate: user.tierChangeDate,
-                tierStartDate: user.tierStartDate,
-                createdAt: user.createdAt
-            });
             
             if (user.subscriptionDueDate) {
                 if (user.subscriptionDueDate.toDate) {
@@ -3422,11 +3404,9 @@ window.renderSubscriptionAlertsPanel = async function() {
             }
             
             if (!dueDate || isNaN(dueDate.getTime())) {
-                console.log('[SubscriptionAlerts] No valid date for user:', user.email);
                 return;
             }
             
-            console.log('[SubscriptionAlerts] Calculated due date for', user.email, ':', dueDate, 'from', dateSource);
             
             const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
             const daysUntilDue = Math.floor((dueDateOnly - today) / (1000 * 60 * 60 * 24));
@@ -3452,21 +3432,12 @@ window.renderSubscriptionAlertsPanel = async function() {
         });
         
         const total = overdue.length + dueToday.length + dueTomorrow.length;
-        console.log('[SubscriptionAlerts] Results:', {
-            proEliteUsers: proEliteCount,
-            overdue: overdue.length,
-            dueToday: dueToday.length,
-            dueTomorrow: dueTomorrow.length,
-            total: total
-        });
         
         if (total === 0) {
-            console.log('[SubscriptionAlerts] No alerts to show, hiding panel');
             panel.classList.add('hidden');
             return;
         }
         
-        console.log('[SubscriptionAlerts] Showing panel with', total, 'alerts');
         panel.classList.remove('hidden');
         
         const isUrgent = overdue.length > 0;
@@ -3616,11 +3587,9 @@ function renderSubscriptionItem(sub, urgency) {
  * Navigate to admin panel and highlight a user by email
  */
 window.goToAdminUserByEmail = function(email) {
-    console.log('[SubscriptionAlerts] Navigating to user:', email);
     
     // Switch to admin panel tab (use 'admin' not 'adminPanel')
     if (typeof switchDashboardTab === 'function') {
-        console.log('[SubscriptionAlerts] Calling switchDashboardTab(admin)');
         switchDashboardTab('admin');
     } else {
         console.warn('[SubscriptionAlerts] switchDashboardTab function not found');
@@ -3629,13 +3598,11 @@ window.goToAdminUserByEmail = function(email) {
     // Wait for admin panel to render, then search for and highlight the user
     setTimeout(function() {
         const searchInput = $('adminUserSearch');
-        console.log('[SubscriptionAlerts] Search input found:', !!searchInput);
         
         if (searchInput) {
             searchInput.value = email;
             // Trigger the search
             if (typeof filterAdminUsers === 'function') {
-                console.log('[SubscriptionAlerts] Filtering users...');
                 filterAdminUsers();
             }
             
@@ -3643,7 +3610,6 @@ window.goToAdminUserByEmail = function(email) {
             setTimeout(function() {
                 // Find and highlight the user card using data-email attribute
                 const userCard = document.querySelector(`.admin-user-card[data-email="${email}"]`);
-                console.log('[SubscriptionAlerts] User card found:', !!userCard);
                 
                 if (userCard) {
                     userCard.scrollIntoView({ behavior: 'smooth', block: 'center' });

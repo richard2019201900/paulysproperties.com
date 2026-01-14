@@ -703,7 +703,6 @@ window.goToRentAlerts = function() {
         maxWaitMs: 3000,
         highlightColor: 'rgba(239, 68, 68, 0.7)',
         glowColor: 'rgba(239, 68, 68, 0.4)',
-        onNotFound: () => console.log('[RentAlerts] Rent notifications panel not found or hidden')
     });
 };
 

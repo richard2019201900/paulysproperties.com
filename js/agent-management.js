@@ -106,7 +106,6 @@ window.loadAgents = async function(forceRefresh) {
         
         agentsCache = tempAgents;
         agentsCacheTime = Date.now();
-        console.log('[Agents] Loaded', agentsCache.length, 'agents');
         return agentsCache;
     } catch (error) {
         console.error('[Agents] Error loading agents:', error);
@@ -204,7 +203,6 @@ window.demoteFromAgent = async function(odId, email) {
             }
             
             if (removedCount > 0) {
-                console.log('[Agents] Removed agent from', removedCount, 'properties');
             }
         }
         
@@ -846,7 +844,6 @@ window.migrateAgentDisplayNames = async function() {
         return;
     }
     
-    console.log('[Agents] Starting agentDisplayNames migration...');
     
     try {
         // Load agents first
@@ -854,7 +851,6 @@ window.migrateAgentDisplayNames = async function() {
         
         var propsDoc = await db.collection('settings').doc('properties').get();
         if (!propsDoc.exists) {
-            console.log('[Agents] No properties found');
             return;
         }
         
@@ -870,7 +866,6 @@ window.migrateAgentDisplayNames = async function() {
             var hasPhones = prop.agentPhones && Object.keys(prop.agentPhones).length > 0;
             
             if (hasDisplayNames && hasPhones) {
-                console.log('[Agents] Property', propId, 'already has agentDisplayNames and agentPhones');
                 return;
             }
             
@@ -902,16 +897,13 @@ window.migrateAgentDisplayNames = async function() {
             updates[propId + '.agentDisplayNames'] = displayNames;
             updates[propId + '.agentPhones'] = phones;
             migratedCount++;
-            console.log('[Agents] Will migrate property', propId, ':', { displayNames, phones });
         });
         
         if (Object.keys(updates).length === 0) {
-            console.log('[Agents] No properties need migration');
             return;
         }
         
         await db.collection('settings').doc('properties').update(updates);
-        console.log('[Agents] ✅ Migration complete! Updated', migratedCount, 'properties');
         showToast('Migration complete! Updated ' + migratedCount + ' properties', 'success');
         
     } catch (error) {
@@ -920,4 +912,3 @@ window.migrateAgentDisplayNames = async function() {
     }
 };
 
-console.log('[Agents] Agent management module loaded');

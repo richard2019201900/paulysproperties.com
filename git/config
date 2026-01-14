@@ -1,0 +1,16 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[user]
+	email = richard2019201900@gmail.com
+	name = Richard
+[remote "origin"]
+	url = https://github.com/richard2019201900/paulysproperties.com.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[credential]
+	helper = store
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main

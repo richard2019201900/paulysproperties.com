@@ -308,13 +308,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 statUpdate: { propertiesPosted: 1 }
                             }).then(result => {
                                 if (result && !result.alreadyEarned) {
-                                    console.log('[Gamification] Awarded 500 XP for first listing');
                                 }
                             }).catch(err => console.error('[Gamification] Error:', err));
                         } else {
                             // Additional listing - award 250 XP
                             GamificationService.awardXP(user.uid, 250, 'additional_listing').then(() => {
-                                console.log('[Gamification] Awarded 250 XP for additional listing');
                                 // Update stats
                                 db.collection('users').doc(user.uid).update({
                                     'gamification.stats.propertiesPosted': firebase.firestore.FieldValue.increment(1)
@@ -326,7 +324,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (isPremium) {
                             GamificationService.awardAchievement(user.uid, 'premium_listing', 200).then(result => {
                                 if (result && !result.alreadyEarned) {
-                                    console.log('[Gamification] Awarded 200 XP for premium listing');
                                 }
                             }).catch(err => console.error('[Gamification] Error:', err));
                         }
