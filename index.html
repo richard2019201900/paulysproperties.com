@@ -852,11 +852,11 @@
                 
                 <!-- Center nav links (hidden on mobile, shown on lg+) -->
                 <div class="hidden lg:flex items-center space-x-4 xl:space-x-6 flex-shrink-0">
-                    <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Home</a>
-                    <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Properties</a>
-                    <a onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-amber-400 rounded px-1" role="button" tabindex="0">Leaderboard</a>
-                    <a onclick="openPhotoServicesModal()" class="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer transition text-sm outline-none focus:text-amber-300 rounded px-1" role="button" tabindex="0">Services</a>
-                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-300 rounded px-1" role="button" tabindex="0">Dashboard</a>
+                    <a id="navHomeLink" onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Home</a>
+                    <a id="navPropertiesLink" onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Properties</a>
+                    <a id="navLeaderboardLink" onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-amber-400 rounded px-1" role="button" tabindex="0">Leaderboard</a>
+                    <a id="navServicesLink" onclick="openPhotoServicesModal()" class="text-gray-300 hover:text-cyan-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-cyan-400 rounded px-1" role="button" tabindex="0">Services</a>
+                    <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Dashboard</a>
                 </div>
                 
                 <!-- Right side: buttons + user - with proper spacing -->

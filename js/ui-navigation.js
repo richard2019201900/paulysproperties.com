@@ -674,6 +674,9 @@ window.goToDashboard = function() {
         showElement($('ownerDashboard'));
         renderOwnerDashboard();
         
+        // Update nav highlighting
+        updateNavHighlight('dashboard');
+        
         // Load admin users if master admin
         const user = auth.currentUser;
         if (user && TierService.isMasterAdmin(user.email)) {
@@ -818,6 +821,41 @@ window.goHome = function() {
     window.scrollTo(0, 0);
 };
 
+// Update which nav link is highlighted as active
+window.updateNavHighlight = function(activeSection) {
+    // All nav link IDs
+    const navLinks = {
+        home: 'navHomeLink',
+        properties: 'navPropertiesLink', 
+        leaderboard: 'navLeaderboardLink',
+        services: 'navServicesLink',
+        dashboard: 'navDashboardLink'
+    };
+    
+    // Reset all nav links to gray
+    Object.values(navLinks).forEach(linkId => {
+        const link = $(linkId);
+        if (link) {
+            link.classList.remove('text-purple-400', 'text-amber-400', 'text-cyan-400');
+            link.classList.add('text-gray-300');
+        }
+    });
+    
+    // Highlight the active link
+    const activeLink = $(navLinks[activeSection]);
+    if (activeLink) {
+        activeLink.classList.remove('text-gray-300');
+        // Use different colors for different sections
+        if (activeSection === 'leaderboard') {
+            activeLink.classList.add('text-amber-400');
+        } else if (activeSection === 'services') {
+            activeLink.classList.add('text-cyan-400');
+        } else {
+            activeLink.classList.add('text-purple-400');
+        }
+    }
+};
+
 window.navigateTo = function(section) {
     // Block navigation if profile is incomplete
     if (!canNavigateAway()) {
@@ -830,6 +868,9 @@ window.navigateTo = function(section) {
     hideElement($('propertyStatsPage'));
     hideElement($('blogPage'));
     hideElement($('leaderboardPage'));
+    
+    // Update nav highlighting
+    updateNavHighlight(section);
     
     // Handle home - scroll to absolute top
     if (section === 'home') {
