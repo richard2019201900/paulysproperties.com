@@ -33,6 +33,14 @@ window.copyToClipboard = function(elementId, btn) {
 window.openModal = function(id) {
     showElement($(id));
     
+    // If opening contact modal, prefill the message
+    if (id === 'contactModal') {
+        const modalMessage = $('modalMessage');
+        if (modalMessage && !modalMessage.value.trim()) {
+            modalMessage.value = "Hey Pauly, I'm interested in learning more about some of your properties. Please contact me when you get a chance. Thanks!";
+        }
+    }
+    
     // If opening login modal, clear all forms and show login options
     if (id === 'loginModal') {
         // Clear login form
