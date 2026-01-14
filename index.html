@@ -214,58 +214,67 @@
     <!-- Photo Services Modal -->
     <div id="photoServicesModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden" role="dialog" aria-modal="true">
         <div class="glass-effect rounded-2xl shadow-2xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-amber-500/50">
-            <!-- Compact Header with integrated pitch -->
-            <div class="flex justify-between items-start mb-4">
+            <!-- Header -->
+            <div class="flex justify-between items-start mb-5">
                 <div>
-                    <h2 class="text-2xl font-black bg-gradient-to-r from-amber-500 to-pink-600 bg-clip-text text-transparent">Photos & Property Services</h2>
-                    <p class="text-gray-400 text-sm">Professional photos rent <span class="text-green-400 font-bold">3x faster</span> • Let Pauly handle it all</p>
+                    <h2 class="text-2xl font-black bg-gradient-to-r from-amber-500 to-pink-600 bg-clip-text text-transparent">Property Owner Services</h2>
+                    <p class="text-gray-400 text-sm">Get your property rented faster with professional help</p>
                 </div>
                 <button onclick="closeModal('photoServicesModal')" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
             </div>
             
-            <!-- Photo Options - Compact Grid -->
-            <div class="mb-4">
-                <div class="text-xs text-gray-500 mb-2 font-medium">PHOTO PACKAGES</div>
+            <!-- Professional Photography -->
+            <div class="mb-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-xl">📸</span>
+                    <h3 class="text-lg font-bold text-white">Professional Photography</h3>
+                </div>
+                <p class="text-gray-300 text-sm mb-3">High-quality photos that showcase your property's best features. Properties with pro photos rent <span class="text-green-400 font-bold">3x faster</span> and command higher prices.</p>
                 <div class="grid grid-cols-2 gap-3">
                     <!-- Per Photo -->
                     <div id="photoOptionSingle" onclick="selectPhotoServiceOption('single')"
-                        class="bg-gray-800/70 rounded-lg p-3 border-2 border-gray-600 hover:border-green-500 transition cursor-pointer relative">
+                        class="bg-gray-800/70 rounded-lg p-4 border-2 border-gray-600 hover:border-green-500 transition cursor-pointer relative">
                         <div id="photoSingleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">✓</div>
-                        <div class="text-xl font-black text-white">$5k<span class="text-sm text-gray-400 font-normal">/photo</span></div>
-                        <div class="text-gray-400 text-xs">Min 10 • Extras free</div>
+                        <div class="text-2xl font-black text-white mb-1">$5k<span class="text-sm text-gray-400 font-normal">/photo</span></div>
+                        <div class="text-gray-400 text-sm">10 photo minimum</div>
+                        <div class="text-green-400 text-xs mt-1">✓ Extra angles included free</div>
                     </div>
                     <!-- Premium Bundle -->
                     <div id="photoOptionBundle" onclick="selectPhotoServiceOption('bundle')"
-                        class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-lg p-3 border-2 border-amber-500 relative cursor-pointer hover:border-amber-400 transition">
+                        class="bg-gradient-to-br from-amber-900/50 to-orange-900/50 rounded-lg p-4 border-2 border-amber-500 relative cursor-pointer hover:border-amber-400 transition">
                         <div id="photoBundleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">✓</div>
-                        <div class="absolute -top-2 left-2 bg-amber-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">BEST</div>
-                        <div class="text-xl font-black text-amber-400 mt-1">$75k</div>
-                        <div class="text-amber-300/80 text-xs">10 photos + video + 4wk premium</div>
+                        <div class="absolute -top-2 left-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">BEST VALUE</div>
+                        <div class="text-2xl font-black text-amber-400 mt-1 mb-1">$75k</div>
+                        <div class="text-amber-200 text-sm">Complete media package</div>
+                        <div class="text-amber-300/80 text-xs mt-1">✓ 10 photos + video tour + 4 weeks premium listing</div>
                     </div>
                 </div>
             </div>
             
-            <!-- Managed Services - Compact Grid -->
-            <div class="mb-4">
-                <div class="flex items-center gap-2 mb-2">
-                    <div class="text-xs text-gray-500 font-medium">FULL MANAGEMENT</div>
-                    <span class="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">TURN-KEY</span>
+            <!-- Turn-Key Management -->
+            <div class="mb-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-xl">🔑</span>
+                    <h3 class="text-lg font-bold text-white">Turn-Key Property Management</h3>
+                    <span class="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">HANDS-FREE</span>
                 </div>
-                <p class="text-gray-400 text-xs mb-2">Hand over the keys — Pauly handles photos, listing, tours, screening & more!</p>
+                <p class="text-gray-300 text-sm mb-3">Hand over the keys and let us handle everything. We'll photograph, list, show, screen tenants, and manage the entire process so you can focus on what matters.</p>
                 <div class="grid grid-cols-2 gap-3">
                     <!-- For Rentals -->
-                    <div id="managedOptionRental" onclick="selectPhotoServiceOption('rental')" class="bg-gray-800/70 rounded-lg p-3 border-2 border-gray-600 hover:border-purple-500 transition cursor-pointer relative">
+                    <div id="managedOptionRental" onclick="selectPhotoServiceOption('rental')" class="bg-gray-800/70 rounded-lg p-4 border-2 border-gray-600 hover:border-purple-500 transition cursor-pointer relative">
                         <div id="managedRentalCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">✓</div>
-                        <div class="text-purple-400 text-xs font-bold">FOR RENTALS</div>
-                        <div class="text-xl font-black text-white">$25k <span class="text-purple-300 text-sm font-normal">+10%</span></div>
-                        <div class="text-gray-400 text-xs">Photos, tours, tenant mgmt</div>
+                        <div class="text-purple-400 text-xs font-bold mb-1">FOR RENTALS</div>
+                        <div class="text-2xl font-black text-white">$25k <span class="text-purple-300 text-sm font-normal">+ 10%</span></div>
+                        <div class="text-gray-400 text-sm mt-1">We find & manage your tenant</div>
+                        <div class="text-purple-300/80 text-xs mt-1">✓ Photos, listing, tours, screening, rent collection</div>
                     </div>
                     <!-- For Sales -->
-                    <div id="managedOptionSale" onclick="selectPhotoServiceOption('sale')" class="bg-gray-800/70 rounded-lg p-3 border-2 border-gray-600 hover:border-pink-500 transition cursor-pointer relative">
+                    <div id="managedOptionSale" onclick="selectPhotoServiceOption('sale')" class="bg-gray-800/70 rounded-lg p-4 border-2 border-gray-600 hover:border-pink-500 transition cursor-pointer relative">
                         <div id="managedSaleCheck" class="hidden absolute top-2 right-2 bg-green-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">✓</div>
-                        <div class="text-pink-400 text-xs font-bold">FOR SALES</div>
-                        <div class="text-xl font-black text-white">$50k <span class="text-pink-300 text-sm font-normal">+10%</span></div>
-                        <div class="text-gray-400 text-xs">Photos, tours, negotiation</div>
+                        <div class="text-pink-400 text-xs font-bold mb-1">FOR SALES</div>
+                        <div class="text-2xl font-black text-white">$50k <span class="text-pink-300 text-sm font-normal">+ 10%</span></div>
+                        <div class="text-gray-400 text-sm mt-1">We sell your property for you</div>
+                        <div class="text-pink-300/80 text-xs mt-1">✓ Photos, listing, tours, negotiation, closing</div>
                     </div>
                 </div>
             </div>
@@ -279,7 +288,7 @@
                     Close
                 </button>
             </div>
-            <p class="text-gray-600 text-[10px] text-center mt-2">Copies phone (2057028233) and notifies our team</p>
+            <p class="text-gray-500 text-xs text-center mt-2">Copies our number (205-702-8233) • Text in city for fastest response</p>
         </div>
     </div>
 
@@ -1987,19 +1996,6 @@
                     <button onclick="openModal('createListingModal')" class="bg-black/30 hover:bg-black/50 border border-gray-700 text-white px-5 py-2 rounded-full font-semibold transition text-sm flex items-center gap-2">
                         📋 List Your Property <span>→</span>
                     </button>
-                </div>
-                <!-- Services Banner -->
-                <div onclick="openPhotoServicesModal()" class="mt-6 max-w-2xl mx-auto cursor-pointer group">
-                    <div class="bg-gradient-to-r from-amber-500/20 to-orange-600/20 border border-amber-500/40 rounded-xl px-4 py-3 flex items-center justify-between gap-4 hover:border-amber-400 transition">
-                        <div class="flex items-center gap-3">
-                            <span class="text-2xl">📸</span>
-                            <div class="text-left">
-                                <div class="text-amber-300 font-bold text-sm">Property Owner Services</div>
-                                <div class="text-gray-300 text-xs">Pro photography from $5k • Turn-key management available</div>
-                            </div>
-                        </div>
-                        <span class="text-amber-400 group-hover:translate-x-1 transition-transform">→</span>
-                    </div>
                 </div>
             </div>
         </section>

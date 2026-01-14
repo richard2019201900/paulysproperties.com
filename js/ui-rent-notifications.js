@@ -15,12 +15,12 @@
  */
 
 // ==================== RENT NOTIFICATIONS PANEL ====================
-/**
- * Render the rent notifications panel in the dashboard
- * Shows overdue, due today, and due tomorrow in a prominent location
- * Works for all property owners, showing only their own properties
- */
-window.renderRentNotificationsPanel = function() {
+// NOTE: The main renderRentNotificationsPanel is handled by NotificationManager
+// This legacy version is disabled to prevent conflicts. If you need to restore it,
+// rename _DISABLED_renderRentNotificationsPanel back to renderRentNotificationsPanel
+// and comment out the export in notification-manager.js
+
+window._DISABLED_renderRentNotificationsPanel = function() {
     const panel = $('rentNotificationsPanel');
     if (!panel) return;
     
