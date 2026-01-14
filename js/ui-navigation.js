@@ -287,6 +287,51 @@ window.renderBlogPage = function() {
     // Blog posts data - add new posts at the top
     const blogPosts = [
         {
+            date: 'January 14, 2025',
+            title: '🏠 Property Management Just Got Easier',
+            category: 'New Feature',
+            categoryColor: 'bg-cyan-500',
+            content: `
+                <p class="mb-4">This update focuses on making your day-to-day property management smoother. We've improved how you track rent, added professional services, and cleaned up the interface. We also connected PaulysAutos.com via a dropdown in the top-left corner to make switching between car and property sales as seamless as possible.</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">📊 Dashboard Improvements:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Rent collection alerts are now fully clickable</li>
+                    <li>Click any overdue tenant to jump straight to their property details</li>
+                    <li>One-click copy for reminder messages to send to tenants</li>
+                    <li>Overall performance is noticeably faster</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🛎️ Professional Services:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>New <strong>Services</strong> tab in the navigation bar</li>
+                    <li>Professional photography packages to make your listings stand out</li>
+                    <li>Turn-key management available if you want us to handle everything</li>
+                    <li>Pricing is straightforward: one-time fee plus a percentage of rent or sale</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">✨ Quality of Life Updates:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Navigation is cleaner with only the active page highlighted</li>
+                    <li>Streamlined welcome screen for new visitors</li>
+                    <li>About and Contact info now in one place</li>
+                    <li>Dozens of bug fixes behind the scenes</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🚗 One More Thing:</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>PaulysAutos.com</strong> is now live for vehicle listings</li>
+                    <li>Use the dropdown in the top-left corner to switch between sites</li>
+                    <li>Browsing is always free on both sites</li>
+                    <li>If you want to list on both, you'll need to create a separate account for each</li>
+                </ul>
+                
+                <p class="mt-6 text-gray-300">We're building a connected network of services for Los Santos. Whether you need a place to live or a car to drive, Pauly's got you covered.</p>
+                
+                <p class="mt-4 text-gray-400 italic">Questions or ideas? <strong class="text-green-400">Text Pauly in city.</strong> Your feedback shapes everything we build.</p>
+            `
+        },
+        {
             date: 'December 30, 2024',
             title: '📱 Now Available On Your In-City Phone + Massive Platform Upgrades',
             category: 'Major Update',
@@ -836,23 +881,16 @@ window.updateNavHighlight = function(activeSection) {
     Object.values(navLinks).forEach(linkId => {
         const link = $(linkId);
         if (link) {
-            link.classList.remove('text-purple-400', 'text-amber-400', 'text-cyan-400');
+            link.classList.remove('text-purple-400');
             link.classList.add('text-gray-300');
         }
     });
     
-    // Highlight the active link
+    // Highlight the active link in purple
     const activeLink = $(navLinks[activeSection]);
     if (activeLink) {
         activeLink.classList.remove('text-gray-300');
-        // Use different colors for different sections
-        if (activeSection === 'leaderboard') {
-            activeLink.classList.add('text-amber-400');
-        } else if (activeSection === 'services') {
-            activeLink.classList.add('text-cyan-400');
-        } else {
-            activeLink.classList.add('text-purple-400');
-        }
+        activeLink.classList.add('text-purple-400');
     }
 };
 
