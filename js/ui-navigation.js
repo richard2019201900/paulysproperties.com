@@ -40,7 +40,6 @@ function updateAuthButton(isLoggedIn) {
         
         showElement($('navDashboardLink'));
         showElement($('mobileDashboardLink'));
-        showElement($('mobileServicesLink'));
         // Show Create Listing buttons
         if (navCreateBtn) navCreateBtn.className = 'hidden md:block bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-3 lg:px-5 py-2 lg:py-2.5 rounded-xl hover:opacity-90 transition font-bold shadow-lg text-xs lg:text-sm';
         if (mobileCreateBtn) mobileCreateBtn.className = 'flex px-4 py-3 text-green-400 hover:bg-gray-800 cursor-pointer font-semibold items-center gap-2';
@@ -68,7 +67,6 @@ function updateAuthButton(isLoggedIn) {
         
         hideElement($('navDashboardLink'));
         hideElement($('mobileDashboardLink'));
-        hideElement($('mobileServicesLink'));
         // Hide Create Listing buttons completely (set className to hidden only, no md:block)
         if (navCreateBtn) navCreateBtn.className = 'hidden';
         if (mobileCreateBtn) mobileCreateBtn.className = 'hidden';
@@ -929,3 +927,10 @@ document.addEventListener('click', function(e) {
         closeSiteSwitcher();
     }
 });
+
+// Legacy fallback for cached HTML - Services submenu was moved to hero banner
+function toggleServicesSubmenu(event) {
+    if (event) event.preventDefault();
+    openPhotoServicesModal();
+    closeUserDropdown();
+}

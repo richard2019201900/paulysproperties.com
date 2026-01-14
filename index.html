@@ -845,8 +845,6 @@
                 <div class="hidden lg:flex items-center space-x-4 xl:space-x-6 flex-shrink-0">
                     <a onclick="navigateTo('home')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Home</a>
                     <a onclick="navigateTo('properties')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Properties</a>
-                    <a onclick="navigateTo('about')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">About</a>
-                    <a onclick="navigateTo('contact')" class="text-gray-300 hover:text-purple-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-400 rounded px-1" role="button" tabindex="0">Contact</a>
                     <a onclick="navigateTo('leaderboard')" class="text-gray-300 hover:text-amber-400 font-semibold cursor-pointer transition text-sm outline-none focus:text-amber-400 rounded px-1" role="button" tabindex="0">Leaderboard</a>
                     <a id="navDashboardLink" onclick="goToDashboard()" class="hidden text-purple-400 hover:text-purple-300 font-semibold cursor-pointer transition text-sm outline-none focus:text-purple-300 rounded px-1" role="button" tabindex="0">Dashboard</a>
                 </div>
@@ -917,37 +915,6 @@
                                     <span class="text-lg">🏆</span>
                                     <span class="font-medium">Leaderboard</span>
                                 </a>
-                                <!-- Services submenu -->
-                                <div class="relative group">
-                                    <a onclick="toggleServicesSubmenu(event)" class="flex items-center justify-between px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
-                                        <div class="flex items-center gap-3">
-                                            <span class="text-lg">🛎️</span>
-                                            <span class="font-medium">Services</span>
-                                        </div>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                                    </a>
-                                    <!-- Services submenu panel -->
-                                    <div id="servicesSubmenu" class="hidden absolute left-full top-0 ml-1 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                                        <a onclick="openPhotoServicesModal(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
-                                            <span class="text-lg">📸</span>
-                                            <div>
-                                                <div class="font-medium">Photography</div>
-                                                <div class="text-xs text-gray-400">Pro photos from $5k</div>
-                                            </div>
-                                        </a>
-                                        <a onclick="openPhotoServicesModal(); closeUserDropdown()" class="flex items-center gap-3 px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
-                                            <span class="text-lg">🔑</span>
-                                            <div>
-                                                <div class="font-medium">Turn-Key Management</div>
-                                                <div class="text-xs text-gray-400">We handle everything</div>
-                                            </div>
-                                        </a>
-                                        <div class="border-t border-gray-700"></div>
-                                        <div class="px-4 py-2 text-xs text-gray-500">
-                                            More services coming soon
-                                        </div>
-                                    </div>
-                                </div>
                                 <a onclick="goToBlog(); closeUserDropdown()" class="flex items-center justify-between px-4 py-3 text-gray-200 hover:bg-gray-700 cursor-pointer transition">
                                     <div class="flex items-center gap-3">
                                         <span class="text-lg">📰</span>
@@ -1009,16 +976,14 @@
             <!-- Navigation Links -->
             <a onclick="navigateTo('home'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Home</a>
             <a onclick="navigateTo('properties'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Properties</a>
-            <a onclick="navigateTo('about'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">About</a>
-            <a onclick="navigateTo('contact'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer">Contact</a>
             <a onclick="navigateTo('leaderboard'); hideMobileMenu();" class="block px-4 py-3 text-gray-300 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
                 <span>🏆</span> Leaderboard
             </a>
             <a id="mobileDashboardLink" onclick="goToDashboard(); hideMobileMenu();" class="hidden px-4 py-3 text-purple-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
                 <span>🏠</span> Dashboard
             </a>
-            <a id="mobileServicesLink" onclick="openPhotoServicesModal(); hideMobileMenu();" class="hidden px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
-                <span>🛎️</span> Services
+            <a onclick="openPhotoServicesModal(); hideMobileMenu();" class="px-4 py-3 text-amber-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
+                <span>📸</span> Services
             </a>
             <a id="mobileCreateListingBtn" onclick="openCreateListingModal(); hideMobileMenu();" class="hidden px-4 py-3 text-green-400 hover:bg-gray-800 cursor-pointer font-semibold flex items-center gap-2">
                 <span>➕</span> New Listing
@@ -2022,6 +1987,19 @@
                         📋 List Your Property <span>→</span>
                     </button>
                 </div>
+                <!-- Services Banner -->
+                <div onclick="openPhotoServicesModal()" class="mt-6 max-w-2xl mx-auto cursor-pointer group">
+                    <div class="bg-gradient-to-r from-amber-500/20 to-orange-600/20 border border-amber-500/40 rounded-xl px-4 py-3 flex items-center justify-between gap-4 hover:border-amber-400 transition">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">📸</span>
+                            <div class="text-left">
+                                <div class="text-amber-300 font-bold text-sm">Property Owner Services</div>
+                                <div class="text-gray-300 text-xs">Pro photography from $5k • Turn-key management available</div>
+                            </div>
+                        </div>
+                        <span class="text-amber-400 group-hover:translate-x-1 transition-transform">→</span>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -2082,62 +2060,40 @@
             <div id="propertiesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
         </section>
 
-        <section id="about" class="py-16 md:py-20">
+        <!-- Combined About & Contact Section -->
+        <section id="about" class="bg-gradient-to-br from-gray-800 to-gray-900 py-12 md:py-16 border-t border-gray-700">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="text-center mb-12 md:mb-16">
-                    <h3 class="text-4xl md:text-5xl font-black text-white mb-6">Why Choose PaulysProperties.com?</h3>
-                    <p class="text-lg md:text-xl text-gray-300 max-w-3xl mx-auto font-medium">Simple. Fast. Premium. That's how we do business.</p>
+                <!-- Why Choose Us - Compact Row -->
+                <div class="text-center mb-8">
+                    <h3 class="text-2xl md:text-3xl font-black text-white mb-2">Why PaulysProperties?</h3>
+                    <p class="text-gray-400 font-medium">Simple. Fast. Premium.</p>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
-                    <div class="text-center p-6 md:p-8 glass-effect rounded-2xl shadow-lg transform hover:scale-105 transition">
-                        <div class="gradient-bg w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                            <svg class="w-8 h-8 md:w-10 md:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        </div>
-                        <h4 class="text-xl md:text-2xl font-bold mb-3 text-white">Lightning-Fast Responses</h4>
-                        <p class="text-gray-300 font-medium">Text us in city and get a reply in minutes, not days. We're always ready.</p>
+                <div class="grid grid-cols-3 gap-4 md:gap-6 mb-10">
+                    <div class="text-center p-4 glass-effect rounded-xl">
+                        <div class="text-2xl md:text-3xl mb-2">⚡</div>
+                        <h4 class="text-sm md:text-base font-bold text-white">Fast Replies</h4>
+                        <p class="text-gray-400 text-xs md:text-sm hidden md:block">Minutes, not days</p>
                     </div>
-                    <div class="text-center p-6 md:p-8 glass-effect rounded-2xl shadow-lg transform hover:scale-105 transition">
-                        <div class="gradient-bg w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                            <svg class="w-8 h-8 md:w-10 md:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                        </div>
-                        <h4 class="text-xl md:text-2xl font-bold mb-3 text-white">World-Class Team</h4>
-                        <p class="text-gray-300 font-medium">Our sales and support crew treats every client like family.</p>
+                    <div class="text-center p-4 glass-effect rounded-xl">
+                        <div class="text-2xl md:text-3xl mb-2">👥</div>
+                        <h4 class="text-sm md:text-base font-bold text-white">Great Team</h4>
+                        <p class="text-gray-400 text-xs md:text-sm hidden md:block">Treat you like family</p>
                     </div>
-                    <div class="text-center p-6 md:p-8 glass-effect rounded-2xl shadow-lg transform hover:scale-105 transition">
-                        <div class="gradient-bg w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                            <svg class="w-8 h-8 md:w-10 md:h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <h4 class="text-xl md:text-2xl font-bold mb-3 text-white">Unbeatable Value</h4>
-                        <p class="text-gray-300 font-medium">Premium properties at prices that make sense. No games, just deals.</p>
+                    <div class="text-center p-4 glass-effect rounded-xl">
+                        <div class="text-2xl md:text-3xl mb-2">💰</div>
+                        <h4 class="text-sm md:text-base font-bold text-white">Fair Prices</h4>
+                        <p class="text-gray-400 text-xs md:text-sm hidden md:block">No games, just deals</p>
                     </div>
                 </div>
-            </div>
-        </section>
-
-        <section id="contact" class="bg-gradient-to-br from-gray-800 to-gray-900 py-16 md:py-20 border-t border-gray-700">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="max-w-3xl mx-auto">
-                    <h3 class="text-4xl md:text-5xl font-black text-white mb-6 text-center">Get In Touch</h3>
-                    <p class="text-lg md:text-xl text-gray-400 text-center mb-10 md:mb-12 font-medium">Have questions? Text us in city for the fastest response!</p>
-                    <div class="glass-effect rounded-2xl shadow-2xl p-6 md:p-10">
-                        <div class="mb-8">
-                            <label class="block text-gray-300 font-bold mb-3 text-lg">📱 Our Team's Number:</label>
-                            <div class="flex items-center gap-3">
-                                <input type="text" id="contactPhone" value="2057028233" readonly class="flex-1 px-4 md:px-5 py-3 md:py-4 border-2 border-gray-600 rounded-xl bg-gray-700 font-bold text-lg md:text-xl text-white">
-                                <button onclick="copyToClipboard('contactPhone', this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-base md:text-lg">Copy</button>
-                            </div>
-                        </div>
-                        <div class="mb-8">
-                            <label class="block text-gray-300 font-bold mb-3 text-lg">💬 Your Message (edit as needed):</label>
-                            <textarea id="contactMessage" rows="4" class="w-full px-4 md:px-5 py-3 md:py-4 border-2 border-gray-600 rounded-xl bg-gray-700 font-medium text-white text-base md:text-lg focus:ring-2 focus:ring-purple-500 transition">Hi! I'm interested in learning more about your available properties. Please contact me at your earliest convenience. Thank you!</textarea>
-                            <button onclick="copyToClipboard('contactMessage', this)" class="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-base md:text-lg">Copy Message</button>
-                        </div>
-                        <div class="bg-gradient-to-r from-purple-900 to-blue-900 p-5 md:p-6 rounded-xl text-center border border-purple-700">
-                            <p class="text-purple-200 font-black text-lg md:text-xl">⚡ Text in city for the fastest response!</p>
-                            <p class="text-purple-300 font-medium mt-2">Our team typically responds within minutes.</p>
-                            <p class="text-gray-400 text-sm mt-3">⏰ Please allow up to 24 hours for a response during busy periods.</p>
-                        </div>
+                
+                <!-- Contact - Compact -->
+                <div id="contact" class="max-w-xl mx-auto glass-effect rounded-2xl p-5 md:p-6">
+                    <h4 class="text-xl font-bold text-white mb-4 text-center">📱 Get In Touch</h4>
+                    <div class="flex items-center gap-3 mb-4">
+                        <input type="text" id="contactPhone" value="2057028233" readonly class="flex-1 px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 font-bold text-lg text-white">
+                        <button onclick="copyToClipboard('contactPhone', this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-5 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg">Copy</button>
                     </div>
+                    <p class="text-center text-gray-400 text-sm">Text us in city • We typically respond within minutes</p>
                 </div>
             </div>
         </section>
@@ -2173,8 +2129,8 @@
                     <ul class="space-y-3">
                         <li><a onclick="navigateTo('home')" class="text-gray-400 hover:text-white cursor-pointer transition font-medium" role="button" tabindex="0">Home</a></li>
                         <li><a onclick="navigateTo('properties')" class="text-gray-400 hover:text-white cursor-pointer transition font-medium" role="button" tabindex="0">Properties</a></li>
-                        <li><a onclick="navigateTo('about')" class="text-gray-400 hover:text-white cursor-pointer transition font-medium" role="button" tabindex="0">About</a></li>
-                        <li><a onclick="navigateTo('contact')" class="text-gray-400 hover:text-white cursor-pointer transition font-medium" role="button" tabindex="0">Contact</a></li>
+                        <li><a onclick="navigateTo('leaderboard')" class="text-gray-400 hover:text-white cursor-pointer transition font-medium" role="button" tabindex="0">Leaderboard</a></li>
+                        <li><a onclick="openPhotoServicesModal()" class="text-gray-400 hover:text-white cursor-pointer transition font-medium" role="button" tabindex="0">Services</a></li>
                     </ul>
                 </div>
                 <div>
