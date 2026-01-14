@@ -412,24 +412,29 @@ window.viewPropertyAndHighlightOffers = function(id) {
  * All editable fields sync in real-time with Firestore
  */
 window.viewPropertyStats = async function(id) {
-    const p = properties.find(prop => prop.id === id);
+    // Convert to number if it's a numeric string for consistent comparison
+    const numericId = typeof id === 'string' && !isNaN(id) ? parseInt(id, 10) : id;
+    const p = properties.find(prop => prop.id === numericId || prop.id === id || String(prop.id) === String(id));
     if (!p) {
         console.error('[viewPropertyStats] Property not found:', id);
         return;
     }
     
+    // Use the actual property ID from the found property
+    const propId = p.id;
+    
     // Check if owner owns this property
-    if (!ownsProperty(id)) {
-        console.warn('[viewPropertyStats] Access denied for property:', id);
+    if (!ownsProperty(propId)) {
+        console.warn('[viewPropertyStats] Access denied for property:', propId);
         alert('You do not have access to this property.');
         return;
     }
-    state.currentPropertyId = id;
+    state.currentPropertyId = propId;
     state.currentImages = p.images;
     
     // Fetch fresh data from Firestore and sync to local properties array
     try {
-        const freshData = await PropertyDataService.read(id);
+        const freshData = await PropertyDataService.read(propId);
         if (freshData.exists) {
             // Data is automatically synced to properties array by PropertyDataService.read()
             // Debug log removed
@@ -441,9 +446,9 @@ window.viewPropertyStats = async function(id) {
     // Set up real-time listener for all properties
     PropertyDataService.subscribeAll((data) => {
         // Re-render when data changes from another source
-        if (state.currentPropertyId === id) {
-            renderPropertyStatsContent(id);
-            loadStatsOwnerName(id);
+        if (state.currentPropertyId === propId) {
+            renderPropertyStatsContent(propId);
+            loadStatsOwnerName(propId);
         }
     });
     
@@ -451,13 +456,13 @@ window.viewPropertyStats = async function(id) {
     // in setupGlobalPropertiesListener() which watches the propertyDeletions collection
     // filtered by the logged-in user's email - so only the OWNER sees the notification
     
-    renderPropertyStatsContent(id);
-    loadStatsOwnerName(id);
+    renderPropertyStatsContent(propId);
+    loadStatsOwnerName(propId);
     
     // Load property analytics (async - will populate the analytics section)
     setTimeout(() => {
         if (typeof renderPropertyAnalytics === 'function') {
-            renderPropertyAnalytics(id);
+            renderPropertyAnalytics(propId);
         }
     }, 100);
     

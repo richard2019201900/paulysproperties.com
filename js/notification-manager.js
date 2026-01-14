@@ -763,7 +763,7 @@
         const dueDisplay = rent.dueDate ? new Date(rent.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Unknown';
         
         return `
-            <div id="rent-item-${propertyId}" class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[status]} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${propertyId})">
+            <div id="rent-item-${propertyId}" class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[status]} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats('${propertyId}')">
                 <div class="flex-1 min-w-0" style="outline: none;">
                     <div class="text-white font-medium truncate">${propertyTitle}</div>
                     <div class="text-gray-400 text-sm">Renter: ${renterName}</div>

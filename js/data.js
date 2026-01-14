@@ -303,5 +303,6 @@ function ownsProperty(propertyId) {
     
     const email = user.email.toLowerCase();
     const propertyIds = ownerPropertyMap[email] || [];
-    return propertyIds.includes(propertyId);
+    // Handle both string and number IDs
+    return propertyIds.some(id => String(id) === String(propertyId));
 }
