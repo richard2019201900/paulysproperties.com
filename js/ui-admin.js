@@ -3645,3 +3645,35 @@ window.copySubscriptionReminder = function(message) {
         showToast('Failed to copy message', 'error');
     });
 };
+
+// Event delegation handler for subscription panel clicks
+window.handleSubscriptionPanelClick = function(event) {
+    console.log('[DEBUG handleSubscriptionPanelClick] Click detected on:', event.target);
+    console.log('[DEBUG handleSubscriptionPanelClick] Target classes:', event.target.className);
+    
+    // Check if clicked on the header area (gradient background)
+    const header = event.target.closest('.bg-gradient-to-r');
+    if (header) {
+        console.log('[DEBUG handleSubscriptionPanelClick] Header clicked, toggling panel');
+        toggleSubscriptionPanel();
+        return;
+    }
+    
+    // Check if clicked on copy button
+    if (event.target.closest('button') && event.target.textContent.includes('Copy')) {
+        console.log('[DEBUG handleSubscriptionPanelClick] Copy button clicked');
+        // The button's own onclick should handle this
+        return;
+    }
+    
+    // Check if clicked on a subscription item row (has cursor-pointer)
+    const subItem = event.target.closest('.cursor-pointer');
+    if (subItem && subItem.getAttribute('onclick')?.includes('goToAdminUserByEmail')) {
+        // Extract email from onclick
+        const match = subItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
+        if (match) {
+            console.log('[DEBUG handleSubscriptionPanelClick] Sub item clicked, email:', match[1]);
+            goToAdminUserByEmail(match[1]);
+        }
+    }
+};

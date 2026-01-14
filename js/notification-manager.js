@@ -1221,5 +1221,33 @@
     window.updateMobileRentBadge = refreshBadges;
     window.updateMobileAdminBadges = refreshBadges;
 
+    // Event delegation handler for rent panel clicks
+    window.handleRentPanelClick = function(event) {
+        console.log('[DEBUG handleRentPanelClick] Click detected on:', event.target);
+        console.log('[DEBUG handleRentPanelClick] Target classes:', event.target.className);
+        
+        // Check if clicked on the header area (gradient background)
+        const header = event.target.closest('.bg-gradient-to-r');
+        if (header) {
+            console.log('[DEBUG handleRentPanelClick] Header clicked, toggling panel');
+            NotificationManager.toggleRentPanel();
+            return;
+        }
+        
+        // Check if clicked on copy button
+        if (event.target.closest('button') && event.target.textContent.includes('Copy')) {
+            console.log('[DEBUG handleRentPanelClick] Copy button clicked');
+            // The button's own onclick should handle this
+            return;
+        }
+        
+        // Check if clicked on a rent item row
+        const rentItem = event.target.closest('[id^="rent-item-"]');
+        if (rentItem) {
+            const propertyId = rentItem.id.replace('rent-item-', '');
+            console.log('[DEBUG handleRentPanelClick] Rent item clicked, propertyId:', propertyId);
+            viewPropertyStats(propertyId);
+        }
+    };
 
 })();
