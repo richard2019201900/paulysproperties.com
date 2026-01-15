@@ -3333,7 +3333,7 @@ window.renderSubscriptionAlertsPanel = async function() {
         usersSnapshot.forEach(doc => {
             const user = doc.data();
             if (!user.tier || user.tier === 'starter' || user.tier === 'owner') return;
-            if (user.isTrial) return; // Skip trial users
+            if (user.isTrial || user.isFreeTrial) return; // Skip trial users (both field names for compatibility)
             
             proEliteCount++;
             
@@ -3587,13 +3587,11 @@ function renderSubscriptionItem(sub, urgency) {
  * Navigate to admin panel and highlight a user by email
  */
 window.goToAdminUserByEmail = function(email) {
-    console.log('[DEBUG goToAdminUserByEmail] Called with email:', email);
-    
     // Switch to admin panel tab (use 'admin' not 'adminPanel')
     if (typeof switchDashboardTab === 'function') {
         switchDashboardTab('admin');
     } else {
-        console.warn('[SubscriptionAlerts] switchDashboardTab function not found');
+        console.error('[goToAdminUserByEmail] switchDashboardTab function not found');
     }
     
     // Wait for admin panel to render, then search for and highlight the user
@@ -3626,10 +3624,8 @@ window.goToAdminUserByEmail = function(email) {
 };
 
 window.toggleSubscriptionPanel = function() {
-    console.log('[DEBUG toggleSubscriptionPanel] Called');
     const content = $('subscriptionPanelContent');
     const arrow = $('subscriptionPanelArrow');
-    console.log('[DEBUG toggleSubscriptionPanel] content:', content, 'arrow:', arrow);
     if (content && arrow) {
         content.classList.toggle('hidden');
         arrow.classList.toggle('rotate-180');
@@ -3637,7 +3633,6 @@ window.toggleSubscriptionPanel = function() {
 };
 
 window.copySubscriptionReminder = function(message) {
-    console.log('[DEBUG copySubscriptionReminder] Called with message length:', message?.length);
     navigator.clipboard.writeText(message).then(() => {
         showToast('📋 Reminder copied to clipboard!', 'success');
     }).catch(err => {
@@ -3648,20 +3643,15 @@ window.copySubscriptionReminder = function(message) {
 
 // Event delegation handler for subscription panel clicks
 window.handleSubscriptionPanelClick = function(event) {
-    console.log('[DEBUG handleSubscriptionPanelClick] Click detected on:', event.target);
-    console.log('[DEBUG handleSubscriptionPanelClick] Target classes:', event.target.className);
-    
     // Check if clicked on the header area (gradient background)
     const header = event.target.closest('.bg-gradient-to-r');
     if (header) {
-        console.log('[DEBUG handleSubscriptionPanelClick] Header clicked, toggling panel');
         toggleSubscriptionPanel();
         return;
     }
     
     // Check if clicked on copy button
     if (event.target.closest('button') && event.target.textContent.includes('Copy')) {
-        console.log('[DEBUG handleSubscriptionPanelClick] Copy button clicked');
         // The button's own onclick should handle this
         return;
     }
@@ -3672,7 +3662,6 @@ window.handleSubscriptionPanelClick = function(event) {
         // Extract email from onclick
         const match = subItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
         if (match) {
-            console.log('[DEBUG handleSubscriptionPanelClick] Sub item clicked, email:', match[1]);
             goToAdminUserByEmail(match[1]);
         }
     }

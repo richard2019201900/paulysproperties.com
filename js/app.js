@@ -421,8 +421,6 @@ window.viewPropertyAndHighlightOffers = function(id) {
  * All editable fields sync in real-time with Firestore
  */
 window.viewPropertyStats = async function(id, skipTrack = false) {
-    console.log('[DEBUG viewPropertyStats] Called with id:', id, 'type:', typeof id);
-    
     // Track where user came from for back navigation (unless already tracked)
     if (!skipTrack) {
         if (!$('ownerDashboard')?.classList.contains('hidden')) {
@@ -444,21 +442,15 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
     
     // Convert to number if it's a numeric string for consistent comparison
     const numericId = typeof id === 'string' && !isNaN(id) ? parseInt(id, 10) : id;
-    console.log('[DEBUG viewPropertyStats] numericId:', numericId, 'type:', typeof numericId);
-    console.log('[DEBUG viewPropertyStats] properties count:', properties?.length);
     
     const p = properties.find(prop => {
-        const match = prop.id === numericId || prop.id === id || String(prop.id) === String(id);
-        if (match) console.log('[DEBUG viewPropertyStats] Found match:', prop.id);
-        return match;
+        return prop.id === numericId || prop.id === id || String(prop.id) === String(id);
     });
     
     if (!p) {
-        console.error('[DEBUG viewPropertyStats] Property not found. Looking for:', id, 'Available IDs:', properties?.slice(0, 5).map(p => p.id));
+        console.error('[viewPropertyStats] Property not found:', id);
         return;
     }
-    
-    console.log('[DEBUG viewPropertyStats] Found property:', p.title);
     
     // Use the actual property ID from the found property
     const propId = p.id;
@@ -477,7 +469,6 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
         const freshData = await PropertyDataService.read(propId);
         if (freshData.exists) {
             // Data is automatically synced to properties array by PropertyDataService.read()
-            // Debug log removed
         }
     } catch (error) {
         console.error('Error fetching property data:', error);
@@ -593,9 +584,6 @@ function renderPropertyStatsContent(id) {
     const renterNotes = PropertyDataService.getValue(id, 'renterNotes', p.renterNotes || '');
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || '');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
-    
-    // DEBUG: Log property render (without sensitive renter data)
-    // Debug log removed
     
     // NOTE: Removed AUTO-FIX logic that was causing race conditions with lease completion
     // The availability status should be explicitly managed via toggleAvailability/saveAvailability
@@ -759,12 +747,12 @@ function renderPropertyStatsContent(id) {
                             <span>📝</span>
                             <span class="text-lg text-gray-300 font-semibold">Description:</span>
                             <span id="editable-location-${id}" 
-                                  class="text-lg text-gray-300 font-semibold cursor-pointer hover:text-purple-300 transition"
+                                  class="text-lg ${p.location ? 'text-gray-300' : 'text-gray-500 italic'} font-semibold cursor-pointer hover:text-purple-300 transition"
                                   onclick="startEditField('location', ${id}, this)"
                                   title="Click to edit description">
-                                ${sanitize(p.location)}
+                                ${p.location ? sanitize(p.location) : 'Click to add description'}
                             </span>
-                            <span class="text-purple-400 text-sm">✏️</span>
+                            <span class="text-purple-400 text-sm cursor-pointer hover:text-purple-300" onclick="startEditField('location', ${id}, document.getElementById('editable-location-${id}'))" title="Click to edit description">✏️</span>
                         </div>
                     </div>
                     <div class="flex flex-col items-end gap-2">
@@ -7422,33 +7410,23 @@ init();
 
 // Setup click handlers for notification panels after DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[DEBUG] DOMContentLoaded - setting up panel click handlers');
-    
     // Rent panel
     const rentPanel = document.getElementById('rentNotificationsPanel');
     if (rentPanel) {
-        console.log('[DEBUG] Found rentNotificationsPanel, adding click listener');
         rentPanel.addEventListener('click', function(e) {
-            console.log('[DEBUG RENT CLICK] Event fired!', e.target);
             if (typeof handleRentPanelClick === 'function') {
                 handleRentPanelClick(e);
             }
         });
-    } else {
-        console.log('[DEBUG] rentNotificationsPanel NOT found');
     }
     
     // Subscription panel
     const subPanel = document.getElementById('subscriptionNotificationsPanel');
     if (subPanel) {
-        console.log('[DEBUG] Found subscriptionNotificationsPanel, adding click listener');
         subPanel.addEventListener('click', function(e) {
-            console.log('[DEBUG SUB CLICK] Event fired!', e.target);
             if (typeof handleSubscriptionPanelClick === 'function') {
                 handleSubscriptionPanelClick(e);
             }
         });
-    } else {
-        console.log('[DEBUG] subscriptionNotificationsPanel NOT found');
     }
 });
