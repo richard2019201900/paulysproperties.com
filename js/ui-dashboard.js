@@ -796,6 +796,11 @@ window.renderOwnerDashboard = function() {
         initDashboardTabs();
     }
     
+    // Hide password change section for admin
+    if (typeof checkPasswordSectionVisibility === 'function') {
+        checkPasswordSectionVisibility();
+    }
+    
     // Render site update notification if there's a new one
     const siteUpdateContainer = $('siteUpdateNotificationContainer');
     if (siteUpdateContainer) {

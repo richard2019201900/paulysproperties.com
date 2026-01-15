@@ -543,3 +543,132 @@ window.saveOwnerPhone = async function() {
     }
 };
 
+// ============================================================================
+// PASSWORD CHANGE (Profile Settings)
+// ============================================================================
+
+/**
+ * Toggle the change password form visibility
+ */
+window.toggleChangePasswordForm = function() {
+    const form = $('changePasswordForm');
+    const btn = $('changePasswordToggleBtn');
+    
+    if (form && btn) {
+        const isHidden = form.classList.contains('hidden');
+        form.classList.toggle('hidden');
+        btn.textContent = isHidden ? 'Hide' : 'Show';
+        
+        // Clear inputs when hiding
+        if (!isHidden) {
+            $('currentPasswordInput').value = '';
+            $('newPasswordInputProfile').value = '';
+            $('confirmPasswordInputProfile').value = '';
+            hideElement($('changePasswordStatus'));
+        }
+    }
+};
+
+/**
+ * Change user password from profile settings
+ */
+window.changeUserPassword = async function() {
+    const currentPassword = $('currentPasswordInput')?.value?.trim();
+    const newPassword = $('newPasswordInputProfile')?.value?.trim();
+    const confirmPassword = $('confirmPasswordInputProfile')?.value?.trim();
+    const status = $('changePasswordStatus');
+    const btn = $('changePasswordBtn');
+    
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        status.textContent = 'Please fill in all fields';
+        status.className = 'text-red-400 text-sm';
+        showElement(status);
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        status.textContent = 'New password must be at least 6 characters';
+        status.className = 'text-red-400 text-sm';
+        showElement(status);
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        status.textContent = 'New passwords do not match';
+        status.className = 'text-red-400 text-sm';
+        showElement(status);
+        return;
+    }
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-pulse">Updating...</span>';
+    }
+    
+    try {
+        const user = auth.currentUser;
+        if (!user || !user.email) throw new Error('Not logged in');
+        
+        // Re-authenticate with current password
+        const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPassword);
+        await user.reauthenticateWithCredential(credential);
+        
+        // Update password
+        await user.updatePassword(newPassword);
+        
+        // Update Firestore
+        await db.collection('users').doc(user.uid).update({
+            passwordChangedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            passwordChangedByUser: true
+        });
+        
+        // Show success
+        status.textContent = '✅ Password updated successfully!';
+        status.className = 'text-green-400 text-sm';
+        showElement(status);
+        
+        // Clear form
+        $('currentPasswordInput').value = '';
+        $('newPasswordInputProfile').value = '';
+        $('confirmPasswordInputProfile').value = '';
+        
+        // Hide form after delay
+        setTimeout(() => {
+            toggleChangePasswordForm();
+            hideElement(status);
+        }, 2000);
+        
+    } catch (error) {
+        console.error('[Password Change] Error:', error);
+        
+        let errorMsg = 'Failed to update password';
+        if (error.code === 'auth/wrong-password') {
+            errorMsg = 'Current password is incorrect';
+        } else if (error.code === 'auth/requires-recent-login') {
+            errorMsg = 'Session expired. Please log out and log back in.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMsg = 'Password is too weak. Use at least 6 characters.';
+        }
+        
+        status.textContent = '❌ ' + errorMsg;
+        status.className = 'text-red-400 text-sm';
+        showElement(status);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Update Password';
+        }
+    }
+};
+
+/**
+ * Hide change password section for admin
+ * Called when dashboard loads
+ */
+window.checkPasswordSectionVisibility = function() {
+    const section = $('changePasswordSection');
+    if (section && TierService.isMasterAdmin(auth?.currentUser?.email)) {
+        section.classList.add('hidden');
+    }
+};

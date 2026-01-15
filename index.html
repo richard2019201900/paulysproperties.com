@@ -1530,6 +1530,41 @@
                     </div>
                 </div>
                 
+                <!-- Change Password Section (hidden for admin) -->
+                <div id="changePasswordSection" class="mt-6 pt-6 border-t border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="text-lg font-bold text-gray-300">🔐 Change Password</h4>
+                            <p class="text-gray-500 text-sm">Update your account password</p>
+                        </div>
+                        <button onclick="toggleChangePasswordForm()" id="changePasswordToggleBtn" class="text-purple-400 hover:text-purple-300 text-sm font-bold">
+                            Show
+                        </button>
+                    </div>
+                    <div id="changePasswordForm" class="hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">Current Password</label>
+                                <input type="password" id="currentPasswordInput" placeholder="Current password" class="w-full px-4 py-2.5 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">New Password</label>
+                                <input type="password" id="newPasswordInputProfile" placeholder="New password (min 6 chars)" class="w-full px-4 py-2.5 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-gray-400 text-sm mb-2">Confirm New Password</label>
+                                <input type="password" id="confirmPasswordInputProfile" placeholder="Confirm new password" class="w-full px-4 py-2.5 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500 transition">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center gap-4">
+                            <button onclick="changeUserPassword()" id="changePasswordBtn" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm">
+                                Update Password
+                            </button>
+                            <span id="changePasswordStatus" class="text-sm hidden"></span>
+                        </div>
+                    </div>
+                </div>
+                
                 <p id="usernameStatus" class="text-sm mt-3 hidden"></p>
                 <p id="phoneStatus" class="text-sm mt-3 hidden"></p>
             </div>

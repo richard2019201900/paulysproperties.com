@@ -3652,6 +3652,13 @@ async function init() {
                 // Store user tier in state for quick access
                 const updatedDoc = await db.collection('users').doc(user.uid).get();
                 state.userTier = updatedDoc.data()?.tier || 'starter';
+                
+                // Check if password reset is required (admin set temp password)
+                const userData = updatedDoc.data();
+                if (userData?.passwordResetRequired === true) {
+                    // Show forced password change modal
+                    showForcePasswordChangeModal(user);
+                }
             } catch (error) {
                 console.error('[Auth] Error checking user tier:', error);
                 state.userTier = 'starter';
@@ -7430,3 +7437,145 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ============================================================================
+// PASSWORD CHANGE SYSTEM
+// ============================================================================
+
+/**
+ * Show forced password change modal (cannot be dismissed)
+ * Called when admin has reset user's password with a temp password
+ */
+window.showForcePasswordChangeModal = function(user) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('forcePasswordChangeModal');
+    if (existingModal) existingModal.remove();
+    
+    const modalHTML = `
+        <div id="forcePasswordChangeModal" class="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-2xl shadow-2xl border border-amber-500/50 max-w-md w-full p-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="text-3xl">🔐</span>
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Password Change Required</h3>
+                        <p class="text-amber-400 text-sm">Your password was reset by an administrator</p>
+                    </div>
+                </div>
+                
+                <div class="bg-amber-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
+                    <p class="text-amber-200 text-sm">
+                        For security, you must set a new password before continuing. Your new password must be at least 6 characters.
+                    </p>
+                </div>
+                
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">New Password:</label>
+                        <input type="password" id="forceNewPassword" 
+                               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                               placeholder="Enter new password (min 6 chars)"
+                               minlength="6">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Confirm New Password:</label>
+                        <input type="password" id="forceConfirmPassword" 
+                               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                               placeholder="Confirm new password"
+                               minlength="6">
+                    </div>
+                </div>
+                
+                <button id="forcePasswordChangeBtn" onclick="submitForcePasswordChange()" 
+                        class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                    🔑 Set New Password
+                </button>
+                
+                <p class="text-gray-500 text-xs text-center mt-4">
+                    You cannot skip this step. Contact admin if you need help.
+                </p>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus the input
+    setTimeout(() => {
+        const input = document.getElementById('forceNewPassword');
+        if (input) input.focus();
+    }, 100);
+    
+    // Add enter key handler
+    document.getElementById('forceConfirmPassword')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            submitForcePasswordChange();
+        }
+    });
+};
+
+/**
+ * Submit forced password change
+ */
+window.submitForcePasswordChange = async function() {
+    const newPassword = document.getElementById('forceNewPassword')?.value?.trim();
+    const confirmPassword = document.getElementById('forceConfirmPassword')?.value?.trim();
+    
+    if (!newPassword || !confirmPassword) {
+        showToast('Please fill in both password fields', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showToast('Passwords do not match', 'error');
+        return;
+    }
+    
+    const btn = document.getElementById('forcePasswordChangeBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-pulse">⏳ Updating password...</span>';
+    }
+    
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error('Not logged in');
+        
+        // Update password in Firebase Auth
+        await user.updatePassword(newPassword);
+        
+        // Clear the passwordResetRequired flag in Firestore
+        await db.collection('users').doc(user.uid).update({
+            passwordResetRequired: false,
+            passwordChangedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            passwordChangedByUser: true
+        });
+        
+        showToast('✅ Password updated successfully!', 'success');
+        
+        // Close the modal
+        const modal = document.getElementById('forcePasswordChangeModal');
+        if (modal) modal.remove();
+        
+    } catch (error) {
+        console.error('[Password Change] Error:', error);
+        
+        let errorMsg = 'Failed to update password';
+        if (error.code === 'auth/requires-recent-login') {
+            errorMsg = 'Session expired. Please log out and log back in with your temp password, then try again.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMsg = 'Password is too weak. Please use at least 6 characters.';
+        }
+        
+        showToast('❌ ' + errorMsg, 'error');
+        
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔑 Set New Password';
+        }
+    }
+};
