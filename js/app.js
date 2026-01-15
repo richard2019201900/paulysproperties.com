@@ -161,7 +161,7 @@ window.viewProperty = function(id, forcePropertyView = false) {
 
     // Premium badge for images section
     const premiumImageBadge = isPremium 
-        ? '<div class="absolute top-4 left-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' 
+        ? '<div class="absolute top-4 left-4 z-10 bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><span>👑</span> Premium</div>' 
         : '';
 
     // Build images section - horizontal scroll layout with large main image and thumbnails below

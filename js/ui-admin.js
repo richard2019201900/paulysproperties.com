@@ -2982,6 +2982,12 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 </button>`);
             }
             
+            // Reset Password button
+            buttons.push(`<button onclick="openResetPasswordModal('${escapedEmail}', '${displayName.replace(/'/g, "\\'")}')" 
+                class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
+                🔑 Reset Password
+            </button>`);
+            
             // Delete button for all
             buttons.push(`<button onclick="adminDeleteUser('${escapedId}', '${escapedEmail}')" 
                 class="bg-gradient-to-r from-red-600 to-red-700 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
@@ -3663,6 +3669,162 @@ window.handleSubscriptionPanelClick = function(event) {
         const match = subItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
         if (match) {
             goToAdminUserByEmail(match[1]);
+        }
+    }
+};
+
+// ============================================================
+// PASSWORD RESET FUNCTIONS
+// ============================================================
+
+/**
+ * Open the reset password modal for a user
+ */
+window.openResetPasswordModal = function(email, displayName) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('resetPasswordModal');
+    if (existingModal) existingModal.remove();
+    
+    const modalHTML = `
+        <div id="resetPasswordModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'resetPasswordModal') closeResetPasswordModal()">
+            <div class="bg-gray-900 rounded-2xl shadow-2xl border border-blue-500/50 max-w-md w-full p-6" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span>🔑</span> Reset Password
+                    </h3>
+                    <button onclick="closeResetPasswordModal()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+                </div>
+                
+                <div class="bg-blue-900/30 border border-blue-500/30 rounded-xl p-4 mb-4">
+                    <p class="text-blue-300 text-sm">
+                        <strong>User:</strong> ${displayName}<br>
+                        <strong>Email:</strong> ${email}
+                    </p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm mb-2">New Temporary Password:</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="newPasswordInput" 
+                               class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                               placeholder="Enter new password (min 6 chars)"
+                               minlength="6">
+                        <button onclick="generateRandomPassword()" 
+                                class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg font-bold text-sm transition" 
+                                title="Generate random password">
+                            🎲
+                        </button>
+                    </div>
+                    <p class="text-gray-500 text-xs mt-2">Give this password to the user in-city so they can log in.</p>
+                </div>
+                
+                <div class="bg-amber-900/30 border border-amber-500/30 rounded-xl p-3 mb-4">
+                    <p class="text-amber-300 text-xs">
+                        ⚠️ <strong>Note:</strong> This action will be logged for security audit. The user should change their password after logging in.
+                    </p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button id="resetPasswordBtn" onclick="confirmResetPassword('${email.replace(/'/g, "\\'")}')" 
+                            class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        🔑 Set Password
+                    </button>
+                    <button onclick="closeResetPasswordModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus the input
+    setTimeout(() => {
+        const input = document.getElementById('newPasswordInput');
+        if (input) input.focus();
+    }, 100);
+};
+
+/**
+ * Close the reset password modal
+ */
+window.closeResetPasswordModal = function() {
+    const modal = document.getElementById('resetPasswordModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Generate a random password
+ */
+window.generateRandomPassword = function() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const input = document.getElementById('newPasswordInput');
+    if (input) {
+        input.value = password;
+        input.select();
+    }
+};
+
+/**
+ * Confirm and execute password reset
+ */
+window.confirmResetPassword = async function(email) {
+    const input = document.getElementById('newPasswordInput');
+    const newPassword = input?.value?.trim();
+    
+    if (!newPassword) {
+        showToast('Please enter a password', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+    }
+    
+    const btn = document.getElementById('resetPasswordBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-pulse">⏳ Setting password...</span>';
+    }
+    
+    try {
+        // Call the Cloud Function
+        const adminSetUserPassword = firebase.functions().httpsCallable('adminSetUserPassword');
+        const result = await adminSetUserPassword({
+            targetEmail: email,
+            newPassword: newPassword
+        });
+        
+        if (result.data.success) {
+            showToast(`✅ Password set successfully! Tell the user: "${newPassword}"`, 'success', 8000);
+            
+            // Copy password to clipboard
+            try {
+                await navigator.clipboard.writeText(newPassword);
+                showToast('📋 Password copied to clipboard!', 'success');
+            } catch (e) {
+                // Clipboard failed, that's okay - they can see it in the toast
+            }
+            
+            closeResetPasswordModal();
+        } else {
+            throw new Error(result.data.message || 'Failed to set password');
+        }
+        
+    } catch (error) {
+        console.error('[Password Reset] Error:', error);
+        showToast('❌ ' + (error.message || 'Failed to reset password'), 'error');
+        
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔑 Set Password';
         }
     }
 };
