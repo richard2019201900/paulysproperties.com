@@ -193,33 +193,48 @@ window.loadUsername = async function() {
     const user = auth.currentUser;
     if (!user) return;
     
+    // IMPORTANT: Clear fields first to prevent browser autofill showing stale data
+    const phoneInput = $('ownerPhone');
+    const usernameInput = $('ownerUsername');
+    if (phoneInput) phoneInput.value = '';
+    if (usernameInput) usernameInput.value = '';
+    
     try {
         const doc = await db.collection('users').doc(user.uid).get();
         if (doc.exists) {
             const data = doc.data();
-            if (data.username) {
-                $('ownerUsername').value = data.username;
+            const hasUsername = data.username && data.username.trim().length > 0;
+            const hasPhone = data.phone && data.phone.replace(/\D/g, '').length > 0;
+            
+            if (hasUsername && usernameInput) {
+                usernameInput.value = data.username;
                 // Pre-populate cache for this user
                 window.ownerUsernameCache = window.ownerUsernameCache || {};
                 window.ownerUsernameCache[user.email.toLowerCase()] = data.username;
             }
-            if (data.phone) {
+            if (hasPhone && phoneInput) {
                 // Sanitize phone - remove all non-digits
-                $('ownerPhone').value = data.phone.replace(/\D/g, '');
+                phoneInput.value = data.phone.replace(/\D/g, '');
             }
             
             // Update tier badge
             const tier = data.tier || 'starter';
             updateTierBadge(tier, user.email);
             
-            // Check profile completion (skip for master owner)
+            // Highlight incomplete fields for non-admin users
             if (!TierService.isMasterAdmin(user.email)) {
                 checkProfileCompletion(data.username, data.phone);
+                
+                // Highlight fields that need attention
+                if (!hasUsername || !hasPhone) {
+                    highlightIncompleteFields(hasUsername, hasPhone);
+                }
             }
         } else {
-            // New user with no document - show profile completion
+            // New user with no document - show profile completion and highlight fields
             if (!TierService.isMasterAdmin(user.email)) {
                 checkProfileCompletion(null, null);
+                highlightIncompleteFields(false, false);
             }
         }
     } catch (error) {
@@ -544,60 +559,109 @@ window.saveOwnerPhone = async function() {
 };
 
 // ============================================================================
-// PASSWORD CHANGE (Profile Settings)
+// PASSWORD CHANGE (Profile Settings - Modal)
 // ============================================================================
 
 /**
- * Toggle the change password form visibility
+ * Open change password modal
  */
-window.toggleChangePasswordForm = function() {
-    const form = $('changePasswordForm');
-    const btn = $('changePasswordToggleBtn');
+window.openChangePasswordModal = function() {
+    // Remove any existing modal
+    const existingModal = document.getElementById('changePasswordModal');
+    if (existingModal) existingModal.remove();
     
-    if (form && btn) {
-        const isHidden = form.classList.contains('hidden');
-        form.classList.toggle('hidden');
-        btn.textContent = isHidden ? 'Hide' : 'Show';
-        
-        // Clear inputs when hiding
-        if (!isHidden) {
-            $('currentPasswordInput').value = '';
-            $('newPasswordInputProfile').value = '';
-            $('confirmPasswordInputProfile').value = '';
-            hideElement($('changePasswordStatus'));
-        }
-    }
+    const modalHTML = `
+        <div id="changePasswordModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-2xl shadow-2xl border border-purple-500/50 max-w-md w-full p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                        <span>🔐</span> Change Password
+                    </h3>
+                    <button onclick="closeChangePasswordModal()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                </div>
+                
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Current Password</label>
+                        <input type="password" id="modalCurrentPassword" 
+                               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                               placeholder="Enter current password">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">New Password</label>
+                        <input type="password" id="modalNewPassword" 
+                               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                               placeholder="New password (min 6 chars)">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-sm mb-2">Confirm New Password</label>
+                        <input type="password" id="modalConfirmPassword" 
+                               class="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                               placeholder="Confirm new password">
+                    </div>
+                </div>
+                
+                <div id="changePasswordModalStatus" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+                
+                <div class="flex gap-3">
+                    <button id="changePasswordModalBtn" onclick="submitChangePassword()" 
+                            class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                        Update Password
+                    </button>
+                    <button onclick="closeChangePasswordModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Focus the first input
+    setTimeout(() => {
+        document.getElementById('modalCurrentPassword')?.focus();
+    }, 100);
 };
 
 /**
- * Change user password from profile settings
+ * Close the change password modal
  */
-window.changeUserPassword = async function() {
-    const currentPassword = $('currentPasswordInput')?.value?.trim();
-    const newPassword = $('newPasswordInputProfile')?.value?.trim();
-    const confirmPassword = $('confirmPasswordInputProfile')?.value?.trim();
-    const status = $('changePasswordStatus');
-    const btn = $('changePasswordBtn');
+window.closeChangePasswordModal = function() {
+    const modal = document.getElementById('changePasswordModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Submit password change from modal
+ */
+window.submitChangePassword = async function() {
+    const currentPassword = document.getElementById('modalCurrentPassword')?.value?.trim();
+    const newPassword = document.getElementById('modalNewPassword')?.value?.trim();
+    const confirmPassword = document.getElementById('modalConfirmPassword')?.value?.trim();
+    const status = document.getElementById('changePasswordModalStatus');
+    const btn = document.getElementById('changePasswordModalBtn');
+    
+    const showStatus = (msg, isError) => {
+        status.textContent = msg;
+        status.className = `mb-4 p-3 rounded-lg text-sm ${isError ? 'bg-red-900/50 text-red-300' : 'bg-green-900/50 text-green-300'}`;
+        status.classList.remove('hidden');
+    };
     
     // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
-        status.textContent = 'Please fill in all fields';
-        status.className = 'text-red-400 text-sm';
-        showElement(status);
+        showStatus('Please fill in all fields', true);
         return;
     }
     
     if (newPassword.length < 6) {
-        status.textContent = 'New password must be at least 6 characters';
-        status.className = 'text-red-400 text-sm';
-        showElement(status);
+        showStatus('New password must be at least 6 characters', true);
         return;
     }
     
     if (newPassword !== confirmPassword) {
-        status.textContent = 'New passwords do not match';
-        status.className = 'text-red-400 text-sm';
-        showElement(status);
+        showStatus('New passwords do not match', true);
         return;
     }
     
@@ -623,21 +687,15 @@ window.changeUserPassword = async function() {
             passwordChangedByUser: true
         });
         
-        // Show success
-        status.textContent = '✅ Password updated successfully!';
-        status.className = 'text-green-400 text-sm';
-        showElement(status);
+        showStatus('✅ Password updated successfully!', false);
         
-        // Clear form
-        $('currentPasswordInput').value = '';
-        $('newPasswordInputProfile').value = '';
-        $('confirmPasswordInputProfile').value = '';
-        
-        // Hide form after delay
+        // Close modal after delay
         setTimeout(() => {
-            toggleChangePasswordForm();
-            hideElement(status);
-        }, 2000);
+            closeChangePasswordModal();
+            if (typeof showToast === 'function') {
+                showToast('Password updated successfully!', 'success');
+            }
+        }, 1500);
         
     } catch (error) {
         console.error('[Password Change] Error:', error);
@@ -651,10 +709,8 @@ window.changeUserPassword = async function() {
             errorMsg = 'Password is too weak. Use at least 6 characters.';
         }
         
-        status.textContent = '❌ ' + errorMsg;
-        status.className = 'text-red-400 text-sm';
-        showElement(status);
-    } finally {
+        showStatus('❌ ' + errorMsg, true);
+        
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = 'Update Password';
@@ -663,12 +719,47 @@ window.changeUserPassword = async function() {
 };
 
 /**
- * Hide change password section for admin
+ * Hide change password button for admin
  * Called when dashboard loads
  */
 window.checkPasswordSectionVisibility = function() {
-    const section = $('changePasswordSection');
-    if (section && TierService.isMasterAdmin(auth?.currentUser?.email)) {
-        section.classList.add('hidden');
+    const btn = $('changePasswordBtn');
+    if (btn && TierService.isMasterAdmin(auth?.currentUser?.email)) {
+        btn.classList.add('hidden');
+    }
+};
+
+/**
+ * Highlight profile fields that need attention (for new users)
+ * Called after loadUsername if profile is incomplete
+ */
+window.highlightIncompleteFields = function(hasUsername, hasPhone) {
+    const phoneInput = $('ownerPhone');
+    const usernameInput = $('ownerUsername');
+    
+    if (!hasPhone && phoneInput) {
+        // Add pulsing highlight to phone field
+        phoneInput.classList.add('ring-2', 'ring-amber-500', 'animate-pulse');
+        phoneInput.placeholder = '⚠️ Required - Enter phone number';
+        
+        // Remove highlight after user starts typing
+        phoneInput.addEventListener('input', function handler() {
+            phoneInput.classList.remove('ring-2', 'ring-amber-500', 'animate-pulse');
+            phoneInput.placeholder = 'Enter phone number...';
+            phoneInput.removeEventListener('input', handler);
+        }, { once: true });
+    }
+    
+    if (!hasUsername && usernameInput) {
+        // Add pulsing highlight to username field
+        usernameInput.classList.add('ring-2', 'ring-amber-500', 'animate-pulse');
+        usernameInput.placeholder = '⚠️ Required - Enter display name';
+        
+        // Remove highlight after user starts typing
+        usernameInput.addEventListener('input', function handler() {
+            usernameInput.classList.remove('ring-2', 'ring-amber-500', 'animate-pulse');
+            usernameInput.placeholder = 'Enter display name...';
+            usernameInput.removeEventListener('input', handler);
+        }, { once: true });
     }
 };
