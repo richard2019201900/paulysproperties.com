@@ -578,3 +578,69 @@ exports.getMyProfile = onCall(async (request) => {
         throw new HttpsError('internal', 'Failed to fetch profile');
     }
 });
+
+// ============================================================
+// PASSWORD MANAGEMENT FUNCTIONS
+// ============================================================
+
+/**
+ * Admin-only: Set a user's password directly
+ * Used for resetting passwords for users with fake emails (GTA RP)
+ * Logs all password changes for audit purposes
+ */
+exports.adminSetUserPassword = onCall(async (request) => {
+    verifyAdmin(request);
+    
+    const { targetEmail, newPassword } = request.data;
+    
+    if (!targetEmail || !newPassword) {
+        throw new HttpsError('invalid-argument', 'Target email and new password are required');
+    }
+    
+    // Password validation
+    if (newPassword.length < 6) {
+        throw new HttpsError('invalid-argument', 'Password must be at least 6 characters');
+    }
+    
+    // Prevent admin from changing their own password via this method
+    if (targetEmail.toLowerCase() === MASTER_ADMIN_EMAIL.toLowerCase()) {
+        throw new HttpsError('permission-denied', 'Cannot reset admin password via this method');
+    }
+    
+    try {
+        // Get user by email
+        const userRecord = await admin.auth().getUserByEmail(targetEmail);
+        
+        // Update the password
+        await admin.auth().updateUser(userRecord.uid, {
+            password: newPassword
+        });
+        
+        // Log the password reset for audit
+        await db.collection('passwordResetLogs').add({
+            targetEmail: targetEmail,
+            targetUid: userRecord.uid,
+            resetBy: request.auth.token.email,
+            resetByUid: request.auth.uid,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            method: 'admin_set_password'
+        });
+        
+        console.log('[Password Reset] Admin reset password for:', targetEmail);
+        
+        return {
+            success: true,
+            message: 'Password updated successfully',
+            targetEmail: targetEmail
+        };
+        
+    } catch (error) {
+        console.error('[Password Reset] Error:', error);
+        
+        if (error.code === 'auth/user-not-found') {
+            throw new HttpsError('not-found', 'User not found in Firebase Auth');
+        }
+        
+        throw new HttpsError('internal', error.message);
+    }
+});
