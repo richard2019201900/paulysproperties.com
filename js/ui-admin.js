@@ -3686,8 +3686,8 @@ window.openResetPasswordModal = function(email, displayName) {
     if (existingModal) existingModal.remove();
     
     const modalHTML = `
-        <div id="resetPasswordModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'resetPasswordModal') closeResetPasswordModal()">
-            <div class="bg-gray-900 rounded-2xl shadow-2xl border border-blue-500/50 max-w-md w-full p-6" onclick="event.stopPropagation()">
+        <div id="resetPasswordModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-2xl shadow-2xl border border-blue-500/50 max-w-md w-full p-6">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-xl font-bold text-white flex items-center gap-2">
                         <span>🔑</span> Reset Password

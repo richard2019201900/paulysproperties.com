@@ -1185,8 +1185,8 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
     
     // Create modal overlay
     const modalHTML = `
-        <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'upgradeModal') closeUpgradeModal()">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-700" onclick="event.stopPropagation()">
+        <div id="upgradeModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-700">
                 <h3 class="text-xl font-bold text-white mb-4">⬆️ Upgrade User</h3>
                 
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
@@ -1655,8 +1655,8 @@ window.recordPremiumPayment = function(propertyId, ownerEmail) {
     const propertyTitle = prop?.title || `Property #${propertyId}`;
     
     const modalHTML = `
-        <div id="premiumPaymentModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'premiumPaymentModal') closePremiumPaymentModal()">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-green-600/50" onclick="event.stopPropagation()">
+        <div id="premiumPaymentModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-green-600/50">
                 <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">💰 Record Premium Payment</h3>
                 
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">

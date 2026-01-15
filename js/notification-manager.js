@@ -796,6 +796,9 @@
         const allRents = [...state.rentAlerts.overdue, ...state.rentAlerts.today, ...state.rentAlerts.tomorrow];
         const rentData = allRents.find(r => String(r.propId) === String(propertyId) || String(r.id) === String(propertyId));
         
+        // Get first name for friendly greeting
+        const firstName = window.getFirstName ? window.getFirstName(renterName) : renterName;
+        
         let message;
         
         if (rentData) {
@@ -812,20 +815,20 @@
             
             if (daysOverdue >= 2) {
                 // 2+ days overdue - eviction warning
-                message = `Hey ${renterName}, your ${frequency} rent payment of $${rentAmount.toLocaleString()} was due on ${dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
+                message = `Hey ${firstName}, your ${frequency} rent payment of $${rentAmount.toLocaleString()} for ${propertyTitle} was due on ${dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
             } else if (daysOverdue > 0) {
                 // Overdue but less than 2 days
-                message = `Hey ${renterName}, your ${frequency} rent payment of $${rentAmount.toLocaleString()} was due on ${dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                message = `Hey ${firstName}, your ${frequency} rent payment of $${rentAmount.toLocaleString()} for ${propertyTitle} was due on ${dueDateFormatted} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
             } else if (rentData.isToday) {
                 // Due today
-                message = `Hey ${renterName}, your ${frequency} rent payment of $${rentAmount.toLocaleString()} is due today (${dueDateFormatted}). Please make your payment when you get a chance. Thanks! 🏠`;
+                message = `Hey ${firstName}, your ${frequency} rent payment of $${rentAmount.toLocaleString()} for ${propertyTitle} is due today (${dueDateFormatted}). Please make your payment when you get a chance. Thanks! 🏠`;
             } else {
                 // Due tomorrow
-                message = `Hey ${renterName}, just a heads up - your ${frequency} rent payment of $${rentAmount.toLocaleString()} is due tomorrow (${dueDateFormatted}). Thanks! 🏠`;
+                message = `Hey ${firstName}, just a heads up - your ${frequency} rent payment of $${rentAmount.toLocaleString()} for ${propertyTitle} is due tomorrow (${dueDateFormatted}). Thanks! 🏠`;
             }
         } else {
             // Fallback if rent data not found
-            message = `Hey ${renterName}! 👋 Just a friendly reminder that rent for ${propertyTitle} ($${amount.toLocaleString()}) is due. Please send payment when you get a chance. Thanks! 🏠`;
+            message = `Hey ${firstName}! 👋 Just a friendly reminder that rent for ${propertyTitle} ($${amount.toLocaleString()}) is due. Please send payment when you get a chance. Thanks! 🏠`;
         }
         
         navigator.clipboard.writeText(message).then(() => {

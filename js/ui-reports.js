@@ -59,8 +59,8 @@ window.openReportsModal = async function() {
 function renderReportsModal(reportData) {
     
     const modalHTML = `
-        <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto" onclick="if(event.target.id === 'reportsModal') closeReportsModal()">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-5xl w-full my-8 border border-yellow-500/30" onclick="event.stopPropagation()">
+        <div id="reportsModal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-5xl w-full my-8 border border-yellow-500/30">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-yellow-600 to-amber-700 rounded-t-2xl px-6 py-4 flex items-center justify-between">
                     <div class="flex items-center gap-3">

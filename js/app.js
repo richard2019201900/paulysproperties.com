@@ -2008,8 +2008,8 @@ window.showPremiumEnableModal = function(propertyId, propertyTitle) {
     ` : '';
     
     const modalHTML = `
-        <div id="premiumEnableModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target.id === 'premiumEnableModal') closePremiumEnableModal()">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-amber-700/50" onclick="event.stopPropagation()">
+        <div id="premiumEnableModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-amber-700/50">
                 <h3 class="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">👑 Enable Premium Listing</h3>
                 
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">

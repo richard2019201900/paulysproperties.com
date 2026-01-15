@@ -14,6 +14,39 @@ const showElement = el => el?.classList.remove('hidden');
 const hideElement = el => el?.classList.add('hidden');
 const toggleClass = (el, cls, add) => el?.classList.toggle(cls, add);
 
+/**
+ * Extract first name from full name for friendly messages
+ * - Keeps titles (Dr., Mr., Mrs., Ms., etc.)
+ * - Keeps both words for names like "DJ Mike", "Big Tony", "Lil Wayne"
+ * - Otherwise returns just the first name
+ */
+const getFirstName = (fullName) => {
+    if (!fullName || typeof fullName !== 'string') return fullName || '';
+    
+    const name = fullName.trim();
+    const parts = name.split(/\s+/);
+    
+    if (parts.length <= 1) return name;
+    
+    // Check for titles - keep title + first name
+    const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'prof.', 'prof', 'rev.', 'rev'];
+    if (titles.includes(parts[0].toLowerCase())) {
+        return parts.slice(0, 2).join(' ');
+    }
+    
+    // Check for prefixes that should keep both words
+    const prefixes = ['dj', 'big', 'lil', 'lil\'', 'young', 'old', 'king', 'queen', 'sir', 'lady', 'mc', 'el', 'la'];
+    if (prefixes.includes(parts[0].toLowerCase())) {
+        return parts.slice(0, 2).join(' ');
+    }
+    
+    // Default: return first name only
+    return parts[0];
+};
+
+// Make it globally available
+window.getFirstName = getFirstName;
+
 // ==================== CLIPBOARD ====================
 window.copyToClipboard = function(elementId, btn) {
     const el = $(elementId);
