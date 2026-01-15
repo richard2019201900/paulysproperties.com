@@ -611,10 +611,22 @@ exports.adminSetUserPassword = onCall(async (request) => {
         // Get user by email
         const userRecord = await admin.auth().getUserByEmail(targetEmail);
         
-        // Update the password
+        // Update the password in Firebase Auth
         await admin.auth().updateUser(userRecord.uid, {
             password: newPassword
         });
+        
+        // Set passwordResetRequired flag in Firestore user document
+        // This will force user to change password on next login
+        const userQuery = await db.collection('users').where('email', '==', targetEmail).get();
+        if (!userQuery.empty) {
+            const userDocId = userQuery.docs[0].id;
+            await db.collection('users').doc(userDocId).update({
+                passwordResetRequired: true,
+                passwordResetAt: admin.firestore.FieldValue.serverTimestamp(),
+                passwordResetBy: request.auth.token.email
+            });
+        }
         
         // Log the password reset for audit
         await db.collection('passwordResetLogs').add({
