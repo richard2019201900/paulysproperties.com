@@ -1441,7 +1441,7 @@ window.handleListingNotificationClick = async function(ownerEmail, listingId) {
     await sleep(200);
     
     // Expand all user groups to ensure the user is visible
-    const groups = ['ownerGroup', 'eliteGroup', 'proGroup', 'starterGroup'];
+    const groups = ['ownerGroup', 'eliteGroup', 'starterGroup'];
     groups.forEach(groupId => {
         const group = document.getElementById(groupId);
         const toggle = document.getElementById(groupId + 'Toggle');
@@ -1715,7 +1715,7 @@ window.handleNewUserNotificationClick = async function(userId) {
     await sleep(200);
     
     // Expand all user groups to ensure the user is visible
-    const groups = ['ownerGroup', 'eliteGroup', 'proGroup', 'starterGroup'];
+    const groups = ['ownerGroup', 'eliteGroup', 'starterGroup'];
     groups.forEach(groupId => {
         const group = document.getElementById(groupId);
         const toggle = document.getElementById(groupId + 'Toggle');
@@ -3094,22 +3094,8 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         `;
     }
     
-    // Pro section (expanded by default)
-    if (groups.pro.length > 0) {
-        html += `
-            <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('proGroup')">
-                    <span id="proGroupToggle" class="text-gray-400 transition">▼</span>
-                    <span class="text-xl">⭐</span>
-                    <h5 class="text-purple-400 font-bold">Pro Members</h5>
-                    <span class="text-gray-500 text-sm">(${groups.pro.length}) • $25k/mo each</span>
-                </div>
-                <div id="proGroup" class="space-y-3">
-                    ${groups.pro.map(renderUserCard).join('')}
-                </div>
-            </div>
-        `;
-    }
+    // Pro section removed - Pro tier was retired
+    // Legacy pro users are now displayed in Starter section (see groups.starter filter at line 2567)
     
     // Starter section (expanded by default)
     if (groups.starter.length > 0) {
