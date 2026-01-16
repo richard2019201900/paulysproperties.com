@@ -287,6 +287,63 @@ window.renderBlogPage = function() {
     // Blog posts data - add new posts at the top
     const blogPosts = [
         {
+            date: 'January 15, 2025',
+            title: '🎉 Simplified Tier System - More Value, Lower Prices!',
+            category: 'Major Update',
+            categoryColor: 'bg-green-500',
+            content: `
+                <p class="mb-4">We've completely revamped our subscription tiers to give you <strong>more value at lower prices!</strong></p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🌱 Starter Tier - NOW FREE with 3 Listings!</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>Before:</strong> 1 listing limit</li>
+                    <li><strong>Now:</strong> 3 listings for FREE!</li>
+                </ul>
+                <p class="mb-4 text-gray-300">That's right - you can now list up to <strong class="text-green-400">3 properties completely free</strong>. No subscription, no monthly payments, just create your account and start listing!</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">👑 Elite Tier - Now Just $25,000/month!</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>Before:</strong> $50,000/month</li>
+                    <li><strong>Now:</strong> $25,000/month <span class="text-green-400 font-bold">(50% OFF!)</span></li>
+                </ul>
+                <p class="mb-4 text-gray-300">Get <strong>unlimited listings</strong> at half the previous price! Perfect for serious property managers who want to dominate the rental market.</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">⭐ Pro Tier - Retired</h4>
+                <p class="mb-2 text-gray-300">The Pro tier has been retired. All former Pro members have been automatically migrated:</p>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>You now have 3 FREE listings</strong> on the Starter tier</li>
+                    <li><strong>No payment required</strong> - your trial status has been cleared</li>
+                    <li><strong>Keep all your existing properties</strong> - nothing changes with your listings</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">💡 Why Did We Make This Change?</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li><strong>Simpler choices</strong> - Two tiers instead of three makes it easier to decide</li>
+                    <li><strong>More free value</strong> - Triple the free listings for everyone</li>
+                    <li><strong>Lower barrier to entry</strong> - 50% price reduction for Elite makes unlimited listings more accessible</li>
+                    <li><strong>Better for the community</strong> - More property owners = more options for renters</li>
+                </ul>
+                
+                <div class="bg-gray-800 rounded-xl p-4 mt-6">
+                    <h4 class="font-bold text-white mb-3">📋 Summary</h4>
+                    <div class="grid grid-cols-3 gap-2 text-sm">
+                        <div class="text-gray-400 font-bold">Tier</div>
+                        <div class="text-gray-400 font-bold">Listings</div>
+                        <div class="text-gray-400 font-bold">Price</div>
+                        <div class="text-white">🌱 Starter</div>
+                        <div class="text-white">3</div>
+                        <div class="text-green-400 font-bold">FREE</div>
+                        <div class="text-white">👑 Elite</div>
+                        <div class="text-white">Unlimited</div>
+                        <div class="text-yellow-400 font-bold">$25,000/mo</div>
+                    </div>
+                </div>
+                
+                <p class="mt-6 text-gray-300">Questions? Hit up Pauly in-city or send a message through the platform. We're here to help!</p>
+                <p class="mt-2 text-gray-400 italic">Thank you for being part of PaulysProperties.com! 🏠✨</p>
+            `
+        },
+        {
             date: 'January 14, 2025',
             title: '🏠 Property Management Just Got Easier',
             category: 'Major Update',
