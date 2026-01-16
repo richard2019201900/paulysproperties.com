@@ -656,3 +656,135 @@ exports.adminSetUserPassword = onCall(async (request) => {
         throw new HttpsError('internal', error.message);
     }
 });
+
+// ============================================================
+// PRO TIER MIGRATION FUNCTION
+// ============================================================
+
+/**
+ * Migrate all Pro tier users to Starter tier
+ * Pro tier is being removed - all Pro users (who all have ≤3 properties) 
+ * get moved to Starter which now supports 3 listings for free
+ */
+exports.migrateProToStarter = onCall(async (request) => {
+    verifyAdmin(request);
+    
+    const results = {
+        migrated: [],
+        errors: [],
+        timestamp: new Date().toISOString()
+    };
+    
+    try {
+        // Get all Pro users
+        const proUsers = await db.collection('users').where('tier', '==', 'pro').get();
+        
+        console.log(`[Migration] Found ${proUsers.size} Pro users to migrate`);
+        
+        for (const doc of proUsers.docs) {
+            const user = doc.data();
+            
+            try {
+                // Update user to Starter tier
+                await db.collection('users').doc(doc.id).update({
+                    tier: 'starter',
+                    previousTier: 'pro',
+                    migrationDate: admin.firestore.FieldValue.serverTimestamp(),
+                    migrationReason: 'pro_tier_removed_jan2025',
+                    // Clear trial and subscription fields since Starter is free
+                    isFreeTrial: admin.firestore.FieldValue.delete(),
+                    isTrial: admin.firestore.FieldValue.delete(),
+                    trialEndDate: admin.firestore.FieldValue.delete(),
+                    subscriptionLastPaid: admin.firestore.FieldValue.delete(),
+                    subscriptionDueDate: admin.firestore.FieldValue.delete(),
+                    subscriptionAmount: admin.firestore.FieldValue.delete()
+                });
+                
+                // Create in-app notification for user
+                await db.collection('users').doc(doc.id).collection('notifications').add({
+                    type: 'tier_migration',
+                    title: '🎉 Great News - Free Upgrade!',
+                    message: 'Your account has been upgraded to our new Starter tier with 3 FREE listings! The Pro tier has been retired, and you now get more listings at no cost. Thank you for being part of PaulysProperties.com!',
+                    read: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                
+                results.migrated.push({
+                    email: user.email,
+                    username: user.username || user.email?.split('@')[0]
+                });
+                
+                console.log(`[Migration] Migrated ${user.email} to Starter`);
+                
+            } catch (error) {
+                console.error(`[Migration] Error migrating ${user.email}:`, error);
+                results.errors.push({
+                    email: user.email,
+                    error: error.message
+                });
+            }
+        }
+        
+        // Log the migration
+        await db.collection('migrationLogs').add({
+            type: 'pro_tier_removal',
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            executedBy: request.auth.token.email,
+            totalMigrated: results.migrated.length,
+            totalErrors: results.errors.length,
+            results: results
+        });
+        
+        console.log(`[Migration] Complete: ${results.migrated.length} migrated, ${results.errors.length} errors`);
+        
+        return results;
+        
+    } catch (error) {
+        console.error('[Migration] Fatal error:', error);
+        throw new HttpsError('internal', error.message);
+    }
+});
+
+/**
+ * Rollback Pro tier migration if needed
+ */
+exports.rollbackProMigration = onCall(async (request) => {
+    verifyAdmin(request);
+    
+    const results = {
+        rolledBack: [],
+        errors: []
+    };
+    
+    try {
+        // Find all users migrated from Pro
+        const migratedUsers = await db.collection('users')
+            .where('migrationReason', '==', 'pro_tier_removed_jan2025')
+            .get();
+        
+        for (const doc of migratedUsers.docs) {
+            try {
+                await db.collection('users').doc(doc.id).update({
+                    tier: 'pro',
+                    previousTier: admin.firestore.FieldValue.delete(),
+                    migrationDate: admin.firestore.FieldValue.delete(),
+                    migrationReason: admin.firestore.FieldValue.delete(),
+                    // Restore trial status
+                    isFreeTrial: true
+                });
+                
+                results.rolledBack.push(doc.data().email);
+            } catch (error) {
+                results.errors.push({
+                    email: doc.data().email,
+                    error: error.message
+                });
+            }
+        }
+        
+        return results;
+        
+    } catch (error) {
+        throw new HttpsError('internal', error.message);
+    }
+});
