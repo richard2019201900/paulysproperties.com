@@ -33,10 +33,19 @@ window.browseProperties = function() {
  * List property - open create listing modal
  */
 window.listYourProperty = function() {
+    // MUST check authentication FIRST before allowing any listing creation
+    if (!auth.currentUser) {
+        // Not logged in - redirect to sign up
+        if (typeof openAuthModal === 'function') {
+            openAuthModal('signup');
+            showToast('Please sign up or log in to list a property', 'info');
+        }
+        return;
+    }
+    
+    // User is logged in - open the create listing modal
     if (typeof openCreateListingModal === 'function') {
         openCreateListingModal();
-    } else if (!auth.currentUser && typeof openAuthModal === 'function') {
-        openAuthModal();
     }
 };
 

@@ -19,7 +19,13 @@ window.openCreateListingModal = async function() {
     // Check tier limits before opening
     const user = auth.currentUser;
     if (!user) {
-        alert('Please sign in to create a listing.');
+        // Not logged in - redirect to sign up modal
+        if (typeof openAuthModal === 'function') {
+            openAuthModal('signup');
+            showToast('Please sign up or log in to list a property', 'info');
+        } else {
+            alert('Please sign in to create a listing.');
+        }
         return;
     }
     
