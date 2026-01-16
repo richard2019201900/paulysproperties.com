@@ -1,25 +1,21 @@
 // ==================== TIER SYSTEM ====================
 /**
- * User Tiers Configuration
- * - Starter (free): 1 listing
- * - Pro: 3 listings  
- * - Elite: Unlimited listings
+ * User Tiers Configuration (Updated January 2025)
+ * - Starter (FREE): 3 listings
+ * - Elite ($25,000/month): Unlimited listings
+ * 
+ * Pro tier has been removed - all former Pro users migrated to Starter
  */
 const TIERS = {
     starter: { 
-        maxListings: 1, 
+        maxListings: 3,  // Updated from 1 - now FREE with 3 listings
         icon: '🌱', 
         name: 'Starter',
         color: 'text-gray-400',
         bgColor: 'bg-gray-600'
     },
-    pro: { 
-        maxListings: 3, 
-        icon: '⭐', 
-        name: 'Pro',
-        color: 'text-yellow-400',
-        bgColor: 'bg-yellow-600'
-    },
+    // PRO TIER REMOVED - January 2025
+    // All Pro users migrated to Starter (≤3 properties) or Elite (4+ properties)
     elite: { 
         maxListings: Infinity, 
         icon: '👑', 
@@ -262,7 +258,7 @@ const TierService = {
             upgradedAt: firebase.firestore.FieldValue.serverTimestamp(),
             upgradedBy: auth.currentUser?.email || 'system',
             paymentNote: paymentNote,
-            price: isFreeTrial ? 0 : (newTier === 'pro' ? 25000 : (newTier === 'elite' ? 50000 : 0)),
+            price: isFreeTrial ? 0 : (newTier === 'elite' ? 25000 : 0),  // Elite $25k/month, Starter is free
             isFreeTrial: isFreeTrial
         });
     },

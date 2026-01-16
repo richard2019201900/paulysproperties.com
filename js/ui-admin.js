@@ -120,9 +120,9 @@ window.loadUpgradeRequests = async function() {
         
         container.innerHTML = requests.map(req => {
             const currentTierData = TIERS[req.currentTier] || TIERS.starter;
-            const requestedTierData = TIERS[req.requestedTier] || TIERS.pro;
+            const requestedTierData = TIERS[req.requestedTier] || TIERS.elite;  // Default to Elite (Pro removed)
             const date = req.createdAt?.toDate ? req.createdAt.toDate().toLocaleString() : 'Unknown';
-            const price = req.requestedTier === 'pro' ? '$25,000' : '$50,000';
+            const price = '$25,000';  // Elite is $25k/month
             
             return `
                 <div class="bg-gray-800 rounded-xl p-4 border border-orange-600/50">
@@ -413,13 +413,12 @@ window.deletePhotoRequest = async function(requestId) {
 // Approve upgrade request - show modal with trial option
 window.approveUpgradeRequest = async function(requestId, userEmail, newTier, currentTier) {
     const tierData = TIERS[newTier];
-    const price = newTier === 'pro' ? '$25,000' : '$50,000';
+    const price = '$25,000';  // Elite is $25k/month
     
-    // Check if this is a Pro → Elite upgrade (prorated eligible)
-    const isProToElite = currentTier === 'pro' && newTier === 'elite';
-    const proratedPrice = '$25,000'; // Difference between Elite ($50k) and Pro ($25k)
+    // No more prorated upgrades (Pro tier removed)
+    const isProToElite = false;
     
-    // Show approval modal with trial and prorated options
+    // Show approval modal with trial option
     const modalHTML = `
         <div id="approveModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
             <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-green-700">
@@ -428,8 +427,8 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
                 <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
                     <p class="text-gray-300 mb-2"><strong>User:</strong> ${userEmail}</p>
                     <p class="text-gray-300 mb-2"><strong>Current Tier:</strong> <span class="text-gray-400">${TIERS[currentTier]?.name || currentTier}</span></p>
-                    <p class="text-gray-300"><strong>Requested Tier:</strong> <span class="${newTier === 'pro' ? 'text-purple-400' : 'text-yellow-400'} font-bold">${tierData?.icon || '⭐'} ${tierData?.name || newTier}</span></p>
-                    <p class="text-gray-300"><strong>Standard Price:</strong> ${price}/month</p>
+                    <p class="text-gray-300"><strong>Requested Tier:</strong> <span class="text-yellow-400 font-bold">${tierData?.icon || '👑'} ${tierData?.name || newTier}</span></p>
+                    <p class="text-gray-300"><strong>Price:</strong> ${price}/month</p>
                 </div>
                 
                 ${isProToElite ? `
@@ -555,12 +554,10 @@ window.confirmApproveRequest = async function(requestId, userEmail, newTier, cur
     const paymentNote = $('approveNotes')?.value || '';
     const tierData = TIERS[newTier];
     
-    // Calculate actual subscription amount
-    let subscriptionAmount = newTier === 'pro' ? 25000 : 50000; // Standard prices
+    // Calculate actual subscription amount - Elite is $25k/month
+    let subscriptionAmount = 25000;
     if (isTrial) {
         subscriptionAmount = 0;
-    } else if (isProrated && currentTier === 'pro' && newTier === 'elite') {
-        subscriptionAmount = 25000; // Only the difference
     }
     
     // Show loading state
@@ -2209,15 +2206,14 @@ window.updateClearAllButton = function() {
 
 window.updateAdminStats = async function(users) {
     const totalUsers = users.length;
+    // Pro tier removed - but keep filter for any legacy pro users during migration
     const proUsers = users.filter(u => u.tier === 'pro');
     const eliteUsers = users.filter(u => u.tier === 'elite');
     // Exclude master admin from starter count
     const starterUsers = users.filter(u => !TierService.isMasterAdmin(u.email) && (u.tier === 'starter' || !u.tier));
     const adminUsers = users.filter(u => TierService.isMasterAdmin(u.email));
     
-    // Separate trial users from paid users
-    const proTrialUsers = proUsers.filter(u => u.isFreeTrial === true);
-    const proPaidUsers = proUsers.filter(u => u.isFreeTrial !== true);
+    // Separate trial users from paid users (Elite only now)
     const eliteTrialUsers = eliteUsers.filter(u => u.isFreeTrial === true);
     const elitePaidUsers = eliteUsers.filter(u => u.isFreeTrial !== true);
     
@@ -2237,23 +2233,13 @@ window.updateAdminStats = async function(users) {
         // Silently handle error
     }
     
-    // Calculate PAID revenue only (excluding trials)
-    // Use actual subscriptionAmount when available (for prorated upgrades)
-    let proRevenue = 0;
+    // Calculate PAID revenue only (Elite is $25k/month now)
     let eliteRevenue = 0;
-    let proratedCount = 0;
-    
-    proPaidUsers.forEach(u => {
-        // Use stored subscriptionAmount if available, otherwise default
-        const amount = u.subscriptionAmount !== undefined ? u.subscriptionAmount : 25000;
-        proRevenue += amount;
-    });
     
     elitePaidUsers.forEach(u => {
-        // Use stored subscriptionAmount if available, otherwise default
-        const amount = u.subscriptionAmount !== undefined ? u.subscriptionAmount : 50000;
+        // Use stored subscriptionAmount if available, otherwise default to $25k
+        const amount = u.subscriptionAmount !== undefined ? u.subscriptionAmount : 25000;
         eliteRevenue += amount;
-        if (u.isProratedUpgrade) proratedCount++;
     });
     
     // Calculate Premium Ad Fees (weekly fees from premium listings)
@@ -2563,13 +2549,14 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
     const pending = pendingRequests || window.adminPendingRequests || [];
     const pendingEmails = pending.map(r => r.userEmail?.toLowerCase());
     
-    // Sort users into tier groups
-    const tierOrder = { 'owner': 0, 'elite': 1, 'pro': 2, 'starter': 3 };
+    // Sort users into tier groups (Pro tier removed)
+    const tierOrder = { 'owner': 0, 'elite': 1, 'starter': 2 };
     const sortedUsers = [...users].sort((a, b) => {
         const aIsAdmin = TierService.isMasterAdmin(a.email);
         const bIsAdmin = TierService.isMasterAdmin(b.email);
-        const aTier = aIsAdmin ? 'owner' : (a.tier || 'starter');
-        const bTier = bIsAdmin ? 'owner' : (b.tier || 'starter');
+        // Treat legacy pro users as starter
+        const aTier = aIsAdmin ? 'owner' : (a.tier === 'elite' ? 'elite' : 'starter');
+        const bTier = bIsAdmin ? 'owner' : (b.tier === 'elite' ? 'elite' : 'starter');
         
         // First sort by tier
         if (tierOrder[aTier] !== tierOrder[bTier]) {
@@ -2579,12 +2566,11 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         return (a.username || a.email).localeCompare(b.username || b.email);
     });
     
-    // Group users by tier
+    // Group users by tier (Pro merged into Starter for display)
     const groups = {
         owner: sortedUsers.filter(u => TierService.isMasterAdmin(u.email)),
         elite: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && u.tier === 'elite'),
-        pro: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && u.tier === 'pro'),
-        starter: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && (!u.tier || u.tier === 'starter'))
+        starter: sortedUsers.filter(u => !TierService.isMasterAdmin(u.email) && (!u.tier || u.tier === 'starter' || u.tier === 'pro'))
     };
     
     // Render function for individual user card
@@ -2798,15 +2784,15 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             </span>
         ` : '';
         
-        // Subscription tracking HTML for Pro/Elite
+        // Subscription tracking HTML for Elite only (Pro tier removed, Starter is free)
         let subscriptionHTML = '';
-        if (!isUserMasterAdmin && (user.tier === 'pro' || user.tier === 'elite')) {
+        if (!isUserMasterAdmin && user.tier === 'elite') {
             const subLastPaid = user.subscriptionLastPaid || '';
-            // Use actual subscription amount if set (for prorated upgrades), otherwise default
-            const defaultPrice = user.tier === 'pro' ? 25000 : 50000;
+            // Elite is now $25k/month
+            const defaultPrice = 25000;
             const actualAmount = user.subscriptionAmount !== undefined ? user.subscriptionAmount : defaultPrice;
             const tierPrice = '$' + actualAmount.toLocaleString();
-            const tierName = user.tier === 'pro' ? 'Pro ⭐' : 'Elite 👑';
+            const tierName = 'Elite 👑';
             const isFreeTrial = user.isFreeTrial === true;
             const trialEndDate = user.trialEndDate || '';
             const isProratedUpgrade = user.isProratedUpgrade === true;
@@ -2945,37 +2931,19 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
             `;
         }
         
-        // Build action buttons based on current tier
+        // Build action buttons based on current tier (Pro tier removed - only Starter and Elite)
         let actionButtonsHTML = '';
         if (!isUserMasterAdmin) {
             const buttons = [];
             
-            if (user.tier === 'starter') {
-                // Starter can upgrade to Pro or Elite
-                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'pro', '${user.tier}')" 
-                    class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                    ⭐ Upgrade to Pro
-                </button>`);
-                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
+            if (user.tier === 'starter' || user.tier === 'pro' || !user.tier) {
+                // Starter (or legacy Pro) can upgrade to Elite only
+                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier || 'starter'}')" 
                     class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
                     👑 Upgrade to Elite
-                </button>`);
-            } else if (user.tier === 'pro') {
-                // Pro can upgrade to Elite or downgrade to Starter
-                buttons.push(`<button onclick="adminUpgradeUser('${escapedEmail}', 'elite', '${user.tier}')" 
-                    class="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                    👑 Upgrade to Elite
-                </button>`);
-                buttons.push(`<button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}', 'starter')" 
-                    class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                    🌱 Downgrade
                 </button>`);
             } else if (user.tier === 'elite') {
-                // Elite can downgrade to Pro or Starter
-                buttons.push(`<button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}', 'pro')" 
-                    class="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
-                    ⭐ Downgrade to Pro
-                </button>`);
+                // Elite can only downgrade to Starter
                 buttons.push(`<button onclick="adminDowngradeUser('${escapedEmail}', '${user.tier}', 'starter')" 
                     class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:opacity-90 transition">
                     🌱 Downgrade to Starter
@@ -3422,7 +3390,7 @@ window.renderSubscriptionAlertsPanel = async function() {
                 email: user.email,
                 username: user.username || user.email.split('@')[0],
                 tier: user.tier,
-                amount: user.tier === 'elite' ? 50000 : 25000, // $10k/week elite, $5k/week pro
+                amount: 25000, // Elite is now $25k/month
                 dueDate: dueDate,
                 dueDateFormatted: dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                 daysUntilDue: daysUntilDue
