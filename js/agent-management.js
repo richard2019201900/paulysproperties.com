@@ -293,8 +293,10 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
             [propKey + '.agentPhones']: agentPhones
         });
         
-        // Update local cache
-        var localProp = window.properties?.find(function(p) { return p.id == propertyId; });
+        // Update local cache - properties is a global array
+        var localProp = (typeof properties !== 'undefined' && Array.isArray(properties)) 
+            ? properties.find(function(p) { return p.id == propertyId; })
+            : null;
         if (localProp) {
             localProp.agents = currentAgents;
             localProp.agentDisplayNames = agentDisplayNames;
@@ -303,8 +305,11 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
         
         // Log activity
         if (typeof logActivity === 'function') {
-            var prop = properties.find(function(p) { return p.id == propertyId; }) || { title: 'Property ' + propertyId };
-            logActivity('agent_assign', 'Assigned ' + agentEmail + ' to ' + (prop.title || 'Property ' + propertyId));
+            var prop = (typeof properties !== 'undefined' && Array.isArray(properties))
+                ? properties.find(function(p) { return p.id == propertyId; }) 
+                : null;
+            var propTitle = prop?.title || 'Property ' + propertyId;
+            logActivity('agent_assign', 'Assigned ' + agentEmail + ' to ' + propTitle);
         }
         
         showToast('✅ Agent assigned to property', 'success');
