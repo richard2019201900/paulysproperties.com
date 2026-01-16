@@ -2269,9 +2269,9 @@ window.updateAdminStats = async function(users) {
     // Show actual weekly premium revenue (not multiplied - actuals only)
     const premiumWeeklyRevenue = premiumFeeTotal;
     
-    // Total revenue is monthly subscriptions + weekly premium (not multiplied)
+    // Total revenue is Elite subscriptions + weekly premium (Pro tier removed)
     // This represents: confirmed recurring revenue from subs + current weekly premium fees
-    const totalRevenue = proRevenue + eliteRevenue + premiumWeeklyRevenue;
+    const totalRevenue = eliteRevenue + premiumWeeklyRevenue;
     
     // Helper function to get user listing count - uses OwnershipService for consistency
     const getUserListings = (user) => {
@@ -2296,27 +2296,29 @@ window.updateAdminStats = async function(users) {
         `;
     }
     
-    // Pro Users Tile
+    // Pro Users Tile - RETIRED (show 0 or legacy count)
     const statPro = $('adminStatPro');
     const statProBreakdown = $('adminStatProBreakdown');
     if (statPro) statPro.textContent = proUsers.length;
     if (statProBreakdown) {
         if (proUsers.length > 0) {
-            statProBreakdown.textContent = `(${proPaidUsers.length} paid, ${proTrialUsers.length} trial)`;
+            statProBreakdown.textContent = '(legacy - needs migration)';
         } else {
-            statProBreakdown.textContent = '';
+            statProBreakdown.textContent = '(tier retired)';
         }
     }
     
     const proDetail = $('adminStatProDetail');
     if (proDetail) {
-        const allProUsersList = proUsers.map(u => {
-            const listings = getUserListings(u);
-            const isTrial = u.isFreeTrial === true;
-            const trialTag = isTrial ? '<span class="text-cyan-400">🎁</span>' : '<span class="text-green-400">💰</span>';
-            return `<div class="truncate">${trialTag} ${u.username || u.email.split('@')[0]} <span class="text-gray-500">${listings}/3</span></div>`;
-        }).join('');
-        proDetail.innerHTML = allProUsersList || '<div class="text-gray-500">No Pro users</div>';
+        if (proUsers.length > 0) {
+            const allProUsersList = proUsers.map(u => {
+                const listings = getUserListings(u);
+                return `<div class="truncate text-orange-400">⚠️ ${u.username || u.email.split('@')[0]} <span class="text-gray-500">${listings}/3</span></div>`;
+            }).join('');
+            proDetail.innerHTML = `<div class="text-orange-400 mb-1">Legacy users needing migration:</div>${allProUsersList}`;
+        } else {
+            proDetail.innerHTML = '<div class="text-gray-500">Pro tier has been retired</div><div class="text-gray-500 text-xs">All users migrated to Starter/Elite</div>';
+        }
     }
     
     // Elite Users Tile
@@ -2351,41 +2353,34 @@ window.updateAdminStats = async function(users) {
         usersDetail.innerHTML = `
             <div>👑 Owner/Admin: ${adminUsers.length}</div>
             <div>🌱 Starter: ${starterUsers.length}</div>
-            <div>⭐ Pro: ${proUsers.length} ${proTrialUsers.length > 0 ? `<span class="text-cyan-400">(${proTrialUsers.length} trial)</span>` : ''}</div>
             <div>👑 Elite: ${eliteUsers.length} ${eliteTrialUsers.length > 0 ? `<span class="text-cyan-400">(${eliteTrialUsers.length} trial)</span>` : ''}</div>
+            ${proUsers.length > 0 ? `<div class="text-orange-400">⚠️ Legacy Pro: ${proUsers.length}</div>` : ''}
         `;
     }
     
     // ==================== ROW 2: REVENUE ====================
     
-    // Pro Revenue Tile
+    // Pro Revenue Tile - REMOVED (Pro tier no longer exists)
+    // Hide the Pro revenue tile if it exists
     const statProRevenue = $('adminStatProRevenue');
     const statProRevenueSub = $('adminStatProRevenueSub');
-    if (statProRevenue) statProRevenue.textContent = `$${(proRevenue / 1000).toFixed(0)}k`;
-    if (statProRevenueSub) statProRevenueSub.textContent = `${proPaidUsers.length} paid × $25k`;
+    if (statProRevenue) statProRevenue.textContent = '$0k';
+    if (statProRevenueSub) statProRevenueSub.textContent = 'Pro tier removed';
     
     const proRevenueDetail = $('adminStatProRevenueDetail');
     if (proRevenueDetail) {
-        const paidList = proPaidUsers.map(u => 
-            `<div class="truncate">💰 ${u.username || u.email.split('@')[0]} - $25k</div>`
-        ).join('');
         proRevenueDetail.innerHTML = `
-            <div class="mb-1 text-yellow-400 font-bold">$${proRevenue.toLocaleString()}/mo</div>
-            ${paidList || '<div class="text-gray-500">No paid Pro users</div>'}
-            ${proTrialUsers.length > 0 ? `<div class="text-cyan-400 mt-1">🎁 ${proTrialUsers.length} on free trial</div>` : ''}
+            <div class="text-gray-500">Pro tier has been retired</div>
+            <div class="text-gray-500 text-xs mt-1">All Pro users migrated to Starter</div>
         `;
     }
     
-    // Elite Revenue Tile
+    // Elite Revenue Tile (now $25k/month)
     const statEliteRevenue = $('adminStatEliteRevenue');
     const statEliteRevenueSub = $('adminStatEliteRevenueSub');
     if (statEliteRevenue) statEliteRevenue.textContent = `$${(eliteRevenue / 1000).toFixed(0)}k`;
     if (statEliteRevenueSub) {
-        if (proratedCount > 0) {
-            statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid (${proratedCount} prorated)`;
-        } else {
-            statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid × $50k`;
-        }
+        statEliteRevenueSub.textContent = `${elitePaidUsers.length} paid × $25k`;
     }
     
     const eliteRevenueDetail = $('adminStatEliteRevenueDetail');
@@ -2439,17 +2434,16 @@ window.updateAdminStats = async function(users) {
     const statTotalRevenueSub = $('adminStatTotalRevenueSub');
     if (statTotalRevenue) statTotalRevenue.textContent = `$${(totalRevenue / 1000).toFixed(0)}k`;
     if (statTotalRevenueSub) {
-        const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
+        const totalTrials = eliteTrialUsers.length;  // Only Elite has trials now
         statTotalRevenueSub.textContent = totalTrials > 0 ? `${totalTrials} on free trial` : 'Current revenue';
     }
     
     const totalRevenueDetail = $('adminStatTotalRevenueDetail');
     if (totalRevenueDetail) {
-        const totalTrials = proTrialUsers.length + eliteTrialUsers.length;
+        const totalTrials = eliteTrialUsers.length;  // Only Elite has trials now
         totalRevenueDetail.innerHTML = `
             <div class="text-green-400 font-bold mb-2">$${totalRevenue.toLocaleString()}</div>
             <div class="space-y-1 text-xs">
-                <div>⭐ Pro: $${proRevenue.toLocaleString()}/mo</div>
                 <div>👑 Elite: $${eliteRevenue.toLocaleString()}/mo</div>
                 <div>🏆 Premium: $${premiumWeeklyRevenue.toLocaleString()}/wk</div>
             </div>
