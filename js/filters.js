@@ -35,11 +35,15 @@ window.browseProperties = function() {
 window.listYourProperty = function() {
     // MUST check authentication FIRST before allowing any listing creation
     if (!auth.currentUser) {
-        // Not logged in - redirect to sign up
-        if (typeof openAuthModal === 'function') {
-            openAuthModal('signup');
-            showToast('Please sign up or log in to list a property', 'info');
-        }
+        // Not logged in - open login modal and show create account form
+        openModal('loginModal');
+        // Small delay to ensure modal is open, then switch to create account
+        setTimeout(function() {
+            if (typeof showCreateAccountForm === 'function') {
+                showCreateAccountForm();
+            }
+        }, 100);
+        showToast('Please sign up or log in to list a property', 'info');
         return;
     }
     
