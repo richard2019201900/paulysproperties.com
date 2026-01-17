@@ -30,16 +30,14 @@ window.openUpgradeModal = function(reason, currentTier) {
         }
     });
     
-    // Filter dropdown to only show upgrades
+    // Filter dropdown to only show upgrades (Pro tier removed)
     const dropdown = $('upgradeRequestedTier');
     if (dropdown) {
         dropdown.innerHTML = '<option value="">Choose a plan...</option>';
-        if (currentTier === 'starter') {
-            dropdown.innerHTML += '<option value="pro">⭐ Pro - 3 Listings ($25k/month)</option>';
-            dropdown.innerHTML += '<option value="elite">👑 Elite - Unlimited ($50k/month)</option>';
-        } else if (currentTier === 'pro') {
-            dropdown.innerHTML += '<option value="elite">👑 Elite - Unlimited ($50k/month)</option>';
+        if (currentTier === 'starter' || !currentTier) {
+            dropdown.innerHTML += '<option value="elite">👑 Elite - Unlimited ($25k/month)</option>';
         }
+        // Elite users have no further upgrades available
     }
     
     hideElement($('upgradeStatus'));
@@ -60,11 +58,14 @@ window.generateUpgradeMessage = function() {
     }
     
     const tierInfo = {
-        pro: { name: 'Pro', price: '$25,000', listings: '3' },
-        elite: { name: 'Elite', price: '$50,000', listings: 'unlimited' }
+        elite: { name: 'Elite', price: '$25,000', listings: 'unlimited' }
     };
     
     const info = tierInfo[requestedTier];
+    if (!info) {
+        messageBox.value = '';
+        return;
+    }
     const currentTierName = TIERS[currentTier]?.name || 'Starter';
     const displayName = $('ownerUsername')?.value || user.email.split('@')[0];
     

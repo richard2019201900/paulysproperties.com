@@ -1198,7 +1198,7 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
                         <input type="checkbox" id="upgradeProratedCheckbox" class="w-5 h-5 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
                         <div>
                             <span class="text-amber-300 font-bold">💰 Prorated Upgrade (${proratedPrice})</span>
-                            <p class="text-amber-400/70 text-sm">User was already paying for Pro - only charge the $25k difference</p>
+                            <p class="text-amber-400/70 text-sm">User qualifies for prorated pricing</p>
                         </div>
                     </label>
                 </div>
@@ -1278,8 +1278,7 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
             }
             
             if (this.checked) {
-                const tierName = newTier === 'pro' ? 'Pro' : 'Elite';
-                notesInput.value = `Enjoy a 30 day free trial of ${tierName} Membership on Pauly!`;
+                notesInput.value = `Enjoy a 30 day free trial of Elite Membership on Pauly!`;
             } else {
                 if (notesInput.value.includes('free trial')) {
                     notesInput.value = '';
@@ -1300,7 +1299,7 @@ function showUpgradeModal(email, newTier, currentTier, tierData, price) {
             }
             
             if (this.checked) {
-                notesInput.value = `Prorated upgrade from Pro to Elite - paid $25k difference`;
+                notesInput.value = `Prorated upgrade - paid difference`;
             } else {
                 if (notesInput.value.includes('Prorated')) {
                     notesInput.value = '';

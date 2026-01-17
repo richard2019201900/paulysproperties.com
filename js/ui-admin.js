@@ -438,7 +438,7 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
                         <input type="checkbox" id="approveProratedCheckbox" class="w-5 h-5 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
                         <div>
                             <span class="text-amber-300 font-bold">💰 Prorated Upgrade (${proratedPrice})</span>
-                            <p class="text-amber-400/70 text-sm">User was already paying for Pro - only charge the $25k difference</p>
+                            <p class="text-amber-400/70 text-sm">User qualifies for prorated pricing</p>
                         </div>
                     </label>
                 </div>
@@ -532,7 +532,7 @@ window.approveUpgradeRequest = async function(requestId, userEmail, newTier, cur
             }
             
             if (this.checked) {
-                notesInput.value = `Prorated upgrade from Pro to Elite - paid $25k difference`;
+                notesInput.value = `Prorated upgrade - paid difference`;
             } else {
                 if (notesInput.value.includes('Prorated')) {
                     notesInput.value = '';

@@ -505,12 +505,10 @@ window.renderBlogPage = function() {
                     <li>Occupancy breakdowns by property type</li>
                 </ul>
                 
-                <h4 class="font-bold text-white mb-2 mt-6">3-Tier Subscription System:</h4>
+                <h4 class="font-bold text-white mb-2 mt-6">2-Tier Subscription System:</h4>
                 <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
-                    <li>🌱 <strong>Starter</strong> (Free) - 1 listing, perfect for getting started</li>
-                    <li>⭐ <strong>Pro</strong> ($25,000/mo) - Up to 3 listings for growing landlords</li>
-                    <li>👑 <strong>Elite</strong> ($50,000/mo) - Unlimited listings plus exclusive Portfolio Reports</li>
-                    <li>Prorated upgrades so you only pay the difference when moving up</li>
+                    <li>🌱 <strong>Starter</strong> (Free) - Up to 3 listings, perfect for getting started</li>
+                    <li>👑 <strong>Elite</strong> ($25,000/mo) - Unlimited listings plus exclusive Portfolio Reports</li>
                 </ul>
                 
                 <h4 class="font-bold text-white mb-2 mt-6">Photo Services:</h4>

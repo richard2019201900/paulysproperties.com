@@ -360,9 +360,7 @@ function formatActivityTime(timestamp) {
 function getTierColor(tier) {
     const colors = {
         'free': 'gray-400',
-        'starter': 'gray-400',
-        'premium': 'amber-400',
-        'pro': 'amber-400',
+        'starter': 'green-400',
         'elite': 'purple-400',
         'owner': 'rose-400'
     };
@@ -373,10 +371,8 @@ function getTierColor(tier) {
 function getTierDisplay(tier) {
     const displays = {
         'free': '🆓 Free',
-        'starter': '🆓 Starter',
-        'premium': '👑 Premium',
-        'pro': '👑 Pro',
-        'elite': '💎 Elite',
+        'starter': '🌱 Starter',
+        'elite': '👑 Elite',
         'owner': '🏆 Site Owner'
     };
     return displays[tier] || tier;

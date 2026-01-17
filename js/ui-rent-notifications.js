@@ -542,12 +542,12 @@ window.updateNavTierDisplay = function(tier) {
     const tierData = TIERS[tier] || TIERS.starter;
     navTierEl.innerHTML = `${tierData.icon} ${tierData.name}`;
     
-    // Update color classes
+    // Update color classes (Pro tier removed)
     navTierEl.className = 'text-xs';
-    if (tier === 'pro') {
-        navTierEl.classList.add('text-yellow-400');
-    } else if (tier === 'elite') {
+    if (tier === 'elite') {
         navTierEl.classList.add('text-purple-400');
+    } else if (tier === 'starter' || !tier) {
+        navTierEl.classList.add('text-green-400');
     } else {
         navTierEl.classList.add('text-gray-400');
     }
