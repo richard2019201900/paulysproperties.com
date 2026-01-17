@@ -927,6 +927,14 @@ window.deletePropertyCompletely = async function(propertyId, ownerEmail) {
                 });
             }
         }
+        
+        // Refresh notification panels (premium alerts need to update)
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+            NotificationManager.refreshUI();
+        } else if (typeof window.renderPremiumAlertsPanel === 'function') {
+            window.renderPremiumAlertsPanel();
+        }
+        
         return true;
     } catch (error) {
         console.error(`Error deleting property ${propertyId}:`, error);

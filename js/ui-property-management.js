@@ -463,6 +463,19 @@ window.executeDeleteProperty = async function() {
         renderProperties(state.filteredProperties);
         renderOwnerDashboard();
         
+        // Refresh notification panels (subscription alerts, premium alerts, etc.)
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+            NotificationManager.refreshUI();
+        } else {
+            // Fallback: directly refresh premium alerts panel
+            if (typeof window.renderPremiumAlertsPanel === 'function') {
+                window.renderPremiumAlertsPanel();
+            }
+            if (typeof window.renderSubscriptionAlertsPanel === 'function') {
+                window.renderSubscriptionAlertsPanel();
+            }
+        }
+        
         // Update tier badge to reflect new listing count
         updateTierBadge(state.userTier || 'starter', currentUserEmail);
         
