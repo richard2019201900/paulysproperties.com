@@ -3440,11 +3440,6 @@ window.renderSubscriptionAlertsPanel = async function() {
         // Set global subscription alert count for notification badges
         window.subscriptionAlertCount = total;
         
-        // Only refresh badges, NOT panels (to avoid infinite loop)
-        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshBadges) {
-            NotificationManager.refreshBadges();
-        }
-        
     } catch (error) {
         console.error('[SubscriptionAlerts] Error:', error);
         panel.classList.add('hidden');
@@ -3489,9 +3484,10 @@ function renderSubscriptionItem(sub, urgency) {
     
     const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
     const escapedEmail = sub.email.replace(/'/g, "\\'");
+    const itemId = sub.email.replace(/[^a-zA-Z0-9]/g, '_'); // Safe id from email
     
     return `
-        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency] || 'border-l-gray-500'} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="goToAdminUserByEmail('${escapedEmail}')">
+        <div id="sub-item-${itemId}" data-email="${sub.email}" class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency] || 'border-l-gray-500'} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer">
             <div class="flex-1 min-w-0">
                 <div class="text-white font-medium truncate flex items-center gap-2">
                     <span class="${tierColor}">${tierIcon}</span>
@@ -3586,13 +3582,12 @@ window.handleSubscriptionPanelClick = function(event) {
         return;
     }
     
-    // Check if clicked on a subscription item row (has cursor-pointer)
-    const subItem = event.target.closest('.cursor-pointer');
-    if (subItem && subItem.getAttribute('onclick')?.includes('goToAdminUserByEmail')) {
-        // Extract email from onclick
-        const match = subItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
-        if (match) {
-            goToAdminUserByEmail(match[1]);
+    // Check if clicked on a subscription item row (has id starting with sub-item-)
+    const subItem = event.target.closest('[id^="sub-item-"]');
+    if (subItem) {
+        const email = subItem.dataset.email;
+        if (email) {
+            goToAdminUserByEmail(email);
         }
     }
 };
@@ -3818,10 +3813,10 @@ function renderPremiumItem(item, urgency) {
     }
     
     const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
-    const escapedEmail = item.ownerEmail.replace(/'/g, "\\'");
+    const itemId = `premium-${item.propertyId}`;
     
     return `
-        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency] || 'border-l-gray-500'} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="goToAdminUserByEmail('${escapedEmail}')">
+        <div id="${itemId}" data-email="${item.ownerEmail}" class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency] || 'border-l-gray-500'} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer">
             <div class="flex-1 min-w-0">
                 <div class="text-white font-medium truncate flex items-center gap-2">
                     <span class="text-amber-400">👑</span>
@@ -3864,12 +3859,12 @@ window.handlePremiumPanelClick = function(event) {
         return;
     }
     
-    // Check if clicked on a premium item row
-    const premiumItem = event.target.closest('.cursor-pointer');
-    if (premiumItem && premiumItem.getAttribute('onclick')?.includes('goToAdminUserByEmail')) {
-        const match = premiumItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
-        if (match) {
-            goToAdminUserByEmail(match[1]);
+    // Check if clicked on a premium item row (has id starting with premium-)
+    const premiumItem = event.target.closest('[id^="premium-"]');
+    if (premiumItem) {
+        const email = premiumItem.dataset.email;
+        if (email) {
+            goToAdminUserByEmail(email);
         }
     }
 };

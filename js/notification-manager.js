@@ -547,17 +547,38 @@
         }
     }
     
+    // Guards to prevent rapid re-renders
+    let panelRenderInProgress = false;
+    let panelRenderTimeout = null;
+    
     function refreshPanels() {
-        renderNotificationStack();
-        renderRentAlertsPanel();
-        // Also render subscription alerts for admin
-        if (typeof window.renderSubscriptionAlertsPanel === 'function') {
-            window.renderSubscriptionAlertsPanel();
+        // Debounce panel refresh to prevent rapid re-renders
+        if (panelRenderInProgress) return;
+        
+        if (panelRenderTimeout) {
+            clearTimeout(panelRenderTimeout);
         }
-        // Also render premium listing alerts for admin
-        if (typeof window.renderPremiumAlertsPanel === 'function') {
-            window.renderPremiumAlertsPanel();
-        }
+        
+        panelRenderTimeout = setTimeout(() => {
+            panelRenderInProgress = true;
+            
+            renderNotificationStack();
+            renderRentAlertsPanel();
+            
+            // Also render subscription alerts for admin (only if not already rendering)
+            if (typeof window.renderSubscriptionAlertsPanel === 'function') {
+                window.renderSubscriptionAlertsPanel();
+            }
+            // Also render premium listing alerts for admin
+            if (typeof window.renderPremiumAlertsPanel === 'function') {
+                window.renderPremiumAlertsPanel();
+            }
+            
+            // Reset flag after a small delay
+            setTimeout(() => {
+                panelRenderInProgress = false;
+            }, 100);
+        }, 50); // 50ms debounce
     }
     
     function renderNotificationStack() {
