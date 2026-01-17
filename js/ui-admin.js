@@ -1441,7 +1441,7 @@ window.handleListingNotificationClick = async function(ownerEmail, listingId) {
     await sleep(200);
     
     // Expand all user groups to ensure the user is visible
-    const groups = ['ownerGroup', 'eliteGroup', 'starterGroup'];
+    const groups = ['ownerGroup', 'eliteGroup', 'proGroup', 'starterGroup'];
     groups.forEach(groupId => {
         const group = document.getElementById(groupId);
         const toggle = document.getElementById(groupId + 'Toggle');
@@ -1715,7 +1715,7 @@ window.handleNewUserNotificationClick = async function(userId) {
     await sleep(200);
     
     // Expand all user groups to ensure the user is visible
-    const groups = ['ownerGroup', 'eliteGroup', 'starterGroup'];
+    const groups = ['ownerGroup', 'eliteGroup', 'proGroup', 'starterGroup'];
     groups.forEach(groupId => {
         const group = document.getElementById(groupId);
         const toggle = document.getElementById(groupId + 'Toggle');
@@ -3027,24 +3027,8 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
     // Render grouped sections
     let html = '';
     
-    // VIP Leads section - Users interested in managed services (at the top!)
-    const vipLeads = sortedUsers.filter(u => u.managedServicesInterest === true && !TierService.isMasterAdmin(u.email));
-    if (vipLeads.length > 0) {
-        html += `
-            <div class="mb-6 bg-gradient-to-r from-purple-900/20 to-pink-900/20 rounded-xl p-4 border border-purple-500/50">
-                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-500/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('vipLeadsGroup')">
-                    <span id="vipLeadsGroupToggle" class="text-gray-400 transition">▼</span>
-                    <span class="text-xl">🚀</span>
-                    <h5 class="text-transparent bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text font-black">VIP LEADS - Managed Services Interest</h5>
-                    <span class="text-purple-300 text-sm font-bold">(${vipLeads.length})</span>
-                    <span class="ml-auto bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] px-2 py-1 rounded-full font-bold animate-pulse">💰 HIGH VALUE</span>
-                </div>
-                <div id="vipLeadsGroup" class="space-y-3">
-                    ${vipLeads.map(renderUserCard).join('')}
-                </div>
-            </div>
-        `;
-    }
+    // VIP Leads section - REMOVED per user request
+    // (managedServicesInterest feature has been deprecated)
     
     // Owner/Admin section (expanded by default)
     if (groups.owner.length > 0) {
@@ -3094,8 +3078,22 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         `;
     }
     
-    // Pro section removed - Pro tier was retired
-    // Legacy pro users are now displayed in Starter section (see groups.starter filter at line 2567)
+    // Pro section (expanded by default)
+    if (groups.pro.length > 0) {
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3 pb-2 border-b border-purple-600/50 cursor-pointer hover:opacity-80 transition" onclick="toggleUserGroup('proGroup')">
+                    <span id="proGroupToggle" class="text-gray-400 transition">▼</span>
+                    <span class="text-xl">⭐</span>
+                    <h5 class="text-purple-400 font-bold">Pro Members</h5>
+                    <span class="text-gray-500 text-sm">(${groups.pro.length}) • $25k/mo each</span>
+                </div>
+                <div id="proGroup" class="space-y-3">
+                    ${groups.pro.map(renderUserCard).join('')}
+                </div>
+            </div>
+        `;
+    }
     
     // Starter section (expanded by default)
     if (groups.starter.length > 0) {
@@ -3282,85 +3280,42 @@ window.renderSubscriptionAlertsPanel = async function() {
         const overdue = [];
         const dueToday = [];
         const dueTomorrow = [];
-        let proEliteCount = 0;
+        const neverPaid = [];
         
         usersSnapshot.forEach(doc => {
             const user = doc.data();
-            if (!user.tier || user.tier === 'starter' || user.tier === 'owner') return;
-            if (user.isTrial || user.isFreeTrial) return; // Skip trial users (both field names for compatibility)
             
-            proEliteCount++;
+            // Only Elite users have subscriptions now (Starter is free, Pro removed)
+            if (user.tier !== 'elite') return;
+            if (TierService.isMasterAdmin(user.email)) return;
+            if (user.isTrial || user.isFreeTrial) return; // Skip trial users
             
-            // Check subscriptionDueDate first, then calculate from tierChangeDate, createdAt
+            // Use subscriptionLastPaid + 30 days as the canonical due date calculation
+            // This matches what's shown on user cards
             let dueDate = null;
-            let dateSource = 'none';
             
-            // Log all available date fields for debugging
-            
-            if (user.subscriptionDueDate) {
-                if (user.subscriptionDueDate.toDate) {
-                    dueDate = user.subscriptionDueDate.toDate();
-                } else if (typeof user.subscriptionDueDate === 'string') {
-                    dueDate = new Date(user.subscriptionDueDate);
-                }
-                dateSource = 'subscriptionDueDate';
-            } else if (user.tierChangeDate) {
-                // Calculate next due date: tierChangeDate + 7 days (weekly subscription)
-                let changeDate;
-                if (user.tierChangeDate.toDate) {
-                    changeDate = user.tierChangeDate.toDate();
-                } else if (typeof user.tierChangeDate === 'string') {
-                    changeDate = new Date(user.tierChangeDate);
-                }
-                
-                if (changeDate) {
-                    // Find next weekly due date from tier change
-                    dueDate = new Date(changeDate);
-                    while (dueDate < today) {
-                        dueDate.setDate(dueDate.getDate() + 7);
-                    }
-                    dateSource = 'tierChangeDate';
-                }
-            } else if (user.tierStartDate) {
-                // Fallback to tierStartDate
-                let startDate;
-                if (user.tierStartDate.toDate) {
-                    startDate = user.tierStartDate.toDate();
-                } else if (typeof user.tierStartDate === 'string') {
-                    startDate = new Date(user.tierStartDate);
-                }
-                
-                if (startDate) {
-                    dueDate = new Date(startDate);
-                    while (dueDate < today) {
-                        dueDate.setDate(dueDate.getDate() + 7);
-                    }
-                    dateSource = 'tierStartDate';
-                }
-            } else if (user.createdAt) {
-                // Last fallback: use createdAt (when user signed up)
-                let createdDate;
-                if (user.createdAt.toDate) {
-                    createdDate = user.createdAt.toDate();
-                } else if (typeof user.createdAt === 'string') {
-                    createdDate = new Date(user.createdAt);
-                } else if (user.createdAt.seconds) {
-                    createdDate = new Date(user.createdAt.seconds * 1000);
-                }
-                
-                if (createdDate) {
-                    dueDate = new Date(createdDate);
-                    while (dueDate < today) {
-                        dueDate.setDate(dueDate.getDate() + 7);
-                    }
-                    dateSource = 'createdAt';
-                }
+            if (user.subscriptionLastPaid) {
+                // Parse the date string (format: YYYY-MM-DD)
+                const [year, month, day] = user.subscriptionLastPaid.split('-').map(Number);
+                const lastPaid = new Date(year, month - 1, day);
+                dueDate = new Date(lastPaid);
+                dueDate.setDate(dueDate.getDate() + 30); // Monthly subscription
+            } else {
+                // Never paid - add to neverPaid list
+                neverPaid.push({
+                    odId: doc.id,
+                    email: user.email,
+                    username: user.username || user.email.split('@')[0],
+                    tier: user.tier,
+                    amount: 25000,
+                    daysUntilDue: null
+                });
+                return;
             }
             
             if (!dueDate || isNaN(dueDate.getTime())) {
                 return;
             }
-            
             
             const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
             const daysUntilDue = Math.floor((dueDateOnly - today) / (1000 * 60 * 60 * 24));
@@ -3370,7 +3325,7 @@ window.renderSubscriptionAlertsPanel = async function() {
                 email: user.email,
                 username: user.username || user.email.split('@')[0],
                 tier: user.tier,
-                amount: 25000, // Elite is now $25k/month
+                amount: 25000, // Elite is $25k/month
                 dueDate: dueDate,
                 dueDateFormatted: dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
                 daysUntilDue: daysUntilDue
@@ -3385,7 +3340,7 @@ window.renderSubscriptionAlertsPanel = async function() {
             }
         });
         
-        const total = overdue.length + dueToday.length + dueTomorrow.length;
+        const total = overdue.length + dueToday.length + dueTomorrow.length + neverPaid.length;
         
         if (total === 0) {
             panel.classList.add('hidden');
@@ -3394,7 +3349,7 @@ window.renderSubscriptionAlertsPanel = async function() {
         
         panel.classList.remove('hidden');
         
-        const isUrgent = overdue.length > 0;
+        const isUrgent = overdue.length > 0 || neverPaid.length > 0;
         const isWarning = dueToday.length > 0;
         
         const borderColor = isUrgent ? 'border-red-500/70' : isWarning ? 'border-orange-500/70' : 'border-cyan-500/70';
@@ -3421,6 +3376,20 @@ window.renderSubscriptionAlertsPanel = async function() {
                 </div>
                 <div id="subscriptionPanelContent" class="p-4 space-y-4">
         `;
+        
+        // Never paid section (highest priority)
+        if (neverPaid.length > 0) {
+            html += `
+                <div class="bg-red-900/30 rounded-xl p-4 border border-red-500/50">
+                    <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                        <span>🚨</span> NEVER PAID (${neverPaid.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${neverPaid.map(sub => renderSubscriptionItem(sub, 'never')).join('')}
+                    </div>
+                </div>
+            `;
+        }
         
         if (overdue.length > 0) {
             html += `
@@ -3485,12 +3454,14 @@ window.renderSubscriptionAlertsPanel = async function() {
 
 function renderSubscriptionItem(sub, urgency) {
     const statusColors = {
+        never: 'text-red-300',
         overdue: 'text-red-300',
         today: 'text-orange-300',
         tomorrow: 'text-yellow-300'
     };
     
     const borderColors = {
+        never: 'border-l-red-500',
         overdue: 'border-l-red-500',
         today: 'border-l-orange-500',
         tomorrow: 'border-l-yellow-500'
@@ -3502,7 +3473,12 @@ function renderSubscriptionItem(sub, urgency) {
     
     // Generate reminder message
     let reminderMsg = '';
-    if (sub.daysUntilDue === 1) {
+    let dueDisplay = sub.dueDateFormatted || 'Never paid';
+    
+    if (urgency === 'never' || sub.daysUntilDue === null) {
+        reminderMsg = `Hey ${sub.username}! 👋 Welcome to ${tierLabel}! We haven't received your first subscription payment yet. 💰 $${sub.amount.toLocaleString()} for the ${tierLabel} plan. Let me know when you're ready to meet up!`;
+        dueDisplay = 'Never paid';
+    } else if (sub.daysUntilDue === 1) {
         reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${tierLabel} subscription payment of $${sub.amount.toLocaleString()} is due tomorrow (${sub.dueDateFormatted}). Let me know if you have any questions!`;
     } else if (sub.daysUntilDue === 0) {
         reminderMsg = `Hey ${sub.username}! 👋 Just a friendly reminder that your ${tierLabel} subscription payment of $${sub.amount.toLocaleString()} is due today (${sub.dueDateFormatted}). Let me know if you have any questions!`;
@@ -3515,7 +3491,7 @@ function renderSubscriptionItem(sub, urgency) {
     const escapedEmail = sub.email.replace(/'/g, "\\'");
     
     return `
-        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency]} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="goToAdminUserByEmail('${escapedEmail}')">
+        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency] || 'border-l-gray-500'} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="goToAdminUserByEmail('${escapedEmail}')">
             <div class="flex-1 min-w-0">
                 <div class="text-white font-medium truncate flex items-center gap-2">
                     <span class="${tierColor}">${tierIcon}</span>
@@ -3523,7 +3499,7 @@ function renderSubscriptionItem(sub, urgency) {
                     <span class="text-xs ${tierColor} font-bold uppercase">${tierLabel}</span>
                 </div>
                 <div class="text-gray-400 text-sm">${sub.email}</div>
-                <div class="${statusColors[urgency]} text-xs">Due: ${sub.dueDateFormatted}</div>
+                <div class="${statusColors[urgency] || 'text-gray-400'} text-xs">Due: ${dueDisplay}</div>
             </div>
             <div class="text-right">
                 <div class="text-white font-bold">$${sub.amount.toLocaleString()}</div>
@@ -3615,6 +3591,283 @@ window.handleSubscriptionPanelClick = function(event) {
     if (subItem && subItem.getAttribute('onclick')?.includes('goToAdminUserByEmail')) {
         // Extract email from onclick
         const match = subItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
+        if (match) {
+            goToAdminUserByEmail(match[1]);
+        }
+    }
+};
+
+// ============================================================
+// PREMIUM LISTING ALERTS PANEL
+// ============================================================
+
+/**
+ * Render premium listing collection alerts panel
+ * Shows all premium listings with overdue/due weekly fees
+ */
+window.renderPremiumAlertsPanel = async function() {
+    const panel = $('premiumNotificationsPanel');
+    if (!panel) {
+        return;
+    }
+    
+    // Only show for master admin
+    if (!TierService.isMasterAdmin(auth?.currentUser?.email)) {
+        panel.classList.add('hidden');
+        return;
+    }
+    
+    try {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        const overdue = [];
+        const dueToday = [];
+        const dueTomorrow = [];
+        const neverPaid = [];
+        
+        // Get all premium listings from the global properties array
+        const premiumListings = (typeof properties !== 'undefined' && Array.isArray(properties))
+            ? properties.filter(p => {
+                const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
+                const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
+                return isPremium && !isPremiumTrial;
+            })
+            : [];
+        
+        premiumListings.forEach(p => {
+            const title = p.title || p.name || 'Property ' + p.id;
+            const premiumLastPayment = PropertyDataService.getValue(p.id, 'premiumLastPayment', p.premiumLastPayment || '');
+            const weeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
+            const ownerEmail = (p.ownerEmail || '').toLowerCase();
+            
+            // Get owner name
+            const ownerUser = window.adminUsersData?.find(u => u.email?.toLowerCase() === ownerEmail);
+            const ownerName = ownerUser?.username || ownerEmail.split('@')[0] || 'Unknown';
+            
+            let dueDate = null;
+            let daysUntilDue = null;
+            
+            if (premiumLastPayment) {
+                const [year, month, day] = premiumLastPayment.split('-').map(Number);
+                const lastDate = new Date(year, month - 1, day);
+                dueDate = new Date(lastDate);
+                dueDate.setDate(dueDate.getDate() + 7); // Weekly premium
+                
+                dueDate.setHours(0, 0, 0, 0);
+                daysUntilDue = Math.floor((dueDate - today) / (1000 * 60 * 60 * 24));
+            }
+            
+            const premiumInfo = {
+                propertyId: p.id,
+                title: title,
+                ownerEmail: ownerEmail,
+                ownerName: ownerName,
+                amount: weeklyFee,
+                dueDate: dueDate,
+                dueDateFormatted: dueDate ? dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : null,
+                daysUntilDue: daysUntilDue,
+                lastPaid: premiumLastPayment
+            };
+            
+            if (!premiumLastPayment) {
+                neverPaid.push(premiumInfo);
+            } else if (daysUntilDue < 0) {
+                overdue.push(premiumInfo);
+            } else if (daysUntilDue === 0) {
+                dueToday.push(premiumInfo);
+            } else if (daysUntilDue === 1) {
+                dueTomorrow.push(premiumInfo);
+            }
+        });
+        
+        const total = overdue.length + dueToday.length + dueTomorrow.length + neverPaid.length;
+        
+        if (total === 0) {
+            panel.classList.add('hidden');
+            return;
+        }
+        
+        panel.classList.remove('hidden');
+        
+        const isUrgent = overdue.length > 0 || neverPaid.length > 0;
+        const isWarning = dueToday.length > 0;
+        
+        const borderColor = isUrgent ? 'border-amber-500/70' : isWarning ? 'border-orange-500/70' : 'border-cyan-500/70';
+        const headerGradient = isUrgent ? 'from-amber-600 to-orange-600' : isWarning ? 'from-orange-500 to-amber-500' : 'from-cyan-500 to-blue-500';
+        const headerIcon = isUrgent ? '👑' : isWarning ? '⏰' : '📅';
+        
+        let html = `
+            <div class="glass-effect rounded-2xl shadow-2xl overflow-hidden border-2 ${borderColor}">
+                <div class="bg-gradient-to-r ${headerGradient} px-6 py-4 cursor-pointer" onclick="togglePremiumPanel()">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">${headerIcon}</span>
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Premium Listing Collection Alert</h3>
+                                <p class="text-white/80 text-sm">${total} premium listing${total !== 1 ? 's' : ''} need${total === 1 ? 's' : ''} payment</p>
+                            </div>
+                        </div>
+                        <div id="premiumPanelToggle" class="text-white/80 hover:text-white transition">
+                            <svg class="w-6 h-6 transform transition-transform" id="premiumPanelArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="premiumPanelContent" class="p-4 space-y-4">
+        `;
+        
+        if (neverPaid.length > 0) {
+            html += `
+                <div class="bg-red-900/30 rounded-xl p-4 border border-red-500/50">
+                    <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                        <span>🚨</span> NEVER PAID (${neverPaid.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${neverPaid.map(p => renderPremiumItem(p, 'never')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (overdue.length > 0) {
+            html += `
+                <div class="bg-red-900/30 rounded-xl p-4 border border-red-500/50">
+                    <h4 class="text-red-400 font-bold mb-3 flex items-center gap-2">
+                        <span>🚨</span> OVERDUE (${overdue.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${overdue.map(p => renderPremiumItem(p, 'overdue')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (dueToday.length > 0) {
+            html += `
+                <div class="bg-orange-900/30 rounded-xl p-4 border border-orange-500/50">
+                    <h4 class="text-orange-400 font-bold mb-3 flex items-center gap-2">
+                        <span>⏰</span> DUE TODAY (${dueToday.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${dueToday.map(p => renderPremiumItem(p, 'today')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (dueTomorrow.length > 0) {
+            html += `
+                <div class="bg-cyan-900/30 rounded-xl p-4 border border-cyan-500/50">
+                    <h4 class="text-cyan-400 font-bold mb-3 flex items-center gap-2">
+                        <span>📅</span> DUE TOMORROW (${dueTomorrow.length})
+                    </h4>
+                    <div class="space-y-2">
+                        ${dueTomorrow.map(p => renderPremiumItem(p, 'tomorrow')).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        panel.innerHTML = html;
+        
+        // Set global premium alert count
+        window.premiumAlertCount = total;
+        
+    } catch (error) {
+        console.error('[PremiumAlerts] Error:', error);
+        panel.classList.add('hidden');
+        window.premiumAlertCount = 0;
+    }
+};
+
+function renderPremiumItem(item, urgency) {
+    const statusColors = {
+        never: 'text-red-300',
+        overdue: 'text-red-300',
+        today: 'text-orange-300',
+        tomorrow: 'text-yellow-300'
+    };
+    
+    const borderColors = {
+        never: 'border-l-red-500',
+        overdue: 'border-l-red-500',
+        today: 'border-l-orange-500',
+        tomorrow: 'border-l-yellow-500'
+    };
+    
+    let dueDisplay = item.dueDateFormatted || 'Never paid';
+    let reminderMsg = '';
+    
+    if (urgency === 'never') {
+        reminderMsg = `Hey ${item.ownerName}! 👋 Just a reminder about the premium listing fee for "${item.title}". 💰 $${item.amount.toLocaleString()}/week. Let me know when you're ready to meet up!`;
+    } else if (item.daysUntilDue === 1) {
+        reminderMsg = `Hey ${item.ownerName}! 👋 Just a reminder that the premium listing fee for "${item.title}" is due tomorrow. 💰 $${item.amount.toLocaleString()}/week. Let me know when you're available!`;
+    } else if (item.daysUntilDue === 0) {
+        reminderMsg = `Hey ${item.ownerName}! 👋 Just a reminder that the premium listing fee for "${item.title}" is due today. 💰 $${item.amount.toLocaleString()}/week. Let me know when you're available!`;
+    } else if (item.daysUntilDue < 0) {
+        const daysOverdue = Math.abs(item.daysUntilDue);
+        reminderMsg = `Hey ${item.ownerName}, the premium listing fee for "${item.title}" was due ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago. 💰 $${item.amount.toLocaleString()}/week. Please let me know when we can meet up to sort this out!`;
+        dueDisplay = `${daysOverdue}d OVERDUE!`;
+    }
+    
+    const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const escapedEmail = item.ownerEmail.replace(/'/g, "\\'");
+    
+    return `
+        <div class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[urgency] || 'border-l-gray-500'} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="goToAdminUserByEmail('${escapedEmail}')">
+            <div class="flex-1 min-w-0">
+                <div class="text-white font-medium truncate flex items-center gap-2">
+                    <span class="text-amber-400">👑</span>
+                    ${item.title}
+                </div>
+                <div class="text-gray-400 text-sm">Owner: ${item.ownerName}</div>
+                <div class="${statusColors[urgency] || 'text-gray-400'} text-xs">Due: ${dueDisplay}</div>
+            </div>
+            <div class="text-right">
+                <div class="text-amber-400 font-bold">$${item.amount.toLocaleString()}/wk</div>
+                <button onclick="event.stopPropagation(); copySubscriptionReminder('${escapedReminder}')" 
+                        class="text-cyan-400 hover:text-cyan-300 text-xs mt-1 flex items-center gap-1"
+                        style="outline: none;">
+                    📋 Copy Reminder
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+window.togglePremiumPanel = function() {
+    const content = $('premiumPanelContent');
+    const arrow = $('premiumPanelArrow');
+    if (content && arrow) {
+        content.classList.toggle('hidden');
+        arrow.classList.toggle('rotate-180');
+    }
+};
+
+window.handlePremiumPanelClick = function(event) {
+    // Check if clicked on the header area (gradient background)
+    const header = event.target.closest('.bg-gradient-to-r');
+    if (header) {
+        togglePremiumPanel();
+        return;
+    }
+    
+    // Check if clicked on copy button
+    if (event.target.closest('button') && event.target.textContent.includes('Copy')) {
+        return;
+    }
+    
+    // Check if clicked on a premium item row
+    const premiumItem = event.target.closest('.cursor-pointer');
+    if (premiumItem && premiumItem.getAttribute('onclick')?.includes('goToAdminUserByEmail')) {
+        const match = premiumItem.getAttribute('onclick')?.match(/goToAdminUserByEmail\('([^']+)'\)/);
         if (match) {
             goToAdminUserByEmail(match[1]);
         }

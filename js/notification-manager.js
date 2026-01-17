@@ -554,6 +554,10 @@
         if (typeof window.renderSubscriptionAlertsPanel === 'function') {
             window.renderSubscriptionAlertsPanel();
         }
+        // Also render premium listing alerts for admin
+        if (typeof window.renderPremiumAlertsPanel === 'function') {
+            window.renderPremiumAlertsPanel();
+        }
     }
     
     function renderNotificationStack() {
