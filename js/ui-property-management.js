@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Show managed services prompt after a short delay
                 setTimeout(() => {
-                    showManagedServicesPrompt(newPropertyId);
+                    showManagedServicesPrompt(newId);
                 }, 800);
                 
                 // Close modal after delay (longer to allow prompt to be seen)
