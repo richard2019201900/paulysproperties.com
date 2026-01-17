@@ -1316,8 +1316,9 @@ window.saveCellEdit = async function(input, propertyId, field, type) {
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             
             // Show thank you message popup with copy functionality
+            const propertyTitle = p?.title || `Property #${propertyId}`;
             if (logSuccess && typeof showPaymentConfirmationModal === 'function') {
-                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount);
+                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, propertyTitle);
             }
         }
         

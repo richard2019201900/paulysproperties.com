@@ -1779,14 +1779,14 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             
             // Show thank you message popup with copy functionality
+            const propertyTitle = p?.title || `Property #${propertyId}`;
             if (logSuccess) {
-                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, rtoPaymentInfo);
+                showPaymentConfirmationModal(renterName, nextDueDateStr, paymentAmount, propertyTitle, rtoPaymentInfo);
                 
                 // Award XP for logging a payment
                 if (typeof GamificationService !== 'undefined' && GamificationService.awardXP) {
                     const userId = auth.currentUser?.uid;
                     if (userId) {
-                        const propertyTitle = p?.title || `Property #${propertyId}`;
                         await GamificationService.awardXP(userId, 100, `Collected $${paymentAmount.toLocaleString()} rent on ${propertyTitle}`);
                     }
                 }
@@ -2209,7 +2209,7 @@ window.logPayment = async function(propertyId, paymentData) {
 };
 
 // Show payment confirmation modal with copyable thank you message
-window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, rtoInfo = null) {
+window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, propertyTitle = 'your property', rtoInfo = null) {
     // Get display name - handle titles like Dr., Mr., Mrs., Ms.
     const nameParts = renterName.trim().split(' ');
     const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'miss', 'prof.', 'prof'];
@@ -2231,18 +2231,18 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
     
     if (rtoInfo && rtoInfo.isDeposit) {
         // DEPOSIT PAYMENT MESSAGE
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${amount.toLocaleString()} for your Rent-to-Own agreement has been received. Your first monthly payment of $${rtoInfo.monthlyAmount.toLocaleString()} will be due on ${nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${amount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received. Your first monthly payment of $${rtoInfo.monthlyAmount.toLocaleString()} will be due on ${nextDueDate}. Let me know if you have any questions!`;
         headerSubtext = `$${amount.toLocaleString()} deposit from ${renterName}`;
         rtoBadge = `<p class="text-emerald-400 text-sm mt-1">💰 RTO Deposit Received</p>`;
     } else if (rtoInfo && !rtoInfo.isDeposit) {
         // MONTHLY RTO PAYMENT MESSAGE
         const rtoPaymentStr = ` (Payment ${rtoInfo.current} of ${rtoInfo.total} in your Rent-to-Own agreement)`;
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${amount.toLocaleString()}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${amount.toLocaleString()} for ${propertyTitle}${rtoPaymentStr} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
         headerSubtext = `$${amount.toLocaleString()} from ${renterName}`;
         rtoBadge = `<p class="text-amber-400 text-sm mt-1">📋 RTO Payment ${rtoInfo.current} of ${rtoInfo.total}</p>`;
     } else {
         // REGULAR (NON-RTO) PAYMENT MESSAGE
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${amount.toLocaleString()} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${amount.toLocaleString()} for ${propertyTitle} has been received. Your next payment is due on ${nextDueDate}. Let me know if you have any questions!`;
         headerSubtext = `$${amount.toLocaleString()} from ${renterName}`;
     }
     
@@ -6618,10 +6618,12 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             // Get expected monthly for message
             const rtoExpectedMonthly = PropertyDataService.getValue(propertyId, 'rtoExpectedMonthly', p?.rtoExpectedMonthly || 0);
             const rtoRemainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
+            const propertyTitle = p?.title || `Property #${propertyId}`;
             
             // Show confirmation
             showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
                 type: 'deposit',
+                propertyTitle: propertyTitle,
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: rtoExpectedMonthly,
                 remainingBalance: rtoRemainingBalance
@@ -6697,10 +6699,12 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             const nextDate = new Date(paymentDate);
             nextDate.setMonth(nextDate.getMonth() + 1);
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            const propertyTitle = p?.title || `Property #${propertyId}`;
             
             // Show confirmation
             showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
                 type: 'monthly',
+                propertyTitle: propertyTitle,
                 paymentNumber: newPaymentNumber,
                 totalPayments: rtoTotalPayments - 1, // -1 for final payment
                 nextDueDate: nextDueDateStr,
@@ -6749,16 +6753,17 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
         displayName = nameParts[0];
     }
     
+    const propertyTitle = info.propertyTitle || 'your property';
     let thankYouMessage, headerText, badgeText;
     
     if (info.type === 'deposit') {
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for your Rent-to-Own agreement has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
     } else {
         headerText = 'Payment Logged!';
         badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
     }
     
     // Show variance if different from expected
