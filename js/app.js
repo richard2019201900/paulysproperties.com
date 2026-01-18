@@ -652,17 +652,18 @@ function renderPropertyStatsContent(id) {
         }
         
         if (renterName && daysUntilDue <= 1) {
+            const propertyTitle = p.title || `Property #${id}`;
             if (daysUntilDue === 1) {
-                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} for ${propertyTitle} is due tomorrow (${nextDueDate}). Let me know if you have any questions!`;
             } else if (daysUntilDue === 0) {
-                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} is due today (${nextDueDate}). Let me know if you have any questions!`;
+                reminderScript = `Hey ${renterName}! 👋 Just a friendly reminder that your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} for ${propertyTitle} is due today (${nextDueDate}). Let me know if you have any questions!`;
             } else {
                 const daysOverdue = Math.abs(daysUntilDue);
                 if (daysOverdue >= 3) {
                     // 3+ days overdue - eviction warning
-                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} for ${propertyTitle} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). ⚠️ You are scheduled for eviction in 24 hours if payment is not received. Please make your payment immediately or contact me to discuss your situation.`;
                 } else {
-                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
+                    reminderScript = `Hey ${renterName}, your ${paymentFrequency} rent payment of $${amountDue.toLocaleString()}${rtoPaymentInfo} for ${propertyTitle} was due on ${nextDueDate} (${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago). Please make your payment as soon as possible. Let me know if you need to discuss anything!`;
                 }
             }
         }
