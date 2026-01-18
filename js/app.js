@@ -839,10 +839,18 @@ function renderPropertyStatsContent(id) {
                             <h3 class="text-2xl font-bold text-gray-200">📸 Property Images</h3>
                             <p class="text-gray-400 text-sm mt-1">Drag to reorder • First image is the main photo</p>
                         </div>
-                        <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            Add Images
-                        </button>
+                        <div class="flex items-center gap-2">
+                            ${p.images.length > 0 ? `
+                            <button onclick="confirmClearAllImages(${id}, '${sanitize(p.title).replace(/'/g, "\\'")}')" class="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-red-600 hover:to-red-700 text-white px-3 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition shadow-lg flex items-center gap-2" title="Clear all images">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                Clear All
+                            </button>
+                            ` : ''}
+                            <button onclick="openAddImageModal(${id})" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Add Images
+                            </button>
+                        </div>
                     </div>
                     <div class="flex gap-4 overflow-x-auto pb-4" id="images-grid-${id}" data-property-id="${id}">
                         ${p.images.map((img, i) => `
@@ -3305,6 +3313,97 @@ window.deletePropertyImage = async function(propertyId, imageIndex, imageUrl) {
     } catch (error) {
         console.error('Failed to delete image:', error);
         alert('Failed to delete image. Please try again.');
+    }
+};
+
+/**
+ * Show confirmation modal before clearing all images
+ */
+window.confirmClearAllImages = function(propertyId, propertyTitle) {
+    const prop = properties.find(p => p.id === propertyId);
+    if (!prop || !prop.images || prop.images.length === 0) {
+        showToast('No images to clear', 'info');
+        return;
+    }
+    
+    const imageCount = prop.images.length;
+    
+    const modalHTML = `
+        <div id="clearImagesModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-red-500">
+                <div class="text-center mb-4">
+                    <span class="text-5xl">🗑️</span>
+                    <h3 class="text-xl font-bold text-red-400 mt-2">Clear All Images?</h3>
+                </div>
+                
+                <div class="bg-red-900/30 border border-red-600/50 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 text-sm mb-2">
+                        You are about to delete <strong class="text-white">${imageCount} image${imageCount > 1 ? 's' : ''}</strong> from:
+                    </p>
+                    <p class="text-white font-bold">${propertyTitle}</p>
+                    <p class="text-red-300 text-sm mt-3">⚠️ This action cannot be undone!</p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="closeClearImagesModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Cancel
+                    </button>
+                    <button onclick="executeClearAllImages(${propertyId})" 
+                            class="flex-1 bg-red-600 text-white py-3 rounded-xl font-bold hover:bg-red-500 transition">
+                        🗑️ Delete All
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existing = $('clearImagesModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeClearImagesModal = function() {
+    const modal = $('clearImagesModal');
+    if (modal) modal.remove();
+};
+
+window.executeClearAllImages = async function(propertyId) {
+    closeClearImagesModal();
+    
+    const prop = properties.find(p => p.id === propertyId);
+    if (!prop) return;
+    
+    const imageCount = prop.images?.length || 0;
+    
+    try {
+        // Clear images array
+        prop.images = [];
+        state.currentImages = [];
+        
+        // Ensure owner info is set
+        if (!prop.ownerEmail) {
+            prop.ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
+        }
+        
+        // Save to Firestore
+        await db.collection('settings').doc('properties').set({
+            [propertyId]: prop
+        }, { merge: true });
+        
+        // Re-render
+        renderPropertyStatsContent(propertyId);
+        
+        // Show toast
+        if (typeof showToast === 'function') {
+            showToast(`Cleared ${imageCount} image${imageCount > 1 ? 's' : ''} successfully!`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('Failed to clear images:', error);
+        alert('Failed to clear images. Please try again.');
     }
 };
 
