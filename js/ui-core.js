@@ -542,3 +542,87 @@ window.closePriceWarningModal = function(confirmed) {
     window._priceWarningCancel = null;
 };
 
+/**
+ * Show warning modal when user tries to manually clear renter info
+ * Encourages using Complete Lease or Evict Renter buttons instead
+ */
+window.showRenterClearWarningModal = function(field, propertyId, type, newValue, tile, valueEl) {
+    const fieldName = field === 'renterName' ? 'Renter Name' : 'Renter Phone';
+    
+    const modalHTML = `
+        <div id="renterClearWarningModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-red-500">
+                <div class="text-center mb-4">
+                    <span class="text-5xl">⚠️</span>
+                    <h3 class="text-xl font-bold text-red-400 mt-2">Incorrect Rental Ending Method</h3>
+                </div>
+                
+                <div class="bg-red-900/30 border border-red-600/50 rounded-xl p-4 mb-4">
+                    <p class="text-red-200 text-sm mb-3">
+                        <strong>Don't manually clear renter info!</strong> This can cause issues with lb-phones in the city.
+                    </p>
+                    <p class="text-gray-300 text-sm mb-3">
+                        Instead, use one of these buttons to properly end a rental:
+                    </p>
+                    <div class="space-y-2 mb-3">
+                        <div class="flex items-center gap-2 text-green-400">
+                            <span>✅</span>
+                            <span class="font-bold">Complete Lease</span>
+                            <span class="text-gray-400 text-xs">- Renter left on good terms</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-amber-400">
+                            <span>🚨</span>
+                            <span class="font-bold">Evict Renter</span>
+                            <span class="text-gray-400 text-xs">- Remove problematic tenant</span>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 text-xs">
+                        These buttons automatically clear all renter info, relist the property, and update everything properly in one click.
+                    </p>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="closeRenterClearWarningModal(false)" 
+                            class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-500 transition">
+                        ← Go Back (Recommended)
+                    </button>
+                    <button onclick="closeRenterClearWarningModal(true)" 
+                            class="flex-1 bg-gray-700 text-gray-300 py-3 rounded-xl font-bold hover:bg-gray-600 transition text-sm">
+                        Clear Anyway (Not Recommended)
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Store save parameters for if they confirm
+    window._renterClearSaveParams = { field, propertyId, type, newValue, tile, valueEl };
+    
+    // Remove existing modal if any
+    const existing = $('renterClearWarningModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeRenterClearWarningModal = function(confirmed) {
+    const modal = $('renterClearWarningModal');
+    if (modal) modal.remove();
+    
+    if (confirmed && window._renterClearSaveParams) {
+        const { field, propertyId, type, newValue, tile, valueEl } = window._renterClearSaveParams;
+        // User insisted on clearing manually - proceed but they've been warned
+        if (typeof executeTileSave === 'function') {
+            executeTileSave(field, propertyId, type, newValue, tile, valueEl);
+        }
+    } else if (!confirmed && window._renterClearSaveParams) {
+        // User chose to go back - cancel the edit
+        const { field, propertyId } = window._renterClearSaveParams;
+        if (typeof cancelTileEdit === 'function') {
+            cancelTileEdit(field, propertyId);
+        }
+    }
+    
+    window._renterClearSaveParams = null;
+};
+

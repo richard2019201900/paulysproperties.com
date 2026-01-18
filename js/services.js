@@ -788,13 +788,8 @@ window.toggleAvailability = async function(id) {
         const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', '');
         
         if (renterName || renterPhone || lastPaymentDate) {
-            let message = '⚠️ Cannot mark as Available\n\nThis property has renter/payment information set:\n';
-            if (renterName) message += `• Renter Name: ${renterName}\n`;
-            if (renterPhone) message += `• Renter Phone: ${renterPhone}\n`;
-            if (lastPaymentDate) message += `• Last Payment Date: ${lastPaymentDate}\n`;
-            message += '\nTo mark this property as Available, first clear these fields by clicking on them and deleting the values.';
-            
-            alert(message);
+            // Show warning modal instead of simple alert
+            showMarkAvailableWarningModal(id, renterName, renterPhone, lastPaymentDate);
             return;
         }
     }
@@ -813,6 +808,82 @@ window.toggleAvailability = async function(id) {
             status.className = 'text-green-400 mt-2 font-medium';
         }, 3000);
     }
+};
+
+/**
+ * Show warning modal when trying to mark property as available with renter info
+ */
+window.showMarkAvailableWarningModal = function(propertyId, renterName, renterPhone, lastPaymentDate) {
+    const p = properties.find(prop => prop.id === propertyId);
+    const propertyTitle = p?.title || `Property #${propertyId}`;
+    
+    let renterInfoList = '';
+    if (renterName) renterInfoList += `<li class="text-gray-300">• Renter Name: <span class="text-white">${renterName}</span></li>`;
+    if (renterPhone) renterInfoList += `<li class="text-gray-300">• Renter Phone: <span class="text-white">${renterPhone}</span></li>`;
+    if (lastPaymentDate) renterInfoList += `<li class="text-gray-300">• Last Payment: <span class="text-white">${lastPaymentDate}</span></li>`;
+    
+    const modalHTML = `
+        <div id="markAvailableWarningModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-red-500">
+                <div class="text-center mb-4">
+                    <span class="text-5xl">🚫</span>
+                    <h3 class="text-xl font-bold text-red-400 mt-2">Cannot Mark as Available</h3>
+                </div>
+                
+                <div class="bg-red-900/30 border border-red-600/50 rounded-xl p-4 mb-4">
+                    <p class="text-red-200 text-sm mb-2">
+                        <strong>${propertyTitle}</strong> has active renter information:
+                    </p>
+                    <ul class="text-sm space-y-1 mb-3">
+                        ${renterInfoList}
+                    </ul>
+                    <p class="text-gray-300 text-sm mb-3">
+                        <strong>Don't manually clear these fields!</strong> This can cause crashes in lb-phones.
+                    </p>
+                </div>
+                
+                <div class="bg-gray-900/50 border border-gray-600 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 text-sm mb-3">
+                        <strong>Use one of these buttons instead:</strong>
+                    </p>
+                    <div class="space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">✅</span>
+                            <div>
+                                <div class="text-green-400 font-bold">Complete Lease</div>
+                                <div class="text-gray-400 text-xs">Use when renter leaves on good terms. Clears all info and relists property automatically.</div>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">🚨</span>
+                            <div>
+                                <div class="text-amber-400 font-bold">Evict Renter</div>
+                                <div class="text-gray-400 text-xs">Use when removing a problematic tenant. Clears all info and relists property automatically.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="closeMarkAvailableWarningModal()" 
+                            class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-500 transition">
+                        Got it, I'll use the proper buttons
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existing = $('markAvailableWarningModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeMarkAvailableWarningModal = function() {
+    const modal = $('markAvailableWarningModal');
+    if (modal) modal.remove();
 };
 
 async function initFirestore() {

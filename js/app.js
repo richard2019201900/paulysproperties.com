@@ -491,11 +491,14 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
     loadStatsOwnerName(propId);
     
     // Load property analytics (async - will populate the analytics section)
-    setTimeout(() => {
-        if (typeof renderPropertyAnalytics === 'function') {
-            renderPropertyAnalytics(propId);
-        }
-    }, 100);
+    // Use requestAnimationFrame + timeout to ensure DOM is ready
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            if (typeof renderPropertyAnalytics === 'function') {
+                renderPropertyAnalytics(propId);
+            }
+        }, 200);
+    });
     
     hideElement($('ownerDashboard'));
     hideElement($('renterSection'));
@@ -1611,6 +1614,21 @@ window.saveTileEdit = async function(field, propertyId, type) {
                 );
                 return; // Don't save yet, wait for confirmation
             }
+        }
+    }
+    
+    // RENTAL WORKFLOW VALIDATION - warn when manually clearing renter info on rented property
+    if ((field === 'renterName' || field === 'renterPhone') && !newValue) {
+        const isRented = state.availability[propertyId] === false;
+        const p = properties.find(prop => prop.id === propertyId);
+        const otherField = field === 'renterName' ? 'renterPhone' : 'renterName';
+        const otherValue = PropertyDataService.getValue(propertyId, otherField, p?.[otherField] || '');
+        const lastPayment = PropertyDataService.getValue(propertyId, 'lastPaymentDate', p?.lastPaymentDate || '');
+        
+        // Only warn if property is rented or has other renter info
+        if (isRented || otherValue || lastPayment) {
+            showRenterClearWarningModal(field, propertyId, type, newValue, tile, valueEl);
+            return; // Don't save yet, wait for confirmation
         }
     }
     
