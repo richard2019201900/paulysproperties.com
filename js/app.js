@@ -3758,13 +3758,18 @@ async function init() {
             // Ensure user has tier set (default to starter for new users)
             try {
                 const userDoc = await db.collection('users').doc(user.uid).get();
-                if (!userDoc.exists || !userDoc.data()?.tier) {
-                    // New user or missing tier - set to starter
+                if (!userDoc.exists) {
+                    // Truly new user - create document with createdAt
                     await db.collection('users').doc(user.uid).set({
                         email: user.email.toLowerCase(),
                         tier: 'starter',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    });
+                } else if (!userDoc.data()?.tier) {
+                    // Existing user missing tier - only add tier, DO NOT update createdAt
+                    await db.collection('users').doc(user.uid).update({
+                        tier: 'starter'
+                    });
                 }
                 
                 // Store user tier in state for quick access
