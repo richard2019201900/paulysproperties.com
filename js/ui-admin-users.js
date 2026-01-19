@@ -123,6 +123,329 @@ window.saveSubscriptionDate = async function(userId, email, date) {
     }
 };
 
+// ==================== SUBSCRIPTION PAYMENT MODAL ====================
+/**
+ * Open subscription payment modal - similar to property payment flow
+ * Allows recording payment with date picker, shows confirmation message
+ */
+window.openSubscriptionPaymentModal = function(userId, email, displayName, currentLastPaid, subscriptionAmount = 25000) {
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    
+    // Calculate current status
+    let daysUntilDue = null;
+    let statusText = 'Never paid';
+    let statusColor = 'text-red-400';
+    
+    if (currentLastPaid) {
+        const [year, month, day] = currentLastPaid.split('-').map(Number);
+        const lastPaidDate = new Date(year, month - 1, day);
+        const dueDate = new Date(lastPaidDate);
+        dueDate.setDate(dueDate.getDate() + 30);
+        
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
+        dueDate.setHours(0, 0, 0, 0);
+        
+        daysUntilDue = Math.floor((dueDate - todayDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilDue < 0) {
+            statusText = `${Math.abs(daysUntilDue)} days OVERDUE`;
+            statusColor = 'text-red-400';
+        } else if (daysUntilDue === 0) {
+            statusText = 'Due TODAY';
+            statusColor = 'text-orange-400';
+        } else if (daysUntilDue === 1) {
+            statusText = 'Due tomorrow';
+            statusColor = 'text-yellow-400';
+        } else {
+            statusText = `${daysUntilDue} days until due`;
+            statusColor = 'text-green-400';
+        }
+    }
+    
+    const formattedAmount = `$${subscriptionAmount.toLocaleString()}`;
+    const escapedId = userId.replace(/'/g, "\\'");
+    const escapedEmail = email.replace(/'/g, "\\'");
+    const escapedName = displayName.replace(/'/g, "\\'");
+    
+    const modalHTML = `
+        <div id="subscriptionPaymentModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeSubscriptionPaymentModal()">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-purple-500/50">
+                <div class="p-6">
+                    <!-- Header -->
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                                <span class="text-2xl">👑</span> Record Subscription Payment
+                            </h2>
+                            <p class="text-gray-400 text-sm mt-1">${displayName} • ${email}</p>
+                        </div>
+                        <button onclick="closeSubscriptionPaymentModal()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                    </div>
+                    
+                    <!-- Current Status -->
+                    <div class="bg-gray-900/50 rounded-xl p-4 mb-4 border border-gray-700">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-400">Last Payment:</span>
+                                <span class="text-white ml-2 font-medium">${currentLastPaid || 'Never'}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Status:</span>
+                                <span class="${statusColor} ml-2 font-bold">${statusText}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Amount:</span>
+                                <span class="text-green-400 ml-2 font-bold">${formattedAmount}/mo</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400">Tier:</span>
+                                <span class="text-yellow-400 ml-2 font-bold">👑 Elite</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Payment Date Selector -->
+                    <div class="bg-purple-900/30 rounded-xl p-4 mb-4 border border-purple-500/30">
+                        <label class="block text-purple-300 font-bold mb-2">📅 Payment Date</label>
+                        <input type="date" 
+                               id="subPaymentDate" 
+                               value="${today}"
+                               max="${today}"
+                               class="w-full bg-gray-900 text-white px-4 py-3 rounded-xl border border-purple-500/50 focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 transition">
+                        
+                        <!-- Quick date buttons -->
+                        <div class="flex gap-2 mt-3">
+                            <button onclick="document.getElementById('subPaymentDate').value='${today}'" 
+                                    class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition">
+                                Today
+                            </button>
+                            <button onclick="document.getElementById('subPaymentDate').value='${yesterday}'" 
+                                    class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-medium transition">
+                                Yesterday
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3">
+                        <button onclick="closeSubscriptionPaymentModal()" 
+                                class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button onclick="recordSubscriptionPayment('${escapedId}', '${escapedEmail}', '${escapedName}', ${subscriptionAmount})" 
+                                class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                            <span>✅</span> Record Payment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existing = $('subscriptionPaymentModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeSubscriptionPaymentModal = function() {
+    const modal = $('subscriptionPaymentModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Record subscription payment and show confirmation
+ */
+window.recordSubscriptionPayment = async function(userId, email, displayName, amount) {
+    const dateInput = $('subPaymentDate');
+    if (!dateInput) return;
+    
+    const paymentDate = dateInput.value;
+    if (!paymentDate) {
+        alert('Please select a payment date');
+        return;
+    }
+    
+    try {
+        // Save payment date
+        await db.collection('users').doc(userId).update({
+            subscriptionLastPaid: paymentDate,
+            subscriptionUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Log to subscription payment history
+        await db.collection('subscriptionPayments').add({
+            userId: userId,
+            email: email.toLowerCase(),
+            username: displayName,
+            amount: amount,
+            paymentDate: paymentDate,
+            recordedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            recordedBy: auth.currentUser?.email || 'admin'
+        });
+        
+        // Log to admin activity
+        if (typeof logAdminActivity === 'function') {
+            logAdminActivity('subscription_payment', {
+                email: email,
+                amount: amount,
+                paymentDate: paymentDate
+            });
+        }
+        
+        // Update local cache
+        if (window.adminUsersData) {
+            const userIndex = window.adminUsersData.findIndex(u => u.id === userId);
+            if (userIndex !== -1) {
+                window.adminUsersData[userIndex].subscriptionLastPaid = paymentDate;
+            }
+        }
+        
+        // Close payment modal
+        closeSubscriptionPaymentModal();
+        
+        // Show confirmation modal with thank-you message
+        showSubscriptionPaymentConfirmation(displayName, email, amount, paymentDate);
+        
+        // Refresh all relevant UI
+        loadAllUsers();
+        
+        if (typeof window.renderSubscriptionAlertsPanel === 'function') {
+            window.renderSubscriptionAlertsPanel();
+        }
+        
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+            NotificationManager.refreshUI();
+        }
+        
+    } catch (error) {
+        console.error('Error recording subscription payment:', error);
+        alert('Failed to record payment: ' + error.message);
+    }
+};
+
+/**
+ * Show subscription payment confirmation with copy-able thank-you message
+ */
+window.showSubscriptionPaymentConfirmation = function(displayName, email, amount, paymentDate) {
+    // Calculate next due date (30 days from payment)
+    const [year, month, day] = paymentDate.split('-').map(Number);
+    const paidDate = new Date(year, month - 1, day);
+    const nextDue = new Date(paidDate);
+    nextDue.setDate(nextDue.getDate() + 30);
+    const nextDueFormatted = nextDue.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    
+    // Format payment date for display
+    const paidFormatted = paidDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    
+    // Get first name for friendly message
+    const firstName = displayName.split(' ')[0];
+    
+    // Generate thank-you message
+    const thankYouMessage = `Thanks ${firstName}! 🙏 Your Elite subscription payment of $${amount.toLocaleString()} has been received. Your account is all set until ${nextDueFormatted}. We really appreciate your continued support of PaulysProperties.com! 👑🏠`;
+    
+    const modalHTML = `
+        <div id="subPaymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeSubPaymentConfirmModal()">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl">
+                <div class="text-center mb-4">
+                    <div class="text-5xl mb-3">✅</div>
+                    <h3 class="text-2xl font-bold text-green-400">Payment Recorded!</h3>
+                    <p class="text-gray-400 mt-1">$${amount.toLocaleString()} from ${displayName}</p>
+                    <p class="text-yellow-400 text-sm mt-1">👑 Elite Subscription</p>
+                </div>
+                
+                <!-- Payment Details -->
+                <div class="bg-gray-800/50 rounded-xl p-4 mb-4 border border-gray-700">
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span class="text-gray-400">Payment Date:</span>
+                            <span class="text-white ml-2">${paidFormatted}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Next Due:</span>
+                            <span class="text-green-400 ml-2 font-medium">${nextDueFormatted}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Thank You Message -->
+                <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${firstName}:</span>
+                    </div>
+                    <div id="subThankYouText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600">
+                        ${thankYouMessage}
+                    </div>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="copySubThankYouMessage()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Message
+                    </button>
+                    <button onclick="closeSubPaymentConfirmModal()" class="flex-1 bg-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Store message for copy
+    window.currentSubThankYouMessage = thankYouMessage;
+    
+    // Remove existing and add new
+    const existing = $('subPaymentConfirmModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeSubPaymentConfirmModal = function() {
+    const modal = $('subPaymentConfirmModal');
+    if (modal) modal.remove();
+};
+
+window.copySubThankYouMessage = async function() {
+    try {
+        await navigator.clipboard.writeText(window.currentSubThankYouMessage);
+        
+        // Show feedback
+        const btn = document.querySelector('#subPaymentConfirmModal button');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<span>✓</span> Copied!';
+            btn.classList.remove('from-green-500', 'to-emerald-600');
+            btn.classList.add('from-gray-600', 'to-gray-700');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('from-gray-600', 'to-gray-700');
+                btn.classList.add('from-green-500', 'to-emerald-600');
+            }, 2000);
+        }
+        
+        if (typeof showToast === 'function') {
+            showToast('Message copied to clipboard!', 'success');
+        }
+    } catch (error) {
+        console.error('Failed to copy:', error);
+        // Fallback
+        const text = $('subThankYouText');
+        if (text) {
+            const range = document.createRange();
+            range.selectNode(text);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            alert('Message copied!');
+        }
+    }
+};
+
 // Edit subscription amount for a user
 window.editSubscriptionAmount = async function(userId, email, currentAmount) {
     const newAmount = prompt(

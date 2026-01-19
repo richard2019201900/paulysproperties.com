@@ -2901,6 +2901,10 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                         </div>
                         <div class="flex items-center gap-2">
                             ${toggleTrialBtn}
+                            <button onclick="openSubscriptionPaymentModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${subLastPaid}', ${user.subscriptionAmount || 25000})" 
+                                class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition">
+                                💰 Record Payment
+                            </button>
                             <button onclick="openSubscriptionReminderModal('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}', '${user.tier}', '${tierPrice}', ${daysUntilDue})" 
                                 class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs font-bold transition">
                                 📋 Scripts
@@ -3292,8 +3296,9 @@ window.renderSubscriptionAlertsPanel = async function() {
                     email: user.email,
                     username: user.username || user.email.split('@')[0],
                     tier: user.tier,
-                    amount: 25000,
-                    daysUntilDue: null
+                    amount: user.subscriptionAmount || 25000,
+                    daysUntilDue: null,
+                    lastPaid: ''
                 });
                 return;
             }
@@ -3310,10 +3315,11 @@ window.renderSubscriptionAlertsPanel = async function() {
                 email: user.email,
                 username: user.username || user.email.split('@')[0],
                 tier: user.tier,
-                amount: 25000, // Elite is $25k/month
+                amount: user.subscriptionAmount || 25000, // Elite is $25k/month, or custom amount
                 dueDate: dueDate,
                 dueDateFormatted: dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                daysUntilDue: daysUntilDue
+                daysUntilDue: daysUntilDue,
+                lastPaid: user.subscriptionLastPaid || ''
             };
             
             if (daysUntilDue < 0) {
@@ -3469,6 +3475,8 @@ function renderSubscriptionItem(sub, urgency) {
     
     const escapedReminder = reminderMsg.replace(/'/g, "\\'").replace(/"/g, '\\"');
     const escapedEmail = sub.email.replace(/'/g, "\\'");
+    const escapedUsername = (sub.username || '').replace(/'/g, "\\'");
+    const escapedOdId = (sub.odId || '').replace(/'/g, "\\'");
     const itemId = sub.email.replace(/[^a-zA-Z0-9]/g, '_'); // Safe id from email
     
     return `
@@ -3482,13 +3490,20 @@ function renderSubscriptionItem(sub, urgency) {
                 <div class="text-gray-400 text-sm">${sub.email}</div>
                 <div class="${statusColors[urgency] || 'text-gray-400'} text-xs">Due: ${dueDisplay}</div>
             </div>
-            <div class="text-right">
+            <div class="text-right flex flex-col items-end gap-1">
                 <div class="text-white font-bold">$${sub.amount.toLocaleString()}</div>
-                <button onclick="event.stopPropagation(); copySubscriptionReminder('${escapedReminder}')" 
-                        class="text-cyan-400 hover:text-cyan-300 text-xs mt-1 flex items-center gap-1"
-                        style="outline: none;">
-                    📋 Copy Reminder
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation(); openSubscriptionPaymentModal('${escapedOdId}', '${escapedEmail}', '${escapedUsername}', '${sub.lastPaid || ''}', ${sub.amount})" 
+                            class="bg-green-600 hover:bg-green-500 text-white text-xs px-2 py-1 rounded font-bold transition"
+                            style="outline: none;">
+                        💰 Pay
+                    </button>
+                    <button onclick="event.stopPropagation(); copySubscriptionReminder('${escapedReminder}')" 
+                            class="text-cyan-400 hover:text-cyan-300 text-xs flex items-center gap-1"
+                            style="outline: none;">
+                        📋 Copy
+                    </button>
+                </div>
             </div>
         </div>
     `;
