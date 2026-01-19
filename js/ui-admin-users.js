@@ -98,6 +98,16 @@ window.saveSubscriptionDate = async function(userId, email, date) {
         // Re-render the user list
         loadAllUsers();
         
+        // Refresh subscription alerts panel so overdue status updates immediately
+        if (typeof window.renderSubscriptionAlertsPanel === 'function') {
+            window.renderSubscriptionAlertsPanel();
+        }
+        
+        // Also refresh notification manager if available
+        if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+            NotificationManager.refreshUI();
+        }
+        
     } catch (error) {
         console.error('Error saving subscription date:', error);
         // Show error toast
