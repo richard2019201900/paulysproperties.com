@@ -4909,12 +4909,16 @@ function showRTOUpgradeRequired() {
 /**
  * Get PMA Government minimum final payment based on property type
  * These are FINAL PAYMENT minimums, not buy prices
- * Apartments 600 storage - $700k
- * Hotel 800 Storage - $750k
- * Instance House 800-900 Storage - $800K
- * Hotel 1050 Storage - $900k
- * Instance House 1000+ - $1.2 Mil
- * Walk In House - $1.5m
+ * 
+ * PRICING TIERS:
+ * - Apartments 600 storage: $700k
+ * - Hotel 800 storage: $750k
+ * - Instance House 800-900 storage: $800k
+ * - Hotel 1050 storage: $900k
+ * - Instance House 1000+: $1.2m
+ * - Walk-In House: $1.5m (flat rate)
+ * 
+ * SPECIAL CASE: Walk-In Hotels use hotel storage pricing, NOT flat $1.5m
  */
 function getMinimumBuyPrice(property) {
     const title = (property.title || '').toLowerCase();
@@ -4932,9 +4936,13 @@ function getMinimumBuyPrice(property) {
     // Get storage space - check multiple sources
     let storageSpace = 0;
     if (property.id) {
-        storageSpace = parseInt(PropertyDataService.getValue(property.id, 'storageSpace', property.storageSpace || 0)) || 0;
+        storageSpace = parseInt(PropertyDataService.getValue(property.id, 'storage', property.storage || 0)) || 0;
+        // Also check 'storageSpace' key
+        if (!storageSpace) {
+            storageSpace = parseInt(PropertyDataService.getValue(property.id, 'storageSpace', property.storageSpace || 0)) || 0;
+        }
     } else {
-        storageSpace = parseInt(property.storageSpace) || 0;
+        storageSpace = parseInt(property.storage || property.storageSpace) || 0;
     }
     
     // Also try to find storage in title/description
@@ -4945,18 +4953,31 @@ function getMinimumBuyPrice(property) {
         }
     }
     
-    
-    // Check for walk-in house first (highest tier) - $1.5M
-    // Case-insensitive check for any variation of "walk-in" or "walkin"
-    if (interiorType.includes('walk') || 
+    // Check if it's a walk-in
+    const isWalkIn = interiorType.includes('walk') || 
         title.includes('walk in') || title.includes('walk-in') || title.includes('walkin') ||
         description.includes('walk in') || description.includes('walk-in') || description.includes('walkin') ||
-        type.includes('walk')) {
+        type.includes('walk');
+    
+    // Check if it's a hotel
+    const isHotel = type === 'hotel' || title.includes('hotel');
+    
+    // SPECIAL CASE: Walk-In Hotels use hotel storage pricing (NOT flat $1.5m)
+    if (isWalkIn && isHotel) {
+        // Walk-in hotels use storage-based hotel pricing
+        if (storageSpace >= 1050) return { min: 900000, category: 'Walk-In Hotel 1050 Storage', storage: storageSpace + ' storage' };
+        if (storageSpace >= 800) return { min: 750000, category: 'Walk-In Hotel 800 Storage', storage: storageSpace + ' storage' };
+        // Default hotel pricing for walk-in hotels
+        return { min: 750000, category: 'Walk-In Hotel', storage: storageSpace ? storageSpace + ' storage' : 'Unknown' };
+    }
+    
+    // Walk-In House (non-hotel) - flat $1.5M
+    if (isWalkIn) {
         return { min: 1500000, category: 'Walk-In House', storage: storageSpace ? storageSpace + ' storage' : 'N/A' };
     }
     
-    // Check for hotel
-    if (type === 'hotel' || title.includes('hotel')) {
+    // Regular (Instance) Hotel - storage-based pricing
+    if (isHotel) {
         if (storageSpace >= 1050) return { min: 900000, category: 'Hotel 1050 Storage', storage: storageSpace + ' storage' };
         if (storageSpace >= 800) return { min: 750000, category: 'Hotel 800 Storage', storage: storageSpace + ' storage' };
         return { min: 750000, category: 'Hotel', storage: storageSpace ? storageSpace + ' storage' : 'Unknown' };
