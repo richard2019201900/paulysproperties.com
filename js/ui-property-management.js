@@ -745,19 +745,37 @@ window.executeCopyListing = async function(sourcePropertyId) {
         const maxId = Math.max(0, ...existingIds);
         const newId = maxId + 1;
         
-        // Determine owner and agent
-        let newOwnerEmail = currentUserEmail;
+        // Determine owner and agent based on management selection
+        let newOwnerEmail = '';
         let newAgentEmail = '';
         
-        // If admin is copying someone else's property, keep original owner
-        if (isAdmin && sourceProperty.ownerEmail && sourceProperty.ownerEmail.toLowerCase() !== currentUserEmail) {
-            newOwnerEmail = sourceProperty.ownerEmail.toLowerCase();
-        }
+        const adminEmail = 'richard2019201900@gmail.com';
+        const sourceOwner = (sourceProperty.ownerEmail || '').toLowerCase();
         
-        // Set agent based on selection
         if (managementOption === 'agent') {
-            // Assign to admin (Pauly Amato)
-            newAgentEmail = 'richard2019201900@gmail.com';
+            // "Assign Agent" selected - Admin (Pauly) manages this property
+            // If admin is doing the copy, they become the owner
+            // If non-admin is copying, they stay owner and admin becomes agent
+            if (isAdmin) {
+                // Admin copying with agent = admin owns and manages it
+                newOwnerEmail = adminEmail;
+                newAgentEmail = ''; // No separate agent needed, owner IS the admin
+            } else {
+                // Non-admin copying with agent = they own it, admin manages
+                newOwnerEmail = currentUserEmail;
+                newAgentEmail = adminEmail;
+            }
+        } else {
+            // "Self-Manage" selected
+            if (isAdmin) {
+                // Admin self-managing = admin owns it
+                newOwnerEmail = adminEmail;
+                newAgentEmail = '';
+            } else {
+                // Non-admin self-managing = they own it, no agent
+                newOwnerEmail = currentUserEmail;
+                newAgentEmail = '';
+            }
         }
         
         // Build the new property object (copy relevant fields)

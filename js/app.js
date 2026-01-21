@@ -3086,8 +3086,19 @@ window.startEditField = function(field, propertyId, element) {
     input.focus();
     input.select();
     
+    let isSaving = false; // Prevent double-save
+    
     const saveField = async () => {
+        if (isSaving) return;
+        isSaving = true;
+        
         const newValue = input.value.trim();
+        
+        // Safety check - element might have been removed from DOM
+        if (!element.isConnected) {
+            return;
+        }
+        
         if (newValue && newValue !== currentValue) {
             element.innerHTML = '<span class="text-gray-400">Saving...</span>';
             try {
@@ -3106,10 +3117,14 @@ window.startEditField = function(field, propertyId, element) {
                 renderProperties(state.filteredProperties);
             } catch (error) {
                 console.error('Failed to save:', error);
-                element.innerHTML = originalContent;
+                if (element.isConnected) {
+                    element.innerHTML = originalContent;
+                }
             }
         } else {
-            element.innerHTML = currentValue;
+            if (element.isConnected) {
+                element.innerHTML = currentValue;
+            }
         }
     };
     
@@ -3119,7 +3134,9 @@ window.startEditField = function(field, propertyId, element) {
             e.preventDefault();
             input.blur();
         } else if (e.key === 'Escape') {
-            element.innerHTML = currentValue;
+            if (element.isConnected) {
+                element.innerHTML = currentValue;
+            }
         }
     });
 };
