@@ -1101,7 +1101,13 @@
                     nextDate.setMonth(nextDate.getMonth() + 1);
                 }
                 
-                const dueDate = nextDate.toISOString().split('T')[0];
+                // Format dueDate as YYYY-MM-DD in LOCAL timezone (not UTC)
+                // Using toISOString() would shift the date in western timezones
+                const dueYear = nextDate.getFullYear();
+                const dueMonth = String(nextDate.getMonth() + 1).padStart(2, '0');
+                const dueDay = String(nextDate.getDate()).padStart(2, '0');
+                const dueDate = `${dueYear}-${dueMonth}-${dueDay}`;
+                
                 const daysUntilDue = Math.ceil((nextDate - now) / (1000 * 60 * 60 * 24));
                 
                 // Get rent amount based on frequency
