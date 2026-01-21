@@ -550,3 +550,304 @@ window.copyDashboardReminder = function(propertyId, btn) {
     });
 };
 
+// ==================== COPY LISTING FEATURE ====================
+
+/**
+ * Open the copy listing modal
+ * Allows duplicating a property with options to modify storage and management
+ */
+window.openCopyListingModal = function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) {
+        alert('Property not found');
+        return;
+    }
+    
+    const currentUserEmail = (auth.currentUser?.email || '').toLowerCase();
+    const isAdmin = TierService.isMasterAdmin(currentUserEmail);
+    const propertyOwner = (p.ownerEmail || '').toLowerCase();
+    
+    // Check if user can copy this listing (owner or admin)
+    if (!isAdmin && propertyOwner !== currentUserEmail) {
+        alert('You can only copy your own listings.');
+        return;
+    }
+    
+    // Get current values
+    const currentStorage = PropertyDataService.getValue(propertyId, 'storage', p.storage || 0);
+    const currentTitle = p.title || 'Untitled Property';
+    const hasAgent = p.agentEmail && p.agentEmail !== propertyOwner;
+    
+    const modalHTML = `
+        <div id="copyListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeCopyListingModal()">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full border border-cyan-500/50">
+                <div class="p-6">
+                    <!-- Header -->
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                                <span class="text-2xl">📋</span> Copy Listing
+                            </h2>
+                            <p class="text-gray-400 text-sm mt-1">Duplicate "${currentTitle}"</p>
+                        </div>
+                        <button onclick="closeCopyListingModal()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                    </div>
+                    
+                    <!-- Copy Options -->
+                    <div class="space-y-4">
+                        <!-- New Title -->
+                        <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+                            <label class="block text-cyan-400 font-bold mb-2">📝 New Listing Title</label>
+                            <input type="text" 
+                                   id="copyListingTitle" 
+                                   value="${currentTitle} (Copy)"
+                                   class="w-full bg-gray-800 text-white px-4 py-3 rounded-xl border border-gray-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 transition"
+                                   placeholder="Enter title for the copy">
+                            <p class="text-gray-500 text-xs mt-2">Tip: Change "Apt 105" to "Apt 106", etc.</p>
+                        </div>
+                        
+                        <!-- Storage Amount -->
+                        <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+                            <label class="block text-amber-400 font-bold mb-2">📦 Storage Space</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" 
+                                       id="copyListingStorage" 
+                                       value="${currentStorage}"
+                                       min="0"
+                                       class="flex-1 bg-gray-800 text-white px-4 py-3 rounded-xl border border-gray-600 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20 transition"
+                                       placeholder="Storage amount">
+                                <span class="text-gray-400 whitespace-nowrap">Current: ${currentStorage}</span>
+                            </div>
+                            <p class="text-gray-500 text-xs mt-2">Adjust if the new unit has different storage capacity</p>
+                        </div>
+                        
+                        <!-- Management Option -->
+                        <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+                            <label class="block text-purple-400 font-bold mb-3">🏠 Property Management</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition">
+                                    <input type="radio" name="copyManagement" value="self" checked
+                                           class="w-5 h-5 text-purple-500 border-gray-600 focus:ring-purple-500 bg-gray-800">
+                                    <div>
+                                        <span class="text-white font-medium">Self-Manage</span>
+                                        <p class="text-gray-400 text-xs">I'll handle this property myself</p>
+                                    </div>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition">
+                                    <input type="radio" name="copyManagement" value="agent"
+                                           class="w-5 h-5 text-purple-500 border-gray-600 focus:ring-purple-500 bg-gray-800">
+                                    <div>
+                                        <span class="text-white font-medium">Assign Agent</span>
+                                        <p class="text-gray-400 text-xs">Pauly Amato will manage this property</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- What Gets Copied -->
+                        <div class="bg-cyan-900/20 rounded-xl p-4 border border-cyan-500/30">
+                            <p class="text-cyan-300 font-bold text-sm mb-2">✓ What will be copied:</p>
+                            <ul class="text-cyan-200/80 text-xs space-y-1">
+                                <li>• All property details (beds, baths, type, interior)</li>
+                                <li>• All pricing (daily, weekly, biweekly, monthly, buy price)</li>
+                                <li>• All images</li>
+                                <li>• Description</li>
+                            </ul>
+                            <p class="text-gray-400 text-xs mt-2">❌ NOT copied: Renter info, payment history, premium status</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 mt-6">
+                        <button onclick="closeCopyListingModal()" 
+                                class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                        <button onclick="executeCopyListing(${propertyId})" 
+                                class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                            <span>📋</span> Create Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existing = $('copyListingModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closeCopyListingModal = function() {
+    const modal = $('copyListingModal');
+    if (modal) modal.remove();
+};
+
+/**
+ * Execute the copy listing operation
+ */
+window.executeCopyListing = async function(sourcePropertyId) {
+    const sourceProperty = properties.find(p => p.id === sourcePropertyId);
+    if (!sourceProperty) {
+        alert('Source property not found');
+        return;
+    }
+    
+    // Get values from modal
+    const newTitle = $('copyListingTitle')?.value?.trim();
+    const newStorage = parseInt($('copyListingStorage')?.value) || 0;
+    const managementOption = document.querySelector('input[name="copyManagement"]:checked')?.value || 'self';
+    
+    if (!newTitle) {
+        alert('Please enter a title for the new listing');
+        return;
+    }
+    
+    // Check for duplicate title
+    const existingWithTitle = properties.find(p => p.title?.toLowerCase() === newTitle.toLowerCase());
+    if (existingWithTitle) {
+        if (!confirm(`A property with the title "${newTitle}" already exists. Create anyway?`)) {
+            return;
+        }
+    }
+    
+    const currentUserEmail = (auth.currentUser?.email || '').toLowerCase();
+    const isAdmin = TierService.isMasterAdmin(currentUserEmail);
+    
+    // Check listing limits for non-admin
+    if (!isAdmin) {
+        const userTier = state.userTier || 'starter';
+        const userListings = properties.filter(p => 
+            (p.ownerEmail || '').toLowerCase() === currentUserEmail
+        ).length;
+        
+        const limits = { starter: 3, elite: Infinity };
+        const maxListings = limits[userTier] || 3;
+        
+        if (userListings >= maxListings) {
+            alert(`You've reached your listing limit (${maxListings} for ${userTier} tier). Upgrade to Elite for unlimited listings.`);
+            return;
+        }
+    }
+    
+    // Show loading state
+    const createBtn = document.querySelector('#copyListingModal button:last-child');
+    if (createBtn) {
+        createBtn.disabled = true;
+        createBtn.innerHTML = '<span class="animate-pulse">Creating...</span>';
+    }
+    
+    try {
+        // Generate new property ID
+        const existingIds = properties.map(p => typeof p.id === 'number' ? p.id : parseInt(p.id) || 0);
+        const maxId = Math.max(0, ...existingIds);
+        const newId = maxId + 1;
+        
+        // Determine owner and agent
+        let newOwnerEmail = currentUserEmail;
+        let newAgentEmail = '';
+        
+        // If admin is copying someone else's property, keep original owner
+        if (isAdmin && sourceProperty.ownerEmail && sourceProperty.ownerEmail.toLowerCase() !== currentUserEmail) {
+            newOwnerEmail = sourceProperty.ownerEmail.toLowerCase();
+        }
+        
+        // Set agent based on selection
+        if (managementOption === 'agent') {
+            // Assign to admin (Pauly Amato)
+            newAgentEmail = 'richard2019201900@gmail.com';
+        }
+        
+        // Build the new property object (copy relevant fields)
+        const newProperty = {
+            id: newId,
+            title: newTitle,
+            description: sourceProperty.description || '',
+            type: sourceProperty.type || 'house',
+            interiorType: PropertyDataService.getValue(sourcePropertyId, 'interiorType', sourceProperty.interiorType || 'Instance'),
+            bedrooms: PropertyDataService.getValue(sourcePropertyId, 'bedrooms', sourceProperty.bedrooms || 1),
+            bathrooms: PropertyDataService.getValue(sourcePropertyId, 'bathrooms', sourceProperty.bathrooms || 1),
+            storage: newStorage,
+            
+            // Pricing
+            dailyPrice: PropertyDataService.getValue(sourcePropertyId, 'dailyPrice', sourceProperty.dailyPrice || 0),
+            weeklyPrice: PropertyDataService.getValue(sourcePropertyId, 'weeklyPrice', sourceProperty.weeklyPrice || 0),
+            biweeklyPrice: PropertyDataService.getValue(sourcePropertyId, 'biweeklyPrice', sourceProperty.biweeklyPrice || 0),
+            monthlyPrice: PropertyDataService.getValue(sourcePropertyId, 'monthlyPrice', sourceProperty.monthlyPrice || 0),
+            buyPrice: PropertyDataService.getValue(sourcePropertyId, 'buyPrice', sourceProperty.buyPrice || 0),
+            
+            // Images (copy all)
+            images: [...(sourceProperty.images || [])],
+            
+            // Ownership
+            ownerEmail: newOwnerEmail,
+            agentEmail: newAgentEmail,
+            
+            // Metadata
+            createdAt: new Date().toISOString(),
+            copiedFrom: sourcePropertyId,
+            
+            // Reset these fields (don't copy)
+            renterName: '',
+            renterPhone: '',
+            renterNotes: '',
+            lastPaymentDate: '',
+            paymentFrequency: '',
+            isPremium: false,
+            isPremiumTrial: false,
+            isSold: false
+        };
+        
+        // Save to Firestore
+        await db.collection('settings').doc('properties').set({
+            [newId]: newProperty
+        }, { merge: true });
+        
+        // Set initial availability (available)
+        await db.collection('settings').doc('propertyAvailability').set({
+            [newId]: true
+        }, { merge: true });
+        
+        // Update local state
+        properties.push(newProperty);
+        state.availability[newId] = true;
+        
+        // Update owner property map
+        if (!ownerPropertyMap[newOwnerEmail]) {
+            ownerPropertyMap[newOwnerEmail] = [];
+        }
+        ownerPropertyMap[newOwnerEmail].push(newId);
+        propertyOwnerEmail[newId] = newOwnerEmail;
+        
+        // Close modal
+        closeCopyListingModal();
+        
+        // Show success message
+        if (typeof showToast === 'function') {
+            showToast(`Listing copied successfully! "${newTitle}"`, 'success');
+        }
+        
+        // Refresh UI
+        state.filteredProperties = [...properties];
+        renderProperties(state.filteredProperties);
+        renderOwnerDashboard();
+        
+        // Navigate to the new property
+        setTimeout(() => {
+            viewPropertyStats(newId);
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error copying listing:', error);
+        alert('Failed to copy listing: ' + error.message);
+        
+        // Reset button
+        if (createBtn) {
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<span>📋</span> Create Copy';
+        }
+    }
+};
+
