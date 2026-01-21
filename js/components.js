@@ -85,10 +85,8 @@ window.openModal = function(id) {
         // Clear create account form
         const newAccountEmail = $('newAccountEmail');
         const newAccountPassword = $('newAccountPassword');
-        const newAccountDisplayName = $('newAccountDisplayName');
         if (newAccountEmail) newAccountEmail.value = '';
         if (newAccountPassword) newAccountPassword.value = '';
-        if (newAccountDisplayName) newAccountDisplayName.value = '';
         
         // Hide error messages
         hideElement($('loginError'));
@@ -121,12 +119,10 @@ window.closeModal = function(id) {
         const ownerPassword = $('ownerPassword');
         const newAccountEmail = $('newAccountEmail');
         const newAccountPassword = $('newAccountPassword');
-        const newAccountDisplayName = $('newAccountDisplayName');
         if (ownerEmail) ownerEmail.value = '';
         if (ownerPassword) ownerPassword.value = '';
         if (newAccountEmail) newAccountEmail.value = '';
         if (newAccountPassword) newAccountPassword.value = '';
-        if (newAccountDisplayName) newAccountDisplayName.value = '';
         
         // Reset button states
         const createBtn = $('createAccountBtn');

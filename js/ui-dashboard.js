@@ -796,6 +796,35 @@ window.renderOwnerDashboard = function() {
         initDashboardTabs();
     }
     
+    // Check for new user welcome flow
+    // Trigger if: isNewUserRegistration flag is set OR user has no displayName/phone
+    if (window.isNewUserRegistration) {
+        setTimeout(() => {
+            if (typeof triggerNewUserWelcome === 'function') {
+                triggerNewUserWelcome();
+            }
+        }, 500);
+    } else if (window.currentUserData) {
+        // Also check if existing user has incomplete profile (no displayName or phone)
+        const userData = window.currentUserData;
+        const hasDisplayName = userData.username && userData.username.trim();
+        const hasPhone = userData.phone && userData.phone.trim();
+        
+        if (!hasDisplayName || !hasPhone) {
+            // Show subtle reminder for incomplete profile
+            setTimeout(() => {
+                if (typeof triggerNewUserWelcome === 'function') {
+                    triggerNewUserWelcome();
+                }
+            }, 1000);
+        } else {
+            // Profile is complete - clear any welcome styling
+            if (typeof clearNewUserWelcome === 'function') {
+                clearNewUserWelcome();
+            }
+        }
+    }
+    
     // Hide password change section for admin
     if (typeof checkPasswordSectionVisibility === 'function') {
         checkPasswordSectionVisibility();
