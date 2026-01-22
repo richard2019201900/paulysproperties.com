@@ -4026,8 +4026,8 @@ window.confirmResetPassword = async function(email) {
 };
 
 /**
- * ADMIN UTILITY: Bulk sync owner contact info to all properties
- * This fixes properties that were created before ownerContactPhone syncing was implemented.
+ * ADMIN UTILITY: Bulk sync owner contact info AND display names to all properties
+ * This fixes properties that were created before ownerContactPhone/ownerDisplayName syncing was implemented.
  * Run from browser console: await adminBulkSyncOwnerContacts()
  */
 window.adminBulkSyncOwnerContacts = async function() {
@@ -4036,21 +4036,48 @@ window.adminBulkSyncOwnerContacts = async function() {
         return { success: false, error: 'Admin access required' };
     }
     
-    console.log('[BulkSync] Starting bulk sync of owner contact info to properties...');
+    console.log('[BulkSync] Starting bulk sync of owner contact info AND display names to properties...');
+    
+    // Helper function to resolve display name (matches data.js logic)
+    function resolveDisplayName(userData, email) {
+        if (userData.displayName && userData.displayName.includes(' ')) {
+            return userData.displayName;
+        }
+        if (userData.firstName && userData.lastName) {
+            return userData.firstName + ' ' + userData.lastName;
+        }
+        if (userData.firstName) {
+            return userData.firstName;
+        }
+        if (userData.displayName) {
+            return userData.displayName;
+        }
+        if (userData.username && userData.username.includes(' ')) {
+            return userData.username;
+        }
+        if (userData.username) {
+            return userData.username;
+        }
+        return email ? email.split('@')[0] : 'Unknown';
+    }
     
     try {
-        // Get all users with phone numbers
+        // Get all users
         const usersSnapshot = await db.collection('users').get();
-        const userPhones = {};
+        const userInfo = {};
         
         usersSnapshot.docs.forEach(doc => {
             const userData = doc.data();
-            if (userData.email && userData.phone) {
-                userPhones[userData.email.toLowerCase()] = userData.phone.replace(/\D/g, '');
+            if (userData.email) {
+                const email = userData.email.toLowerCase();
+                userInfo[email] = {
+                    phone: userData.phone ? userData.phone.replace(/\D/g, '') : null,
+                    displayName: resolveDisplayName(userData, email)
+                };
             }
         });
         
-        console.log(`[BulkSync] Found ${Object.keys(userPhones).length} users with phone numbers`);
+        console.log(`[BulkSync] Found ${Object.keys(userInfo).length} users`);
         
         // Get all properties
         const propsDoc = await db.collection('settings').doc('properties').get();
@@ -4063,7 +4090,7 @@ window.adminBulkSyncOwnerContacts = async function() {
         const updates = {};
         let updatedCount = 0;
         let skippedCount = 0;
-        let noPhoneCount = 0;
+        let noUserCount = 0;
         
         Object.keys(allProperties).forEach(propId => {
             const prop = allProperties[propId];
@@ -4073,23 +4100,34 @@ window.adminBulkSyncOwnerContacts = async function() {
             }
             
             const ownerEmail = prop.ownerEmail.toLowerCase();
-            const ownerPhone = userPhones[ownerEmail];
+            const ownerData = userInfo[ownerEmail];
             
-            if (ownerPhone) {
-                // Only update if missing or different
-                if (!prop.ownerContactPhone || prop.ownerContactPhone !== ownerPhone) {
-                    updates[propId] = {
-                        ...prop,
-                        ownerContactPhone: ownerPhone
-                    };
+            if (ownerData) {
+                let needsUpdate = false;
+                const propUpdate = { ...prop };
+                
+                // Check if phone needs update
+                if (ownerData.phone && (!prop.ownerContactPhone || prop.ownerContactPhone !== ownerData.phone)) {
+                    propUpdate.ownerContactPhone = ownerData.phone;
+                    needsUpdate = true;
+                }
+                
+                // Check if display name needs update
+                if (ownerData.displayName && (!prop.ownerDisplayName || prop.ownerDisplayName !== ownerData.displayName)) {
+                    propUpdate.ownerDisplayName = ownerData.displayName;
+                    needsUpdate = true;
+                }
+                
+                if (needsUpdate) {
+                    updates[propId] = propUpdate;
                     updatedCount++;
-                    console.log(`[BulkSync] Will update property ${propId} (${prop.title || 'Unknown'}) with phone: ${ownerPhone}`);
+                    console.log(`[BulkSync] Will update property ${propId} (${prop.title || 'Unknown'}): displayName="${ownerData.displayName}", phone="${ownerData.phone || 'none'}"`);
                 } else {
                     skippedCount++;
                 }
             } else {
-                noPhoneCount++;
-                console.warn(`[BulkSync] Owner ${ownerEmail} has no phone number on file (property: ${prop.title || propId})`);
+                noUserCount++;
+                console.warn(`[BulkSync] Owner ${ownerEmail} not found in users collection (property: ${prop.title || propId})`);
             }
         });
         
@@ -4108,11 +4146,11 @@ window.adminBulkSyncOwnerContacts = async function() {
             success: true,
             updated: updatedCount,
             skipped: skippedCount,
-            ownersWithoutPhone: noPhoneCount
+            ownersNotFound: noUserCount
         };
         
         console.log('[BulkSync] ✅ Complete:', result);
-        showToast(`✅ Synced ${updatedCount} properties. ${noPhoneCount} owners missing phone numbers.`, 'success', 5000);
+        showToast(`✅ Synced ${updatedCount} properties with display names and contact info.`, 'success', 5000);
         
         return result;
         
