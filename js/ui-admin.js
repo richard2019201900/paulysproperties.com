@@ -4024,3 +4024,101 @@ window.confirmResetPassword = async function(email) {
         }
     }
 };
+
+/**
+ * ADMIN UTILITY: Bulk sync owner contact info to all properties
+ * This fixes properties that were created before ownerContactPhone syncing was implemented.
+ * Run from browser console: await adminBulkSyncOwnerContacts()
+ */
+window.adminBulkSyncOwnerContacts = async function() {
+    if (!auth.currentUser || !TierService.isMasterAdmin(auth.currentUser.email)) {
+        console.error('[BulkSync] Admin access required');
+        return { success: false, error: 'Admin access required' };
+    }
+    
+    console.log('[BulkSync] Starting bulk sync of owner contact info to properties...');
+    
+    try {
+        // Get all users with phone numbers
+        const usersSnapshot = await db.collection('users').get();
+        const userPhones = {};
+        
+        usersSnapshot.docs.forEach(doc => {
+            const userData = doc.data();
+            if (userData.email && userData.phone) {
+                userPhones[userData.email.toLowerCase()] = userData.phone.replace(/\D/g, '');
+            }
+        });
+        
+        console.log(`[BulkSync] Found ${Object.keys(userPhones).length} users with phone numbers`);
+        
+        // Get all properties
+        const propsDoc = await db.collection('settings').doc('properties').get();
+        if (!propsDoc.exists) {
+            console.error('[BulkSync] No properties document found');
+            return { success: false, error: 'No properties found' };
+        }
+        
+        const allProperties = propsDoc.data();
+        const updates = {};
+        let updatedCount = 0;
+        let skippedCount = 0;
+        let noPhoneCount = 0;
+        
+        Object.keys(allProperties).forEach(propId => {
+            const prop = allProperties[propId];
+            if (!prop || !prop.ownerEmail) {
+                skippedCount++;
+                return;
+            }
+            
+            const ownerEmail = prop.ownerEmail.toLowerCase();
+            const ownerPhone = userPhones[ownerEmail];
+            
+            if (ownerPhone) {
+                // Only update if missing or different
+                if (!prop.ownerContactPhone || prop.ownerContactPhone !== ownerPhone) {
+                    updates[propId] = {
+                        ...prop,
+                        ownerContactPhone: ownerPhone
+                    };
+                    updatedCount++;
+                    console.log(`[BulkSync] Will update property ${propId} (${prop.title || 'Unknown'}) with phone: ${ownerPhone}`);
+                } else {
+                    skippedCount++;
+                }
+            } else {
+                noPhoneCount++;
+                console.warn(`[BulkSync] Owner ${ownerEmail} has no phone number on file (property: ${prop.title || propId})`);
+            }
+        });
+        
+        if (Object.keys(updates).length > 0) {
+            console.log(`[BulkSync] Applying ${updatedCount} updates to Firestore...`);
+            await db.collection('settings').doc('properties').set(updates, { merge: true });
+            console.log('[BulkSync] ✅ Firestore updated successfully');
+            
+            // Refresh PropertyDataService
+            if (typeof PropertyDataService !== 'undefined' && PropertyDataService.refresh) {
+                await PropertyDataService.refresh();
+            }
+        }
+        
+        const result = {
+            success: true,
+            updated: updatedCount,
+            skipped: skippedCount,
+            ownersWithoutPhone: noPhoneCount
+        };
+        
+        console.log('[BulkSync] ✅ Complete:', result);
+        showToast(`✅ Synced ${updatedCount} properties. ${noPhoneCount} owners missing phone numbers.`, 'success', 5000);
+        
+        return result;
+        
+    } catch (error) {
+        console.error('[BulkSync] Error:', error);
+        showToast('❌ Bulk sync failed: ' + error.message, 'error');
+        return { success: false, error: error.message };
+    }
+};

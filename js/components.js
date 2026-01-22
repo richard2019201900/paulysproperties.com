@@ -217,50 +217,27 @@ window.openContactModal = async function(type, propertyTitle, propertyId) {
             $('modalPhone').value = agentContacts[0].phone.replace(/\D/g, '');
         }
     } else {
-        // No agents - use owner contact (existing behavior)
+        // No agents - use owner contact from PropertyDataService (already loaded, no permissions issues)
         try {
-            if (propertyId && typeof db !== 'undefined') {
-                // Get property data to find owner contact info
-                const propsDoc = await db.collection('settings').doc('properties').get();
-                if (propsDoc.exists) {
-                    const properties = propsDoc.data();
-                    const property = properties[propertyId] || properties[String(propertyId)];
-                    
-                    if (property) {
-                        // Check ownerContactPhone first (synced from user profile)
-                        if (property.ownerContactPhone) {
-                            $('modalPhone').value = property.ownerContactPhone.replace(/\D/g, '');
-                            usedFallback = false;
-                        }
-                        // Then check legacy ownerPhone field
-                        else if (property.ownerPhone) {
-                            $('modalPhone').value = property.ownerPhone.replace(/\D/g, '');
-                            usedFallback = false;
-                        }
-                        // Finally try user doc (may fail for non-admins due to permissions)
-                        else if (property.ownerEmail) {
-                            try {
-                                const usersSnapshot = await db.collection('users')
-                                    .where('email', '==', property.ownerEmail.toLowerCase())
-                                    .limit(1)
-                                    .get();
-                                
-                                if (!usersSnapshot.empty) {
-                                    const userData = usersSnapshot.docs[0].data();
-                                    if (userData.phone) {
-                                        $('modalPhone').value = userData.phone.replace(/\D/g, '');
-                                        usedFallback = false;
-                                    }
-                                }
-                            } catch (permError) {
-                                // Permission denied - expected for non-admins
-                            }
-                        }
-                    }
+            if (propertyId && typeof PropertyDataService !== 'undefined') {
+                // Use PropertyDataService - data is already loaded and publicly accessible
+                // This avoids Firestore permission issues for non-admin users
+                const ownerContactPhone = PropertyDataService.getValue(propertyId, 'ownerContactPhone', '');
+                const ownerPhone = PropertyDataService.getValue(propertyId, 'ownerPhone', '');
+                
+                if (ownerContactPhone) {
+                    $('modalPhone').value = ownerContactPhone.replace(/\D/g, '');
+                    usedFallback = false;
+                } else if (ownerPhone) {
+                    // Legacy fallback
+                    $('modalPhone').value = ownerPhone.replace(/\D/g, '');
+                    usedFallback = false;
                 }
+                // Note: We no longer try to query user docs directly - that caused permission issues
+                // Owner contact info should be synced to property via ownerContactPhone field
             }
         } catch (error) {
-            console.warn('[Contact] Could not fetch owner phone, using default:', error);
+            console.warn('[Contact] Could not fetch owner phone from PropertyDataService:', error);
         }
     }
     
