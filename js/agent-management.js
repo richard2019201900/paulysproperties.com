@@ -150,7 +150,7 @@ window.promoteToAgent = async function(odId, email) {
             logActivity('agent_promote', 'Promoted user to agent: ' + email);
         }
         
-        showToast('✅ ' + (userData.username || email) + ' is now an agent!', 'success');
+        showToast('✅ ' + (userData.displayName || userData.username || email) + ' is now an agent!', 'success');
         return true;
     } catch (error) {
         console.error('[Agents] Error promoting user:', error);
@@ -276,7 +276,8 @@ window.assignAgentToProperty = async function(propertyId, agentEmail) {
                 return a.email.toLowerCase() === agentEmail.toLowerCase(); 
             });
             if (agent) {
-                agentDisplayName = agent.username;
+                // Prefer displayName, fall back to username for backwards compatibility
+                agentDisplayName = agent.displayName || agent.username;
                 agentPhone = agent.phone || '2057028233';
             }
         }
@@ -534,16 +535,17 @@ window.renderAgentsTab = async function() {
                 
                 var isMasterAdmin = agent.email.toLowerCase() === 'richard2019201900@gmail.com';
                 var tierIcon = TierService.getTierIcon ? TierService.getTierIcon(agent.tier) : '';
+                var agentDisplayName = agent.displayName || agent.username || 'Unknown';
                 
                 agentCardsHtml += '<div class="bg-gray-800/50 rounded-xl border border-gray-700 p-4">' +
                     '<div class="flex items-start justify-between">' +
                         '<div class="flex items-center gap-3">' +
                             '<div class="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg">' +
-                                (agent.username ? agent.username.charAt(0).toUpperCase() : '?') +
+                                (agentDisplayName.charAt(0).toUpperCase()) +
                             '</div>' +
                             '<div>' +
                                 '<div class="flex items-center gap-2">' +
-                                    '<span class="text-white font-bold">' + (agent.username || 'Unknown') + '</span>' +
+                                    '<span class="text-white font-bold">' + agentDisplayName + '</span>' +
                                     '<span>' + tierIcon + '</span>' +
                                     (isMasterAdmin ? '<span class="bg-amber-500 text-black text-xs px-2 py-0.5 rounded-full font-bold">MASTER</span>' : '') +
                                 '</div>' +
@@ -714,14 +716,15 @@ window.renderPropertyAgentSection = async function(propertyId) {
             var agent = allAgents.find(function(a) { return a.email.toLowerCase() === agentEmail.toLowerCase(); });
             var canRemove = isMasterAdmin || (userEmail === agentEmail.toLowerCase()) || canAssign;
             var isSelf = userEmail === agentEmail.toLowerCase();
+            var agentDisplayName = agent ? (agent.displayName || agent.username) : agentEmail;
             
             html += '<div class="flex items-center justify-between bg-gray-700 rounded-lg p-3">' +
                 '<div class="flex items-center gap-3">' +
                     '<div class="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-white font-bold text-sm">' +
-                        (agent ? agent.username.charAt(0).toUpperCase() : '?') +
+                        (agentDisplayName.charAt(0).toUpperCase()) +
                     '</div>' +
                     '<div>' +
-                        '<div class="text-white font-medium">' + (agent ? agent.username : agentEmail) + '</div>' +
+                        '<div class="text-white font-medium">' + agentDisplayName + '</div>' +
                         '<div class="text-gray-400 text-xs">📞 ' + (agent ? agent.phone : 'Unknown') + '</div>' +
                     '</div>' +
                 '</div>' +

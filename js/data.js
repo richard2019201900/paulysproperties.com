@@ -67,27 +67,51 @@ function getPropertyOwnerEmail(propertyId) {
 }
 
 // Fetch username by email from Firestore
+// ============================================================
+// DISPLAY NAME RESOLUTION HIERARCHY
+// ============================================================
+// Priority order:
+// 1. displayName field (if contains space = likely real name)
+// 2. firstName + lastName
+// 3. firstName only
+// 4. displayName field (even without space)
+// 5. username field (for backwards compatibility)
+// 6. Email prefix as last resort
+//
+// NEVER use the internal 'username' field for display unless necessary
+// ============================================================
 async function getUsernameByEmail(email) {
     if (!email) return 'Unassigned';
     
     const normalizedEmail = email.toLowerCase();
     
-    // Check cache first
+    // Check cache first (cache is populated by this function only)
     if (window.ownerUsernameCache[normalizedEmail]) {
         return window.ownerUsernameCache[normalizedEmail];
     }
 
     try {
-        const querySnapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
-        if (!querySnapshot.empty) {
-            const userData = querySnapshot.docs[0].data();
-            // Prefer firstName + lastName, then username, then email prefix
-            let displayName;
-            if (userData.firstName && userData.lastName) {
-                displayName = userData.firstName + ' ' + userData.lastName;
-            } else {
-                displayName = userData.username || email.split('@')[0];
+        const currentUser = auth.currentUser;
+        let userData = null;
+        
+        // If looking up current user's own info, use UID for direct access (always permitted)
+        if (currentUser && currentUser.email && currentUser.email.toLowerCase() === normalizedEmail) {
+            const userDoc = await db.collection('users').doc(currentUser.uid).get();
+            if (userDoc.exists) {
+                userData = userDoc.data();
             }
+        } else {
+            // Looking up another user - try email query (works for admin, may fail for regular users)
+            const querySnapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
+            if (!querySnapshot.empty) {
+                userData = querySnapshot.docs[0].data();
+            }
+        }
+        
+        if (userData) {
+            // Apply the display name hierarchy
+            let displayName = resolveDisplayName(userData, email);
+            
             window.ownerUsernameCache[normalizedEmail] = displayName;
             return displayName;
         }
@@ -146,6 +170,51 @@ async function getUsernameByEmail(email) {
     return 'Unassigned';
 }
 
+// ============================================================
+// RESOLVE DISPLAY NAME FROM USER DATA
+// Helper function that applies the display name hierarchy
+// This ensures consistent logic everywhere
+// 
+// IMPORTANT: For backwards compatibility with existing users,
+// we fall back to 'username' field if displayName is not set.
+// New accounts should always have displayName set.
+// ============================================================
+function resolveDisplayName(userData, email) {
+    // Priority 1: displayName with space (looks like "First Last")
+    if (userData.displayName && userData.displayName.includes(' ')) {
+        return userData.displayName;
+    }
+    
+    // Priority 2: firstName + lastName
+    if (userData.firstName && userData.lastName) {
+        return userData.firstName + ' ' + userData.lastName;
+    }
+    
+    // Priority 3: firstName only
+    if (userData.firstName) {
+        return userData.firstName;
+    }
+    
+    // Priority 4: displayName without space (better than username)
+    if (userData.displayName) {
+        return userData.displayName;
+    }
+    
+    // Priority 5: BACKWARDS COMPATIBILITY - use username if it looks like a name
+    // This handles existing users who only have username field set
+    if (userData.username && userData.username.includes(' ')) {
+        return userData.username;
+    }
+    
+    // Priority 6: username without space (still better than email prefix)
+    if (userData.username) {
+        return userData.username;
+    }
+    
+    // Priority 7: Email prefix as absolute last resort
+    return email ? email.split('@')[0] : 'Unknown';
+}
+
 // Get owner username for a property
 async function getPropertyOwnerUsername(propertyId) {
     const email = getPropertyOwnerEmail(propertyId);
@@ -175,7 +244,8 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
                 else if (typeof agentsCache !== 'undefined' && agentsCache.length > 0) {
                     const agent = agentsCache.find(a => a.email.toLowerCase() === agentEmail.toLowerCase());
                     if (agent) {
-                        agentName = agent.username;
+                        // Prefer displayName, fall back to username for backwards compatibility
+                        agentName = agent.displayName || agent.username;
                     }
                 } 
                 // Finally, try to load agents (requires auth)
@@ -184,7 +254,8 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
                         const loadedAgents = await loadAgents();
                         const agent = loadedAgents.find(a => a.email.toLowerCase() === agentEmail.toLowerCase());
                         if (agent) {
-                            agentName = agent.username;
+                            // Prefer displayName, fall back to username for backwards compatibility
+                            agentName = agent.displayName || agent.username;
                         }
                     } catch (e) {
                         // Silent fail for anonymous users

@@ -331,12 +331,19 @@ window.submitVehicleSale = async function(vehicleId, saleType, financingContract
             const userDoc = await db.collection('users').doc(sellerUid).get();
             if (userDoc.exists) {
                 const userData = userDoc.data();
-                if (userData.firstName && userData.lastName) {
+                // Use consistent display name resolution hierarchy
+                if (userData.displayName && userData.displayName.includes(' ')) {
+                    sellerDisplayName = userData.displayName;
+                } else if (userData.firstName && userData.lastName) {
                     sellerDisplayName = userData.firstName + ' ' + userData.lastName;
+                } else if (userData.firstName) {
+                    sellerDisplayName = userData.firstName;
                 } else if (userData.displayName) {
                     sellerDisplayName = userData.displayName;
+                } else if (userData.username) {
+                    sellerDisplayName = userData.username;
                 } else {
-                    sellerDisplayName = userData.username || sellerEmail.split('@')[0];
+                    sellerDisplayName = sellerEmail.split('@')[0];
                 }
             } else {
                 sellerDisplayName = sellerEmail.split('@')[0];
@@ -1901,10 +1908,19 @@ window.submitCompletePendingSale = async function(vehicleId) {
                     if (!usersSnapshot.empty) {
                         const userData = usersSnapshot.docs[0].data();
                         sellerUid = usersSnapshot.docs[0].id;
-                        if (userData.firstName && userData.lastName) {
+                        // Use consistent display name resolution hierarchy
+                        if (userData.displayName && userData.displayName.includes(' ')) {
+                            sellerDisplayName = userData.displayName;
+                        } else if (userData.firstName && userData.lastName) {
                             sellerDisplayName = userData.firstName + ' ' + userData.lastName;
+                        } else if (userData.firstName) {
+                            sellerDisplayName = userData.firstName;
+                        } else if (userData.displayName) {
+                            sellerDisplayName = userData.displayName;
+                        } else if (userData.username) {
+                            sellerDisplayName = userData.username;
                         } else {
-                            sellerDisplayName = userData.username || sellerEmail.split('@')[0];
+                            sellerDisplayName = sellerEmail.split('@')[0];
                         }
                     }
                 } catch (e) {
