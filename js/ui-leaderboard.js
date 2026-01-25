@@ -402,7 +402,7 @@ async function updateUserRankCard() {
         const levelInfo = GamificationService.getLevelFromXP(gam.xp || 0);
         
         if ($('userRankPosition')) $('userRankPosition').textContent = `#${userRank}`;
-        if ($('userRankName')) $('userRankName').textContent = window.currentUserData.username || window.currentUserData.displayName || user.email.split('@')[0];
+        if ($('userRankName')) $('userRankName').textContent = window.currentUserData.displayName || window.currentUserData.username || user.email.split('@')[0];
         if ($('userRankIcon')) $('userRankIcon').textContent = levelInfo.icon;
         if ($('userRankTitleText')) $('userRankTitleText').textContent = levelInfo.title;
         if ($('userRankXP')) $('userRankXP').textContent = `${(gam.xp || 0).toLocaleString()} XP`;

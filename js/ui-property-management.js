@@ -217,6 +217,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Get owner email first (lowercase for consistency)
                 const ownerEmail = (auth.currentUser?.email || 'richard2019201900@gmail.com').toLowerCase();
                 
+                // Fetch owner's contact info for public visibility
+                // Uses same display name hierarchy as data.js resolveDisplayName()
+                let ownerContactPhone = null;
+                let ownerDisplayName = null;
+                try {
+                    const user = auth.currentUser;
+                    if (user) {
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        if (userDoc.exists) {
+                            const userData = userDoc.data();
+                            ownerContactPhone = userData.phone ? userData.phone.replace(/\D/g, '') : null;
+                            
+                            // Display name hierarchy (matches data.js resolveDisplayName):
+                            // displayName (with space) > firstName+lastName > firstName > displayName > username > email prefix
+                            if (userData.displayName && userData.displayName.includes(' ')) {
+                                ownerDisplayName = userData.displayName;
+                            } else if (userData.firstName && userData.lastName) {
+                                ownerDisplayName = userData.firstName + ' ' + userData.lastName;
+                            } else if (userData.firstName) {
+                                ownerDisplayName = userData.firstName;
+                            } else if (userData.displayName) {
+                                ownerDisplayName = userData.displayName;
+                            } else if (userData.username) {
+                                ownerDisplayName = userData.username;
+                            } else {
+                                ownerDisplayName = ownerEmail.split('@')[0];
+                            }
+                        }
+                    }
+                } catch (phoneErr) {
+                    console.warn('[CreateListing] Could not fetch owner info:', phoneErr);
+                }
+                
                 // Create new property object
                 const newProperty = {
                     id: newId,
@@ -235,6 +268,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     videoUrl: null,
                     features: false,
                     ownerEmail: ownerEmail,
+                    ownerContactPhone: ownerContactPhone, // Public contact phone (synced from profile)
+                    ownerDisplayName: ownerDisplayName,   // Public display name (synced from profile)
                     isPremium: isPremium,
                     premiumRequestedAt: isPremium ? new Date().toISOString() : null,
                     createdAt: new Date().toISOString(),
@@ -778,6 +813,41 @@ window.executeCopyListing = async function(sourcePropertyId) {
             }
         }
         
+        // Fetch owner's contact info for public visibility
+        // Uses same display name hierarchy as data.js resolveDisplayName()
+        let ownerContactPhone = null;
+        let ownerDisplayName = null;
+        try {
+            // Look up the new owner's user doc to get their info
+            const usersSnapshot = await db.collection('users')
+                .where('email', '==', newOwnerEmail.toLowerCase())
+                .limit(1)
+                .get();
+            
+            if (!usersSnapshot.empty) {
+                const userData = usersSnapshot.docs[0].data();
+                ownerContactPhone = userData.phone ? userData.phone.replace(/\D/g, '') : null;
+                
+                // Display name hierarchy (matches data.js resolveDisplayName):
+                // displayName (with space) > firstName+lastName > firstName > displayName > username > email prefix
+                if (userData.displayName && userData.displayName.includes(' ')) {
+                    ownerDisplayName = userData.displayName;
+                } else if (userData.firstName && userData.lastName) {
+                    ownerDisplayName = userData.firstName + ' ' + userData.lastName;
+                } else if (userData.firstName) {
+                    ownerDisplayName = userData.firstName;
+                } else if (userData.displayName) {
+                    ownerDisplayName = userData.displayName;
+                } else if (userData.username) {
+                    ownerDisplayName = userData.username;
+                } else {
+                    ownerDisplayName = newOwnerEmail.split('@')[0];
+                }
+            }
+        } catch (phoneErr) {
+            console.warn('[CopyListing] Could not fetch owner info:', phoneErr);
+        }
+        
         // Build the new property object (copy relevant fields)
         const newProperty = {
             id: newId,
@@ -801,6 +871,8 @@ window.executeCopyListing = async function(sourcePropertyId) {
             
             // Ownership
             ownerEmail: newOwnerEmail,
+            ownerContactPhone: ownerContactPhone, // Public contact phone (synced from profile)
+            ownerDisplayName: ownerDisplayName,   // Public display name (synced from profile)
             agentEmail: newAgentEmail,
             
             // Metadata
