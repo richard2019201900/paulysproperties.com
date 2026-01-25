@@ -133,7 +133,7 @@
         switch (type) {
             case 'user':
                 notification.title = isMissed ? '📬 While You Were Away...' : '👤 New User Registered!';
-                notification.subtitle = `${rawData.username || rawData.email?.split('@')[0] || 'Unknown'} created a Starter account`;
+                notification.subtitle = `${rawData.displayName || rawData.username || rawData.email?.split('@')[0] || 'Unknown'} created a Starter account`;
                 notification.action = {
                     type: 'scrollToUser',
                     target: rawData.id,
@@ -1101,13 +1101,7 @@
                     nextDate.setMonth(nextDate.getMonth() + 1);
                 }
                 
-                // Format dueDate as YYYY-MM-DD in LOCAL timezone (not UTC)
-                // Using toISOString() would shift the date in western timezones
-                const dueYear = nextDate.getFullYear();
-                const dueMonth = String(nextDate.getMonth() + 1).padStart(2, '0');
-                const dueDay = String(nextDate.getDate()).padStart(2, '0');
-                const dueDate = `${dueYear}-${dueMonth}-${dueDay}`;
-                
+                const dueDate = nextDate.toISOString().split('T')[0];
                 const daysUntilDue = Math.ceil((nextDate - now) / (1000 * 60 * 60 * 24));
                 
                 // Get rent amount based on frequency

@@ -1683,7 +1683,7 @@ window.showNewUserNotification = function(user, isMissed = false) {
                 <span class="text-3xl">${isMissed ? '📬' : '👤'}</span>
                 <div class="flex-1">
                     <div class="text-white font-bold text-lg">${titleText}</div>
-                    <div class="text-white/90">${user.username || user.email?.split('@')[0] || 'Unknown'} created a Starter account</div>
+                    <div class="text-white/90">${user.displayName || user.username || user.email?.split('@')[0] || 'Unknown'} created a Starter account</div>
                     <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
                 </div>
             </div>
@@ -4157,6 +4157,106 @@ window.adminBulkSyncOwnerContacts = async function() {
     } catch (error) {
         console.error('[BulkSync] Error:', error);
         showToast('❌ Bulk sync failed: ' + error.message, 'error');
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * ADMIN UTILITY: Clear all admin notifications from Firestore
+ * Use this to clean up stale notifications that keep appearing
+ * Run from browser console: await adminClearNotifications()
+ */
+window.adminClearNotifications = async function(olderThanDays = 7) {
+    if (!auth.currentUser || !TierService.isMasterAdmin(auth.currentUser.email)) {
+        console.error('[ClearNotifs] Admin access required');
+        return { success: false, error: 'Admin access required' };
+    }
+    
+    console.log(`[ClearNotifs] Clearing admin notifications older than ${olderThanDays} days...`);
+    
+    try {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+        
+        const snapshot = await db.collection('adminNotifications').get();
+        
+        if (snapshot.empty) {
+            console.log('[ClearNotifs] No notifications found');
+            return { success: true, deleted: 0 };
+        }
+        
+        let deletedCount = 0;
+        let keptCount = 0;
+        const batch = db.batch();
+        
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
+            
+            if (createdAt < cutoffDate || data.dismissed) {
+                batch.delete(doc.ref);
+                deletedCount++;
+                console.log(`[ClearNotifs] Will delete: ${doc.id} (${data.type || 'unknown'}, created: ${createdAt.toISOString()})`);
+            } else {
+                keptCount++;
+            }
+        });
+        
+        if (deletedCount > 0) {
+            await batch.commit();
+            console.log(`[ClearNotifs] ✅ Deleted ${deletedCount} notifications, kept ${keptCount}`);
+        } else {
+            console.log(`[ClearNotifs] No old notifications to delete, kept ${keptCount}`);
+        }
+        
+        showToast(`✅ Cleared ${deletedCount} old notifications`, 'success');
+        return { success: true, deleted: deletedCount, kept: keptCount };
+        
+    } catch (error) {
+        console.error('[ClearNotifs] Error:', error);
+        showToast('❌ Failed to clear notifications: ' + error.message, 'error');
+        return { success: false, error: error.message };
+    }
+};
+
+/**
+ * ADMIN UTILITY: View all admin notifications in Firestore (for debugging)
+ * Run from browser console: await adminViewNotifications()
+ */
+window.adminViewNotifications = async function() {
+    if (!auth.currentUser || !TierService.isMasterAdmin(auth.currentUser.email)) {
+        console.error('[ViewNotifs] Admin access required');
+        return { success: false, error: 'Admin access required' };
+    }
+    
+    try {
+        const snapshot = await db.collection('adminNotifications').get();
+        
+        if (snapshot.empty) {
+            console.log('[ViewNotifs] No notifications in adminNotifications collection');
+            return { success: true, notifications: [] };
+        }
+        
+        const notifications = [];
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            notifications.push({
+                id: doc.id,
+                type: data.type,
+                userEmail: data.userEmail,
+                displayName: data.displayName,
+                dismissed: data.dismissed,
+                createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt
+            });
+        });
+        
+        console.log('[ViewNotifs] Found notifications:', notifications);
+        console.table(notifications);
+        
+        return { success: true, notifications };
+        
+    } catch (error) {
+        console.error('[ViewNotifs] Error:', error);
         return { success: false, error: error.message };
     }
 };
