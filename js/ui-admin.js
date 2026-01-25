@@ -971,7 +971,9 @@ window.startAdminNotificationsListener = function() {
     }
 };
 
-// Real-time listener for users - detects new signups immediately AND shows missed signups
+// Real-time listener for users - ONLY loads user data for admin panel
+// NOTE: New user NOTIFICATIONS are handled by notification-manager.js (unified system)
+// This function only maintains window.adminUsersData for the user list UI
 window.startAdminUsersListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) return;
     
@@ -979,160 +981,37 @@ window.startAdminUsersListener = function() {
         window.adminUsersUnsubscribe();
     }
     
-    // Get admin's last visit time from UserPreferencesService
-    let lastAdminVisit = null;
-    if (window.UserPreferencesService) {
-        lastAdminVisit = UserPreferencesService.getAdminLastVisit();
-    }
-    
-    // Record current session start time
+    // Record current session start time (used by notification-manager.js)
     window.adminSessionStartTime = new Date();
     
-    // Load pending notifications from UserPreferencesService
-    if (window.UserPreferencesService) {
-        const pendingList = UserPreferencesService.getPendingNotifications('user');
-        window.pendingAdminNotifications = new Set(pendingList);
-        
-        // Load dismissed notifications
-        const dismissedList = UserPreferencesService.getAll().dismissedNotifications || [];
-        dismissedList.forEach(id => window.dismissedAdminNotifications.add(id));
-    } else {
-        window.pendingAdminNotifications = new Set();
+    // Initialize tracking sets if not already done
+    if (!window.knownUserIds) {
+        window.knownUserIds = new Set();
     }
     
-    // Clean up: remove any pending notifications that are also in dismissed
-    window.dismissedAdminNotifications.forEach(id => {
-        window.pendingAdminNotifications.delete(id);
-    });
-    
-    // First snapshot flag - used for catching "missed" users
-    let isFirstSnapshot = true;
-    
-    // Track which user IDs from pending notifications actually exist
-    const validPendingUserIds = new Set();
-    
-    // Simple listener - no orderBy to avoid index requirement
+    // Simple listener - ONLY for loading user data, NOT for notifications
+    // Notifications are handled by notification-manager.js to prevent duplicates
     window.adminUsersUnsubscribe = db.collection('users')
         .onSnapshot((snapshot) => {
             const users = [];
-            const newUsers = [];
-            const missedUsers = []; // Users created while admin was away
-            
-            // Build set of all current user IDs
-            const currentUserIds = new Set();
             
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const user = { id: doc.id, ...data };
                 users.push(user);
-                currentUserIds.add(doc.id);
-                
-                const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : null;
-                const notificationId = 'new-user-' + doc.id;
-                
-                if (isFirstSnapshot) {
-                    // Check if this user has a pending (unacknowledged) notification
-                    if (window.pendingAdminNotifications.has(notificationId)) {
-                        if (!window.dismissedAdminNotifications.has(notificationId)) {
-                            missedUsers.push(user);
-                            validPendingUserIds.add(notificationId);
-                        }
-                    }
-                    // Also check for users created since last visit (new missed users)
-                    else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
-                        if (!window.dismissedAdminNotifications.has(notificationId)) {
-                            missedUsers.push(user);
-                            // Add to pending so it persists across refreshes
-                            window.pendingAdminNotifications.add(notificationId);
-                        }
-                    }
-                } else {
-                    // Real-time: detect users created AFTER session started
-                    if (!window.knownUserIds.has(doc.id)) {
-                        if (createdAt && createdAt > window.adminSessionStartTime) {
-                            newUsers.push(user);
-                            // Add to pending notifications
-                            window.pendingAdminNotifications.add(notificationId);
-                            logAdminActivity('new_user', user);
-                        }
-                    }
-                }
-                
                 window.knownUserIds.add(doc.id);
             });
             
-            // Save pending notifications to Firestore via UserPreferencesService
-            if (window.UserPreferencesService) {
-                // Add any new pending notifications
-                window.pendingAdminNotifications.forEach(id => {
-                    if (id.startsWith('new-user-')) {
-                        UserPreferencesService.addPendingNotification(id, 'user');
-                    }
-                });
-            }
-            
-            // Update admin data
+            // Update admin data for user list UI
             window.adminUsersData = users;
             
-            // Show notifications for MISSED users (created while away or pending from last session)
-            if (isFirstSnapshot && missedUsers.length > 0) {
-                // Show notification for each missed user (no flash for these)
-                missedUsers.forEach(user => {
-                    showNewUserNotification(user, true); // true = missed (not real-time)
-                });
+            // Update notification badge (counts are managed by notification-manager.js)
+            if (typeof updateNotificationBadge === 'function') {
+                updateNotificationBadge();
             }
             
-            // Show notifications for REAL-TIME new users
-            if (newUsers.length > 0) {
-                // Flash screen for real-time only
-                flashScreen();
-                
-                // Show notification for each new user
-                newUsers.forEach(user => {
-                    showNewUserNotification(user, false); // false = real-time
-                });
-                
-                // Refresh the user list and stats
-                const container = $('allUsersList');
-                if (container) {
-                    renderAdminUsersList(users);
-                }
-                updateAdminStats(users);
-            }
-            
-            // Update notification badge
-            updateNotificationBadge();
-            
-            // After first snapshot, mark as no longer first and clean up stale notifications
-            if (isFirstSnapshot) {
-                isFirstSnapshot = false;
-                // Clean up stale pending notifications (users that were deleted)
-                const staleNotifications = [];
-                window.pendingAdminNotifications.forEach(id => {
-                    if (id.startsWith('new-user-')) {
-                        const userId = id.replace('new-user-', '');
-                        if (!currentUserIds.has(userId)) {
-                            staleNotifications.push(id);
-                        }
-                    }
-                });
-                
-                if (staleNotifications.length > 0) {
-                    staleNotifications.forEach(id => {
-                        window.pendingAdminNotifications.delete(id);
-                        window.dismissedAdminNotifications.add(id);
-                    });
-                    // Clean up via UserPreferencesService
-                    if (window.UserPreferencesService) {
-                        UserPreferencesService.cleanupStalePending(Array.from(currentUserIds), 'user');
-                    }
-                    // Update badge after cleanup
-                    updateNotificationBadge();
-                }
-            }
-            
-        }, (error) => {
-            console.error('[AdminUsers] Users listener error:', error);
+        }, error => {
+            console.error('[AdminUsers] Listener error:', error);
         });
 };
 
@@ -1145,38 +1024,23 @@ window.startAdminPropertiesListener = function() {
 };
 
 // Real-time listener for settings/properties document - this is where user-created properties are stored
+// NOTE: New listing NOTIFICATIONS are handled by notification-manager.js (unified system)
+// This function only maintains local properties array and owner mappings for UI
 window.startSettingsPropertiesListener = function() {
     // Always unsubscribe existing listener first (prevents orphaned listeners)
     if (window.settingsPropertiesUnsubscribe) {
         window.settingsPropertiesUnsubscribe();
         window.settingsPropertiesUnsubscribe = null;
     }
-    // Ensure adminSessionStartTime is set (backup if users listener hasn't set it yet)
+    
+    // Ensure adminSessionStartTime is set
     if (!window.adminSessionStartTime) {
         window.adminSessionStartTime = new Date();
-    }
-    
-    // Get admin's last visit time from UserPreferencesService for missed listings detection
-    let lastAdminVisit = null;
-    if (window.UserPreferencesService) {
-        lastAdminVisit = UserPreferencesService.getAdminLastVisit();
-    }
-    
-    // Load pending listing notifications from UserPreferencesService
-    if (window.UserPreferencesService) {
-        const pendingListings = UserPreferencesService.getPendingNotifications('listing');
-        pendingListings.forEach(id => window.pendingAdminNotifications.add(id));
     }
     
     // Use GLOBAL seenPropertyIds set so it persists
     if (!window.seenPropertyIds) {
         window.seenPropertyIds = new Set();
-    }
-    
-    // Track if this is the VERY FIRST snapshot we've ever received
-    // Use a separate flag that persists
-    if (window.settingsPropertiesFirstLoadDone === undefined) {
-        window.settingsPropertiesFirstLoadDone = false;
     }
     
     window.settingsPropertiesUnsubscribe = db.collection('settings').doc('properties')
@@ -1186,30 +1050,17 @@ window.startSettingsPropertiesListener = function() {
             }
             
             const propsData = doc.data();
-            const newListings = [];
-            const missedListings = [];
-            const isFirstSnapshot = !window.settingsPropertiesFirstLoadDone;
+            
             Object.keys(propsData).forEach(key => {
                 const propId = parseInt(key);
                 const prop = propsData[key];
                 
-                // Only skip if prop is completely invalid - allow empty images arrays
+                // Only skip if prop is completely invalid
                 if (!prop || !prop.title) {
-                    return; // Skip invalid properties (must have at least a title)
+                    return;
                 }
                 
                 prop.id = propId;
-                const notificationId = 'new-listing-' + propId;
-                
-                // Parse createdAt - handle both string and Firestore timestamp
-                let createdAt = null;
-                if (prop.createdAt) {
-                    if (typeof prop.createdAt === 'string') {
-                        createdAt = new Date(prop.createdAt);
-                    } else if (prop.createdAt.toDate) {
-                        createdAt = prop.createdAt.toDate();
-                    }
-                }
                 
                 // Check if this is a NEW property (not seen in any previous snapshot)
                 const isNewToUs = !window.seenPropertyIds.has(propId);
@@ -1233,28 +1084,6 @@ window.startSettingsPropertiesListener = function() {
                             state.availability[propId] = true;
                         }
                     }
-                    
-                    // Determine if this is a MISSED listing (first snapshot) or REAL-TIME (subsequent)
-                    if (isFirstSnapshot) {
-                        // First snapshot - check if created while admin was away
-                        if (window.pendingAdminNotifications.has(notificationId)) {
-                            if (!window.dismissedAdminNotifications.has(notificationId)) {
-                                missedListings.push(prop);
-                            }
-                        } else if (lastAdminVisit && createdAt && createdAt > lastAdminVisit) {
-                            if (!window.dismissedAdminNotifications.has(notificationId)) {
-                                missedListings.push(prop);
-                                window.pendingAdminNotifications.add(notificationId);
-                            }
-                        }
-                    } else {
-                        // REAL-TIME - this is a new listing created while we're watching!
-                        // Only notify if created after we started listening
-                        if (!createdAt || createdAt > window.adminSessionStartTime) {
-                            newListings.push(prop);
-                            window.pendingAdminNotifications.add(notificationId);
-                        }
-                    }
                 }
                 
                 // Mark this property ID as seen
@@ -1264,54 +1093,11 @@ window.startSettingsPropertiesListener = function() {
             // Update filtered properties
             state.filteredProperties = [...properties];
             
-            // Save pending listing notifications to Firestore via UserPreferencesService
-            if (window.UserPreferencesService) {
-                const listingNotifs = Array.from(window.pendingAdminNotifications).filter(id => id.startsWith('new-listing-'));
-                listingNotifs.forEach(id => {
-                    UserPreferencesService.addPendingNotification(id, 'listing');
-                });
-            }
-            
-            // Show notifications for MISSED listings (on first load only)
-            if (isFirstSnapshot && missedListings.length > 0) {
-                missedListings.forEach(listing => {
-                    showNewListingNotification(listing, true);
-                });
+            // Update notification badge (counts are managed by notification-manager.js)
+            if (typeof updateNotificationBadge === 'function') {
                 updateNotificationBadge();
             }
             
-            // Show notifications for REAL-TIME new listings
-            if (!isFirstSnapshot && newListings.length > 0) {
-                // Filter out listings created by the current admin
-                const currentUserEmail = auth.currentUser?.email?.toLowerCase();
-                const otherUsersListings = newListings.filter(listing => 
-                    listing.ownerEmail?.toLowerCase() !== currentUserEmail
-                );
-                
-                if (otherUsersListings.length > 0) {
-                    // Flash screen green!
-                    flashScreen('green');
-                    
-                    // Show notification for each
-                    otherUsersListings.forEach(listing => {
-                        showNewListingNotification(listing, false);
-                        logAdminActivity('new_listing', listing);
-                    });
-                    
-                    // Refresh admin panel
-                    if (window.adminUsersData && window.adminUsersData.length > 0) {
-                        updateAdminStats(window.adminUsersData);
-                        renderAdminUsersList(window.adminUsersData);
-                    }
-                    
-                    updateNotificationBadge();
-                }
-            }
-            
-            // Mark first snapshot as complete (use global flag)
-            if (!window.settingsPropertiesFirstLoadDone) {
-                window.settingsPropertiesFirstLoadDone = true;
-            }
         }, (error) => {
             console.error('[SettingsProperties] Listener error:', error);
         });

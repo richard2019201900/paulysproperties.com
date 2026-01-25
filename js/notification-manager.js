@@ -951,6 +951,8 @@
     function startUserListener() {
         if (state.listeners.users) state.listeners.users();
         
+        const currentUserEmail = auth?.currentUser?.email?.toLowerCase();
+        
         state.listeners.users = db.collection('users')
             .orderBy('createdAt', 'desc')
             .limit(50)
@@ -958,29 +960,49 @@
                 snapshot.docs.forEach(doc => {
                     const userId = doc.id;
                     const user = { id: userId, ...doc.data() };
+                    const userEmail = user.email?.toLowerCase();
                     const createdAt = user.createdAt?.toDate?.();
                     
+                    // CRITICAL: Never show notification for admin's own account
+                    if (userEmail === currentUserEmail) {
+                        state.knownUserIds.add(userId);
+                        return;
+                    }
+                    
                     if (!state.initialLoadComplete.users) {
-                        // Initial load - check for missed notifications
+                        // Initial load - check for missed notifications (users created while away)
                         state.knownUserIds.add(userId);
                         
+                        // Only show "missed" if:
+                        // 1. User has a createdAt timestamp
+                        // 2. Admin has a lastAdminVisit recorded
+                        // 3. User was created AFTER admin's last visit
+                        // 4. Notification hasn't been dismissed
                         if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
-                            const notification = createNotification('user', user, {
-                                id: `user-${userId}`,
-                                timestamp: createdAt.toISOString(),
-                                isMissed: true
-                            });
-                            addNotification(notification);
+                            const notifId = `user-${userId}`;
+                            if (!state.dismissed.has(notifId)) {
+                                const notification = createNotification('user', user, {
+                                    id: notifId,
+                                    timestamp: createdAt.toISOString(),
+                                    isMissed: true
+                                });
+                                addNotification(notification);
+                            }
                         }
                     } else {
-                        // Real-time - check for new users
+                        // Real-time - only notify for TRULY new users (not in knownUserIds)
+                        // AND created after session started (prevents false positives)
                         if (!state.knownUserIds.has(userId)) {
                             state.knownUserIds.add(userId);
-                            const notification = createNotification('user', user, {
-                                id: `user-${userId}`,
-                                isMissed: false
-                            });
-                            addNotification(notification);
+                            
+                            // Only notify if created after this session started
+                            if (createdAt && state.sessionStart && createdAt > state.sessionStart) {
+                                const notification = createNotification('user', user, {
+                                    id: `user-${userId}`,
+                                    isMissed: false
+                                });
+                                addNotification(notification);
+                            }
                         }
                     }
                 });
@@ -994,6 +1016,8 @@
     function startListingListener() {
         if (state.listeners.listings) state.listeners.listings();
         
+        const currentUserEmail = auth?.currentUser?.email?.toLowerCase();
+        
         state.listeners.listings = db.collection('settings').doc('properties')
             .onSnapshot(doc => {
                 if (!doc.exists) return;
@@ -1001,41 +1025,49 @@
                 const properties = doc.data();
                 
                 Object.entries(properties).forEach(([propId, prop]) => {
-                    if (!prop) return;
+                    if (!prop || !prop.title) return;
                     
+                    const ownerEmail = prop.ownerEmail?.toLowerCase();
                     const createdAt = prop.createdAtTimestamp?.toDate?.() || 
                                      (prop.createdAt ? new Date(prop.createdAt) : null);
                     
+                    // Skip admin's own listings
+                    if (ownerEmail === currentUserEmail) {
+                        state.knownListingIds.add(propId);
+                        return;
+                    }
+                    
                     if (!state.initialLoadComplete.listings) {
-                        // Initial load
+                        // Initial load - check for missed listings
                         state.knownListingIds.add(propId);
                         
-                        // Skip admin's own listings
-                        if (prop.ownerEmail === auth?.currentUser?.email) return;
-                        
+                        // Only show "missed" if created after last admin visit
                         if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
-                            const listing = { id: parseInt(propId), ...prop };
-                            const notification = createNotification('listing', listing, {
-                                id: `listing-${propId}`,
-                                timestamp: createdAt.toISOString(),
-                                isMissed: true
-                            });
-                            addNotification(notification);
+                            const notifId = `listing-${propId}`;
+                            if (!state.dismissed.has(notifId)) {
+                                const listing = { id: parseInt(propId), ...prop };
+                                const notification = createNotification('listing', listing, {
+                                    id: notifId,
+                                    timestamp: createdAt.toISOString(),
+                                    isMissed: true
+                                });
+                                addNotification(notification);
+                            }
                         }
                     } else {
-                        // Real-time
+                        // Real-time - only for truly new listings
                         if (!state.knownListingIds.has(propId)) {
                             state.knownListingIds.add(propId);
                             
-                            // Skip admin's own listings
-                            if (prop.ownerEmail === auth?.currentUser?.email) return;
-                            
-                            const listing = { id: parseInt(propId), ...prop };
-                            const notification = createNotification('listing', listing, {
-                                id: `listing-${propId}`,
-                                isMissed: false
-                            });
-                            addNotification(notification);
+                            // Only notify if created after session started
+                            if (createdAt && state.sessionStart && createdAt > state.sessionStart) {
+                                const listing = { id: parseInt(propId), ...prop };
+                                const notification = createNotification('listing', listing, {
+                                    id: `listing-${propId}`,
+                                    isMissed: false
+                                });
+                                addNotification(notification);
+                            }
                         }
                     }
                 });
