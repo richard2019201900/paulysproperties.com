@@ -102,7 +102,8 @@ async function updateNavUserDisplay() {
     try {
         const doc = await db.collection('users').doc(user.uid).get();
         const data = doc.data() || {};
-        const username = data.username || user.email.split('@')[0];
+        // Try displayName first, then username, then fall back to email
+        const username = data.displayName || data.username || user.email.split('@')[0];
         
         // Check if master admin
         if (TierService.isMasterAdmin(user.email)) {
