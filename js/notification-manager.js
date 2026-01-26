@@ -943,6 +943,11 @@
                 state.initialized = true;
                 refreshUI();
                 
+                // Now that preferences are loaded, update site update badge with correct state
+                if (typeof updateSiteUpdateBadge === 'function') {
+                    updateSiteUpdateBadge();
+                }
+                
             } catch (error) {
                 console.error('[NotificationManager] Init error:', error);
                 initPromise = null; // Allow retry on error

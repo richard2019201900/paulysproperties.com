@@ -300,7 +300,20 @@ const UserPreferencesService = (function() {
      * @returns {boolean}
      */
     function hasSeenSiteUpdate(latestVersion) {
+        // If preferences aren't loaded yet, assume they've seen it to prevent flashing
+        // The badge will be updated properly once preferences are loaded
+        if (!isLoaded) {
+            return true; // Assume seen until we know otherwise
+        }
         return cache.lastSeenSiteUpdate === latestVersion;
+    }
+    
+    /**
+     * Check if preferences have been loaded from Firestore
+     * @returns {boolean}
+     */
+    function isPreferencesLoaded() {
+        return isLoaded;
     }
     
     /**
@@ -405,6 +418,9 @@ const UserPreferencesService = (function() {
         load,
         reset,
         getAll,
+        
+        // State check
+        isPreferencesLoaded,
         
         // Notifications
         isNotificationDismissed,

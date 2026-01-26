@@ -23,10 +23,15 @@ const LATEST_SITE_UPDATE_VERSION = '2025-01-15-tier-update';
 window.hasUnreadSiteUpdate = function() {
     // Use UserPreferencesService if available
     if (window.UserPreferencesService) {
+        // If preferences aren't loaded yet, assume seen to prevent flash
+        // (Badge will update correctly once preferences load)
+        if (!UserPreferencesService.isPreferencesLoaded()) {
+            return false; // Hide badge until we know for sure
+        }
         return !UserPreferencesService.hasSeenSiteUpdate(LATEST_SITE_UPDATE_VERSION);
     }
-    // Fallback for logged-out users (always show)
-    return true;
+    // Service not available - assume seen to prevent false positives
+    return false;
 };
 
 // Mark site update as read
