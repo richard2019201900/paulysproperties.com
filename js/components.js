@@ -292,7 +292,17 @@ window.openRegisterContactModal = function() {
 };
 
 // ==================== PHOTO SERVICES ====================
-window.openPhotoServicesModal = function() {
+// Track current property context for photo service requests
+window.currentPhotoServiceProperty = null;
+
+window.openPhotoServicesModal = function(propertyId = null, propertyTitle = null, propertyAddress = null) {
+    // Store property context if provided
+    window.currentPhotoServiceProperty = propertyId ? {
+        id: propertyId,
+        title: propertyTitle || 'Not specified',
+        address: propertyAddress || 'Not specified'
+    } : null;
+    
     openModal('photoServicesModal');
     // Update opt-in content based on login status
     updateManagedServicesOptIn();
@@ -657,21 +667,81 @@ window.copyAndNotifyPhotoServices = async function() {
     
     // Create notification for admin
     try {
-        const userEmail = user?.email || 'Anonymous Visitor';
-        const username = user?.displayName || user?.email?.split('@')[0] || 'Anonymous';
+        // Get user profile data from Firestore for complete info
+        let displayName = 'Anonymous';
+        let userPhone = 'N/A';
+        let userEmail = 'Anonymous Visitor';
+        
+        if (user) {
+            userEmail = user.email;
+            
+            // Fetch full user profile from Firestore
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    displayName = userData.displayName || userData.username || user.email?.split('@')[0] || 'Anonymous';
+                    userPhone = userData.phone || 'N/A';
+                }
+            } catch (profileError) {
+                console.warn('[PhotoServices] Could not fetch user profile:', profileError);
+                displayName = user.displayName || user.email?.split('@')[0] || 'Anonymous';
+            }
+        }
+        
+        // Get property context
+        const propertyInfo = window.currentPhotoServiceProperty || {
+            id: null,
+            title: 'Not specified',
+            address: 'Not specified'
+        };
         
         // Save to Firestore photoServiceRequests collection
-        await db.collection('photoServiceRequests').add({
+        const docRef = await db.collection('photoServiceRequests').add({
+            // User info
             userEmail: userEmail,
-            username: username,
+            name: displayName,
+            phone: userPhone,
             userId: user?.uid || null,
+            
+            // Property info
+            propertyId: propertyInfo.id,
+            propertyTitle: propertyInfo.title,
+            propertyAddress: propertyInfo.address,
+            
+            // Request info
             requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
             type: info.type,
             packageType: packageType,
             packageName: info.name,
             status: 'pending',
-            viewed: false
+            viewed: false,
+            isNew: true
         });
+        
+        // Trigger real-time notification for admin via NotificationManager
+        if (typeof NotificationManager !== 'undefined') {
+            const notification = NotificationManager.createNotification('photo', {
+                id: docRef.id,
+                name: displayName,
+                phone: userPhone,
+                email: userEmail,
+                propertyTitle: propertyInfo.title,
+                propertyAddress: propertyInfo.address,
+                packageName: info.name,
+                packageType: packageType
+            }, {
+                id: `photo-${docRef.id}`,
+                timestamp: new Date().toISOString(),
+                isMissed: false
+            });
+            NotificationManager.add(notification);
+            
+            // Flash screen for admin
+            if (typeof flashScreen === 'function') {
+                flashScreen('purple');
+            }
+        }
         
         // Update button to show success
         if (btnText) {

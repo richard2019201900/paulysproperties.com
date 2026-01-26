@@ -295,7 +295,7 @@ window.loadPhotoRequests = async function() {
                             <div class="space-y-1 text-sm">
                                 <p class="text-gray-400">
                                     <span class="text-gray-500">Email:</span> 
-                                    <a href="mailto:${escapeHtml(req.email || '')}" class="text-cyan-400 hover:underline">${escapeHtml(req.email || 'N/A')}</a>
+                                    <a href="mailto:${escapeHtml(req.userEmail || req.email || '')}" class="text-cyan-400 hover:underline">${escapeHtml(req.userEmail || req.email || 'N/A')}</a>
                                 </p>
                                 <p class="text-gray-400">
                                     <span class="text-gray-500">Phone:</span> 
@@ -303,8 +303,14 @@ window.loadPhotoRequests = async function() {
                                 </p>
                                 <p class="text-gray-400">
                                     <span class="text-gray-500">Property:</span> 
-                                    <span class="text-white">${escapeHtml(req.propertyName || req.property || 'Not specified')}</span>
+                                    <span class="text-white">${escapeHtml(req.propertyTitle || req.propertyName || req.property || 'Not specified')}</span>
                                 </p>
+                                ${req.packageName ? `
+                                <p class="text-gray-400">
+                                    <span class="text-gray-500">Package:</span> 
+                                    <span class="text-amber-400 font-semibold">${escapeHtml(req.packageName)}</span>
+                                </p>
+                                ` : ''}
                                 ${req.message ? `
                                     <div class="mt-2 bg-gray-900/50 rounded-lg p-3 border border-gray-700">
                                         <span class="text-gray-500 text-xs">Message:</span>

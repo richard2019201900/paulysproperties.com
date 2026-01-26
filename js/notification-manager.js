@@ -87,6 +87,7 @@
         listeners: {
             users: null,
             listings: null,
+            photos: null,
             rentInterval: null
         },
         
@@ -94,7 +95,8 @@
         initialized: false,
         initialLoadComplete: {
             users: false,
-            listings: false
+            listings: false,
+            photos: false
         },
         
         // Session tracking (for "While You Were Away" detection)
@@ -103,7 +105,8 @@
         
         // Known IDs to detect new items
         knownUserIds: new Set(),
-        knownListingIds: new Set()
+        knownListingIds: new Set(),
+        knownPhotoRequestIds: new Set()
     };
 
     // =========================================================================
@@ -166,16 +169,24 @@
                 break;
                 
             case 'photo':
-                notification.title = '📸 Photo Service Request';
-                notification.subtitle = `${rawData.name || 'Someone'} requested photos for ${rawData.propertyAddress || 'a property'}`;
+                const requesterName = rawData.name || rawData.username || 'Someone';
+                const packageLabel = rawData.packageName || 'photo services';
+                const propertyLabel = rawData.propertyTitle || rawData.propertyAddress || 'a property';
+                notification.title = isMissed ? '📸 Photo Request While Away' : '📸 New Photo Service Request!';
+                notification.subtitle = `${requesterName} requested ${packageLabel}${propertyLabel !== 'a property' ? ` for ${propertyLabel}` : ''}`;
                 notification.urgency = CONFIG.URGENCY.INFO;
                 notification.action = {
                     type: 'scrollToSection',
                     target: 'photoRequestsSection',
                     tab: 'admin',
                     subtab: 'requests',
-                    highlightSelector: '#photoRequestsSection'
+                    highlightSelector: `#photoRequest-${rawData.id}`
                 };
+                // Store additional data for display
+                notification.requesterName = requesterName;
+                notification.requesterPhone = rawData.phone || 'N/A';
+                notification.packageName = rawData.packageName;
+                notification.propertyTitle = rawData.propertyTitle;
                 break;
                 
             case 'premium':
@@ -591,7 +602,7 @@
         }
         
         const stackNotifications = state.notifications.filter(n => 
-            n.type === 'user' || n.type === 'listing'
+            n.type === 'user' || n.type === 'listing' || n.type === 'photo'
         );
         
         if (stackNotifications.length === 0) {
@@ -632,6 +643,11 @@
                     : 'from-green-600 to-teal-600 border-green-500';
                 icon = isMissed ? '📬' : '🏠';
             }
+        } else if (type === 'photo') {
+            gradientClass = isMissed 
+                ? 'from-purple-700 to-pink-600 border-purple-500'
+                : 'from-purple-600 to-pink-500 border-purple-400';
+            icon = '📸';
         }
         
         const timeDisplay = new Date(timestamp).toLocaleString('en-US', {
@@ -912,6 +928,7 @@
                 if (isAdmin) {
                     startUserListener();
                     startListingListener();
+                    startPhotoRequestListener();
                     
                     // Update admin visit time in Firestore
                     if (window.UserPreferencesService) {
@@ -938,6 +955,7 @@
     function destroy() {
         if (state.listeners.users) state.listeners.users();
         if (state.listeners.listings) state.listeners.listings();
+        if (state.listeners.photos) state.listeners.photos();
         if (state.listeners.rentInterval) clearInterval(state.listeners.rentInterval);
         
         state.notifications = [];
@@ -945,6 +963,7 @@
         state.initialized = false;
         state.knownUserIds.clear();
         state.knownListingIds.clear();
+        state.knownPhotoRequestIds.clear();
         
     }
     
@@ -1088,6 +1107,65 @@
                 state.initialLoadComplete.listings = true;
             }, error => {
                 console.error('[NotificationManager] Listings listener error:', error);
+            });
+    }
+    
+    function startPhotoRequestListener() {
+        if (state.listeners.photos) state.listeners.photos();
+        
+        state.listeners.photos = db.collection('photoServiceRequests')
+            .where('viewed', '==', false)
+            .onSnapshot(snapshot => {
+                snapshot.docs.forEach(doc => {
+                    const requestId = doc.id;
+                    const request = { id: requestId, ...doc.data() };
+                    const requestedAt = request.requestedAt?.toDate?.();
+                    
+                    const notifId = `photo-${requestId}`;
+                    
+                    // Skip if already dismissed
+                    if (state.dismissed.has(notifId)) {
+                        state.knownPhotoRequestIds.add(requestId);
+                        return;
+                    }
+                    
+                    if (!state.initialLoadComplete.photos) {
+                        // Initial load - check for missed requests
+                        state.knownPhotoRequestIds.add(requestId);
+                        
+                        // Show "missed" if created after last admin visit
+                        if (requestedAt && state.lastAdminVisit && requestedAt > state.lastAdminVisit) {
+                            const notification = createNotification('photo', request, {
+                                id: notifId,
+                                timestamp: requestedAt.toISOString(),
+                                isMissed: true
+                            });
+                            addNotification(notification);
+                        }
+                    } else {
+                        // Real-time updates - show notification for any request not in our known set
+                        if (!state.knownPhotoRequestIds.has(requestId)) {
+                            state.knownPhotoRequestIds.add(requestId);
+                            
+                            // This is a genuinely new photo request - show real-time notification
+                            const notification = createNotification('photo', request, {
+                                id: notifId,
+                                timestamp: requestedAt ? requestedAt.toISOString() : new Date().toISOString(),
+                                isMissed: false
+                            });
+                            addNotification(notification);
+                            
+                            // Flash the screen purple for new photo requests
+                            if (typeof flashScreen === 'function') {
+                                flashScreen('purple');
+                            }
+                        }
+                    }
+                });
+                
+                state.initialLoadComplete.photos = true;
+            }, error => {
+                console.error('[NotificationManager] Photo requests listener error:', error);
             });
     }
     
