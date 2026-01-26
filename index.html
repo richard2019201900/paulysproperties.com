@@ -526,25 +526,19 @@
                 <p id="upgradeReason" class="text-gray-300 mb-4"></p>
             </div>
             
-            <!-- Tier Comparison -->
-            <div class="grid grid-cols-3 gap-3 mb-6">
+            <!-- Tier Comparison - Only Starter and Elite -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
                 <div id="tierStarter" class="p-4 rounded-xl border-2 border-gray-600 bg-gray-800/50 text-center">
                     <div class="text-3xl mb-2">🌱</div>
                     <div class="text-white font-bold">Starter</div>
-                    <div class="text-gray-400 text-sm">1 Listing</div>
-                    <div class="text-green-400 font-bold mt-2">Free</div>
-                </div>
-                <div id="tierPro" class="p-4 rounded-xl border-2 border-yellow-600 bg-yellow-900/20 text-center">
-                    <div class="text-3xl mb-2">⭐</div>
-                    <div class="text-white font-bold">Pro</div>
                     <div class="text-gray-400 text-sm">3 Listings</div>
-                    <div class="text-yellow-400 font-bold mt-2">$25k/mo</div>
+                    <div class="text-green-400 font-bold mt-2">Free</div>
                 </div>
                 <div id="tierElite" class="p-4 rounded-xl border-2 border-purple-600 bg-purple-900/20 text-center">
                     <div class="text-3xl mb-2">👑</div>
                     <div class="text-white font-bold">Elite</div>
                     <div class="text-gray-400 text-sm">Unlimited</div>
-                    <div class="text-purple-400 font-bold mt-2">$50k/mo</div>
+                    <div class="text-purple-400 font-bold mt-2">$25k/mo</div>
                 </div>
             </div>
             
@@ -555,7 +549,7 @@
                     <label class="block text-gray-300 font-semibold mb-2">Select Desired Plan</label>
                     <select id="upgradeRequestedTier" onchange="generateUpgradeMessage()" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-purple-500">
                         <option value="">Choose a plan...</option>
-                        <option value="elite">👑 Elite - Unlimited ($25k/month)</option>
+                        <option value="elite">👑 Elite - Unlimited Listings ($25k/month)</option>
                     </select>
                 </div>
                 

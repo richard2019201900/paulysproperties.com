@@ -26,19 +26,27 @@ window.hasUnreadSiteUpdate = function() {
         // If preferences aren't loaded yet, assume seen to prevent flash
         // (Badge will update correctly once preferences load)
         if (!UserPreferencesService.isPreferencesLoaded()) {
+            console.log('[SiteUpdate] hasUnreadSiteUpdate: Preferences not loaded, returning false');
             return false; // Hide badge until we know for sure
         }
-        return !UserPreferencesService.hasSeenSiteUpdate(LATEST_SITE_UPDATE_VERSION);
+        const unread = !UserPreferencesService.hasSeenSiteUpdate(LATEST_SITE_UPDATE_VERSION);
+        console.log('[SiteUpdate] hasUnreadSiteUpdate:', unread, '(version:', LATEST_SITE_UPDATE_VERSION, ')');
+        return unread;
     }
     // Service not available - assume seen to prevent false positives
+    console.log('[SiteUpdate] hasUnreadSiteUpdate: Service not available, returning false');
     return false;
 };
 
 // Mark site update as read
 window.markSiteUpdateAsRead = function() {
+    console.log('[SiteUpdate] markSiteUpdateAsRead called');
     // Save to Firestore via UserPreferencesService
     if (window.UserPreferencesService) {
         UserPreferencesService.markSiteUpdateSeen(LATEST_SITE_UPDATE_VERSION);
+        console.log('[SiteUpdate] Called UserPreferencesService.markSiteUpdateSeen with:', LATEST_SITE_UPDATE_VERSION);
+    } else {
+        console.warn('[SiteUpdate] UserPreferencesService not available!');
     }
     // Hide both badges
     const navBadge = $('siteUpdateNavBadge');

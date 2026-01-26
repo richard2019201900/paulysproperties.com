@@ -79,11 +79,15 @@ const UserPreferencesService = (function() {
         
         loadPromise = (async () => {
             try {
+                console.log('[UserPreferences] Loading preferences for user:', user.uid);
                 const doc = await db.collection('users').doc(user.uid).get();
                 
                 if (doc.exists) {
                     const data = doc.data();
                     const prefs = data.preferences || {};
+                    
+                    console.log('[UserPreferences] Raw preferences from Firestore:', prefs);
+                    console.log('[UserPreferences] lastSeenSiteUpdate value:', prefs.lastSeenSiteUpdate);
                     
                     // Merge with defaults
                     cache = {
@@ -96,6 +100,9 @@ const UserPreferencesService = (function() {
                         adminActivityLog: prefs.adminActivityLog || []
                     };
                     
+                    console.log('[UserPreferences] ✅ Loaded. lastSeenSiteUpdate =', cache.lastSeenSiteUpdate);
+                } else {
+                    console.log('[UserPreferences] No document exists for user, using defaults');
                 }
                 
                 isLoaded = true;
@@ -121,9 +128,11 @@ const UserPreferencesService = (function() {
     async function save(key, value) {
         // Update cache immediately (optimistic update)
         cache[key] = value;
+        console.log(`[UserPreferences] Saving ${key}:`, value);
         
         const user = auth?.currentUser;
         if (!user) {
+            console.warn('[UserPreferences] Cannot save - no user logged in');
             return;
         }
         
@@ -134,6 +143,7 @@ const UserPreferencesService = (function() {
                 }
             }, { merge: true });
             
+            console.log(`[UserPreferences] ✅ Saved ${key} to Firestore for user ${user.uid}`);
             
         } catch (error) {
             console.error('[UserPreferences] Error saving:', key, error);
@@ -303,9 +313,12 @@ const UserPreferencesService = (function() {
         // If preferences aren't loaded yet, assume they've seen it to prevent flashing
         // The badge will be updated properly once preferences are loaded
         if (!isLoaded) {
+            console.log('[UserPreferences] hasSeenSiteUpdate: Not loaded yet, returning true (assume seen)');
             return true; // Assume seen until we know otherwise
         }
-        return cache.lastSeenSiteUpdate === latestVersion;
+        const seen = cache.lastSeenSiteUpdate === latestVersion;
+        console.log(`[UserPreferences] hasSeenSiteUpdate: cached='${cache.lastSeenSiteUpdate}', latest='${latestVersion}', seen=${seen}`);
+        return seen;
     }
     
     /**
@@ -321,6 +334,7 @@ const UserPreferencesService = (function() {
      * @param {string} version - Version string to mark as seen
      */
     async function markSiteUpdateSeen(version) {
+        console.log('[UserPreferences] markSiteUpdateSeen called with version:', version);
         await save('lastSeenSiteUpdate', version);
     }
 
