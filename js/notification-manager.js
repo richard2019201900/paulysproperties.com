@@ -525,22 +525,36 @@
     
     function refreshBadges() {
         const counts = getCounts();
+        const isAdmin = window.TierService?.isMasterAdmin(auth?.currentUser?.email);
         
-        // Dropdown badges
-        updateBadge('dropdownUserBadge', 'dropdownUserCount', counts.user);
-        updateBadge('dropdownListingBadge', 'dropdownListingCount', counts.listing);
-        updateBadge('dropdownPhotoBadge', 'dropdownPhotoCount', counts.photo);
-        updateBadge('dropdownPremiumBadge', 'dropdownPremiumCount', counts.premium);
+        // Admin-only dropdown badges (only show to admins)
+        if (isAdmin) {
+            updateBadge('dropdownUserBadge', 'dropdownUserCount', counts.user);
+            updateBadge('dropdownListingBadge', 'dropdownListingCount', counts.listing);
+            updateBadge('dropdownPhotoBadge', 'dropdownPhotoCount', counts.photo);
+            updateBadge('dropdownPremiumBadge', 'dropdownPremiumCount', counts.premium);
+            updateBadge('dropdownSubscriptionBadge', 'dropdownSubscriptionCount', counts.subscription);
+            
+            // Nav username badge (total count for admin)
+            const totalAdmin = counts.user + counts.listing + counts.photo + counts.premium + counts.rent + counts.subscription;
+            updateBadge('navNotificationBadge', 'navNotificationCount', totalAdmin);
+            
+            // Mobile badges for admin
+            const mobileAdminTotal = counts.user + counts.listing + counts.photo + counts.premium;
+            updateBadge('mobileAdminBadge', 'mobileAdminCount', mobileAdminTotal);
+        } else {
+            // Hide admin-only badges for non-admins
+            updateBadge('dropdownUserBadge', 'dropdownUserCount', 0);
+            updateBadge('dropdownListingBadge', 'dropdownListingCount', 0);
+            updateBadge('dropdownPhotoBadge', 'dropdownPhotoCount', 0);
+            updateBadge('dropdownPremiumBadge', 'dropdownPremiumCount', 0);
+            updateBadge('dropdownSubscriptionBadge', 'dropdownSubscriptionCount', 0);
+            updateBadge('navNotificationBadge', 'navNotificationCount', counts.rent > 0 ? counts.rent : 0);
+            updateBadge('mobileAdminBadge', 'mobileAdminCount', 0);
+        }
+        
+        // Rent badge - shown to all users (property owners see their rent alerts)
         updateBadge('dropdownRentBadge', 'dropdownRentCount', counts.rent);
-        updateBadge('dropdownSubscriptionBadge', 'dropdownSubscriptionCount', counts.subscription);
-        
-        // Nav username badge (total count for admin)
-        const totalAdmin = counts.user + counts.listing + counts.photo + counts.premium + counts.rent + counts.subscription;
-        updateBadge('navNotificationBadge', 'navNotificationCount', totalAdmin);
-        
-        // Mobile badges
-        const mobileAdminTotal = counts.user + counts.listing + counts.photo + counts.premium;
-        updateBadge('mobileAdminBadge', 'mobileAdminCount', mobileAdminTotal);
         updateBadge('mobileRentBadge', 'mobileRentCount', counts.rent);
     }
     
