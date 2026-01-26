@@ -138,40 +138,34 @@ window.closeModal = function(id) {
     }
 };
 
-window.openContactModal = async function(type, propertyTitle, propertyId) {
-    const isRent = type === 'rent';
-    const colors = isRent ? ['purple', 'blue'] : ['amber', 'orange'];
+window.openContactModal = async function(propertyTitle, propertyId) {
     const defaultPhone = '2057028233'; // Pauly's number as fallback
     let usedFallback = false; // Track if we had to use fallback
     
-    $('modalTitle').textContent = isRent ? 'Rent This Property' : 'Purchase This Property';
-    $('modalTitle').className = `text-3xl font-black bg-gradient-to-r from-${colors[0]}-500 to-${colors[1]}-600 bg-clip-text text-transparent mb-4 text-center`;
-    $('modalPropertyName').textContent = (isRent ? 'Rent: ' : 'Purchase: ') + propertyTitle;
-    $('modalMessage').value = isRent 
-        ? `Hello! I came across your listing for ${propertyTitle} on PaulysProperties.com and I'm interested in renting it. Please contact me ASAP to discuss availability and next steps.`
-        : `Hello! I came across your listing for ${propertyTitle} on PaulysProperties.com and I'm interested in purchasing it. Please contact me ASAP to discuss further.`;
+    // Check if property is for sale (has buyPrice > 0)
+    const buyPrice = PropertyDataService?.getValue(propertyId, 'buyPrice', 0) || 0;
+    const isForSale = buyPrice > 0;
+    
+    $('modalTitle').textContent = 'Contact Owner';
+    $('modalTitle').className = 'text-3xl font-black bg-gradient-to-r from-purple-500 to-blue-600 bg-clip-text text-transparent mb-4 text-center';
+    $('modalPropertyName').textContent = propertyTitle;
+    $('modalMessage').value = `Hello! I came across your listing for ${propertyTitle} on PaulysProperties.com and I'm interested in discussing it further. Please contact me ASAP to talk about availability and next steps.`;
     
     const accent = $('modalAccent');
-    accent.className = `bg-gradient-to-r from-${colors[0]}-900 to-${colors[1]}-900 p-4 rounded-xl mb-6 text-center border border-${colors[0]}-700`;
+    accent.className = 'bg-gradient-to-r from-purple-900 to-blue-900 p-4 rounded-xl mb-6 text-center border border-purple-700';
     
-    // Show appropriate disclaimer
+    // Show unified disclaimer
     const disclaimer = $('modalDisclaimer');
     if (disclaimer) {
-        if (isRent) {
-            disclaimer.innerHTML = `
-                <div class="text-xs text-gray-400 mt-2">
-                    <strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. 
-                    This website serves as a listing platform only.
-                </div>
-            `;
-        } else {
-            disclaimer.innerHTML = `
-                <div class="text-xs text-gray-400 mt-2 space-y-1">
-                    <div><strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. This website serves as a listing platform only.</div>
-                    <div><strong>💰 City Fee:</strong> A standard <span class="text-amber-400 font-bold">10% PMA Realtor Fee</span> (city requirement) applies to all property purchases. This fee is not charged by PaulysProperties.com.</div>
-                </div>
-            `;
+        let disclaimerContent = `
+            <div class="text-xs text-gray-400 mt-2 space-y-1">
+                <div><strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. This website serves as a listing platform only.</div>
+        `;
+        if (isForSale) {
+            disclaimerContent += `<div><strong>💰 City Fee:</strong> A standard <span class="text-amber-400 font-bold">10% PMA Realtor Fee</span> (city requirement) applies to all property purchases. This fee is not charged by PaulysProperties.com.</div>`;
         }
+        disclaimerContent += `</div>`;
+        disclaimer.innerHTML = disclaimerContent;
     }
     
     // Reset to default phone first

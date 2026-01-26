@@ -969,39 +969,43 @@
                         return;
                     }
                     
+                    const notifId = `user-${userId}`;
+                    
+                    // Skip if already dismissed
+                    if (state.dismissed.has(notifId)) {
+                        state.knownUserIds.add(userId);
+                        return;
+                    }
+                    
                     if (!state.initialLoadComplete.users) {
                         // Initial load - check for missed notifications (users created while away)
                         state.knownUserIds.add(userId);
                         
-                        // Only show "missed" if:
-                        // 1. User has a createdAt timestamp
-                        // 2. Admin has a lastAdminVisit recorded
-                        // 3. User was created AFTER admin's last visit
-                        // 4. Notification hasn't been dismissed
+                        // Show "missed" if user was created after admin's last visit
                         if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
-                            const notifId = `user-${userId}`;
-                            if (!state.dismissed.has(notifId)) {
-                                const notification = createNotification('user', user, {
-                                    id: notifId,
-                                    timestamp: createdAt.toISOString(),
-                                    isMissed: true
-                                });
-                                addNotification(notification);
-                            }
+                            const notification = createNotification('user', user, {
+                                id: notifId,
+                                timestamp: createdAt.toISOString(),
+                                isMissed: true
+                            });
+                            addNotification(notification);
                         }
                     } else {
-                        // Real-time - only notify for TRULY new users (not in knownUserIds)
-                        // AND created after session started (prevents false positives)
+                        // Real-time updates - show notification for any user not in our known set
                         if (!state.knownUserIds.has(userId)) {
                             state.knownUserIds.add(userId);
                             
-                            // Only notify if created after this session started
-                            if (createdAt && state.sessionStart && createdAt > state.sessionStart) {
-                                const notification = createNotification('user', user, {
-                                    id: `user-${userId}`,
-                                    isMissed: false
-                                });
-                                addNotification(notification);
+                            // This is a genuinely new user - show real-time notification
+                            const notification = createNotification('user', user, {
+                                id: notifId,
+                                timestamp: createdAt ? createdAt.toISOString() : new Date().toISOString(),
+                                isMissed: false
+                            });
+                            addNotification(notification);
+                            
+                            // Flash the screen for real-time new users
+                            if (typeof flashScreen === 'function') {
+                                flashScreen();
                             }
                         }
                     }
@@ -1037,36 +1041,45 @@
                         return;
                     }
                     
+                    const notifId = `listing-${propId}`;
+                    
+                    // Skip if already dismissed
+                    if (state.dismissed.has(notifId)) {
+                        state.knownListingIds.add(propId);
+                        return;
+                    }
+                    
                     if (!state.initialLoadComplete.listings) {
                         // Initial load - check for missed listings
                         state.knownListingIds.add(propId);
                         
-                        // Only show "missed" if created after last admin visit
+                        // Show "missed" if created after last admin visit
                         if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
-                            const notifId = `listing-${propId}`;
-                            if (!state.dismissed.has(notifId)) {
-                                const listing = { id: parseInt(propId), ...prop };
-                                const notification = createNotification('listing', listing, {
-                                    id: notifId,
-                                    timestamp: createdAt.toISOString(),
-                                    isMissed: true
-                                });
-                                addNotification(notification);
-                            }
+                            const listing = { id: parseInt(propId), ...prop };
+                            const notification = createNotification('listing', listing, {
+                                id: notifId,
+                                timestamp: createdAt.toISOString(),
+                                isMissed: true
+                            });
+                            addNotification(notification);
                         }
                     } else {
-                        // Real-time - only for truly new listings
+                        // Real-time updates - show notification for any listing not in our known set
                         if (!state.knownListingIds.has(propId)) {
                             state.knownListingIds.add(propId);
                             
-                            // Only notify if created after session started
-                            if (createdAt && state.sessionStart && createdAt > state.sessionStart) {
-                                const listing = { id: parseInt(propId), ...prop };
-                                const notification = createNotification('listing', listing, {
-                                    id: `listing-${propId}`,
-                                    isMissed: false
-                                });
-                                addNotification(notification);
+                            // This is a genuinely new listing - show real-time notification
+                            const listing = { id: parseInt(propId), ...prop };
+                            const notification = createNotification('listing', listing, {
+                                id: notifId,
+                                timestamp: createdAt ? createdAt.toISOString() : new Date().toISOString(),
+                                isMissed: false
+                            });
+                            addNotification(notification);
+                            
+                            // Flash the screen green for new listings
+                            if (typeof flashScreen === 'function') {
+                                flashScreen('green');
                             }
                         }
                     }
