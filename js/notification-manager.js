@@ -281,6 +281,28 @@
         refreshUI();
     }
     
+    function dismissAll() {
+        console.log('[NotificationManager] Dismissing all', state.notifications.length, 'notifications');
+        const allIds = state.notifications.map(n => n.id);
+        allIds.forEach(id => state.dismissed.add(id));
+        state.notifications = [];
+        
+        // Save to Firestore via UserPreferencesService
+        if (window.UserPreferencesService) {
+            UserPreferencesService.dismissNotifications(allIds);
+        }
+        
+        // Clear the notification stack from DOM
+        const stack = document.getElementById('adminNotificationsStack');
+        if (stack) {
+            stack.innerHTML = '';
+            stack.classList.add('hidden');
+        }
+        
+        refreshUI();
+        showToast('✓ All notifications cleared', 'success');
+    }
+    
     function getCounts() {
         const counts = {
             user: 0,
@@ -626,7 +648,22 @@
         
         stack.classList.remove('hidden');
         
+        // Add Clear All button if more than 3 notifications
         let html = '';
+        if (stackNotifications.length > 3) {
+            html += `
+                <div class="flex justify-end mb-2">
+                    <button onclick="NotificationManager.dismissAllNotifications()" 
+                            class="bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Clear All (${stackNotifications.length})
+                    </button>
+                </div>
+            `;
+        }
+        
         stackNotifications.forEach(notification => {
             html += renderNotificationCard(notification);
         });
@@ -1360,7 +1397,8 @@
         // Notification management
         add: addNotification,
         dismiss: dismissNotification,
-        dismissAll: dismissAllOfType,
+        dismissAllOfType: dismissAllOfType,
+        dismissAllNotifications: dismissAll,
         
         // Getters
         getCounts,

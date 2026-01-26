@@ -60,17 +60,26 @@ const UserPreferencesService = (function() {
     async function load() {
         const user = auth?.currentUser;
         if (!user) {
+            console.log('[UserPreferences] No user logged in, using defaults');
             isLoaded = true;
             return cache;
         }
         
+        // CRITICAL: If user changed, reset everything
+        if (currentUserId && currentUserId !== user.uid) {
+            console.log('[UserPreferences] User changed! Resetting state. Old:', currentUserId, 'New:', user.uid);
+            reset();
+        }
+        
         // Return existing promise if already loading
         if (isLoading && loadPromise) {
+            console.log('[UserPreferences] Already loading, returning existing promise');
             return loadPromise;
         }
         
         // Return cache if already loaded for this user
         if (isLoaded && currentUserId === user.uid) {
+            console.log('[UserPreferences] Already loaded for this user, returning cache');
             return cache;
         }
         
@@ -79,7 +88,7 @@ const UserPreferencesService = (function() {
         
         loadPromise = (async () => {
             try {
-                console.log('[UserPreferences] Loading preferences for user:', user.uid);
+                console.log('[UserPreferences] Loading preferences for user:', user.uid, '(email:', user.email, ')');
                 const doc = await db.collection('users').doc(user.uid).get();
                 
                 if (doc.exists) {
@@ -118,6 +127,26 @@ const UserPreferencesService = (function() {
         })();
         
         return loadPromise;
+    }
+    
+    /**
+     * Reset all state - call this when user logs out or changes
+     */
+    function reset() {
+        console.log('[UserPreferences] Resetting all state');
+        cache = {
+            dismissedNotifications: [],
+            dashboardTab: 'myProperties',
+            lastSeenSiteUpdate: null,
+            adminLastVisit: null,
+            pendingUserNotifications: [],
+            pendingListingNotifications: [],
+            adminActivityLog: []
+        };
+        isLoaded = false;
+        isLoading = false;
+        loadPromise = null;
+        currentUserId = null;
     }
     
     /**

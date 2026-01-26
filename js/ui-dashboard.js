@@ -71,6 +71,14 @@ window.logout = function() {
         window.userTierUnsubscribe();
         window.userTierUnsubscribe = null;
     }
+    // CRITICAL: Reset UserPreferencesService to prevent stale data for next user
+    if (window.UserPreferencesService) {
+        UserPreferencesService.reset();
+    }
+    // CRITICAL: Destroy NotificationManager to reset all state
+    if (window.NotificationManager) {
+        NotificationManager.destroy();
+    }
     // Hide global alert
     dismissGlobalAlert();
     // Reset all admin alert state
