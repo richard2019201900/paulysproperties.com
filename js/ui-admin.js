@@ -949,7 +949,9 @@ window.dismissGlobalAlert = function() {
 };
 
 // ==================== ADMIN PERSISTENT NOTIFICATIONS ====================
-// Track dismissed notifications in this session
+// DEPRECATED: Legacy notification state - kept for backward compatibility only
+// All notification logic is now handled by notification-manager.js (unified system)
+// These variables are NO LONGER USED but kept to prevent errors from any stale references
 window.dismissedAdminNotifications = new Set();
 window.pendingAdminNotifications = new Set();
 window.adminNotificationsData = [];
@@ -957,15 +959,17 @@ window.knownUserIds = new Set();
 window.knownPropertyIds = new Set();
 window.knownSettingsPropertyIds = new Set();
 
-// Start listening for admin notifications - uses new unified system
+// Start listening for admin notifications - delegates to unified system
 window.startAdminNotificationsListener = function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
         return;
     }
     
-    // Use new unified notification system
+    // Delegate to unified notification system (notification-manager.js)
     if (typeof initAdminNotifications === 'function') {
         initAdminNotifications();
+    } else if (typeof NotificationManager !== 'undefined') {
+        NotificationManager.init();
     } else {
         console.error('[AdminNotify] Unified notification system not loaded!');
     }
@@ -1103,104 +1107,12 @@ window.startSettingsPropertiesListener = function() {
         });
 };
 
-// Show a notification for a new listing
+// DEPRECATED: showNewListingNotification - now handled by notification-manager.js
+// Kept as no-op for backward compatibility
 window.showNewListingNotification = function(listing, isMissed = false) {
-    const stack = $('adminNotificationsStack');
-    if (!stack) {
-        return;
-    }
-    
-    stack.classList.remove('hidden');
-    
-    const notificationId = 'new-listing-' + listing.id;
-    
-    // Don't add if already dismissed or already showing
-    if (window.dismissedAdminNotifications.has(notificationId)) {
-        return;
-    }
-    if ($('notification-' + notificationId)) {
-        return;
-    }
-    // Get owner name
-    const ownerEmail = listing.ownerEmail || 'Unknown';
-    const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
-    
-    // ALWAYS use actual creation time from listing data
-    let timeDisplay;
-    let createdDate = null;
-    
-    if (listing.createdAt) {
-        if (typeof listing.createdAt === 'string') {
-            createdDate = new Date(listing.createdAt);
-        } else if (listing.createdAt.toDate) {
-            createdDate = listing.createdAt.toDate();
-        }
-    } else if (listing.createdAtTimestamp?.toDate) {
-        createdDate = listing.createdAtTimestamp.toDate();
-    }
-    
-    if (createdDate && !isNaN(createdDate.getTime())) {
-        timeDisplay = createdDate.toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
-    } else {
-        // Fallback only if no timestamp exists
-        timeDisplay = 'Recently';
-    }
-    
-    // Check if this is a premium listing
-    const isPremium = listing.isPremium === true;
-    const isPremiumTrial = listing.isPremiumTrial === true;
-    
-    // Different styling for missed vs real-time, and premium vs regular
-    let gradientClass, titleText, icon, premiumBadge = '';
-    
-    if (isPremium && !isPremiumTrial) {
-        // PAID PREMIUM - needs payment collection!
-        gradientClass = 'from-amber-600 to-orange-600 border-amber-400';
-        icon = '👑💰';
-        titleText = isMissed ? '👑 Premium Listing (Payment Due!)' : '👑 New Premium Listing!';
-        premiumBadge = `
-            <div class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded mt-2 animate-pulse">
-                ⚠️ COLLECT $10,000/week PAYMENT
-            </div>
-        `;
-    } else if (isPremium && isPremiumTrial) {
-        // Premium trial - no payment needed
-        gradientClass = 'from-cyan-600 to-blue-600 border-cyan-400';
-        icon = '🎁';
-        titleText = isMissed ? '🎁 Premium Trial Listing' : '🎁 New Premium Trial Listing';
-        premiumBadge = `<div class="text-cyan-300 text-xs mt-1">Free trial - no payment needed</div>`;
-    } else {
-        // Regular listing
-        gradientClass = isMissed 
-            ? 'from-emerald-700 to-green-600 border-emerald-500' 
-            : 'from-green-600 to-teal-600 border-green-500';
-        icon = isMissed ? '📬' : '🏠';
-        titleText = isMissed ? '🏠 Listing While You Were Away...' : '🏠 New Listing Posted!';
-    }
-    
-    const notificationHTML = `
-        <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new" 
-             onclick="handleListingNotificationClick('${listing.ownerEmail}', ${listing.id})">
-            <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
-                    class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
-                ✕
-            </button>
-            <div class="flex items-center gap-4 pr-8 cursor-pointer">
-                <span class="text-3xl">${icon}</span>
-                <div class="flex-1">
-                    <div class="text-white font-bold text-lg">${titleText}</div>
-                    <div class="text-white/90">${listing.title || 'New Property'}</div>
-                    <div class="text-white/70 text-sm">by ${ownerName}</div>
-                    ${premiumBadge}
-                    <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    stack.insertAdjacentHTML('afterbegin', notificationHTML);
+    // NO-OP: All listing notifications are now handled by notification-manager.js
+    // This prevents duplicate notifications and ensures dismissals persist to Firestore
+    return;
 };
 
 /**
@@ -1416,67 +1328,12 @@ window.clearActivityLog = function() {
 };
 
 // Show a notification for a new user
+// DEPRECATED: showNewUserNotification - now handled by notification-manager.js
+// Kept as no-op for backward compatibility
 window.showNewUserNotification = function(user, isMissed = false) {
-    const stack = $('adminNotificationsStack');
-    if (!stack) return;
-    
-    stack.classList.remove('hidden');
-    
-    const notificationId = 'new-user-' + user.id;
-    
-    // Don't add if already dismissed or already showing
-    if (window.dismissedAdminNotifications.has(notificationId)) return;
-    if ($('notification-' + notificationId)) return;
-    
-    // ALWAYS use the user's actual creation time, not current time
-    let timeDisplay;
-    if (user.createdAt?.toDate) {
-        // Firestore Timestamp object
-        const createdDate = user.createdAt.toDate();
-        timeDisplay = createdDate.toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
-    } else if (user.createdAt) {
-        // String or Date object
-        const createdDate = new Date(user.createdAt);
-        timeDisplay = createdDate.toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
-    } else {
-        // Fallback only if no createdAt exists at all
-        timeDisplay = new Date().toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
-    }
-    
-    // Different styling for missed vs real-time notifications
-    const gradientClass = isMissed 
-        ? 'from-orange-600 to-amber-600 border-orange-500' 
-        : 'from-cyan-600 to-blue-600 border-cyan-500';
-    
-    const titleText = isMissed 
-        ? '📬 While You Were Away...' 
-        : '👤 New User Registered!';
-    
-    const notificationHTML = `
-        <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new" 
-             onclick="handleNewUserNotificationClick('${user.id}')">
-            <button onclick="event.stopPropagation(); dismissNewUserNotification('${notificationId}')" 
-                    class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
-                ✕
-            </button>
-            <div class="flex items-center gap-4 pr-8 cursor-pointer">
-                <span class="text-3xl">${isMissed ? '📬' : '👤'}</span>
-                <div class="flex-1">
-                    <div class="text-white font-bold text-lg">${titleText}</div>
-                    <div class="text-white/90">${user.displayName || user.username || user.email?.split('@')[0] || 'Unknown'} created a Starter account</div>
-                    <div class="text-white/60 text-xs mt-1">${timeDisplay}</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    stack.insertAdjacentHTML('afterbegin', notificationHTML);
+    // NO-OP: All user notifications are now handled by notification-manager.js
+    // This prevents duplicate notifications and ensures dismissals persist to Firestore
+    return;
 };
 
 // Handle click on new user notification - navigate and highlight user
@@ -1619,39 +1476,33 @@ window.waitForElement = async function(selector, maxWaitMs = 5000, pollIntervalM
 };
 
 // Dismiss new user notification
+// DEPRECATED: dismissNewUserNotification - redirect to notification-manager.js
+// This function may still be called from inline onclick handlers in rendered HTML
 window.dismissNewUserNotification = function(notificationId) {
-    window.dismissedAdminNotifications.add(notificationId);
-    
-    // Remove from pending notifications
-    window.pendingAdminNotifications.delete(notificationId);
-    
-    // Save to Firestore via UserPreferencesService
-    if (window.UserPreferencesService) {
-        UserPreferencesService.dismissNotification(notificationId);
-        
-        // If all notifications are dismissed, update lastVisit time
-        if (window.pendingAdminNotifications.size === 0) {
-            UserPreferencesService.updateAdminLastVisit();
+    // Delegate to unified notification system for Firestore persistence
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.dismiss) {
+        // Convert legacy ID format to unified format if needed
+        // Legacy: 'new-user-xxx' or 'new-listing-xxx'
+        // Unified: 'user-xxx' or 'listing-xxx'
+        let unifiedId = notificationId;
+        if (notificationId.startsWith('new-user-')) {
+            unifiedId = notificationId.replace('new-user-', 'user-');
+        } else if (notificationId.startsWith('new-listing-')) {
+            unifiedId = notificationId.replace('new-listing-', 'listing-');
         }
+        NotificationManager.dismiss(unifiedId);
     }
     
+    // Also try to dismiss via legacy method for backward compatibility
+    if (window.UserPreferencesService) {
+        UserPreferencesService.dismissNotification(notificationId);
+    }
+    
+    // Remove from DOM if present (handles any stale legacy notifications)
     const notification = $('notification-' + notificationId);
     if (notification) {
         notification.style.animation = 'slideUp 0.3s ease-out forwards';
         setTimeout(() => notification.remove(), 300);
-    }
-    
-    // Update the notification badge
-    updateNotificationBadge();
-    
-    // Hide stack if empty
-    const stack = $('adminNotificationsStack');
-    if (stack && stack.children.length <= 1) {
-        setTimeout(() => {
-            if (stack.children.length === 0) {
-                stack.classList.add('hidden');
-            }
-        }, 350);
     }
 };
 
@@ -1665,248 +1516,81 @@ window.updateNotificationBadge = function() {
 };
 
 // Show new user notifications popup
+// DEPRECATED: showNewUserNotifications - now delegates to notification-manager.js
 window.showNewUserNotifications = function(event) {
     event.stopPropagation();
-    // Navigate to dashboard and switch to users tab
-    goToDashboard();
-    
-    // Re-render pending notifications from the users list
-    setTimeout(() => {
-        reRenderPendingNotifications();
-        switchAdminTab('users');
-    }, 100);
+    // Delegate to unified system
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.handleBadgeClick) {
+        NotificationManager.handleBadgeClick('user');
+    } else {
+        goToDashboard();
+        setTimeout(() => {
+            if (typeof switchAdminTab === 'function') switchAdminTab('users');
+        }, 100);
+    }
 };
 
-// Show new listing notifications popup
+// DEPRECATED: showNewListingNotifications - now delegates to notification-manager.js
 window.showNewListingNotifications = function(event) {
     event.stopPropagation();
-    // Navigate to dashboard - listings are shown in the notifications stack
-    goToDashboard();
-    
-    // Re-render pending notifications
-    setTimeout(() => {
-        reRenderPendingNotifications();
-    }, 100);
+    // Delegate to unified system
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.handleBadgeClick) {
+        NotificationManager.handleBadgeClick('listing');
+    } else {
+        goToDashboard();
+    }
 };
 
-// Show new premium notifications popup
+// DEPRECATED: showNewPremiumNotifications - now delegates to notification-manager.js
 window.showNewPremiumNotifications = function(event) {
     event.stopPropagation();
-    // Navigate to dashboard - premium notifications are shown in the stack
-    goToDashboard();
-    
-    // Re-render pending notifications
-    setTimeout(() => {
-        reRenderPendingNotifications();
-    }, 100);
+    // Delegate to unified system
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.handleBadgeClick) {
+        NotificationManager.handleBadgeClick('premium');
+    } else {
+        goToDashboard();
+    }
 };
 
-// Show new photo service request notifications popup
+// DEPRECATED: showNewPhotoNotifications - now delegates to notification-manager.js
 window.showNewPhotoNotifications = function(event) {
     event.stopPropagation();
-    // Navigate to dashboard - photo notifications are shown in the stack
-    goToDashboard();
-    
-    // Re-render pending notifications
-    setTimeout(() => {
-        reRenderPendingNotifications();
-    }, 100);
+    // Delegate to unified system
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.handleBadgeClick) {
+        NotificationManager.handleBadgeClick('photo');
+    } else {
+        goToDashboard();
+    }
 };
 
 // Re-render all pending notifications that might not be showing
+// DEPRECATED: reRenderPendingNotifications - now delegates to notification-manager.js
+// Kept for backward compatibility with ui-navigation.js call
 window.reRenderPendingNotifications = function() {
-    const stack = $('adminNotificationsStack');
-    if (!stack) return;
-    // Go through all pending notifications and re-render any that aren't showing
-    window.pendingAdminNotifications.forEach(notificationId => {
-        // Skip if already dismissed
-        if (window.dismissedAdminNotifications.has(notificationId)) {
-            window.pendingAdminNotifications.delete(notificationId);
-            return;
-        }
-        
-        // Skip if already showing
-        if ($('notification-' + notificationId)) {
-            return;
-        }
-        // Parse the notification ID to determine type
-        if (notificationId.startsWith('new-user-')) {
-            const userId = notificationId.replace('new-user-', '');
-            const user = window.adminUsersData?.find(u => u.id === userId);
-            if (user) {
-                showNewUserNotification(user, true);
-            }
-        } else if (notificationId.startsWith('new-listing-')) {
-            const listingId = parseInt(notificationId.replace('new-listing-', ''));
-            const listing = properties.find(p => p.id === listingId);
-            if (listing) {
-                showNewListingNotification(listing, true);
-            }
-        }
-    });
-    
-    // Make sure stack is visible if there are notifications
-    if (stack.querySelectorAll('[id^="notification-"]').length > 0) {
-        stack.classList.remove('hidden');
+    // Delegate to unified notification system
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+        NotificationManager.refreshUI();
     }
-    
-    updateNotificationBadge();
 };
 
 // Show a notification for a new premium activation
+// DEPRECATED: showNewPremiumNotification - now handled by notification-manager.js
+// Kept as no-op for backward compatibility
 window.showNewPremiumNotification = function(property, ownerEmail, isMissed = false) {
-    const stack = $('adminNotificationsStack');
-    if (!stack) {
-        return;
-    }
-    
-    stack.classList.remove('hidden');
-    
-    const notificationId = 'new-premium-' + property.id + '-' + Date.now();
-    
-    // Don't add if already dismissed
-    if (window.dismissedAdminNotifications.has(notificationId)) return;
-    // Get owner name
-    const ownerName = window.ownerUsernameCache?.[ownerEmail?.toLowerCase()] || ownerEmail?.split('@')[0] || 'Unknown';
-    
-    // Use actual premium activation timestamp if available
-    let timeDisplay;
-    let activatedDate = null;
-    
-    if (property.premiumActivatedAt?.toDate) {
-        activatedDate = property.premiumActivatedAt.toDate();
-    } else if (property.premiumActivatedAt) {
-        activatedDate = new Date(property.premiumActivatedAt);
-    } else if (property.createdAt?.toDate) {
-        activatedDate = property.createdAt.toDate();
-    } else if (property.createdAt) {
-        activatedDate = new Date(property.createdAt);
-    }
-    
-    if (activatedDate && !isNaN(activatedDate.getTime())) {
-        timeDisplay = activatedDate.toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
-    } else {
-        timeDisplay = 'Recently';
-    }
-    
-    const gradientClass = isMissed 
-        ? 'from-amber-700 to-orange-600 border-amber-500' 
-        : 'from-amber-600 to-yellow-500 border-amber-400';
-    
-    const titleText = isMissed 
-        ? '👑 Premium Request While Away...' 
-        : '👑 New Premium Activation!';
-    
-    const notificationHTML = `
-        <div id="notification-${notificationId}" class="bg-gradient-to-r ${gradientClass} rounded-xl p-4 border-2 shadow-lg relative admin-notification-new">
-            <button onclick="event.stopPropagation(); dismissAdminNotification('${notificationId}')" 
-                    class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
-                ✕
-            </button>
-            <div class="flex items-center gap-4 pr-8">
-                <span class="text-3xl">👑</span>
-                <div class="flex-1">
-                    <div class="text-white font-bold text-lg">${titleText}</div>
-                    <div class="text-white/90 font-semibold">${property.title || 'Property'}</div>
-                    <div class="text-white/70 text-sm">by ${ownerName} • $10k/week fee</div>
-                    <div class="text-white/50 text-xs mt-1">${timeDisplay}</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    stack.insertAdjacentHTML('afterbegin', notificationHTML);
-    
-    // Add to pending
-    window.pendingAdminNotifications.add(notificationId);
-    updateNotificationBadge();
+    // NO-OP: All premium notifications are now handled by notification-manager.js
+    // This prevents duplicate notifications and ensures dismissals persist to Firestore
+    return;
 };
 
 // Render the persistent admin notification stack
+// DEPRECATED: renderAdminNotificationStack - now handled by notification-manager.js
+// Kept as no-op for backward compatibility
 window.renderAdminNotificationStack = function(notifications, hasNew = false) {
-    const stack = $('adminNotificationsStack');
-    if (!stack) return;
-    
-    // Filter out dismissed ones
-    const activeNotifications = notifications.filter(n => 
-        !window.dismissedAdminNotifications.has(n.id)
-    );
-    
-    if (activeNotifications.length === 0) {
-        stack.classList.add('hidden');
-        stack.innerHTML = '';
-        return;
+    // NO-OP: Stack rendering is now handled by notification-manager.js
+    // Delegate to unified system to refresh if needed
+    if (typeof NotificationManager !== 'undefined' && NotificationManager.refreshUI) {
+        NotificationManager.refreshUI();
     }
-    
-    stack.classList.remove('hidden');
-    
-    // Flash the entire screen if there are new notifications
-    if (hasNew) {
-        flashScreen();
-    }
-    
-    stack.innerHTML = activeNotifications.map(n => {
-        const time = n.createdAt?.toDate ? n.createdAt.toDate() : new Date();
-        const timeStr = time.toLocaleString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-        });
-        
-        let icon, bgGradient, borderColor, title, message;
-        
-        switch(n.type) {
-            case 'new_user':
-                icon = '👤';
-                bgGradient = 'from-cyan-600 to-blue-600';
-                borderColor = 'border-cyan-500';
-                title = 'New User Registered!';
-                message = `${n.displayName || n.userEmail?.split('@')[0]} created a Starter account`;
-                break;
-            case 'upgrade_request':
-                icon = '💰';
-                bgGradient = 'from-purple-600 to-pink-600';
-                borderColor = 'border-purple-500';
-                title = 'Upgrade Request';
-                message = `${n.displayName || n.userEmail} wants ${TIERS[n.requestedTier]?.name || 'upgrade'}`;
-                break;
-            case 'premium_request':
-                icon = '👑';
-                bgGradient = 'from-amber-600 to-yellow-500';
-                borderColor = 'border-amber-400';
-                title = 'Premium Listing Activated!';
-                message = n.message || `${n.propertyTitle || 'Property'} enabled premium - collect $10k/week`;
-                // Add to pending premium notifications for badge count
-                if (!window.pendingAdminNotifications.has('new-premium-' + n.id)) {
-                    window.pendingAdminNotifications.add('new-premium-' + n.id);
-                }
-                break;
-            default:
-                icon = '🔔';
-                bgGradient = 'from-purple-600 to-pink-600';
-                borderColor = 'border-purple-500';
-                title = 'Notification';
-                message = n.message || 'New notification';
-        }
-        
-        return `
-            <div class="bg-gradient-to-r ${bgGradient} rounded-xl p-4 border-2 ${borderColor} shadow-lg relative admin-notification-new" 
-                 onclick="handleAdminNotificationClick('${n.id}', '${n.type}')">
-                <button onclick="event.stopPropagation(); dismissAdminNotification('${n.id}')" 
-                        class="absolute top-2 right-2 text-white/70 hover:text-white text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition">
-                    ✕
-                </button>
-                <div class="flex items-center gap-4 pr-8 cursor-pointer">
-                    <span class="text-3xl">${icon}</span>
-                    <div class="flex-1">
-                        <div class="text-white font-bold text-lg">${title}</div>
-                        <div class="text-white/80">${message}</div>
-                        <div class="text-white/50 text-xs mt-1">${timeStr}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
 };
 
 // Flash the screen for new notifications
