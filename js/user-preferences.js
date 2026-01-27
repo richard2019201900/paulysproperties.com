@@ -162,6 +162,13 @@ const UserPreferencesService = (function() {
      * @param {any} value - Preference value
      */
     async function save(key, value) {
+        // CRITICAL: Wait for load to complete before saving
+        // Otherwise we might overwrite existing data with partial cache
+        if (isLoading && loadPromise) {
+            console.log(`[UserPreferences] Waiting for load to complete before saving ${key}...`);
+            await loadPromise;
+        }
+        
         // Update cache immediately (optimistic update)
         cache[key] = value;
         console.log(`[UserPreferences] Saving ${key}:`, value);
@@ -191,6 +198,12 @@ const UserPreferencesService = (function() {
      * @param {Object} prefs - Object with key-value pairs
      */
     async function saveMultiple(prefs) {
+        // CRITICAL: Wait for load to complete before saving
+        if (isLoading && loadPromise) {
+            console.log('[UserPreferences] Waiting for load to complete before saveMultiple...');
+            await loadPromise;
+        }
+        
         // Update cache immediately
         Object.assign(cache, prefs);
         console.log('[UserPreferences] saveMultiple called with keys:', Object.keys(prefs));
@@ -351,6 +364,10 @@ const UserPreferencesService = (function() {
      */
     async function setDashboardTab(tabName) {
         if (tabName === 'myProperties' || tabName === 'admin') {
+            // Don't save if value hasn't changed (prevents unnecessary writes)
+            if (cache.dashboardTab === tabName) {
+                return;
+            }
             await save('dashboardTab', tabName);
         }
     }
