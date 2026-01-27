@@ -2059,7 +2059,8 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         const maxListings = (isUserMasterAdmin || tierData.maxListings === Infinity) ? '∞' : tierData.maxListings;
         const escapedEmail = user.email.replace(/'/g, "\\'");
         const escapedId = user.id;
-        const displayName = user.username || user.email.split('@')[0];
+        // CRITICAL: Use displayName field (preferred) over username
+        const displayName = user.displayName || user.username || user.email.split('@')[0];
         
         // Format activity times
         const lastLogin = user.lastLogin?.toDate 
@@ -2453,7 +2454,9 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <span class="text-xl">${tierData.icon}</span>
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="text-white font-bold">${displayName}</span>
+                                    <span id="displayName_${escapedId}" class="text-white font-bold">${displayName}</span>
+                                    <button onclick="event.stopPropagation(); adminEditDisplayName('${escapedId}', '${escapedEmail}', '${displayName.replace(/'/g, "\\'")}')" 
+                                            class="text-gray-500 hover:text-cyan-400 text-xs transition" title="Edit display name">✏️</button>
                                     ${pendingBadge}
                                 </div>
                                 <div class="text-gray-500 text-xs truncate">${user.email}</div>

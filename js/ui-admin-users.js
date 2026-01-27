@@ -2322,3 +2322,53 @@ window.batchSyncOwnerProfiles = async function() {
     }
 };
 
+// =========================================================================
+// ADMIN EDIT DISPLAY NAME
+// =========================================================================
+
+/**
+ * Allow admin to edit a user's display name
+ * @param {string} userId - User document ID
+ * @param {string} email - User email
+ * @param {string} currentName - Current display name
+ */
+window.adminEditDisplayName = async function(userId, email, currentName) {
+    const newName = prompt(`Edit display name for ${email}:`, currentName);
+    
+    if (newName === null) return; // Cancelled
+    
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+        alert('Display name cannot be empty.');
+        return;
+    }
+    
+    if (trimmedName === currentName) {
+        return; // No change
+    }
+    
+    try {
+        // Update user document - use 'displayName' field (preferred) not 'username'
+        await updateAdminUserField(userId, email, 'displayName', trimmedName);
+        
+        // Update the display in the admin panel
+        const displayNameEl = document.getElementById(`displayName_${userId}`);
+        if (displayNameEl) {
+            displayNameEl.textContent = trimmedName;
+        }
+        
+        // Sync to all properties owned by this user
+        await syncOwnerProfileToProperties(email, trimmedName, null);
+        
+        // Refresh the admin users list to ensure everything is synced
+        if (typeof loadAllUsers === 'function') {
+            loadAllUsers();
+        }
+        
+        showToast(`Display name updated to "${trimmedName}"`, 'success');
+        
+    } catch (error) {
+        console.error('[AdminEditDisplayName] Error:', error);
+        alert('Error updating display name: ' + error.message);
+    }
+};
