@@ -281,15 +281,21 @@
         refreshUI();
     }
     
-    function dismissAll() {
+    async function dismissAll() {
+        console.log('[NotificationManager] ====== DISMISS ALL ======');
         console.log('[NotificationManager] Dismissing all', state.notifications.length, 'notifications');
         const allIds = state.notifications.map(n => n.id);
+        console.log('[NotificationManager] IDs to dismiss:', allIds);
         allIds.forEach(id => state.dismissed.add(id));
         state.notifications = [];
         
         // Save to Firestore via UserPreferencesService
         if (window.UserPreferencesService) {
-            UserPreferencesService.dismissNotifications(allIds);
+            console.log('[NotificationManager] Calling UserPreferencesService.dismissNotifications...');
+            await UserPreferencesService.dismissNotifications(allIds);
+            console.log('[NotificationManager] ✅ dismissNotifications completed');
+        } else {
+            console.error('[NotificationManager] UserPreferencesService not available!');
         }
         
         // Clear the notification stack from DOM
@@ -300,6 +306,7 @@
         }
         
         refreshUI();
+        console.log('[NotificationManager] ===========================');
         showToast('✓ All notifications cleared', 'success');
     }
     
