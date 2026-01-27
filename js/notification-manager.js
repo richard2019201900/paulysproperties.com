@@ -282,20 +282,15 @@
     }
     
     async function dismissAll() {
-        console.log('[NotificationManager] ====== DISMISS ALL ======');
-        console.log('[NotificationManager] Dismissing all', state.notifications.length, 'notifications');
+        const count = state.notifications.length;
+        console.log('[NotificationManager] Dismissing all', count, 'notifications');
         const allIds = state.notifications.map(n => n.id);
-        console.log('[NotificationManager] IDs to dismiss:', allIds);
         allIds.forEach(id => state.dismissed.add(id));
         state.notifications = [];
         
         // Save to Firestore via UserPreferencesService
         if (window.UserPreferencesService) {
-            console.log('[NotificationManager] Calling UserPreferencesService.dismissNotifications...');
             await UserPreferencesService.dismissNotifications(allIds);
-            console.log('[NotificationManager] ✅ dismissNotifications completed');
-        } else {
-            console.error('[NotificationManager] UserPreferencesService not available!');
         }
         
         // Clear the notification stack from DOM
@@ -306,7 +301,6 @@
         }
         
         refreshUI();
-        console.log('[NotificationManager] ===========================');
         showToast('✓ All notifications cleared', 'success');
     }
     
@@ -966,8 +960,6 @@
         // Create promise to prevent concurrent calls
         initPromise = (async () => {
             try {
-                console.log('[NotificationManager] Starting init for user:', currentUser.email);
-                
                 // Load preferences from Firestore via UserPreferencesService
                 if (window.UserPreferencesService) {
                     await UserPreferencesService.load();
@@ -975,27 +967,20 @@
                     // Load dismissed notifications into local Set for fast lookups
                     const dismissedList = UserPreferencesService.getAll().dismissedNotifications || [];
                     state.dismissed = new Set(dismissedList);
-                    console.log('[NotificationManager] Loaded', state.dismissed.size, 'dismissed notifications');
                     
                     // Load last admin visit time
                     state.lastAdminVisit = UserPreferencesService.getAdminLastVisit();
-                    console.log('[NotificationManager] Last admin visit:', state.lastAdminVisit);
                 }
                 
                 state.sessionStart = new Date();
                 
                 const isAdmin = window.TierService?.isMasterAdmin(currentUser.email);
-                console.log('[NotificationManager] Is admin:', isAdmin);
                 
                 if (isAdmin) {
                     // IMPORTANT: Update admin visit time BEFORE starting listeners
-                    // This ensures we don't show "missed" notifications for users 
-                    // created during the current session
                     if (window.UserPreferencesService) {
                         await UserPreferencesService.updateAdminLastVisit();
-                        // Update local state immediately after saving
                         state.lastAdminVisit = new Date();
-                        console.log('[NotificationManager] Updated admin visit to:', state.lastAdminVisit);
                     }
                     
                     startUserListener();
@@ -1074,9 +1059,7 @@
                         
                         // Show "missed" if user was created after admin's last visit
                         // CRITICAL: If lastAdminVisit is null, we don't show missed notifications
-                        // (this means admin is logging in for the first time or preferences failed to load)
                         if (createdAt && state.lastAdminVisit && createdAt > state.lastAdminVisit) {
-                            console.log(`[NotificationManager] Missed user: ${user.email}, created: ${createdAt}, lastVisit: ${state.lastAdminVisit}`);
                             const notification = createNotification('user', user, {
                                 id: notifId,
                                 timestamp: createdAt.toISOString(),

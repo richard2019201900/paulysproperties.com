@@ -95,16 +95,6 @@ const UserPreferencesService = (function() {
                     const data = doc.data();
                     const prefs = data.preferences || {};
                     
-                    console.log('[UserPreferences] ====== LOAD DEBUG ======');
-                    console.log('[UserPreferences] User UID:', user.uid);
-                    console.log('[UserPreferences] User Email:', user.email);
-                    console.log('[UserPreferences] Full document data:', JSON.stringify(data, null, 2));
-                    console.log('[UserPreferences] Preferences object:', JSON.stringify(prefs, null, 2));
-                    console.log('[UserPreferences] dismissedNotifications:', prefs.dismissedNotifications);
-                    console.log('[UserPreferences] adminLastVisit:', prefs.adminLastVisit);
-                    console.log('[UserPreferences] lastSeenSiteUpdate:', prefs.lastSeenSiteUpdate);
-                    console.log('[UserPreferences] ========================');
-                    
                     // Merge with defaults
                     cache = {
                         dismissedNotifications: prefs.dismissedNotifications || [],
@@ -116,7 +106,7 @@ const UserPreferencesService = (function() {
                         adminActivityLog: prefs.adminActivityLog || []
                     };
                     
-                    console.log('[UserPreferences] ✅ Loaded. dismissedNotifications count =', cache.dismissedNotifications.length);
+                    console.log('[UserPreferences] ✅ Loaded preferences. dismissedNotifications:', cache.dismissedNotifications.length, 'adminLastVisit:', cache.adminLastVisit);
                 } else {
                     console.log('[UserPreferences] No document exists for user, using defaults');
                 }
@@ -165,17 +155,14 @@ const UserPreferencesService = (function() {
         // CRITICAL: Wait for load to complete before saving
         // Otherwise we might overwrite existing data with partial cache
         if (isLoading && loadPromise) {
-            console.log(`[UserPreferences] Waiting for load to complete before saving ${key}...`);
             await loadPromise;
         }
         
         // Update cache immediately (optimistic update)
         cache[key] = value;
-        console.log(`[UserPreferences] Saving ${key}:`, value);
         
         const user = auth?.currentUser;
         if (!user) {
-            console.warn('[UserPreferences] Cannot save - no user logged in');
             return;
         }
         
@@ -185,9 +172,6 @@ const UserPreferencesService = (function() {
                     [key]: value
                 }
             }, { merge: true });
-            
-            console.log(`[UserPreferences] ✅ Saved ${key} to Firestore for user ${user.uid}`);
-            
         } catch (error) {
             console.error('[UserPreferences] Error saving:', key, error);
         }
@@ -200,17 +184,14 @@ const UserPreferencesService = (function() {
     async function saveMultiple(prefs) {
         // CRITICAL: Wait for load to complete before saving
         if (isLoading && loadPromise) {
-            console.log('[UserPreferences] Waiting for load to complete before saveMultiple...');
             await loadPromise;
         }
         
         // Update cache immediately
         Object.assign(cache, prefs);
-        console.log('[UserPreferences] saveMultiple called with keys:', Object.keys(prefs));
         
         const user = auth?.currentUser;
         if (!user) {
-            console.warn('[UserPreferences] saveMultiple - no user logged in!');
             return;
         }
         
@@ -218,9 +199,6 @@ const UserPreferencesService = (function() {
             await db.collection('users').doc(user.uid).set({
                 preferences: prefs
             }, { merge: true });
-            
-            console.log('[UserPreferences] ✅ Saved multiple prefs to Firestore:', Object.keys(prefs));
-            
         } catch (error) {
             console.error('[UserPreferences] Error saving multiple:', error);
         }
@@ -264,11 +242,6 @@ const UserPreferencesService = (function() {
      * @param {Array<string>} notificationIds 
      */
     async function dismissNotifications(notificationIds) {
-        console.log('[UserPreferences] ====== DISMISS NOTIFICATIONS ======');
-        console.log('[UserPreferences] dismissNotifications called with', notificationIds.length, 'IDs');
-        console.log('[UserPreferences] IDs:', notificationIds.slice(0, 5), notificationIds.length > 5 ? '...' : '');
-        console.log('[UserPreferences] Current cache.dismissedNotifications count:', cache.dismissedNotifications.length);
-        
         let changed = false;
         notificationIds.forEach(id => {
             if (!cache.dismissedNotifications.includes(id)) {
@@ -280,24 +253,14 @@ const UserPreferencesService = (function() {
             cache.pendingListingNotifications = cache.pendingListingNotifications.filter(pid => pid !== id);
         });
         
-        console.log('[UserPreferences] Changed:', changed);
-        console.log('[UserPreferences] New cache.dismissedNotifications count:', cache.dismissedNotifications.length);
-        
         if (changed) {
-            const user = auth?.currentUser;
-            console.log('[UserPreferences] User for save:', user?.uid, user?.email);
-            
-            console.log('[UserPreferences] Saving', cache.dismissedNotifications.length, 'dismissed notifications to Firestore');
+            console.log('[UserPreferences] Dismissing', notificationIds.length, 'notifications. Total dismissed:', cache.dismissedNotifications.length);
             await saveMultiple({
                 dismissedNotifications: cache.dismissedNotifications,
                 pendingUserNotifications: cache.pendingUserNotifications,
                 pendingListingNotifications: cache.pendingListingNotifications
             });
-            console.log('[UserPreferences] ✅ Save completed');
-        } else {
-            console.log('[UserPreferences] No new notifications to dismiss');
         }
-        console.log('[UserPreferences] ===================================');
     }
     
     /**
@@ -385,12 +348,9 @@ const UserPreferencesService = (function() {
         // If preferences aren't loaded yet, assume they've seen it to prevent flashing
         // The badge will be updated properly once preferences are loaded
         if (!isLoaded) {
-            console.log('[UserPreferences] hasSeenSiteUpdate: Not loaded yet, returning true (assume seen)');
             return true; // Assume seen until we know otherwise
         }
-        const seen = cache.lastSeenSiteUpdate === latestVersion;
-        console.log(`[UserPreferences] hasSeenSiteUpdate: cached='${cache.lastSeenSiteUpdate}', latest='${latestVersion}', seen=${seen}`);
-        return seen;
+        return cache.lastSeenSiteUpdate === latestVersion;
     }
     
     /**
@@ -406,7 +366,6 @@ const UserPreferencesService = (function() {
      * @param {string} version - Version string to mark as seen
      */
     async function markSiteUpdateSeen(version) {
-        console.log('[UserPreferences] markSiteUpdateSeen called with version:', version);
         await save('lastSeenSiteUpdate', version);
     }
 
