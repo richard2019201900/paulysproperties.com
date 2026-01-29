@@ -613,9 +613,65 @@ window.openCopyListingModal = function(propertyId) {
     const currentTitle = p.title || 'Untitled Property';
     const hasAgent = p.agentEmail && p.agentEmail !== propertyOwner;
     
+    // Build admin-only owner assignment section
+    let ownerAssignmentHTML = '';
+    let agentDropdownHTML = '';
+    
+    if (isAdmin) {
+        // Admin gets owner assignment dropdown
+        ownerAssignmentHTML = `
+            <div class="bg-gray-900/50 rounded-xl p-4 border border-red-500/30">
+                <label class="block text-red-400 font-bold mb-2">👑 Assign Owner <span class="text-xs text-gray-500">(Admin Only)</span></label>
+                <select id="copyListingOwner" 
+                        class="w-full bg-gray-800 text-white px-4 py-3 rounded-xl border border-gray-600 focus:border-red-400 focus:ring-2 focus:ring-red-500/20 transition">
+                    <option value="">Loading users...</option>
+                </select>
+                <p class="text-gray-500 text-xs mt-2">Select which user will own this property</p>
+            </div>
+        `;
+        
+        // Agent dropdown for admin
+        agentDropdownHTML = `
+            <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+                <label class="block text-purple-400 font-bold mb-2">🏠 Managing Agent</label>
+                <select id="copyListingAgent" 
+                        class="w-full bg-gray-800 text-white px-4 py-3 rounded-xl border border-gray-600 focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 transition">
+                    <option value="">No Agent (Owner Self-Manages)</option>
+                    <option value="loading">Loading agents...</option>
+                </select>
+                <p class="text-gray-500 text-xs mt-2">Select an agent to manage this property, or leave empty for self-management</p>
+            </div>
+        `;
+    }
+    
+    // Non-admin management options (original radio buttons)
+    const nonAdminManagementHTML = !isAdmin ? `
+        <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+            <label class="block text-purple-400 font-bold mb-3">🏠 Property Management</label>
+            <div class="space-y-2">
+                <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition">
+                    <input type="radio" name="copyManagement" value="self" checked
+                           class="w-5 h-5 text-purple-500 border-gray-600 focus:ring-purple-500 bg-gray-800">
+                    <div>
+                        <span class="text-white font-medium">Self-Manage</span>
+                        <p class="text-gray-400 text-xs">I'll handle this property myself</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition">
+                    <input type="radio" name="copyManagement" value="agent"
+                           class="w-5 h-5 text-purple-500 border-gray-600 focus:ring-purple-500 bg-gray-800">
+                    <div>
+                        <span class="text-white font-medium">Assign Agent</span>
+                        <p class="text-gray-400 text-xs">Pauly Amato will manage this property</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+    ` : '';
+    
     const modalHTML = `
         <div id="copyListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full border border-cyan-500/50">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full border border-cyan-500/50 max-h-[90vh] overflow-y-auto">
                 <div class="p-6">
                     <!-- Header -->
                     <div class="flex justify-between items-start mb-6">
@@ -656,28 +712,11 @@ window.openCopyListingModal = function(propertyId) {
                             <p class="text-gray-500 text-xs mt-2">Adjust if the new unit has different storage capacity</p>
                         </div>
                         
-                        <!-- Management Option -->
-                        <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                            <label class="block text-purple-400 font-bold mb-3">🏠 Property Management</label>
-                            <div class="space-y-2">
-                                <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition">
-                                    <input type="radio" name="copyManagement" value="self" checked
-                                           class="w-5 h-5 text-purple-500 border-gray-600 focus:ring-purple-500 bg-gray-800">
-                                    <div>
-                                        <span class="text-white font-medium">Self-Manage</span>
-                                        <p class="text-gray-400 text-xs">I'll handle this property myself</p>
-                                    </div>
-                                </label>
-                                <label class="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition">
-                                    <input type="radio" name="copyManagement" value="agent"
-                                           class="w-5 h-5 text-purple-500 border-gray-600 focus:ring-purple-500 bg-gray-800">
-                                    <div>
-                                        <span class="text-white font-medium">Assign Agent</span>
-                                        <p class="text-gray-400 text-xs">Pauly Amato will manage this property</p>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
+                        <!-- Admin-only Owner Assignment -->
+                        ${ownerAssignmentHTML}
+                        
+                        <!-- Agent Selection (Admin) or Management Option (Non-Admin) -->
+                        ${isAdmin ? agentDropdownHTML : nonAdminManagementHTML}
                         
                         <!-- What Gets Copied -->
                         <div class="bg-cyan-900/20 rounded-xl p-4 border border-cyan-500/30">
@@ -713,11 +752,107 @@ window.openCopyListingModal = function(propertyId) {
     if (existing) existing.remove();
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Load users into dropdowns for admin
+    if (isAdmin) {
+        loadCopyListingDropdowns(propertyOwner);
+    }
 };
 
 window.closeCopyListingModal = function() {
     const modal = $('copyListingModal');
     if (modal) modal.remove();
+};
+
+/**
+ * Load users into owner and agent dropdowns for admin copy listing
+ */
+window.loadCopyListingDropdowns = async function(currentOwnerEmail) {
+    const ownerSelect = $('copyListingOwner');
+    const agentSelect = $('copyListingAgent');
+    
+    try {
+        // Fetch all users
+        const snapshot = await db.collection('users').get();
+        const users = [];
+        
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            if (user.email) {
+                // Get display name using same hierarchy as everywhere else
+                let displayName;
+                if (user.displayName && user.displayName.includes(' ')) {
+                    displayName = user.displayName;
+                } else if (user.firstName && user.lastName) {
+                    displayName = user.firstName + ' ' + user.lastName;
+                } else if (user.firstName) {
+                    displayName = user.firstName;
+                } else if (user.displayName) {
+                    displayName = user.displayName;
+                } else if (user.username) {
+                    displayName = user.username;
+                } else {
+                    displayName = user.email.split('@')[0];
+                }
+                
+                const tierData = TIERS[user.tier] || TIERS.starter;
+                const isMasterAdmin = TierService.isMasterAdmin(user.email);
+                
+                users.push({
+                    email: user.email.toLowerCase(),
+                    displayName: displayName,
+                    tier: user.tier || 'starter',
+                    tierIcon: isMasterAdmin ? '👑' : tierData.icon,
+                    tierName: isMasterAdmin ? 'Owner' : tierData.name,
+                    isMasterAdmin: isMasterAdmin
+                });
+            }
+        });
+        
+        // Sort: Admin first, then by tier, then alphabetically
+        users.sort((a, b) => {
+            if (a.isMasterAdmin && !b.isMasterAdmin) return -1;
+            if (!a.isMasterAdmin && b.isMasterAdmin) return 1;
+            if (a.tier === 'elite' && b.tier !== 'elite') return -1;
+            if (a.tier !== 'elite' && b.tier === 'elite') return 1;
+            return a.displayName.localeCompare(b.displayName);
+        });
+        
+        // Populate owner dropdown
+        if (ownerSelect) {
+            ownerSelect.innerHTML = '<option value="">-- Select Owner --</option>';
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.email;
+                option.textContent = `${user.tierIcon} ${user.displayName} (${user.email})`;
+                // Pre-select current owner
+                if (user.email === currentOwnerEmail) {
+                    option.selected = true;
+                }
+                ownerSelect.appendChild(option);
+            });
+        }
+        
+        // Populate agent dropdown
+        if (agentSelect) {
+            agentSelect.innerHTML = '<option value="">No Agent (Owner Self-Manages)</option>';
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.email;
+                option.textContent = `${user.tierIcon} ${user.displayName}`;
+                agentSelect.appendChild(option);
+            });
+        }
+        
+    } catch (error) {
+        console.error('[CopyListing] Error loading users:', error);
+        if (ownerSelect) {
+            ownerSelect.innerHTML = '<option value="">Error loading users</option>';
+        }
+        if (agentSelect) {
+            agentSelect.innerHTML = '<option value="">Error loading agents</option>';
+        }
+    }
 };
 
 /**
@@ -733,7 +868,6 @@ window.executeCopyListing = async function(sourcePropertyId) {
     // Get values from modal
     const newTitle = $('copyListingTitle')?.value?.trim();
     const newStorage = parseInt($('copyListingStorage')?.value) || 0;
-    const managementOption = document.querySelector('input[name="copyManagement"]:checked')?.value || 'self';
     
     if (!newTitle) {
         alert('Please enter a title for the new listing');
@@ -780,32 +914,42 @@ window.executeCopyListing = async function(sourcePropertyId) {
         const maxId = Math.max(0, ...existingIds);
         const newId = maxId + 1;
         
-        // Determine owner and agent based on management selection
+        // Determine owner and agent based on admin dropdowns or non-admin radio buttons
         let newOwnerEmail = '';
         let newAgentEmail = '';
         
         const adminEmail = 'richard2019201900@gmail.com';
         const sourceOwner = (sourceProperty.ownerEmail || '').toLowerCase();
         
-        if (managementOption === 'agent') {
-            // "Assign Agent" selected - Admin (Pauly) manages this property
-            // If admin is doing the copy, they become the owner
-            // If non-admin is copying, they stay owner and admin becomes agent
-            if (isAdmin) {
-                // Admin copying with agent = admin owns and manages it
-                newOwnerEmail = adminEmail;
-                newAgentEmail = ''; // No separate agent needed, owner IS the admin
-            } else {
+        if (isAdmin) {
+            // Admin uses dropdowns
+            const selectedOwner = $('copyListingOwner')?.value;
+            const selectedAgent = $('copyListingAgent')?.value;
+            
+            if (!selectedOwner) {
+                alert('Please select an owner for this property');
+                if (createBtn) {
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = '<span>📋</span> Create Copy';
+                }
+                return;
+            }
+            
+            newOwnerEmail = selectedOwner.toLowerCase();
+            newAgentEmail = selectedAgent ? selectedAgent.toLowerCase() : '';
+            
+            // Don't set agent if owner IS the agent (self-managing)
+            if (newAgentEmail === newOwnerEmail) {
+                newAgentEmail = '';
+            }
+        } else {
+            // Non-admin uses radio buttons
+            const managementOption = document.querySelector('input[name="copyManagement"]:checked')?.value || 'self';
+            
+            if (managementOption === 'agent') {
                 // Non-admin copying with agent = they own it, admin manages
                 newOwnerEmail = currentUserEmail;
                 newAgentEmail = adminEmail;
-            }
-        } else {
-            // "Self-Manage" selected
-            if (isAdmin) {
-                // Admin self-managing = admin owns it
-                newOwnerEmail = adminEmail;
-                newAgentEmail = '';
             } else {
                 // Non-admin self-managing = they own it, no agent
                 newOwnerEmail = currentUserEmail;
