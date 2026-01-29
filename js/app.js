@@ -5438,12 +5438,12 @@ function renderRTOWizardStep(step) {
                             <span class="text-green-400 font-semibold">$${calc.downPayment.toLocaleString()}</span>
                         </div>
                         ${state.hasAgent ? `
-                        <div class="flex justify-between text-purple-400">
-                            <span>− Agent Fee (10% of Down Payment)</span>
+                        <div class="flex justify-between text-purple-400 pl-4">
+                            <span>└─ Agent Commission (10%)</span>
                             <span class="font-semibold">−$${Math.round(calc.downPayment * 0.10).toLocaleString()}</span>
                         </div>
-                        <div class="flex justify-between text-gray-500 text-xs">
-                            <span>Net to Seller:</span>
+                        <div class="flex justify-between text-gray-500 text-xs pl-4">
+                            <span>└─ Net to Property Owner:</span>
                             <span>$${Math.round(calc.downPayment * 0.90).toLocaleString()}</span>
                         </div>
                         ` : ''}
@@ -5455,26 +5455,28 @@ function renderRTOWizardStep(step) {
                             <span class="text-gray-400">Term Length</span>
                             <span class="text-white">${calc.termMonths} Month${calc.termMonths !== 1 ? 's' : ''}</span>
                         </div>
+                        ${calc.termMonths > 1 ? `
                         <div class="flex justify-between">
                             <span class="text-gray-400">Monthly Payments (Months 1-${calc.termMonths - 1})</span>
                             <span class="text-green-400 font-semibold">$${calc.monthlyPayment.toLocaleString()}</span>
                         </div>
-                        ${state.hasAgent ? `
-                        <div class="flex justify-between text-purple-400">
-                            <span>− Agent Fee (10% per payment)</span>
+                        ${state.hasAgent && calc.monthlyPayment > 0 ? `
+                        <div class="flex justify-between text-purple-400 pl-4">
+                            <span>└─ Agent Commission (10%)</span>
                             <span class="font-semibold">−$${Math.round(calc.monthlyPayment * 0.10).toLocaleString()}</span>
                         </div>
-                        <div class="flex justify-between text-gray-500 text-xs">
-                            <span>Net to Seller per month:</span>
+                        <div class="flex justify-between text-gray-500 text-xs pl-4">
+                            <span>└─ Net to Property Owner:</span>
                             <span>$${Math.round(calc.monthlyPayment * 0.90).toLocaleString()}</span>
                         </div>
+                        ` : ''}
                         ` : ''}
                         <div class="flex justify-between border-t border-gray-700 pt-2">
                             <span class="text-gray-400">Final Payment Base (State Min)</span>
                             <span class="text-white">$${calc.finalPaymentBase.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">+ City Transfer Fee (10%)</span>
+                            <span class="text-gray-400">+ Government Transfer Fee (10%)</span>
                             <span class="text-amber-400">$${calc.finalPaymentFee.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between bg-amber-900/30 p-2 rounded-lg">
@@ -5482,14 +5484,34 @@ function renderRTOWizardStep(step) {
                             <span class="text-amber-300 font-bold">$${calc.finalPaymentTotal.toLocaleString()}</span>
                         </div>
                         ${state.hasAgent ? `
-                        <div class="flex justify-between text-purple-400 mt-1">
-                            <span>− Agent Fee (10% of Final Payment Base)</span>
-                            <span class="font-semibold">−$${Math.round(calc.finalPaymentBase * 0.10).toLocaleString()}</span>
+                        <div class="bg-purple-900/20 border border-purple-500/30 rounded-lg p-2 mt-2">
+                            <div class="text-purple-300 text-xs font-bold mb-1">Final Payment Distribution:</div>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-400">Government Fee:</span>
+                                <span class="text-amber-400">$${calc.finalPaymentFee.toLocaleString()} → Government</span>
+                            </div>
+                            <div class="flex justify-between text-xs">
+                                <span class="text-gray-400">Agent Commission (10% of Base):</span>
+                                <span class="text-purple-400">$${Math.round(calc.finalPaymentBase * 0.10).toLocaleString()} → Agent</span>
+                            </div>
+                            <div class="flex justify-between text-xs border-t border-purple-500/30 pt-1 mt-1">
+                                <span class="text-gray-300">Net to Property Owner:</span>
+                                <span class="text-green-400 font-semibold">$${Math.round(calc.finalPaymentBase * 0.90).toLocaleString()}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Total Agent Commission Summary -->
+                        <div class="bg-purple-900/30 border border-purple-500/50 rounded-lg p-3 mt-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-purple-300 font-bold">🏢 Total Agent Commission</span>
+                                <span class="text-purple-300 font-bold text-lg">$${(Math.round(calc.downPayment * 0.10) + Math.round(calc.monthlyPayment * 0.10) * (calc.termMonths - 1) + Math.round(calc.finalPaymentBase * 0.10)).toLocaleString()}</span>
+                            </div>
+                            <div class="text-purple-400/70 text-xs mt-1">via PaulysProperties.com • Agent: ${state.agentName}</div>
                         </div>
                         ` : ''}
                     </div>
                     <div class="mt-2 text-xs text-amber-400">📋 Property Category: ${calc.propertyCategory}</div>
-                    ${state.hasAgent ? `<div class="mt-1 text-xs text-purple-400">🏢 Agent commission applies to all payments</div>` : ''}
+                    ${state.hasAgent ? `<div class="mt-1 text-xs text-gray-500">Note: Agent commission deducted from property owner's portion. Government fee paid separately.</div>` : ''}
                 </div>
                 
                 <!-- Agreement Date -->
@@ -6022,31 +6044,41 @@ function generateRTOContract() {
     // Build preview text - use location as fallback for description
     const propertyDesc = state.property.description || state.property.location || 'N/A';
     
+    // Calculate total agent commission
+    const totalAgentCommission = agentFeeDown + (agentFeeMonthly * (calc.termMonths - 1)) + agentFeeFinal;
+    
     // Build agent section if applicable
     const agentSection = hasAgent ? `
-Managing Agent: ${agentName}
-Agent Commission: 10% of all payments
+Managing Agent: ${agentName} (via PaulysProperties.com)
+Agent Commission: 10% of property owner's portion (excludes government fees)
 ` : '';
 
     const agentFinancialSection = hasAgent ? `
-AGENT COMMISSION BREAKDOWN
+AGENT COMMISSION BREAKDOWN (via PaulysProperties.com)
 ────────────────────────────────────────────────────────────────
 Agent: ${agentName}
-Commission Rate: 10% of all payments
+Commission Rate: 10% (deducted from property owner's portion)
+Note: Agent commission does NOT apply to government fees.
 
 Down Payment: $${calc.downPayment.toLocaleString()}
-  − Agent Fee (10%): −$${agentFeeDown.toLocaleString()}
-  = Net to Seller: $${(calc.downPayment - agentFeeDown).toLocaleString()}
+  └─ Agent Commission (10%): −$${agentFeeDown.toLocaleString()}
+  └─ Net to Property Owner: $${(calc.downPayment - agentFeeDown).toLocaleString()}
 
-Monthly Payments (×${calc.termMonths - 1}): $${calc.monthlyPayment.toLocaleString()} each
-  − Agent Fee (10%): −$${agentFeeMonthly.toLocaleString()}
-  = Net to Seller: $${(calc.monthlyPayment - agentFeeMonthly).toLocaleString()} each
+${calc.termMonths > 1 ? `Monthly Payments (×${calc.termMonths - 1}): $${calc.monthlyPayment.toLocaleString()} each
+  └─ Agent Commission (10%): −$${agentFeeMonthly.toLocaleString()}
+  └─ Net to Property Owner: $${(calc.monthlyPayment - agentFeeMonthly).toLocaleString()} each
+` : ''}
+Final Payment Distribution:
+  Total Final Payment: $${calc.finalPaymentTotal.toLocaleString()}
+  ├─ Government Transfer Fee: $${calc.finalPaymentFee.toLocaleString()} → Government
+  └─ Remaining: $${calc.finalPaymentBase.toLocaleString()}
+      ├─ Agent Commission (10%): −$${agentFeeFinal.toLocaleString()} → Agent
+      └─ Net to Property Owner: $${(calc.finalPaymentBase - agentFeeFinal).toLocaleString()}
 
-Final Payment Base: $${calc.finalPaymentBase.toLocaleString()}
-  − Agent Fee (10%): −$${agentFeeFinal.toLocaleString()}
-  = Net to Seller: $${(calc.finalPaymentBase - agentFeeFinal).toLocaleString()}
-
-Total Agent Commission: $${(agentFeeDown + (agentFeeMonthly * (calc.termMonths - 1)) + agentFeeFinal).toLocaleString()}
+═══════════════════════════════════════════════════════════════
+TOTAL AGENT COMMISSION: $${totalAgentCommission.toLocaleString()}
+(10% of purchase price excluding government fees)
+═══════════════════════════════════════════════════════════════
 ` : '';
 
     const preview = `
@@ -6073,14 +6105,26 @@ FINANCIAL STRUCTURE
 Item                              Amount
 ─────────────────────────────────────────────────────
 Total Purchase Price              $${calc.purchasePrice.toLocaleString()}
-Down Payment (${calc.downPaymentPercent}%)              $${calc.downPayment.toLocaleString()}
+Down Payment (${calc.downPaymentPercent}%)              $${calc.downPayment.toLocaleString()}${hasAgent ? `
+  └─ Agent Commission (10%)       −$${agentFeeDown.toLocaleString()}
+  └─ Net to Property Owner        $${(calc.downPayment - agentFeeDown).toLocaleString()}` : ''}
 Remaining Balance to Finance      $${calc.remainingBalance.toLocaleString()}
 Term Length                       ${calc.termMonths} Month${calc.termMonths !== 1 ? 's' : ''}
-Monthly Payments (×${calc.termMonths - 1})         $${calc.monthlyPayment.toLocaleString()}
-Final Payment Base (State Min)      $${calc.finalPaymentBase.toLocaleString()}
-+ City Transfer Fee (10%)           $${calc.finalPaymentFee.toLocaleString()}
-= Total Final Payment             $${calc.finalPaymentTotal.toLocaleString()}
-${agentFinancialSection}
+${calc.termMonths > 1 ? `Monthly Payments (×${calc.termMonths - 1})         $${calc.monthlyPayment.toLocaleString()}${hasAgent && calc.monthlyPayment > 0 ? `
+  └─ Agent Commission (10%)       −$${agentFeeMonthly.toLocaleString()}
+  └─ Net to Property Owner        $${(calc.monthlyPayment - agentFeeMonthly).toLocaleString()}` : ''}` : ''}
+Final Payment Base (State Min)    $${calc.finalPaymentBase.toLocaleString()}
++ Government Transfer Fee (10%)   $${calc.finalPaymentFee.toLocaleString()}
+= Total Final Payment             $${calc.finalPaymentTotal.toLocaleString()}${hasAgent ? `
+  ├─ Government Fee               $${calc.finalPaymentFee.toLocaleString()} → Government
+  ├─ Agent Commission (10%)       −$${agentFeeFinal.toLocaleString()} → Agent
+  └─ Net to Property Owner        $${(calc.finalPaymentBase - agentFeeFinal).toLocaleString()}` : ''}
+${hasAgent ? `
+───────────────────────────────────────────────────────────────
+TOTAL AGENT COMMISSION            $${totalAgentCommission.toLocaleString()}
+(via PaulysProperties.com)
+───────────────────────────────────────────────────────────────` : ''}
+
 COMPLETE PAYMENT SCHEDULE
 ────────────────────────────────────────────────────────────────
 Agreement Start Date: ${formatDateForContract(startDate)}
@@ -6098,18 +6142,20 @@ schedule.map(p =>
 FINAL PAYMENT BREAKDOWN
 ────────────────────────────────────────────────────────────────
 • Base Final Payment (State Min): $${calc.finalPaymentBase.toLocaleString()}
-• City Transfer Fee (10%): $${calc.finalPaymentFee.toLocaleString()}
+• Government Transfer Fee (10%): $${calc.finalPaymentFee.toLocaleString()} → Paid to Government
 • Total Final Payment: $${calc.finalPaymentTotal.toLocaleString()}
 • Property Category: ${calc.propertyCategory}
-${hasAgent ? `• Agent Fee on Final: $${agentFeeFinal.toLocaleString()} (deducted from base)` : ''}
+${hasAgent ? `• Agent Commission (from Base): $${agentFeeFinal.toLocaleString()} → Paid to Agent via PaulysProperties.com
+• Net to Property Owner: $${(calc.finalPaymentBase - agentFeeFinal).toLocaleString()}` : ''}
 
 CONTRACT TERMS
 ────────────────────────────────────────────────────────────────
 Payment Terms:
-• Monthly payments of $${calc.monthlyPayment.toLocaleString()} due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month
+${calc.termMonths > 1 ? `• Monthly payments of $${calc.monthlyPayment.toLocaleString()} due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month` : '• Single payment contract (no monthly payments)'}
 • Final payment of $${calc.finalPaymentTotal.toLocaleString()} due on ${formatDateForContract(new Date(startDate.setMonth(startDate.getMonth() + calc.termMonths)))}
 • 3-day grace period before late fees apply
-${hasAgent ? `• Agent commission (10%) deducted from each payment before remittance to seller` : ''}
+${hasAgent ? `• Agent commission (10%) deducted from property owner's portion before remittance
+• Government fee ($${calc.finalPaymentFee.toLocaleString()}) paid directly to government on final transaction` : ''}
 
 Late Payment:
 • $50,000 late fee after 3 days
@@ -6436,9 +6482,9 @@ window.downloadRTOContractImage = async function() {
     drawLine();
     y += 4;
     drawText('PARTIES INVOLVED', margin, 16, '#f59e0b', 'Arial Black');
-    drawText(`Seller/Landlord: 👑 ${state.seller}`, margin, 12, '#ffffff');
+    drawText(`Seller/Landlord: 👑 ${state.hasAgent ? '🏢 Managed by: ' + state.agentName : state.seller}`, margin, 12, '#ffffff');
     drawText(`Buyer/Tenant: ${state.buyer.name}`, margin, 12, '#ffffff');
-    drawText(`Realtor/Brokerage: 👑 ${state.seller} / PaulysProperties.com`, margin, 12, '#ffffff');
+    drawText(`Realtor/Brokerage: 👑 ${state.hasAgent ? 'Managed by: ' + state.agentName + ' / ' : state.seller + ' / '}PaulysProperties.com`, margin, 12, '#ffffff');
     y += 6;
     
     // === FINANCIAL STRUCTURE ===
@@ -6446,25 +6492,68 @@ window.downloadRTOContractImage = async function() {
     y += 4;
     drawText('FINANCIAL STRUCTURE', margin, 16, '#f59e0b', 'Arial Black');
     
-    const financialItems = [
-        ['Total Purchase Price', `$${calc.purchasePrice.toLocaleString()}`],
-        [`Down Payment (${calc.downPaymentPercent ?? 10}%)`, `$${calc.downPayment.toLocaleString()}`],
-        ['Remaining Balance to Finance', `$${calc.remainingBalance.toLocaleString()}`],
-        ['Term Length', `${calc.termMonths} Months`],
-        [`Monthly Payments (×${calc.termMonths - 1})`, `$${calc.monthlyPayment.toLocaleString()}`],
-        ['Final Payment Base (State Min)', `$${calc.finalPaymentBase.toLocaleString()}`],
-        ['+ City Transfer Fee (10%)', `$${calc.finalPaymentFee.toLocaleString()}`],
-        ['= Total Final Payment', `$${calc.finalPaymentTotal.toLocaleString()}`]
+    // Check if there's an agent
+    const hasAgent = state.hasAgent || false;
+    const agentName = state.agentName || '';
+    const agentFeeDown = hasAgent ? Math.round(calc.downPayment * 0.10) : 0;
+    const agentFeeMonthly = hasAgent ? Math.round(calc.monthlyPayment * 0.10) : 0;
+    const agentFeeFinal = hasAgent ? Math.round(calc.finalPaymentBase * 0.10) : 0;
+    const totalAgentCommission = agentFeeDown + (agentFeeMonthly * (calc.termMonths - 1)) + agentFeeFinal;
+    
+    // Build financial items dynamically based on agent presence
+    let financialItems = [
+        ['Total Purchase Price', `$${calc.purchasePrice.toLocaleString()}`, '#10b981'],
+        [`Down Payment (${calc.downPaymentPercent ?? 10}%)`, `$${calc.downPayment.toLocaleString()}`, '#10b981']
     ];
     
-    financialItems.forEach(([label, value]) => {
+    if (hasAgent) {
+        financialItems.push(['  └─ Agent Commission (10%)', `−$${agentFeeDown.toLocaleString()}`, '#a855f7']);
+        financialItems.push(['  └─ Net to Property Owner', `$${(calc.downPayment - agentFeeDown).toLocaleString()}`, '#6b7280']);
+    }
+    
+    financialItems.push(['Remaining Balance to Finance', `$${calc.remainingBalance.toLocaleString()}`, '#10b981']);
+    financialItems.push(['Term Length', `${calc.termMonths} Month${calc.termMonths !== 1 ? 's' : ''}`, '#ffffff']);
+    
+    if (calc.termMonths > 1) {
+        financialItems.push([`Monthly Payments (×${calc.termMonths - 1})`, `$${calc.monthlyPayment.toLocaleString()}`, '#10b981']);
+        if (hasAgent && calc.monthlyPayment > 0) {
+            financialItems.push(['  └─ Agent Commission (10%)', `−$${agentFeeMonthly.toLocaleString()}`, '#a855f7']);
+            financialItems.push(['  └─ Net to Property Owner', `$${(calc.monthlyPayment - agentFeeMonthly).toLocaleString()}`, '#6b7280']);
+        }
+    }
+    
+    financialItems.push(['Final Payment Base (State Min)', `$${calc.finalPaymentBase.toLocaleString()}`, '#ffffff']);
+    financialItems.push(['+ Government Transfer Fee (10%)', `$${calc.finalPaymentFee.toLocaleString()}`, '#fbbf24']);
+    financialItems.push(['= Total Final Payment', `$${calc.finalPaymentTotal.toLocaleString()}`, '#10b981']);
+    
+    if (hasAgent) {
+        financialItems.push(['  ├─ Government Fee', `$${calc.finalPaymentFee.toLocaleString()} → Govt`, '#fbbf24']);
+        financialItems.push(['  ├─ Agent Commission (10% of Base)', `−$${agentFeeFinal.toLocaleString()}`, '#a855f7']);
+        financialItems.push(['  └─ Net to Property Owner', `$${(calc.finalPaymentBase - agentFeeFinal).toLocaleString()}`, '#6b7280']);
+    }
+    
+    financialItems.forEach(([label, value, color]) => {
         ctx.font = '12px Arial';
         ctx.fillStyle = '#9ca3af';
         ctx.fillText(label, margin, y);
-        ctx.fillStyle = '#10b981';
+        ctx.fillStyle = color || '#10b981';
         ctx.fillText(value, margin + 280, y);
-        y += 18;
+        y += 16;
     });
+    
+    // Total Agent Commission box if agent present
+    if (hasAgent) {
+        y += 4;
+        ctx.fillStyle = '#581c87';
+        ctx.fillRect(margin, y, contentWidth, 30);
+        ctx.font = 'bold 12px Arial';
+        ctx.fillStyle = '#a855f7';
+        ctx.fillText(`🏢 TOTAL AGENT COMMISSION: $${totalAgentCommission.toLocaleString()}`, margin + 10, y + 18);
+        ctx.font = '10px Arial';
+        ctx.fillStyle = '#9ca3af';
+        ctx.fillText(`via PaulysProperties.com • Agent: ${agentName}`, margin + 350, y + 18);
+        y += 36;
+    }
     
     y += 6;
     
@@ -7209,18 +7298,18 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     if (hasAgent) {
         agentFeeHtml = `
             <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3 mt-3">
-                <div class="text-purple-400 text-xs font-bold mb-1">🏢 Agent Commission Breakdown</div>
+                <div class="text-purple-400 text-xs font-bold mb-1">🏢 Agent Commission Breakdown (via PaulysProperties.com)</div>
                 <div class="text-sm space-y-1">
                     <div class="flex justify-between">
                         <span class="text-gray-400">Payment Received:</span>
                         <span class="text-white">$${actualAmount.toLocaleString()}</span>
                     </div>
                     <div class="flex justify-between">
-                        <span class="text-purple-400">Agent Fee (10%):</span>
+                        <span class="text-purple-400">Agent Commission (10%):</span>
                         <span class="text-purple-400">−$${agentFee.toLocaleString()}</span>
                     </div>
                     <div class="flex justify-between border-t border-purple-500/30 pt-1">
-                        <span class="text-gray-300">Net to Seller:</span>
+                        <span class="text-gray-300">Net to Property Owner:</span>
                         <span class="text-green-400 font-bold">$${netToSeller.toLocaleString()}</span>
                     </div>
                 </div>
@@ -7232,7 +7321,7 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
         if (hasAgent) {
-            thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Fee (10% - ${agentName}): −$${agentFee.toLocaleString()}\n• Net to Seller: $${netToSeller.toLocaleString()}\n\nYour remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+            thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Commission (10% via PaulysProperties.com): −$${agentFee.toLocaleString()}\n• Net to Property Owner: $${netToSeller.toLocaleString()}\n\nYour remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
         } else {
             thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
         }
@@ -7240,7 +7329,7 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
         headerText = 'Payment Logged!';
         badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
         if (hasAgent) {
-            thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Fee (10% - ${agentName}): −$${agentFee.toLocaleString()}\n• Net to Seller: $${netToSeller.toLocaleString()}\n\nYour remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+            thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Commission (10% via PaulysProperties.com): −$${agentFee.toLocaleString()}\n• Net to Property Owner: $${netToSeller.toLocaleString()}\n\nYour remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
         } else {
             thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
         }
