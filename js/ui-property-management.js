@@ -774,7 +774,8 @@ window.loadCopyListingDropdowns = async function(currentOwnerEmail) {
     try {
         // Fetch all users
         const snapshot = await db.collection('users').get();
-        const users = [];
+        const allUsers = [];
+        const agents = [];
         
         snapshot.forEach(doc => {
             const user = doc.data();
@@ -798,19 +799,28 @@ window.loadCopyListingDropdowns = async function(currentOwnerEmail) {
                 const tierData = TIERS[user.tier] || TIERS.starter;
                 const isMasterAdmin = TierService.isMasterAdmin(user.email);
                 
-                users.push({
+                const userObj = {
                     email: user.email.toLowerCase(),
                     displayName: displayName,
                     tier: user.tier || 'starter',
                     tierIcon: isMasterAdmin ? '👑' : tierData.icon,
                     tierName: isMasterAdmin ? 'Owner' : tierData.name,
-                    isMasterAdmin: isMasterAdmin
-                });
+                    isMasterAdmin: isMasterAdmin,
+                    isAgent: user.isAgent === true
+                };
+                
+                // Add to all users list (for owner dropdown)
+                allUsers.push(userObj);
+                
+                // Add to agents list only if they are a real estate agent OR master admin
+                if (user.isAgent === true || isMasterAdmin) {
+                    agents.push(userObj);
+                }
             }
         });
         
-        // Sort: Admin first, then by tier, then alphabetically
-        users.sort((a, b) => {
+        // Sort all users: Admin first, then by tier, then alphabetically
+        allUsers.sort((a, b) => {
             if (a.isMasterAdmin && !b.isMasterAdmin) return -1;
             if (!a.isMasterAdmin && b.isMasterAdmin) return 1;
             if (a.tier === 'elite' && b.tier !== 'elite') return -1;
@@ -818,10 +828,17 @@ window.loadCopyListingDropdowns = async function(currentOwnerEmail) {
             return a.displayName.localeCompare(b.displayName);
         });
         
-        // Populate owner dropdown
+        // Sort agents: Admin first, then alphabetically
+        agents.sort((a, b) => {
+            if (a.isMasterAdmin && !b.isMasterAdmin) return -1;
+            if (!a.isMasterAdmin && b.isMasterAdmin) return 1;
+            return a.displayName.localeCompare(b.displayName);
+        });
+        
+        // Populate owner dropdown (all users)
         if (ownerSelect) {
             ownerSelect.innerHTML = '<option value="">-- Select Owner --</option>';
-            users.forEach(user => {
+            allUsers.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.email;
                 option.textContent = `${user.tierIcon} ${user.displayName} (${user.email})`;
@@ -833,10 +850,10 @@ window.loadCopyListingDropdowns = async function(currentOwnerEmail) {
             });
         }
         
-        // Populate agent dropdown
+        // Populate agent dropdown (only real estate agents)
         if (agentSelect) {
             agentSelect.innerHTML = '<option value="">No Agent (Owner Self-Manages)</option>';
-            users.forEach(user => {
+            agents.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.email;
                 option.textContent = `${user.tierIcon} ${user.displayName}`;

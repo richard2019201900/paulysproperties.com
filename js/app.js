@@ -577,11 +577,13 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
     }
     
     // Set up real-time listener for all properties
-    PropertyDataService.subscribeAll((data) => {
+   PropertyDataService.subscribeAll((data) => {
         // Re-render when data changes from another source
         if (state.currentPropertyId === propId) {
             renderPropertyStatsContent(propId);
-            loadStatsOwnerName(propId);
+            requestAnimationFrame(() => {
+                loadStatsOwnerName(propId);
+            });
         }
     });
     
@@ -590,7 +592,11 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
     // filtered by the logged-in user's email - so only the OWNER sees the notification
     
     renderPropertyStatsContent(propId);
-    loadStatsOwnerName(propId);
+    
+    // Load owner name after DOM is ready
+    requestAnimationFrame(() => {
+        loadStatsOwnerName(propId);
+    });
     
     // Load property analytics (async - will populate the analytics section)
     // Use requestAnimationFrame + timeout to ensure DOM is ready
@@ -599,7 +605,7 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
             if (typeof renderPropertyAnalytics === 'function') {
                 renderPropertyAnalytics(propId);
             }
-        }, 200);
+        }, 100);
     });
     
     hideElement($('ownerDashboard'));
@@ -2669,10 +2675,16 @@ window.calculatePropertyAnalytics = function(payments, property) {
 // Render analytics section on property stats page
 window.renderPropertyAnalytics = async function(propertyId) {
     const container = $('propertyAnalyticsSection');
-    if (!container) return;
+    if (!container) {
+        console.warn('[Analytics] Container not found');
+        return;
+    }
     
     const p = properties.find(prop => prop.id === propertyId);
-    if (!p) return;
+    if (!p) {
+        console.warn('[Analytics] Property not found:', propertyId);
+        return;
+    }
     
     // Show loading
     container.innerHTML = `
@@ -2682,12 +2694,13 @@ window.renderPropertyAnalytics = async function(propertyId) {
         </div>
     `;
     
-    // Fetch payment history (includes tenure history)
-    const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
-    const historyData = historyDoc.exists ? historyDoc.data() : { payments: [], tenureHistory: [], vacancyPeriods: [] };
-    const payments = historyData.payments || [];
-    const tenureHistory = historyData.tenureHistory || [];
-    const vacancyPeriods = historyData.vacancyPeriods || [];
+    try {
+        // Fetch payment history (includes tenure history)
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        const historyData = historyDoc.exists ? historyDoc.data() : { payments: [], tenureHistory: [], vacancyPeriods: [] };
+        const payments = historyData.payments || [];
+        const tenureHistory = historyData.tenureHistory || [];
+        const vacancyPeriods = historyData.vacancyPeriods || [];
     
     const analytics = calculatePropertyAnalytics(payments, p);
     
@@ -2918,6 +2931,19 @@ window.renderPropertyAnalytics = async function(propertyId) {
             ` : ''}
         </div>
     `;
+    } catch (error) {
+        console.error('[Analytics] Error loading analytics:', error);
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4">⚠️</div>
+                <p class="text-red-400">Error loading analytics</p>
+                <p class="text-gray-500 text-sm mt-2">${error.message || 'Please try refreshing'}</p>
+                <button onclick="renderPropertyAnalytics(${propertyId})" class="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition">
+                    🔄 Retry
+                </button>
+            </div>
+        `;
+    }
 };
 
 // Render simple bar chart for earnings
