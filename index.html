@@ -156,6 +156,58 @@
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-gray-100">
+    <!-- Disclaimer Modal - blocks access until accepted -->
+    <div id="disclaimerModal" class="fixed inset-0 bg-black flex items-center justify-center hidden" role="dialog" aria-modal="true" style="z-index: 99999;">
+        <div class="bg-gray-900 rounded-2xl max-w-lg w-full mx-4 border-2 border-amber-500/50 shadow-2xl overflow-hidden">
+            <div class="bg-gradient-to-r from-amber-600 to-yellow-600 px-6 py-4">
+                <h2 class="text-xl font-black text-gray-900 flex items-center gap-3">
+                    <span class="text-2xl">⚠️</span>
+                    IMPORTANT DISCLAIMER
+                </h2>
+            </div>
+            <div class="p-6">
+                <p class="text-white font-semibold mb-4">
+                    PaulysProperties.com is a <span class="text-amber-400">player-run</span> property rental marketplace created and fully managed by <span class="text-amber-400">Pauly Amato</span>.
+                </p>
+                
+                <div class="bg-red-900/30 border border-red-500/50 rounded-xl p-4 mb-4">
+                    <p class="text-red-300 font-bold text-sm">
+                        This service is NOT endorsed by, affiliated with, or officially associated with PMA or any server administration.
+                    </p>
+                </div>
+                
+                <p class="text-gray-300 mb-4">By using this site, you acknowledge and agree:</p>
+                
+                <ul class="text-gray-300 text-sm space-y-2 mb-6">
+                    <li class="flex items-start gap-2">
+                        <span class="text-amber-400">•</span>
+                        <span>All transactions use <strong class="text-amber-400">in-game currency only</strong> — no real money</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-amber-400">•</span>
+                        <span>All communication must occur <strong class="text-amber-400">in-game</strong></span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-amber-400">•</span>
+                        <span>This is a <strong class="text-amber-400">roleplay (RP) service</strong> subject to server rules</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-amber-400">•</span>
+                        <span>PaulysProperties.com is <strong class="text-red-400">not responsible</strong> for any disputes</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <span class="text-amber-400">•</span>
+                        <span>Property listings and transactions are <strong class="text-amber-400">between players only</strong></span>
+                    </li>
+                </ul>
+                
+                <button onclick="acceptDisclaimer()" class="w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 py-4 px-6 rounded-xl font-black text-lg hover:opacity-90 transition shadow-lg">
+                    I Understand & Accept
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Celebration Banner Container (site-wide notifications for achievements) -->
     <div id="celebrationBannerContainer" class="hidden fixed top-0 left-0 right-0 z-50">
         <div id="celebrationBanner" class="bg-gradient-to-r from-amber-600 to-yellow-500 text-white py-3 px-4 shadow-lg">
@@ -182,7 +234,7 @@
         <div class="glass-effect rounded-2xl shadow-2xl p-10 max-w-lg w-full mx-4 max-h-screen overflow-y-auto border border-gray-700">
             <h2 id="modalTitle" class="text-3xl font-black bg-clip-text text-transparent mb-4 text-center"></h2>
             <p id="modalPropertyName" class="text-xl font-bold text-gray-200 mb-4 text-center"></p>
-            <p class="text-gray-400 mb-6 text-center font-medium">Text us in city! Copy the number and message below.</p>
+            <p class="text-gray-400 mb-6 text-center font-medium">Text us! Copy the number and message below.</p>
             
             <div class="mb-6">
                 <label class="block text-gray-300 font-bold mb-3">📱 Our Team's Number:</label>
@@ -199,7 +251,7 @@
             </div>
             
             <div id="modalAccent" class="p-4 rounded-xl mb-6 text-center border">
-                <p class="font-bold">⚡ Text in city for the fastest response!</p>
+                <p class="font-bold">⚡ Text for the fastest response!</p>
                 <p class="text-sm mt-1">Our team typically responds within minutes.</p>
                 <p class="text-gray-400 text-xs mt-2">⏰ Please allow up to 24 hours for a response during busy periods.</p>
             </div>
@@ -288,7 +340,7 @@
                     Close
                 </button>
             </div>
-            <p class="text-gray-500 text-xs text-center mt-2">Copies our number (205-702-8233) • Text in city for fastest response</p>
+            <p class="text-gray-500 text-xs text-center mt-2">Copies our number (205-702-8233) • Text for fastest response</p>
         </div>
     </div>
 
@@ -312,7 +364,7 @@
                     <div id="profileCheckPhone" class="w-6 h-6 rounded-full border-2 border-gray-500 flex items-center justify-center text-xs">
                         <span class="text-gray-500">✗</span>
                     </div>
-                    <span class="text-gray-300">In-City Phone Number</span>
+                    <span class="text-gray-300">Phone Number</span>
                 </div>
             </div>
             
@@ -434,7 +486,7 @@
                         <span class="text-2xl">🚫</span>
                         <div>
                             <p class="text-red-300 font-bold">City Minimum Violation</p>
-                            <p id="buyPriceWarningText" class="text-red-200 text-sm">Your price is below the PMA Government minimum for this property type.</p>
+                            <p id="buyPriceWarningText" class="text-red-200 text-sm">Your price is below the State minimum for this property type.</p>
                         </div>
                     </div>
                 </div>
@@ -466,7 +518,7 @@
                                 <span>✓ Gold border</span>
                                 <span>✓ Premium badge</span>
                             </div>
-                            <p class="text-orange-400 text-xs mt-2 font-semibold">⚠️ Weekly payment required - Pauly will contact you in-city to collect $10k payment</p>
+                            <p class="text-orange-400 text-xs mt-2 font-semibold">⚠️ Weekly payment required - Pauly will contact you to collect $10k payment</p>
                         </div>
                     </label>
                 </div>
@@ -554,7 +606,7 @@
                 </div>
                 
                 <div>
-                    <label class="block text-gray-300 font-semibold mb-2">Message to Send In-City</label>
+                    <label class="block text-gray-300 font-semibold mb-2">Message to Send</label>
                     <textarea id="upgradeMessage" rows="4" readonly class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-800 text-white focus:ring-2 focus:ring-purple-500 resize-none"></textarea>
                     <p class="text-gray-500 text-xs mt-1">This message will be auto-generated based on your selection</p>
                 </div>
@@ -563,7 +615,7 @@
                 
                 <!-- Instructions -->
                 <div class="bg-blue-900/30 border border-blue-600/50 rounded-xl p-4">
-                    <p class="text-blue-300 text-sm font-medium">📱 <strong>How to upgrade:</strong> Copy the message below and send it to Pauly in-city. Your upgrade will be processed within 24 hours after payment.</p>
+                    <p class="text-blue-300 text-sm font-medium">📱 <strong>How to upgrade:</strong> Copy the message below and send it to Pauly via text. Your upgrade will be processed within 24 hours after payment.</p>
                 </div>
                 
                 <div class="flex gap-4 pt-2">
@@ -1344,7 +1396,7 @@
                         </div>
                         <div>
                             <label class="block text-gray-300 font-semibold mb-2">Display Name</label>
-                            <input type="text" id="adminNewDisplayName" required maxlength="30" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="Their in-city name">
+                            <input type="text" id="adminNewDisplayName" required maxlength="30" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 text-white focus:ring-2 focus:ring-cyan-500 transition" placeholder="Their name">
                         </div>
                         <div>
                             <label class="block text-gray-300 font-semibold mb-2">Starting Tier</label>
@@ -2056,7 +2108,7 @@
                         <textarea id="contactMessage" rows="3" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700 font-medium text-white text-sm focus:ring-2 focus:ring-purple-500 transition">Hi! I'm interested in learning more about your available properties. Please contact me at your earliest convenience. Thank you!</textarea>
                         <button onclick="copyToClipboard('contactMessage', this)" class="w-full mt-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold hover:opacity-90 transition shadow-lg text-sm">Copy Message</button>
                     </div>
-                    <p class="text-center text-gray-400 text-xs">Text us in city • We typically respond within minutes</p>
+                    <p class="text-center text-gray-400 text-xs">Text us • We typically respond within minutes</p>
                 </div>
             </div>
         </section>
@@ -2113,7 +2165,7 @@
                         </li>
                         <li class="flex items-center space-x-3 mt-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg cursor-pointer hover:opacity-90 transition" onclick="openModal('contactModal')">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-                            <span class="font-bold">Text in city for fastest response!</span>
+                            <span class="font-bold">Text for fastest response!</span>
                         </li>
                     </ul>
                 </div>

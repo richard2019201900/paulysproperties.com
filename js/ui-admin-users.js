@@ -1945,7 +1945,7 @@ window.copyPremiumReminder = function(title, weeklyFee, nextDue) {
     }
     
     navigator.clipboard.writeText(message).then(() => {
-        showToast('📋 Reminder copied! Send via in-city text.', 'success');
+        showToast('📋 Reminder copied! Send via text.', 'success');
     }).catch(() => {
         const textarea = document.createElement('textarea');
         textarea.value = message;
@@ -1953,7 +1953,7 @@ window.copyPremiumReminder = function(title, weeklyFee, nextDue) {
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        showToast('📋 Reminder copied! Send via in-city text.', 'success');
+        showToast('📋 Reminder copied! Send via text.', 'success');
     });
 };
 
@@ -2033,11 +2033,32 @@ window.confirmPremiumPayment = async function(propertyId) {
         // Use PropertyDataService to write to the correct location (settings/properties)
         await PropertyDataService.write(propertyId, 'premiumLastPayment', dateStr);
         
-        closePremiumPaymentModal();
+        // Get property info for the thank you script
+        const prop = properties.find(p => p.id === propertyId);
+        const propertyTitle = prop?.title || `Property #${propertyId}`;
         
-        // Format date for display
+        // Calculate next due date (7 days from payment)
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const paymentDate = new Date(year, month - 1, day);
+        const nextDueDate = new Date(paymentDate);
+        nextDueDate.setDate(nextDueDate.getDate() + 7);
+        const nextDueFormatted = nextDueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        
+        // Generate thank you script
+        const thankYouScript = `Hey! 👑 Thanks for your premium listing payment for ${propertyTitle}! 💰 $10,000 received. Your listing will continue getting top placement and featured visibility. Next payment due: ${nextDueFormatted}. Thanks for choosing PaulysProperties.com! 🏠✨`;
+        
+        // Close the payment modal and show the thank you script modal
+        closePremiumPaymentModal();
+        showPremiumThankYouScript(propertyTitle, nextDueFormatted, thankYouScript);
+        
+        // Format date for toast
         const displayDate = selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        showToast(`💰 Premium payment recorded: ${displayDate}. Next due in 7 days.`, 'success');
+        showToast(`💰 Premium payment recorded: ${displayDate}`, 'success');
+        
+        // Refresh the premium alerts panel on dashboard
+        if (typeof window.renderPremiumAlertsPanel === 'function') {
+            window.renderPremiumAlertsPanel();
+        }
         
         // Re-render admin users list to update the display
         if (window.adminUsersData && typeof renderAdminUsersList === 'function') {
@@ -2048,6 +2069,65 @@ window.confirmPremiumPayment = async function(propertyId) {
         console.error('[Premium] Error recording payment:', error);
         showToast('Error recording payment: ' + error.message, 'error');
     }
+};
+
+/**
+ * Show thank you script modal after recording premium payment
+ */
+window.showPremiumThankYouScript = function(propertyTitle, nextDue, script) {
+    const modalHTML = `
+        <div id="premiumThankYouModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-green-500/50">
+                <h3 class="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">✅ Payment Recorded!</h3>
+                
+                <div class="bg-gray-900/50 rounded-xl p-4 mb-4">
+                    <p class="text-gray-300 text-sm"><strong>Property:</strong> ${propertyTitle}</p>
+                    <p class="text-gray-300 text-sm"><strong>Next Due:</strong> <span class="text-amber-400">${nextDue}</span></p>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-300 text-sm font-medium mb-2">📋 Thank You Script (Copy & Send)</label>
+                    <textarea id="premiumThankYouScript" readonly
+                              class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-3 text-sm resize-none h-32">${script}</textarea>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="copyPremiumThankYouScript()" 
+                            class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        📋 Copy Script
+                    </button>
+                    <button onclick="closePremiumThankYouModal()" 
+                            class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        Done
+                    </button>
+                </div>
+                <p class="text-gray-500 text-xs text-center mt-3">Text for fastest response</p>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.closePremiumThankYouModal = function() {
+    const modal = $('premiumThankYouModal');
+    if (modal) modal.remove();
+};
+
+window.copyPremiumThankYouScript = function() {
+    const textarea = $('premiumThankYouScript');
+    if (!textarea) return;
+    
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        showToast('📋 Thank you script copied!', 'success');
+        closePremiumThankYouModal();
+    }).catch(err => {
+        // Fallback
+        textarea.select();
+        document.execCommand('copy');
+        showToast('📋 Thank you script copied!', 'success');
+        closePremiumThankYouModal();
+    });
 };
 
 window.exportUsersCSV = function() {
