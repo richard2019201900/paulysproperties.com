@@ -56,26 +56,19 @@
     
     // Check if disclaimer was already accepted (localStorage for guests)
     window.checkDisclaimerAccepted = function() {
-        const accepted = localStorage.getItem('paulysproperties_disclaimer_accepted') === 'true';
-        console.log('[Disclaimer] checkDisclaimerAccepted:', accepted);
-        return accepted;
+        return localStorage.getItem('paulysproperties_disclaimer_accepted') === 'true';
     };
     
-    // Show disclaimer modal - uses hidden class pattern matching other site modals
+    // Show disclaimer modal
     window.showDisclaimerModal = function() {
-        console.log('[Disclaimer] showDisclaimerModal called');
         const modal = document.getElementById('disclaimerModal');
         if (modal) {
             modal.classList.remove('hidden');
-            console.log('[Disclaimer] Modal shown');
-        } else {
-            console.error('[Disclaimer] Modal element not found!');
         }
     };
     
     // Hide disclaimer modal
     window.hideDisclaimerModal = function() {
-        console.log('[Disclaimer] hideDisclaimerModal called');
         const modal = document.getElementById('disclaimerModal');
         if (modal) {
             modal.classList.add('hidden');
@@ -84,7 +77,6 @@
     
     // Accept disclaimer
     window.acceptDisclaimer = async function() {
-        console.log('[Disclaimer] acceptDisclaimer called');
         // Always save to localStorage (for guests and as backup)
         localStorage.setItem('paulysproperties_disclaimer_accepted', 'true');
         
@@ -96,7 +88,7 @@
                     disclaimerAcceptedAt: new Date().toISOString()
                 }, { merge: true });
             } catch (e) {
-                console.warn('Could not save disclaimer acceptance to Firestore:', e);
+                // Silent fail - localStorage is the backup
             }
         }
         
@@ -105,24 +97,16 @@
     
     // Check disclaimer on page load (before Firebase is ready)
     window.initDisclaimerCheck = function() {
-        console.log('[Disclaimer] initDisclaimerCheck running');
-        // If already accepted in localStorage, don't show
         if (checkDisclaimerAccepted()) {
-            console.log('[Disclaimer] Already accepted, hiding modal');
             hideDisclaimerModal();
             return;
         }
-        
-        // Show the disclaimer
-        console.log('[Disclaimer] Not accepted, showing modal');
         showDisclaimerModal();
     };
     
     // Check disclaimer for logged-in users (called after auth state change)
     window.checkDisclaimerForUser = async function(user) {
-        console.log('[Disclaimer] checkDisclaimerForUser called, user:', user?.email);
         if (!user) {
-            // Not logged in - use localStorage check
             if (!checkDisclaimerAccepted()) {
                 showDisclaimerModal();
             }
@@ -133,14 +117,12 @@
         try {
             const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists && userDoc.data().disclaimerAccepted === true) {
-                // Already accepted in Firestore - also update localStorage
-                console.log('[Disclaimer] Accepted in Firestore');
                 localStorage.setItem('paulysproperties_disclaimer_accepted', 'true');
                 hideDisclaimerModal();
                 return;
             }
         } catch (e) {
-            console.warn('Could not check disclaimer in Firestore:', e);
+            // Silent fail - check localStorage
         }
         
         // Check localStorage as fallback
@@ -152,19 +134,17 @@
                     disclaimerAcceptedAt: new Date().toISOString()
                 }, { merge: true });
             } catch (e) {
-                console.warn('Could not sync disclaimer to Firestore:', e);
+                // Silent fail
             }
             hideDisclaimerModal();
             return;
         }
         
         // Not accepted anywhere - show modal
-        console.log('[Disclaimer] Not accepted anywhere, showing modal');
         showDisclaimerModal();
     };
     
     // Run initial check when DOM is ready
-    console.log('[Disclaimer] Setting up initial check, readyState:', document.readyState);
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initDisclaimerCheck);
     } else {
