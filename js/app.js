@@ -49,6 +49,129 @@
     }
 })();
 
+// ==================== DISCLAIMER MODAL ====================
+// Requires user acknowledgment before accessing the site
+(function() {
+    'use strict';
+    
+    // Check if disclaimer was already accepted (localStorage for guests)
+    window.checkDisclaimerAccepted = function() {
+        const accepted = localStorage.getItem('paulysproperties_disclaimer_accepted') === 'true';
+        console.log('[Disclaimer] checkDisclaimerAccepted:', accepted);
+        return accepted;
+    };
+    
+    // Show disclaimer modal - uses hidden class pattern matching other site modals
+    window.showDisclaimerModal = function() {
+        console.log('[Disclaimer] showDisclaimerModal called');
+        const modal = document.getElementById('disclaimerModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            console.log('[Disclaimer] Modal shown');
+        } else {
+            console.error('[Disclaimer] Modal element not found!');
+        }
+    };
+    
+    // Hide disclaimer modal
+    window.hideDisclaimerModal = function() {
+        console.log('[Disclaimer] hideDisclaimerModal called');
+        const modal = document.getElementById('disclaimerModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    };
+    
+    // Accept disclaimer
+    window.acceptDisclaimer = async function() {
+        console.log('[Disclaimer] acceptDisclaimer called');
+        // Always save to localStorage (for guests and as backup)
+        localStorage.setItem('paulysproperties_disclaimer_accepted', 'true');
+        
+        // If user is logged in, also save to Firestore
+        if (typeof auth !== 'undefined' && auth.currentUser) {
+            try {
+                await db.collection('users').doc(auth.currentUser.uid).set({
+                    disclaimerAccepted: true,
+                    disclaimerAcceptedAt: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) {
+                console.warn('Could not save disclaimer acceptance to Firestore:', e);
+            }
+        }
+        
+        hideDisclaimerModal();
+    };
+    
+    // Check disclaimer on page load (before Firebase is ready)
+    window.initDisclaimerCheck = function() {
+        console.log('[Disclaimer] initDisclaimerCheck running');
+        // If already accepted in localStorage, don't show
+        if (checkDisclaimerAccepted()) {
+            console.log('[Disclaimer] Already accepted, hiding modal');
+            hideDisclaimerModal();
+            return;
+        }
+        
+        // Show the disclaimer
+        console.log('[Disclaimer] Not accepted, showing modal');
+        showDisclaimerModal();
+    };
+    
+    // Check disclaimer for logged-in users (called after auth state change)
+    window.checkDisclaimerForUser = async function(user) {
+        console.log('[Disclaimer] checkDisclaimerForUser called, user:', user?.email);
+        if (!user) {
+            // Not logged in - use localStorage check
+            if (!checkDisclaimerAccepted()) {
+                showDisclaimerModal();
+            }
+            return;
+        }
+        
+        // User is logged in - check Firestore first
+        try {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists && userDoc.data().disclaimerAccepted === true) {
+                // Already accepted in Firestore - also update localStorage
+                console.log('[Disclaimer] Accepted in Firestore');
+                localStorage.setItem('paulysproperties_disclaimer_accepted', 'true');
+                hideDisclaimerModal();
+                return;
+            }
+        } catch (e) {
+            console.warn('Could not check disclaimer in Firestore:', e);
+        }
+        
+        // Check localStorage as fallback
+        if (checkDisclaimerAccepted()) {
+            // Sync to Firestore
+            try {
+                await db.collection('users').doc(user.uid).set({
+                    disclaimerAccepted: true,
+                    disclaimerAcceptedAt: new Date().toISOString()
+                }, { merge: true });
+            } catch (e) {
+                console.warn('Could not sync disclaimer to Firestore:', e);
+            }
+            hideDisclaimerModal();
+            return;
+        }
+        
+        // Not accepted anywhere - show modal
+        console.log('[Disclaimer] Not accepted anywhere, showing modal');
+        showDisclaimerModal();
+    };
+    
+    // Run initial check when DOM is ready
+    console.log('[Disclaimer] Setting up initial check, readyState:', document.readyState);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDisclaimerCheck);
+    } else {
+        initDisclaimerCheck();
+    }
+})();
+
 // ==================== DATE HELPER ====================
 // Parse date string (YYYY-MM-DD) as local time, not UTC
 window.parseLocalDate = function(dateStr) {
@@ -337,7 +460,7 @@ window.viewProperty = function(id, forcePropertyView = false) {
                         html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center overflow-hidden">';
                         html += '<div class="text-amber-400 text-xs font-bold mb-1">🏠 OWN IT</div>';
                         html += '<div class="text-amber-400 ' + getLargePriceTextSize(buyPrice) + ' font-black truncate">$' + buyPrice.toLocaleString() + '</div>';
-                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% PMA Realtor Fee ($' + feeAmount.toLocaleString() + ')</div>';
+                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% City Transfer Fee ($' + feeAmount.toLocaleString() + ')</div>';
                         html += '</div>';
                     }
                     
@@ -1138,14 +1261,14 @@ function renderPropertyStatsContent(id) {
                             Payment Reminder Script
                             <span class="text-xs font-normal text-red-300">(edit as needed)</span>
                         </h4>
-                        <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2" title="Text in city for fastest response">
+                        <button onclick="copyReminderScript(${id}, this)" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition flex items-center gap-2" title="Text for fastest response">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                             Copy Message
                         </button>
                     </div>
                     <div class="text-xs text-yellow-300 mb-3 flex items-center gap-1">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Text in city for fastest response
+                        Text for fastest response
                     </div>
                     <textarea id="reminderScript-${id}" rows="4" class="w-full px-4 py-3 border-2 border-gray-600 rounded-xl bg-gray-700/80 font-medium text-white focus:ring-2 focus:ring-purple-500 transition resize-y">${reminderScript}</textarea>
                 </div>
@@ -1501,7 +1624,7 @@ window.startEditTile = function(field, propertyId, type) {
                 const minInfo = getMinimumBuyPrice(p);
                 minPriceNote = `
                     <div class="bg-amber-900/50 border border-amber-500/50 rounded-lg p-2 mt-2 text-xs">
-                        <div class="text-amber-300 font-bold mb-1">📋 PMA Government Minimum</div>
+                        <div class="text-amber-300 font-bold mb-1">📋 State Minimum</div>
                         <div class="text-amber-200">Category: ${minInfo.category}</div>
                         <div class="text-amber-200">Min Price: <span class="font-bold">$${minInfo.min.toLocaleString()}</span></div>
                     </div>
@@ -2032,7 +2155,7 @@ window.showPremiumEnableModal = function(propertyId, propertyTitle) {
                 <div class="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
                     <div class="flex items-center gap-2 text-red-300">
                         <span class="text-xl">⚠️</span>
-                        <p class="text-sm"><strong>Weekly payment required</strong> - Pauly will contact you in-city to collect $10k payment</p>
+                        <p class="text-sm"><strong>Weekly payment required</strong> - Pauly will contact you to collect $10k payment</p>
                     </div>
                 </div>
     ` : '';
@@ -3770,6 +3893,11 @@ async function init() {
     
     // Listen for auth state changes (including on page load)
     auth.onAuthStateChanged(async (user) => {
+        // Check disclaimer acceptance (for both logged-in and logged-out users)
+        if (typeof checkDisclaimerForUser === 'function') {
+            await checkDisclaimerForUser(user);
+        }
+        
         if (user) {
             // User is signed in - restore owner session
             state.currentUser = 'owner';
@@ -4846,7 +4974,7 @@ window.showRentToOwnWizard = async function(propertyId) {
         buyPrice = parseInt(p.buyPrice) || 0;
     }
     
-    // Get PMA Government minimum final payment based on property type
+    // Get State minimum final payment based on property type
     const minPriceInfo = getMinimumBuyPrice(p);
     const finalPaymentBase = minPriceInfo.min;
     const finalPaymentFee = Math.round(finalPaymentBase * 0.10);
@@ -4927,7 +5055,7 @@ function showRTOUpgradeRequired() {
 }
 
 /**
- * Get PMA Government minimum final payment based on property type
+ * Get State minimum final payment based on property type
  * These are FINAL PAYMENT minimums, not buy prices
  * 
  * PRICING TIERS:
@@ -5178,13 +5306,13 @@ function renderRTOWizardStep(step) {
                     </div>
                 </div>
                 
-                <!-- Final Payment Section (PMA Government Minimum) -->
+                <!-- Final Payment Section (State Minimum) -->
                 <div class="bg-gradient-to-br from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4">
                     <h4 class="text-amber-400 font-bold mb-2 flex items-center gap-2">
                         💰 Final Payment (Month <span id="rtoFinalMonth">${f.termMonths}</span>)
                     </h4>
                     <div class="bg-amber-900/40 border border-amber-600/50 rounded-lg p-2 mb-3">
-                        <div class="text-amber-300 text-xs font-bold">📋 PMA Government Minimum</div>
+                        <div class="text-amber-300 text-xs font-bold">📋 State Minimum</div>
                         <div class="text-amber-200 text-xs">Category: <span id="rtoPropertyCategory">${f.propertyCategory || 'Detecting...'}</span></div>
                     </div>
                     <div class="space-y-2">
@@ -5193,7 +5321,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoFinalPaymentBase" class="text-white font-bold">$${(f.finalPaymentBase || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-400">+ PMA Realtor Fee (10%):</span>
+                            <span class="text-gray-400">+ City Transfer Fee (10%):</span>
                             <span id="rtoFinalFee" class="text-amber-400 font-semibold">$${(f.finalPaymentFee || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between pt-2 border-t border-amber-500/30">
@@ -5201,7 +5329,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoFinalTotal" class="text-green-400 font-bold text-lg">$${(f.finalPaymentTotal || 0).toLocaleString()}</span>
                         </div>
                     </div>
-                    <p class="text-gray-500 text-xs mt-2">Final payment set by PMA Government regulations based on property type.</p>
+                    <p class="text-gray-500 text-xs mt-2">Final payment set by State regulations based on property type.</p>
                 </div>
                 
                 <!-- Calculated Summary -->
@@ -5217,7 +5345,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoCalcDown" class="text-red-400">−$${(f.downPayment || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">− Final Payment (PMA Min):</span>
+                            <span class="text-gray-400">− Final Payment (State Min):</span>
                             <span id="rtoCalcFinalMin" class="text-red-400">−$${(f.finalPaymentBase || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between pt-2 border-t border-gray-700">
@@ -5292,11 +5420,11 @@ function renderRTOWizardStep(step) {
                             <span class="text-green-400 font-semibold">$${calc.monthlyPayment.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between border-t border-gray-700 pt-2">
-                            <span class="text-gray-400">Final Payment Base (PMA Min)</span>
+                            <span class="text-gray-400">Final Payment Base (State Min)</span>
                             <span class="text-white">$${calc.finalPaymentBase.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">+ PMA Realtor Fee (10%)</span>
+                            <span class="text-gray-400">+ City Transfer Fee (10%)</span>
                             <span class="text-amber-400">$${calc.finalPaymentFee.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between bg-amber-900/30 p-2 rounded-lg">
@@ -5527,7 +5655,7 @@ window.nextRTOStep = function() {
         
         // Calculate monthly payment from amount to finance
         const amountToFinance = purchasePrice - downPayment;
-        // Final payment uses PMA Government minimum (already set in state.financial.finalPaymentBase)
+        // Final payment uses State minimum (already set in state.financial.finalPaymentBase)
         const finalPaymentBase = state.financial.finalPaymentBase;
         const finalPaymentFee = Math.round(finalPaymentBase * 0.10);
         const finalPaymentTotal = finalPaymentBase + finalPaymentFee;
@@ -5629,7 +5757,7 @@ window.updateRTOTermMonths = function(months) {
 /**
  * Update calculations in real-time
  * Logic:
- * - Final Payment = PMA Government Minimum (based on property type) + 10% PMA Realtor Fee
+ * - Final Payment = State Minimum (based on property type) + 10% City Transfer Fee
  * - Amount for Monthly = Purchase Price - Down Payment - Final Payment Base
  * - Monthly Payment = Amount for Monthly / (Term Months - 1)
  */
@@ -5661,7 +5789,7 @@ window.updateRTOCalculations = function() {
     
     const termMonths = parseInt(document.getElementById('rtoTermMonthsSlider')?.value) || state.financial.termMonths || 24;
     
-    // Final payment uses PMA Government minimum (already stored in state)
+    // Final payment uses State minimum (already stored in state)
     const finalPaymentBase = state.financial.finalPaymentBase || 1500000;
     const finalPaymentFee = Math.round(finalPaymentBase * 0.10);
     const finalPaymentTotal = finalPaymentBase + finalPaymentFee;
@@ -5676,7 +5804,7 @@ window.updateRTOCalculations = function() {
     const percentEl = document.getElementById('rtoDownPaymentPercent');
     if (percentEl) percentEl.textContent = displayPercent + '%';
     
-    // Update final payment display (PMA Government minimum - fixed)
+    // Update final payment display (State minimum - fixed)
     const finalBaseEl = document.getElementById('rtoFinalPaymentBase');
     const feeEl = document.getElementById('rtoFinalFee');
     const totalEl = document.getElementById('rtoFinalTotal');
@@ -5716,7 +5844,7 @@ window.updateRTOCalculations = function() {
 
 /**
  * Calculate RTO terms for contract generation
- * Uses PMA Government minimum for final payment + 10% PMA Realtor Fee
+ * Uses State minimum for final payment + 10% City Transfer Fee
  */
 function calculateRTOTerms() {
     const state = window.rtoWizardState;
@@ -5851,8 +5979,8 @@ Down Payment (${calc.downPaymentPercent}%)              $${calc.downPayment.toLo
 Remaining Balance to Finance      $${calc.remainingBalance.toLocaleString()}
 Term Length                       ${calc.termMonths} Months
 Monthly Payments (×${calc.termMonths - 1})         $${calc.monthlyPayment.toLocaleString()}
-Final Payment Base (PMA Min)      $${calc.finalPaymentBase.toLocaleString()}
-+ PMA Realtor Fee (10%)           $${calc.finalPaymentFee.toLocaleString()}
+Final Payment Base (State Min)      $${calc.finalPaymentBase.toLocaleString()}
++ City Transfer Fee (10%)           $${calc.finalPaymentFee.toLocaleString()}
 = Total Final Payment             $${calc.finalPaymentTotal.toLocaleString()}
 
 COMPLETE PAYMENT SCHEDULE
@@ -5865,8 +5993,8 @@ ${schedule.map(p =>
 
 FINAL PAYMENT BREAKDOWN
 ────────────────────────────────────────────────────────────────
-• Base Final Payment (PMA Min): $${calc.finalPaymentBase.toLocaleString()}
-• PMA Realtor Fee (10%): $${calc.finalPaymentFee.toLocaleString()}
+• Base Final Payment (State Min): $${calc.finalPaymentBase.toLocaleString()}
+• City Transfer Fee (10%): $${calc.finalPaymentFee.toLocaleString()}
 • Total Final Payment: $${calc.finalPaymentTotal.toLocaleString()}
 • Property Category: ${calc.propertyCategory}
 
@@ -5897,7 +6025,7 @@ Transfer of Ownership:
 
 Early Payoff:
 • Allowed without penalty
-• $${calc.finalPaymentFee.toLocaleString()} PMA Realtor Fee still applies upon transfer
+• $${calc.finalPaymentFee.toLocaleString()} City Transfer Fee still applies upon transfer
 
 DOCUMENT IDENTIFIERS
 ────────────────────────────────────────────────────────────────
@@ -6207,8 +6335,8 @@ window.downloadRTOContractImage = async function() {
         ['Remaining Balance to Finance', `$${calc.remainingBalance.toLocaleString()}`],
         ['Term Length', `${calc.termMonths} Months`],
         [`Monthly Payments (×${calc.termMonths - 1})`, `$${calc.monthlyPayment.toLocaleString()}`],
-        ['Final Payment Base (PMA Min)', `$${calc.finalPaymentBase.toLocaleString()}`],
-        ['+ PMA Realtor Fee (10%)', `$${calc.finalPaymentFee.toLocaleString()}`],
+        ['Final Payment Base (State Min)', `$${calc.finalPaymentBase.toLocaleString()}`],
+        ['+ City Transfer Fee (10%)', `$${calc.finalPaymentFee.toLocaleString()}`],
         ['= Total Final Payment', `$${calc.finalPaymentTotal.toLocaleString()}`]
     ];
     
