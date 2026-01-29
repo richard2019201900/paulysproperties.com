@@ -4986,6 +4986,25 @@ window.showRentToOwnWizard = async function(propertyId) {
     const finalPaymentFee = Math.round(finalPaymentBase * 0.10);
     const finalPaymentTotal = finalPaymentBase + finalPaymentFee;
     
+    // Check if property has a real estate agent assigned
+    const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
+    const hasAgent = propertyAgents.length > 0;
+    let agentName = '';
+    
+    if (hasAgent) {
+        // Get agent display name
+        const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+        if (agentDisplayNames && propertyAgents[0]) {
+            agentName = agentDisplayNames[propertyAgents[0].toLowerCase()] || propertyAgents[0].split('@')[0];
+        } else {
+            agentName = propertyAgents[0].split('@')[0];
+        }
+        // Special case for master admin
+        if (propertyAgents[0].toLowerCase() === 'richard2019201900@gmail.com') {
+            agentName = 'Pauly Amato';
+        }
+    }
+    
     // Default values
     const defaultDownPaymentPercent = 10;
     const defaultDownPayment = Math.round(buyPrice * (defaultDownPaymentPercent / 100));
@@ -5003,6 +5022,9 @@ window.showRentToOwnWizard = async function(propertyId) {
             useExisting: true
         },
         seller: sellerName,
+        hasAgent: hasAgent,
+        agentName: agentName,
+        agentEmails: propertyAgents,
         financial: {
             purchasePrice: buyPrice,
             downPaymentPercent: defaultDownPaymentPercent,
@@ -5011,7 +5033,8 @@ window.showRentToOwnWizard = async function(propertyId) {
             finalPaymentBase: finalPaymentBase,
             finalPaymentFee: finalPaymentFee,
             finalPaymentTotal: finalPaymentTotal,
-            propertyCategory: minPriceInfo.category
+            propertyCategory: minPriceInfo.category,
+            agentFeePercent: hasAgent ? 10 : 0
         }
     };
     
@@ -5300,15 +5323,15 @@ function renderRTOWizardStep(step) {
                             <label class="text-gray-400 text-sm">Term Length</label>
                             <p class="text-gray-500 text-xs">${termLabel}</p>
                         </div>
-                        <span id="rtoTermMonthsDisplay" class="text-amber-400 font-bold text-lg">${f.termMonths} months</span>
+                        <span id="rtoTermMonthsDisplay" class="text-amber-400 font-bold text-lg">${f.termMonths} month${f.termMonths !== 1 ? 's' : ''}</span>
                     </div>
-                    <input type="range" id="rtoTermMonthsSlider" value="${f.termMonths}" min="6" max="48" step="1"
+                    <input type="range" id="rtoTermMonthsSlider" value="${f.termMonths}" min="1" max="24" step="1"
                            class="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                            oninput="updateRTOTermMonths(this.value)">
                     <div class="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>6 mo</span>
+                        <span>1 mo</span>
+                        <span>12 mo</span>
                         <span>24 mo</span>
-                        <span>48 mo</span>
                     </div>
                 </div>
                 
@@ -5397,6 +5420,7 @@ function renderRTOWizardStep(step) {
                         </div>
                     </div>
                     <div class="text-gray-400 text-sm mt-2">Realtor/Brokerage: <span class="text-white">${state.seller} / PaulysProperties.com</span></div>
+                    ${state.hasAgent ? `<div class="text-purple-400 text-sm mt-1">🏢 Managing Agent: <span class="text-white font-semibold">${state.agentName}</span> <span class="text-gray-500">(10% commission on all payments)</span></div>` : ''}
                 </div>
                 
                 <!-- Financial Structure -->
@@ -5413,18 +5437,38 @@ function renderRTOWizardStep(step) {
                             <span class="text-gray-400">Down Payment (${calc.downPaymentPercent}%)</span>
                             <span class="text-green-400 font-semibold">$${calc.downPayment.toLocaleString()}</span>
                         </div>
+                        ${state.hasAgent ? `
+                        <div class="flex justify-between text-purple-400">
+                            <span>− Agent Fee (10% of Down Payment)</span>
+                            <span class="font-semibold">−$${Math.round(calc.downPayment * 0.10).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-500 text-xs">
+                            <span>Net to Seller:</span>
+                            <span>$${Math.round(calc.downPayment * 0.90).toLocaleString()}</span>
+                        </div>
+                        ` : ''}
                         <div class="flex justify-between border-t border-gray-700 pt-2">
                             <span class="text-gray-400">Amount to Finance</span>
                             <span class="text-white font-bold">$${calc.remainingBalance.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-400">Term Length</span>
-                            <span class="text-white">${calc.termMonths} Months</span>
+                            <span class="text-white">${calc.termMonths} Month${calc.termMonths !== 1 ? 's' : ''}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-400">Monthly Payments (Months 1-${calc.termMonths - 1})</span>
                             <span class="text-green-400 font-semibold">$${calc.monthlyPayment.toLocaleString()}</span>
                         </div>
+                        ${state.hasAgent ? `
+                        <div class="flex justify-between text-purple-400">
+                            <span>− Agent Fee (10% per payment)</span>
+                            <span class="font-semibold">−$${Math.round(calc.monthlyPayment * 0.10).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-500 text-xs">
+                            <span>Net to Seller per month:</span>
+                            <span>$${Math.round(calc.monthlyPayment * 0.90).toLocaleString()}</span>
+                        </div>
+                        ` : ''}
                         <div class="flex justify-between border-t border-gray-700 pt-2">
                             <span class="text-gray-400">Final Payment Base (State Min)</span>
                             <span class="text-white">$${calc.finalPaymentBase.toLocaleString()}</span>
@@ -5437,8 +5481,15 @@ function renderRTOWizardStep(step) {
                             <span class="text-amber-300 font-bold">= Total Final Payment (Month ${calc.termMonths})</span>
                             <span class="text-amber-300 font-bold">$${calc.finalPaymentTotal.toLocaleString()}</span>
                         </div>
+                        ${state.hasAgent ? `
+                        <div class="flex justify-between text-purple-400 mt-1">
+                            <span>− Agent Fee (10% of Final Payment Base)</span>
+                            <span class="font-semibold">−$${Math.round(calc.finalPaymentBase * 0.10).toLocaleString()}</span>
+                        </div>
+                        ` : ''}
                     </div>
                     <div class="mt-2 text-xs text-amber-400">📋 Property Category: ${calc.propertyCategory}</div>
+                    ${state.hasAgent ? `<div class="mt-1 text-xs text-purple-400">🏢 Agent commission applies to all payments</div>` : ''}
                 </div>
                 
                 <!-- Agreement Date -->
@@ -5654,8 +5705,8 @@ window.nextRTOStep = function() {
             showToast('Please enter a valid purchase price', 'error');
             return;
         }
-        if (termMonths < 6 || termMonths > 48) {
-            showToast('Term must be between 6 and 48 months', 'error');
+        if (termMonths < 1 || termMonths > 24) {
+            showToast('Term must be between 1 and 24 months', 'error');
             return;
         }
         
@@ -5907,12 +5958,19 @@ function generateRTOContract() {
     const state = window.rtoWizardState;
     const calc = calculateRTOTerms();
     const startDate = new Date(state.startDate);
+    const hasAgent = state.hasAgent;
+    const agentName = state.agentName || '';
     
     // Generate document ID
     const dateStr = startDate.toISOString().split('T')[0].replace(/-/g, '');
     const sellerInitials = state.seller.split(' ').map(n => n[0]).join('').toUpperCase();
     const buyerInitials = state.buyer.name.split(' ').map(n => n[0]).join('').toUpperCase();
     const documentId = `SA-RTO-${dateStr.substring(0, 4)}-${dateStr.substring(4, 8)}-${sellerInitials}-${buyerInitials}`;
+    
+    // Calculate agent fees
+    const agentFeeDown = hasAgent ? Math.round(calc.downPayment * 0.10) : 0;
+    const agentFeeMonthly = hasAgent ? Math.round(calc.monthlyPayment * 0.10) : 0;
+    const agentFeeFinal = hasAgent ? Math.round(calc.finalPaymentBase * 0.10) : 0;
     
     // Generate payment schedule
     // All monthly payments are equal, final payment has 10% realtor fee added
@@ -5924,6 +5982,8 @@ function generateRTOContract() {
         num: 'Down Payment',
         date: formatDateForContract(startDate),
         amount: calc.downPayment,
+        agentFee: agentFeeDown,
+        netToSeller: calc.downPayment - agentFeeDown,
         type: `Down Payment (${calc.downPaymentPercent}%)`,
         balance: runningBalance
     });
@@ -5933,16 +5993,18 @@ function generateRTOContract() {
         const paymentDate = new Date(startDate);
         paymentDate.setMonth(paymentDate.getMonth() + i);
         
-        let amount, type;
+        let amount, type, agentFee;
         if (i < calc.termMonths) {
             // Regular monthly payment
             amount = calc.monthlyPayment;
             type = 'Monthly';
+            agentFee = agentFeeMonthly;
             runningBalance -= amount;
         } else {
             // Final payment = monthly payment + 10% realtor fee
             amount = calc.finalPaymentTotal;
             type = `Final + 10% Fee`;
+            agentFee = agentFeeFinal;
             runningBalance = 0;
         }
         
@@ -5950,6 +6012,8 @@ function generateRTOContract() {
             num: i,
             date: formatDateForContract(paymentDate),
             amount: amount,
+            agentFee: agentFee,
+            netToSeller: amount - agentFee,
             type: type,
             balance: Math.max(0, runningBalance)
         });
@@ -5957,6 +6021,34 @@ function generateRTOContract() {
     
     // Build preview text - use location as fallback for description
     const propertyDesc = state.property.description || state.property.location || 'N/A';
+    
+    // Build agent section if applicable
+    const agentSection = hasAgent ? `
+Managing Agent: ${agentName}
+Agent Commission: 10% of all payments
+` : '';
+
+    const agentFinancialSection = hasAgent ? `
+AGENT COMMISSION BREAKDOWN
+────────────────────────────────────────────────────────────────
+Agent: ${agentName}
+Commission Rate: 10% of all payments
+
+Down Payment: $${calc.downPayment.toLocaleString()}
+  − Agent Fee (10%): −$${agentFeeDown.toLocaleString()}
+  = Net to Seller: $${(calc.downPayment - agentFeeDown).toLocaleString()}
+
+Monthly Payments (×${calc.termMonths - 1}): $${calc.monthlyPayment.toLocaleString()} each
+  − Agent Fee (10%): −$${agentFeeMonthly.toLocaleString()}
+  = Net to Seller: $${(calc.monthlyPayment - agentFeeMonthly).toLocaleString()} each
+
+Final Payment Base: $${calc.finalPaymentBase.toLocaleString()}
+  − Agent Fee (10%): −$${agentFeeFinal.toLocaleString()}
+  = Net to Seller: $${(calc.finalPaymentBase - agentFeeFinal).toLocaleString()}
+
+Total Agent Commission: $${(agentFeeDown + (agentFeeMonthly * (calc.termMonths - 1)) + agentFeeFinal).toLocaleString()}
+` : '';
+
     const preview = `
 ═══════════════════════════════════════════════════════════════
                     RENT-TO-OWN AGREEMENT
@@ -5975,7 +6067,7 @@ PARTIES INVOLVED
 Seller/Landlord: ${state.seller}
 Buyer/Tenant: ${state.buyer.name}
 Realtor/Brokerage: ${state.seller} / PaulysProperties.com
-
+${agentSection}
 FINANCIAL STRUCTURE
 ────────────────────────────────────────────────────────────────
 Item                              Amount
@@ -5983,19 +6075,25 @@ Item                              Amount
 Total Purchase Price              $${calc.purchasePrice.toLocaleString()}
 Down Payment (${calc.downPaymentPercent}%)              $${calc.downPayment.toLocaleString()}
 Remaining Balance to Finance      $${calc.remainingBalance.toLocaleString()}
-Term Length                       ${calc.termMonths} Months
+Term Length                       ${calc.termMonths} Month${calc.termMonths !== 1 ? 's' : ''}
 Monthly Payments (×${calc.termMonths - 1})         $${calc.monthlyPayment.toLocaleString()}
 Final Payment Base (State Min)      $${calc.finalPaymentBase.toLocaleString()}
 + City Transfer Fee (10%)           $${calc.finalPaymentFee.toLocaleString()}
 = Total Final Payment             $${calc.finalPaymentTotal.toLocaleString()}
-
+${agentFinancialSection}
 COMPLETE PAYMENT SCHEDULE
 ────────────────────────────────────────────────────────────────
 Agreement Start Date: ${formatDateForContract(startDate)}
 
-${schedule.map(p => 
+${hasAgent ? 
+schedule.map(p => 
+    `${String(p.num).padEnd(12)} ${p.date.padEnd(14)} $${p.amount.toLocaleString().padStart(12)} ${p.type.padEnd(16)} Agent: -$${p.agentFee.toLocaleString().padStart(8)} Net: $${p.netToSeller.toLocaleString()}`
+).join('\n')
+:
+schedule.map(p => 
     `${String(p.num).padEnd(12)} ${p.date.padEnd(14)} $${p.amount.toLocaleString().padStart(12)} ${p.type.padEnd(20)} $${p.balance.toLocaleString()}`
-).join('\n')}
+).join('\n')
+}
 
 FINAL PAYMENT BREAKDOWN
 ────────────────────────────────────────────────────────────────
@@ -6003,6 +6101,7 @@ FINAL PAYMENT BREAKDOWN
 • City Transfer Fee (10%): $${calc.finalPaymentFee.toLocaleString()}
 • Total Final Payment: $${calc.finalPaymentTotal.toLocaleString()}
 • Property Category: ${calc.propertyCategory}
+${hasAgent ? `• Agent Fee on Final: $${agentFeeFinal.toLocaleString()} (deducted from base)` : ''}
 
 CONTRACT TERMS
 ────────────────────────────────────────────────────────────────
@@ -6010,6 +6109,7 @@ Payment Terms:
 • Monthly payments of $${calc.monthlyPayment.toLocaleString()} due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month
 • Final payment of $${calc.finalPaymentTotal.toLocaleString()} due on ${formatDateForContract(new Date(startDate.setMonth(startDate.getMonth() + calc.termMonths)))}
 • 3-day grace period before late fees apply
+${hasAgent ? `• Agent commission (10%) deducted from each payment before remittance to seller` : ''}
 
 Late Payment:
 • $50,000 late fee after 3 days
@@ -6048,7 +6148,10 @@ Seller/Landlord: _________________________ Date: ___________
 
 Buyer/Tenant:    _________________________ Date: ___________
                  ${state.buyer.name}
-
+${hasAgent ? `
+Managing Agent:  _________________________ Date: ___________
+                 ${agentName}
+` : ''}
 PaulysProperties.com: ____________________ Date: ___________
                       Authorized Representative
 
@@ -6063,6 +6166,14 @@ PaulysProperties.com: ____________________ Date: ___________
             ...state,
             calculations: calc,
             schedule,
+            hasAgent,
+            agentName,
+            agentFees: {
+                downPayment: agentFeeDown,
+                monthly: agentFeeMonthly,
+                final: agentFeeFinal,
+                total: agentFeeDown + (agentFeeMonthly * (calc.termMonths - 1)) + agentFeeFinal
+            },
             generatedAt: new Date().toISOString()
         }
     };
@@ -6918,13 +7029,31 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             const rtoRemainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
             const propertyTitle = p?.title || `Property #${propertyId}`;
             
+            // Get agent info for payment breakdown
+            const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
+            const hasAgent = propertyAgents.length > 0;
+            let agentName = '';
+            if (hasAgent) {
+                const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+                if (agentDisplayNames && propertyAgents[0]) {
+                    agentName = agentDisplayNames[propertyAgents[0].toLowerCase()] || propertyAgents[0].split('@')[0];
+                } else {
+                    agentName = propertyAgents[0].split('@')[0];
+                }
+                if (propertyAgents[0].toLowerCase() === 'richard2019201900@gmail.com') {
+                    agentName = 'Pauly Amato';
+                }
+            }
+            
             // Show confirmation
             showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
                 type: 'deposit',
                 propertyTitle: propertyTitle,
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: rtoExpectedMonthly,
-                remainingBalance: rtoRemainingBalance
+                remainingBalance: rtoRemainingBalance,
+                hasAgent: hasAgent,
+                agentName: agentName
             });
             
         } else {
@@ -6999,6 +7128,22 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             const propertyTitle = p?.title || `Property #${propertyId}`;
             
+            // Get agent info for payment breakdown
+            const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
+            const hasAgent = propertyAgents.length > 0;
+            let agentName = '';
+            if (hasAgent) {
+                const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+                if (agentDisplayNames && propertyAgents[0]) {
+                    agentName = agentDisplayNames[propertyAgents[0].toLowerCase()] || propertyAgents[0].split('@')[0];
+                } else {
+                    agentName = propertyAgents[0].split('@')[0];
+                }
+                if (propertyAgents[0].toLowerCase() === 'richard2019201900@gmail.com') {
+                    agentName = 'Pauly Amato';
+                }
+            }
+            
             // Show confirmation
             showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
                 type: 'monthly',
@@ -7007,7 +7152,9 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                 totalPayments: rtoTotalPayments - 1, // -1 for final payment
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: newExpectedMonthly,
-                remainingBalance: newRemainingBalance
+                remainingBalance: newRemainingBalance,
+                hasAgent: hasAgent,
+                agentName: agentName
             });
             
             // Check if RTO is complete (remaining balance is 0 or less)
@@ -7052,16 +7199,51 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     }
     
     const propertyTitle = info.propertyTitle || 'your property';
-    let thankYouMessage, headerText, badgeText;
+    const hasAgent = info.hasAgent || false;
+    const agentName = info.agentName || '';
+    const agentFee = hasAgent ? Math.round(actualAmount * 0.10) : 0;
+    const netToSeller = actualAmount - agentFee;
+    
+    let thankYouMessage, headerText, badgeText, agentFeeHtml = '';
+    
+    if (hasAgent) {
+        agentFeeHtml = `
+            <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3 mt-3">
+                <div class="text-purple-400 text-xs font-bold mb-1">🏢 Agent Commission Breakdown</div>
+                <div class="text-sm space-y-1">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Payment Received:</span>
+                        <span class="text-white">$${actualAmount.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-purple-400">Agent Fee (10%):</span>
+                        <span class="text-purple-400">−$${agentFee.toLocaleString()}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-purple-500/30 pt-1">
+                        <span class="text-gray-300">Net to Seller:</span>
+                        <span class="text-green-400 font-bold">$${netToSeller.toLocaleString()}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     
     if (info.type === 'deposit') {
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        if (hasAgent) {
+            thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Fee (10% - ${agentName}): −$${agentFee.toLocaleString()}\n• Net to Seller: $${netToSeller.toLocaleString()}\n\nYour remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        } else {
+            thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        }
     } else {
         headerText = 'Payment Logged!';
         badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
-        thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        if (hasAgent) {
+            thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Fee (10% - ${agentName}): −$${agentFee.toLocaleString()}\n• Net to Seller: $${netToSeller.toLocaleString()}\n\nYour remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        } else {
+            thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
+        }
     }
     
     // Show variance if different from expected
@@ -7085,13 +7267,16 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
                     <p class="text-gray-400 mt-1">$${actualAmount.toLocaleString()} from ${renterName}</p>
                     ${varianceHtml}
                     <p class="text-amber-400 text-sm mt-2">${badgeText}</p>
+                    ${hasAgent ? `<p class="text-purple-400 text-xs mt-1">🏢 Agent: ${agentName}</p>` : ''}
                 </div>
                 
-                <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                ${agentFeeHtml}
+                
+                <div class="bg-gray-800 rounded-xl p-4 mb-4 mt-4">
                     <div class="flex justify-between items-center mb-2">
                         <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${displayName}:</span>
                     </div>
-                    <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600">
+                    <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600 whitespace-pre-wrap">
                         ${thankYouMessage}
                     </div>
                 </div>
