@@ -340,7 +340,7 @@ window.renderBlogPage = function() {
                     </div>
                 </div>
                 
-                <p class="mt-6 text-gray-300">Questions? Hit up Pauly in-city or send a message through the platform. We're here to help!</p>
+                <p class="mt-6 text-gray-300">Questions? Text Pauly or send a message through the platform. We're here to help!</p>
                 <p class="mt-2 text-gray-400 italic">Thank you for being part of PaulysProperties.com! 🏠✨</p>
             `
         },
@@ -386,12 +386,12 @@ window.renderBlogPage = function() {
                 
                 <p class="mt-6 text-gray-300">We're building a connected network of services for Los Santos. Whether you need a place to live or a car to drive, Pauly's got you covered.</p>
                 
-                <p class="mt-4 text-gray-400 italic">Questions or ideas? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city.</strong> Your feedback shapes everything we build.</p>
+                <p class="mt-4 text-gray-400 italic">Questions or ideas? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly.</strong> Your feedback shapes everything we build.</p>
             `
         },
         {
             date: 'December 30, 2024',
-            title: '📱 Now Available On Your In-City Phone + Massive Platform Upgrades',
+            title: '📱 Now Available On Your Phone + Massive Platform Upgrades',
             category: 'Major Update',
             categoryColor: 'bg-purple-500',
             content: `
@@ -399,11 +399,11 @@ window.renderBlogPage = function() {
                 
                 <p class="mb-4">Over the past two weeks, we've pushed <strong>26 major updates</strong> and completely transformed the platform. Here's what's new:</p>
                 
-                <h4 class="font-bold text-white mb-2 mt-6">📱 In-City Phone Support:</h4>
+                <h4 class="font-bold text-white mb-2 mt-6">📱 Phone Support:</h4>
                 <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
                     <li>Full site now works in the phone browser — no alt-tab needed</li>
                     <li>Custom domain: just type <strong>paulysproperties.com</strong></li>
-                    <li>Optimized for smooth scrolling and fast loading in-city</li>
+                    <li>Optimized for smooth scrolling and fast loading</li>
                     <li>More phone-friendly improvements coming in 2026</li>
                 </ul>
                 
@@ -421,7 +421,7 @@ window.renderBlogPage = function() {
                     <li>Log property sales and track the financials on your dashboard</li>
                     <li>Celebration banners when you complete a sale</li>
                     <li>Earn XP and climb the leaderboard with each sale</li>
-                    <li>Everything still happens in city — the site just keeps you organized</li>
+                    <li>Everything still is coordinated via text — the site just keeps you organized</li>
                 </ul>
                 
                 <h4 class="font-bold text-white mb-2 mt-6">📊 Redesigned Dashboard:</h4>
@@ -464,7 +464,7 @@ window.renderBlogPage = function() {
                 
                 <p class="mt-6 text-gray-300">We're going all-in on the phone browser experience. Our goal is to make PaulysProperties.com the smoothest, most useful tool you can access without ever leaving the city.</p>
                 
-                <p class="mt-4 text-gray-400 italic">Questions, ideas, or feedback? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city</strong> — everything you tell us shapes what we build next.</p>
+                <p class="mt-4 text-gray-400 italic">Questions, ideas, or feedback? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly</strong> — everything you tell us shapes what we build next.</p>
             `
         },
         {
@@ -528,7 +528,7 @@ window.renderBlogPage = function() {
                     <li>Activity logging and VIP leads tracking</li>
                 </ul>
                 
-                <p class="mt-6 text-gray-300">This is just the beginning. We're releasing updates weekly based on your feedback. Have a feature request or question? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city</strong> for the fastest response.</p>
+                <p class="mt-6 text-gray-300">This is just the beginning. We're releasing updates weekly based on your feedback. Have a feature request or question? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly</strong> for the fastest response.</p>
                 
                 <p class="mt-4 text-gray-400 italic">Thank you to everyone who's joined us in these first two weeks. Here's to building something great together.</p>
             `
@@ -566,7 +566,7 @@ window.renderBlogPage = function() {
             <!-- Footer -->
             <div class="text-center mt-12 py-8 border-t border-gray-700">
                 <p class="text-gray-500 text-sm">
-                    Updates posted weekly. <span class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly in city</span> with questions or feedback.
+                    Updates posted weekly. <span class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly</span> with questions or feedback.
                 </p>
                 <button onclick="navigateTo('home')" class="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-xl font-bold hover:opacity-90 transition">
                     ← Back to Home
@@ -951,6 +951,12 @@ window.goHome = function() {
     hideElement($('propertyStatsPage'));
     hideElement($('blogPage'));
     showElement($('renterSection'));
+    
+    // Re-apply filters to ensure checkbox state matches displayed properties
+    if (typeof applyAllFilters === 'function') {
+        applyAllFilters();
+    }
+    
     window.scrollTo(0, 0);
 };
 

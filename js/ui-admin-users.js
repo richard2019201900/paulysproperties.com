@@ -949,7 +949,14 @@ window.adminDeleteUser = async function(userId, email) {
         
         alert(resultMsg);
         loadAllUsers();
-        renderProperties(properties);
+        
+        // Re-apply filters before rendering (respects hideUnavailable checkbox)
+        if (typeof applyAllFilters === 'function') {
+            applyAllFilters();
+        } else {
+            renderProperties(state.filteredProperties || properties);
+        }
+        
         loadActivityLog(); // Refresh activity log
         
     } catch (error) {

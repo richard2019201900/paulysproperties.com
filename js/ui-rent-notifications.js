@@ -528,9 +528,11 @@ window.closePropertyDeletedModal = function() {
         renderOwnerDashboard();
     }
     
-    // Refresh property grid
-    if (typeof renderProperties === 'function') {
-        renderProperties(properties);
+    // Refresh property grid with filters applied
+    if (typeof applyAllFilters === 'function') {
+        applyAllFilters();
+    } else if (typeof renderProperties === 'function') {
+        renderProperties(state.filteredProperties || properties);
     }
 };
 
