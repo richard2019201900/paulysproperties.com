@@ -614,7 +614,7 @@ window.openCopyListingModal = function(propertyId) {
     const hasAgent = p.agentEmail && p.agentEmail !== propertyOwner;
     
     const modalHTML = `
-        <div id="copyListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeCopyListingModal()">
+        <div id="copyListingModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
             <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full border border-cyan-500/50">
                 <div class="p-6">
                     <!-- Header -->

@@ -170,7 +170,7 @@ window.openSubscriptionPaymentModal = function(userId, email, displayName, curre
     const escapedName = displayName.replace(/'/g, "\\'");
     
     const modalHTML = `
-        <div id="subscriptionPaymentModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeSubscriptionPaymentModal()">
+        <div id="subscriptionPaymentModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
             <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-purple-500/50">
                 <div class="p-6">
                     <!-- Header -->
@@ -348,7 +348,7 @@ window.showSubscriptionPaymentConfirmation = function(displayName, email, amount
     const thankYouMessage = `Thanks ${firstName}! 🙏 Your Elite subscription payment of $${amount.toLocaleString()} has been received. Your account is all set until ${nextDueFormatted}. We really appreciate your continued support of PaulysProperties.com! 👑🏠`;
     
     const modalHTML = `
-        <div id="subPaymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeSubPaymentConfirmModal()">
+        <div id="subPaymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl">
                 <div class="text-center mb-4">
                     <div class="text-5xl mb-3">✅</div>
@@ -553,7 +553,7 @@ window.openSubscriptionReminderModal = function(userId, email, displayName, tier
     
     // Create modal HTML with larger text areas
     const modalHTML = `
-        <div id="subscriptionReminderModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) closeModal('subscriptionReminderModal')">
+        <div id="subscriptionReminderModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
             <div class="bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[95vh] overflow-y-auto border ${reminderBg}">
                 <div class="p-6">
                     <div class="flex justify-between items-start mb-4">

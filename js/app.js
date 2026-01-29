@@ -2381,7 +2381,7 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
     
     // Create modal HTML
     const modalHTML = `
-        <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closePaymentConfirmModal()">
+        <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl" onclick="event.stopPropagation()">
                 <div class="text-center mb-4">
                     <div class="text-5xl mb-3">✅</div>
@@ -4004,7 +4004,7 @@ window.showCompleteLeaseModal = async function(propertyId) {
     const tenureSummary = await calculateTenureSummary(propertyId, renterName);
     
     const modalHTML = `
-        <div id="completeLeaseModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeCompleteLeaseModal()">
+        <div id="completeLeaseModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-orange-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-orange-600 to-red-600 px-6 py-4">
@@ -4179,7 +4179,7 @@ window.showEvictionModal = async function(propertyId) {
     const evictionMessage = `Hey ${renterName}, thank you for renting with us. Unfortunately, due to non-payment your property has been cleaned out and placed back on the market for rent. If you have any questions or believe this was done in error, please contact me.`;
     
     const modalHTML = `
-        <div id="evictionModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeEvictionModal()">
+        <div id="evictionModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-red-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
@@ -4786,7 +4786,7 @@ window.showLeaseCompletionMessage = function(renterName, propertyTitle, totalCol
     const thankYouMessage = `Hey ${renterName}, thank you so much for renting ${propertyTitle} with us! It was a pleasure having you as a tenant. Your total payments of $${totalCollected.toLocaleString()} have all been recorded. If you ever need a place again, hit me up anytime - you're always welcome back! 🏠`;
     
     const modalHTML = `
-        <div id="leaseCompletionMessageModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) closeLeaseCompletionMessageModal()">
+        <div id="leaseCompletionMessageModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-green-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
@@ -6454,7 +6454,7 @@ window.viewRTOContract = async function(contractId) {
         
         // Show contract in a modal
         const modalHTML = `
-            <div id="viewContractModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+            <div id="viewContractModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                 <div class="bg-gray-900 rounded-2xl max-w-3xl w-full border border-cyan-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
                     <div class="bg-gradient-to-r from-cyan-600 to-blue-600 px-6 py-4">
                         <h3 class="text-xl font-bold text-white flex items-center gap-3">
@@ -6530,7 +6530,7 @@ window.confirmDeleteRTOContract = function(propertyId, contractId) {
     }
     
     const modalHTML = `
-        <div id="deleteRTOConfirmModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onclick="if(event.target === this) this.remove()">
+        <div id="deleteRTOConfirmModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-red-500/50 shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
                 <div class="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
                     <h3 class="text-xl font-bold text-white flex items-center gap-3">
