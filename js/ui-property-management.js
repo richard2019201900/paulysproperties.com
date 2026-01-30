@@ -1009,6 +1009,43 @@ window.executeCopyListing = async function(sourcePropertyId) {
             console.warn('[CopyListing] Could not fetch owner info:', phoneErr);
         }
         
+        // Build agent data if agent is selected
+        let agentsArray = [];
+        let agentDisplayNames = {};
+        let agentPhones = {};
+        
+        if (newAgentEmail) {
+            agentsArray = [newAgentEmail];
+            
+            // Get agent display name and phone
+            let agentDisplayName = 'Agent';
+            let agentPhone = '2057028233'; // Default to Pauly's number
+            
+            if (newAgentEmail === 'richard2019201900@gmail.com') {
+                agentDisplayName = 'Pauly Amato';
+                agentPhone = '2057028233';
+            } else {
+                // Try to get from agentsCache or users collection
+                try {
+                    if (typeof loadAgents === 'function') {
+                        await loadAgents();
+                    }
+                    if (typeof agentsCache !== 'undefined' && Array.isArray(agentsCache)) {
+                        const agent = agentsCache.find(a => a.email.toLowerCase() === newAgentEmail);
+                        if (agent) {
+                            agentDisplayName = agent.displayName || agent.username || newAgentEmail.split('@')[0];
+                            agentPhone = agent.phone || '2057028233';
+                        }
+                    }
+                } catch (agentErr) {
+                    console.warn('[CopyListing] Could not fetch agent info:', agentErr);
+                }
+            }
+            
+            agentDisplayNames[newAgentEmail] = agentDisplayName;
+            agentPhones[newAgentEmail] = agentPhone;
+        }
+        
         // Build the new property object (copy relevant fields)
         const newProperty = {
             id: newId,
@@ -1034,7 +1071,11 @@ window.executeCopyListing = async function(sourcePropertyId) {
             ownerEmail: newOwnerEmail,
             ownerContactPhone: ownerContactPhone, // Public contact phone (synced from profile)
             ownerDisplayName: ownerDisplayName,   // Public display name (synced from profile)
-            agentEmail: newAgentEmail,
+            
+            // Agent assignment (proper structure)
+            agents: agentsArray,
+            agentDisplayNames: agentDisplayNames,
+            agentPhones: agentPhones,
             
             // Metadata
             createdAt: new Date().toISOString(),
