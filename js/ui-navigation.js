@@ -395,7 +395,7 @@ window.renderBlogPage = function() {
             category: 'Major Update',
             categoryColor: 'bg-purple-500',
             content: `
-                <p class="mb-4"><strong>PaulysProperties.com now works directly in your phone browser while you're in the city.</strong> No more alt-tabbing to Chrome — browse listings, manage your properties, and check your dashboard right from your phone. Just type paulysproperties.com and you're in.</p>
+                <p class="mb-4"><strong>PaulysProperties.com now works directly in your phone browser.</strong> No more alt-tabbing to Chrome — browse listings, manage your properties, and check your dashboard right from your phone. Just type paulysproperties.com and you're in.</p>
                 
                 <p class="mb-4">Over the past two weeks, we've pushed <strong>26 major updates</strong> and completely transformed the platform. Here's what's new:</p>
                 
@@ -462,7 +462,7 @@ window.renderBlogPage = function() {
                     <li>Dozens of bug fixes and quality improvements</li>
                 </ul>
                 
-                <p class="mt-6 text-gray-300">We're going all-in on the phone browser experience. Our goal is to make PaulysProperties.com the smoothest, most useful tool you can access without ever leaving the city.</p>
+                <p class="mt-6 text-gray-300">We're going all-in on the phone browser experience. Our goal is to make PaulysProperties.com the smoothest, most useful tool you can access from your phone.</p>
                 
                 <p class="mt-4 text-gray-400 italic">Questions, ideas, or feedback? <strong class="text-green-400 cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">Text Pauly</strong> — everything you tell us shapes what we build next.</p>
             `
@@ -1114,7 +1114,7 @@ function toggleServicesSubmenu(event) {
  * - Shows welcome banner
  * - Highlights profile fields
  * - Scrolls to profile section
- * - Requires City Name and Phone before listing
+ * - Requires Display Name and Phone before listing
  */
 window.triggerNewUserWelcome = function() {
     console.log('[NewUser] Triggering welcome flow...');
@@ -1154,7 +1154,7 @@ window.triggerNewUserWelcome = function() {
             profileSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
-        // Focus the city name input
+        // Focus the display name input
         setTimeout(() => {
             const cityNameInput = $('ownerUsername');
             if (cityNameInput) {

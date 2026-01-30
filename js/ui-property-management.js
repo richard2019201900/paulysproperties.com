@@ -182,12 +182,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reset Discord warning flag for next time
             window.createListingDiscordWarningAcknowledged = false;
             
-            // Validate buy price against city minimum (HARD BLOCK)
+            // Validate buy price against government minimum (HARD BLOCK)
             if (buyPrice > 0) {
                 const minInfo = getMinimumBuyPriceForForm();
                 if (buyPrice < minInfo.min) {
                     errorDiv.innerHTML = `
-                        <strong>🚫 City Minimum Violation</strong><br>
+                        <strong>🚫 Government Minimum Violation</strong><br>
                         ${minInfo.category} requires minimum <strong>$${minInfo.min.toLocaleString()}</strong>.<br>
                         Your price: $${buyPrice.toLocaleString()} (Short by $${(minInfo.min - buyPrice).toLocaleString()})
                     `;
@@ -1085,10 +1085,10 @@ window.executeCopyListing = async function(sourcePropertyId) {
         renderProperties(state.filteredProperties);
         renderOwnerDashboard();
         
-        // Navigate to the new property
+        // Navigate to the new property after data has time to propagate
         setTimeout(() => {
             viewPropertyStats(newId);
-        }, 500);
+        }, 800);
         
     } catch (error) {
         console.error('Error copying listing:', error);

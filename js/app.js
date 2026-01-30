@@ -440,7 +440,7 @@ window.viewProperty = function(id, forcePropertyView = false) {
                         html += '<div class="bg-gradient-to-br from-amber-600/20 to-orange-700/20 border-2 border-amber-500 rounded-xl p-4 text-center overflow-hidden">';
                         html += '<div class="text-amber-400 text-xs font-bold mb-1">🏠 OWN IT</div>';
                         html += '<div class="text-amber-400 ' + getLargePriceTextSize(buyPrice) + ' font-black truncate">$' + buyPrice.toLocaleString() + '</div>';
-                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% City Transfer Fee ($' + feeAmount.toLocaleString() + ')</div>';
+                        html += '<div class="text-amber-300/70 text-[10px] mt-1 truncate">+10% Government Transfer Fee ($' + feeAmount.toLocaleString() + ')</div>';
                         html += '</div>';
                     }
                     
@@ -625,22 +625,23 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
 // Load owner name for stats page (always shows real owner, not anonymized)
 async function loadStatsOwnerName(propertyId) {
     const ownerEl = $(`stats-owner-${propertyId}`);
-    if (!ownerEl) return;
+    if (!ownerEl) {
+        // Element doesn't exist yet - retry after a short delay
+        setTimeout(() => loadStatsOwnerName(propertyId), 200);
+        return;
+    }
+    
+    const spanEl = ownerEl.querySelector('span');
+    if (!spanEl) return;
     
     try {
         // Use tier-aware username lookup with forceShowOwner to bypass agent anonymization
         const ownerInfo = await getPropertyOwnerWithTier(propertyId, { forceShowOwner: true });
-        const spanEl = ownerEl.querySelector('span');
-        if (spanEl) {
-            spanEl.textContent = ownerInfo.display;
-        }
+        spanEl.textContent = ownerInfo.display;
     } catch (error) {
         console.error('Error loading owner name:', error);
         const ownerEmail = propertyOwnerEmail[propertyId];
-        const spanEl = ownerEl.querySelector('span');
-        if (spanEl) {
-            spanEl.textContent = ownerEmail ? ownerEmail.split('@')[0] : 'Unknown';
-        }
+        spanEl.textContent = ownerEmail ? ownerEmail.split('@')[0] : 'Unknown';
     }
 }
 
@@ -1610,7 +1611,7 @@ window.startEditTile = function(field, propertyId, type) {
                 const minInfo = getMinimumBuyPrice(p);
                 minPriceNote = `
                     <div class="bg-amber-900/50 border border-amber-500/50 rounded-lg p-2 mt-2 text-xs">
-                        <div class="text-amber-300 font-bold mb-1">📋 State Minimum</div>
+                        <div class="text-amber-300 font-bold mb-1">📋 Government Minimum</div>
                         <div class="text-amber-200">Category: ${minInfo.category}</div>
                         <div class="text-amber-200">Min Price: <span class="font-bold">$${minInfo.min.toLocaleString()}</span></div>
                     </div>
@@ -2673,16 +2674,32 @@ window.calculatePropertyAnalytics = function(payments, property) {
 };
 
 // Render analytics section on property stats page
-window.renderPropertyAnalytics = async function(propertyId) {
+window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
     const container = $('propertyAnalyticsSection');
     if (!container) {
-        console.warn('[Analytics] Container not found');
+        // Container doesn't exist yet - retry after a short delay (max 3 retries)
+        if (retryCount < 3) {
+            console.warn('[Analytics] Container not found, retrying...', retryCount + 1);
+            setTimeout(() => renderPropertyAnalytics(propertyId, retryCount + 1), 300);
+        } else {
+            console.warn('[Analytics] Container not found after 3 retries');
+        }
         return;
     }
     
     const p = properties.find(prop => prop.id === propertyId);
     if (!p) {
         console.warn('[Analytics] Property not found:', propertyId);
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4">⏳</div>
+                <p class="text-gray-400">Loading property data...</p>
+            </div>
+        `;
+        // Retry once more in case property data is still loading
+        if (retryCount < 2) {
+            setTimeout(() => renderPropertyAnalytics(propertyId, retryCount + 1), 500);
+        }
         return;
     }
     
@@ -5335,13 +5352,13 @@ function renderRTOWizardStep(step) {
                     </div>
                 </div>
                 
-                <!-- Final Payment Section (State Minimum) -->
+                <!-- Final Payment Section (Government Minimum) -->
                 <div class="bg-gradient-to-br from-amber-900/30 to-yellow-900/30 border border-amber-500/30 rounded-xl p-4">
                     <h4 class="text-amber-400 font-bold mb-2 flex items-center gap-2">
                         💰 Final Payment (Month <span id="rtoFinalMonth">${f.termMonths}</span>)
                     </h4>
                     <div class="bg-amber-900/40 border border-amber-600/50 rounded-lg p-2 mb-3">
-                        <div class="text-amber-300 text-xs font-bold">📋 State Minimum</div>
+                        <div class="text-amber-300 text-xs font-bold">📋 Government Minimum</div>
                         <div class="text-amber-200 text-xs">Category: <span id="rtoPropertyCategory">${f.propertyCategory || 'Detecting...'}</span></div>
                     </div>
                     <div class="space-y-2">
@@ -5350,7 +5367,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoFinalPaymentBase" class="text-white font-bold">$${(f.finalPaymentBase || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <span class="text-gray-400">+ City Transfer Fee (10%):</span>
+                            <span class="text-gray-400">+ Government Transfer Fee (10%):</span>
                             <span id="rtoFinalFee" class="text-amber-400 font-semibold">$${(f.finalPaymentFee || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between pt-2 border-t border-amber-500/30">
@@ -5374,7 +5391,7 @@ function renderRTOWizardStep(step) {
                             <span id="rtoCalcDown" class="text-red-400">−$${(f.downPayment || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-gray-400">− Final Payment (State Min):</span>
+                            <span class="text-gray-400">− Final Payment (Govt Min):</span>
                             <span id="rtoCalcFinalMin" class="text-red-400">−$${(f.finalPaymentBase || 0).toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between pt-2 border-t border-gray-700">
@@ -5472,7 +5489,7 @@ function renderRTOWizardStep(step) {
                         ` : ''}
                         ` : ''}
                         <div class="flex justify-between border-t border-gray-700 pt-2">
-                            <span class="text-gray-400">Final Payment Base (State Min)</span>
+                            <span class="text-gray-400">Final Payment Base (Govt Min)</span>
                             <span class="text-white">$${calc.finalPaymentBase.toLocaleString()}</span>
                         </div>
                         <div class="flex justify-between">
@@ -5836,7 +5853,7 @@ window.updateRTOTermMonths = function(months) {
 /**
  * Update calculations in real-time
  * Logic:
- * - Final Payment = State Minimum (based on property type) + 10% City Transfer Fee
+ * - Final Payment = Government Minimum (based on property type) + 10% Government Transfer Fee
  * - Amount for Monthly = Purchase Price - Down Payment - Final Payment Base
  * - Monthly Payment = Amount for Monthly / (Term Months - 1)
  */
@@ -5923,7 +5940,7 @@ window.updateRTOCalculations = function() {
 
 /**
  * Calculate RTO terms for contract generation
- * Uses State minimum for final payment + 10% City Transfer Fee
+ * Uses Government minimum for final payment + 10% Government Transfer Fee
  */
 function calculateRTOTerms() {
     const state = window.rtoWizardState;
@@ -6113,7 +6130,7 @@ Term Length                       ${calc.termMonths} Month${calc.termMonths !== 
 ${calc.termMonths > 1 ? `Monthly Payments (×${calc.termMonths - 1})         $${calc.monthlyPayment.toLocaleString()}${hasAgent && calc.monthlyPayment > 0 ? `
   └─ Agent Commission (10%)       −$${agentFeeMonthly.toLocaleString()}
   └─ Net to Property Owner        $${(calc.monthlyPayment - agentFeeMonthly).toLocaleString()}` : ''}` : ''}
-Final Payment Base (State Min)    $${calc.finalPaymentBase.toLocaleString()}
+Final Payment Base (Govt Min)    $${calc.finalPaymentBase.toLocaleString()}
 + Government Transfer Fee (10%)   $${calc.finalPaymentFee.toLocaleString()}
 = Total Final Payment             $${calc.finalPaymentTotal.toLocaleString()}${hasAgent ? `
   ├─ Government Fee               $${calc.finalPaymentFee.toLocaleString()} → Government
@@ -6141,7 +6158,7 @@ schedule.map(p =>
 
 FINAL PAYMENT BREAKDOWN
 ────────────────────────────────────────────────────────────────
-• Base Final Payment (State Min): $${calc.finalPaymentBase.toLocaleString()}
+• Base Final Payment (Govt Min): $${calc.finalPaymentBase.toLocaleString()}
 • Government Transfer Fee (10%): $${calc.finalPaymentFee.toLocaleString()} → Paid to Government
 • Total Final Payment: $${calc.finalPaymentTotal.toLocaleString()}
 • Property Category: ${calc.propertyCategory}
@@ -6189,7 +6206,7 @@ Early Payoff:
 DOCUMENT IDENTIFIERS
 ────────────────────────────────────────────────────────────────
 • Document ID: ${documentId}
-• Jurisdiction: State of San Andreas
+• Jurisdiction: San Andreas
 • Generated: ${new Date().toLocaleString()}
 
 ═══════════════════════════════════════════════════════════════
@@ -6529,7 +6546,7 @@ window.downloadRTOContractImage = async function() {
         }
     }
     
-    financialItems.push(['Final Payment Base (State Min)', `$${calc.finalPaymentBase.toLocaleString()}`, '#ffffff']);
+    financialItems.push(['Final Payment Base (Govt Min)', `$${calc.finalPaymentBase.toLocaleString()}`, '#ffffff']);
     financialItems.push(['+ Government Transfer Fee (10%)', `$${calc.finalPaymentFee.toLocaleString()}`, '#fbbf24']);
     financialItems.push(['= Total Final Payment', `$${calc.finalPaymentTotal.toLocaleString()}`, '#10b981']);
     
@@ -6639,7 +6656,7 @@ window.downloadRTOContractImage = async function() {
     ctx.textAlign = 'center';
     ctx.font = '9px Arial';
     ctx.fillStyle = '#4b5563';
-    ctx.fillText('This document is a legally binding agreement in the State of San Andreas', canvas.width / 2, y);
+    ctx.fillText('This document is a legally binding agreement in San Andreas', canvas.width / 2, y);
     ctx.fillText('© PaulysProperties.com - All Rights Reserved', canvas.width / 2, y + 12);
     
     // Convert to blob and download

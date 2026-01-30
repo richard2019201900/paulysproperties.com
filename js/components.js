@@ -159,10 +159,10 @@ window.openContactModal = async function(propertyTitle, propertyId) {
     if (disclaimer) {
         let disclaimerContent = `
             <div class="text-xs text-gray-400 mt-2 space-y-1">
-                <div><strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted in-city. This website serves as a listing platform only.</div>
+                <div><strong>📋 Note:</strong> All communications, property viewings, and transactions are conducted via phone/text. This website serves as a listing platform only.</div>
         `;
         if (isForSale) {
-            disclaimerContent += `<div><strong>💰 City Fee:</strong> A standard <span class="text-amber-400 font-bold">10% PMA Realtor Fee</span> (city requirement) applies to all property purchases. This fee is not charged by PaulysProperties.com.</div>`;
+            disclaimerContent += `<div><strong>💰 Government Fee:</strong> A standard <span class="text-amber-400 font-bold">10% Government Transfer Fee</span> applies to all property purchases.</div>`;
         }
         disclaimerContent += `</div>`;
         disclaimer.innerHTML = disclaimerContent;

@@ -310,8 +310,8 @@ window.renderPricingTiers = function(p, isPremium) {
     // Buy Price
     if (buyPrice > 0) {
         html += '<div class="flex items-center justify-between border-t border-gray-700 pt-1.5 mt-1.5">';
-        html += '<span class="text-amber-400 text-xs font-semibold" title="+10% PMA Realtor Fee (city fee)">🏠 Own It:</span>';
-        html += '<div class="text-right"><span class="text-amber-400 font-black text-lg">$' + buyPrice.toLocaleString() + '</span><span class="text-amber-400/60 text-[9px] block">+10% PMA Fee</span></div>';
+        html += '<span class="text-amber-400 text-xs font-semibold" title="+10% Government Transfer Fee">🏠 Own It:</span>';
+        html += '<div class="text-right"><span class="text-amber-400 font-black text-lg">$' + buyPrice.toLocaleString() + '</span><span class="text-amber-400/60 text-[9px] block">+10% Govt Fee</span></div>';
         html += '</div>';
     }
     
@@ -390,7 +390,7 @@ window.validatePriceLogic = function(weekly, biweekly, monthly) {
 };
 
 // ==================== BUY PRICE VALIDATION ====================
-// Validates buy price against city minimums based on property type and storage
+// Validates buy price against government minimums based on property type and storage
 
 /**
  * Get minimum buy price based on property type and storage (for create listing form)
@@ -431,7 +431,7 @@ window.getMinimumBuyPriceForForm = function() {
 };
 
 /**
- * Validate buy price against city minimum - called on input change
+ * Validate buy price against government minimum - called on input change
  * Updates hint text and shows warning if price is below minimum
  */
 window.validateBuyPrice = function() {
@@ -448,7 +448,7 @@ window.validateBuyPrice = function() {
     if (buyPrice === 0) {
         if (hintDiv) {
             const minInfo = getMinimumBuyPriceForForm();
-            hintDiv.innerHTML = `Enter a price if for sale. <span class="text-amber-400">City min for ${minInfo.category}: $${minInfo.min.toLocaleString()}</span>`;
+            hintDiv.innerHTML = `Enter a price if for sale. <span class="text-amber-400">Government min for ${minInfo.category}: $${minInfo.min.toLocaleString()}</span>`;
         }
         if (warningDiv) hideElement(warningDiv);
         buyPriceInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500');
@@ -460,7 +460,7 @@ window.validateBuyPrice = function() {
     
     // Update hint with detected category
     if (hintDiv) {
-        hintDiv.innerHTML = `Detected: <span class="text-cyan-400">${minInfo.category}</span> (${minInfo.storage}) → <span class="text-amber-400">City min: $${minInfo.min.toLocaleString()}</span>`;
+        hintDiv.innerHTML = `Detected: <span class="text-cyan-400">${minInfo.category}</span> (${minInfo.storage}) → <span class="text-amber-400">Government min: $${minInfo.min.toLocaleString()}</span>`;
     }
     
     // Check if below minimum
@@ -559,7 +559,7 @@ window.showRenterClearWarningModal = function(field, propertyId, type, newValue,
                 
                 <div class="bg-red-900/30 border border-red-600/50 rounded-xl p-4 mb-4">
                     <p class="text-red-200 text-sm mb-3">
-                        <strong>Don't manually clear renter info!</strong> This can cause issues with lb-phones in the city.
+                        <strong>Don't manually clear renter info!</strong> This can cause issues with lb-phones.
                     </p>
                     <p class="text-gray-300 text-sm mb-3">
                         Instead, use one of these buttons to properly end a rental:

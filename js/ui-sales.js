@@ -185,11 +185,11 @@ window.showLogSaleModal = function(vehicleId, financingContractId = null) {
                     </div>
                     
                     <div>
-                        <label class="block text-gray-400 text-sm mb-2">City Sales Fee:</label>
+                        <label class="block text-gray-400 text-sm mb-2">Government Sales Fee:</label>
                         <div id="salesFeeDisplay" class="bg-gray-800 rounded-xl py-3 px-4 text-amber-400 font-bold">
                             $25,000
                         </div>
-                        <p class="text-gray-500 text-xs mt-1">Flat city tax paid at LUX</p>
+                        <p class="text-gray-500 text-xs mt-1">Flat government tax paid at LUX</p>
                     </div>
                     
                     <div>
@@ -919,7 +919,7 @@ window.updateSaleBreakdown = function() {
                 </div>
             </div>
             <div class="mt-3 text-center text-gray-400 text-sm">
-                + City Fee: <span class="text-amber-400 font-bold">$${breakdown.cityFee.toLocaleString()}</span> (buyer pays at LUX)
+                + Govt Fee: <span class="text-amber-400 font-bold">$${breakdown.cityFee.toLocaleString()}</span> (buyer pays at LUX)
             </div>
         `;
     } else {
@@ -934,7 +934,7 @@ window.updateSaleBreakdown = function() {
                     <div class="text-green-400 text-xl font-bold">$${breakdown.vehiclePrice.toLocaleString()}</div>
                 </div>
                 <div class="bg-gray-700/50 rounded-lg p-3">
-                    <div class="text-gray-400 text-xs">+ City Fee</div>
+                    <div class="text-gray-400 text-xs">+ Govt Fee</div>
                     <div class="text-amber-400 text-xl font-bold">$${breakdown.cityFee.toLocaleString()}</div>
                 </div>
             </div>
@@ -1027,7 +1027,7 @@ function generateSaleContractHTML(data) {
             `}
         </div>
         <div style="text-align: center; margin-top: 8px; font-size: 10px; color: #D4AF37;">
-            + City Fee: $${data.cityFee.toLocaleString()} (buyer pays at LUX)
+            + Govt Fee: $${data.cityFee.toLocaleString()} (buyer pays at LUX)
         </div>
     </div>
     
@@ -1478,11 +1478,11 @@ window.downloadContractAsPNG = async function() {
         
         y += data.downPayment > 0 ? 105 : 95;
         
-        // City Sales Fee line
+        // Government Sales Fee line
         ctx.textAlign = 'center';
         ctx.font = '11px Arial';
         ctx.fillStyle = goldColor;
-        ctx.fillText('+ City Sales Fee: $' + data.cityFee.toLocaleString() + ' (paid by buyer at LUX)', canvas.width / 2, y);
+        ctx.fillText('+ Govt Sales Fee: $' + data.cityFee.toLocaleString() + ' (paid by buyer at LUX)', canvas.width / 2, y);
         y += 18;
         
         // === DOWN PAYMENT AGREEMENT (if applicable) ===
@@ -1594,7 +1594,7 @@ window.downloadContractAsPNG = async function() {
         y += 12;
         ctx.font = '8px Arial';
         ctx.fillStyle = '#374151';
-        ctx.fillText('PaulysAutos.com is NOT responsible for disputes. This document is for city court records only.', canvas.width / 2, y);
+        ctx.fillText('PaulysAutos.com is NOT responsible for disputes. This document is for court records only.', canvas.width / 2, y);
         
         // Convert to blob and download
         canvas.toBlob((blob) => {

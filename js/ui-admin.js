@@ -3390,7 +3390,7 @@ window.openResetPasswordModal = function(email, displayName) {
                             🎲
                         </button>
                     </div>
-                    <p class="text-gray-500 text-xs mt-2">Give this password to the user in-city so they can log in.</p>
+                    <p class="text-gray-500 text-xs mt-2">Give this password to the user so they can log in.</p>
                 </div>
                 
                 <div class="bg-amber-900/30 border border-amber-500/30 rounded-xl p-3 mb-4">
