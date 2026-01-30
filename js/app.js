@@ -6158,13 +6158,20 @@ ${hasAgent ? `• Agent commission (10%) deducted from property owner's portion 
 • Government fee ($${calc.finalPaymentFee.toLocaleString()}) paid directly to government on final transaction` : ''}
 
 Late Payment:
-• $50,000 late fee after 3 days
-• Default possible after 14 days late
+• Days 1-3: Grace period (no penalty)
+• Day 4: $50,000 late fee applied to balance
+• Partial payments do not satisfy payment obligation
 
-Default:
-• Two consecutive missed payments = default
-• Seller retains all previous payments as liquidated damages
-• Buyer must vacate within 72 hours of default notice
+Default & Eviction:
+• Day 7: Failure to pay in full = DEFAULT (no exceptions)
+• Day 8: Buyer must VACATE property (24 hours after default)
+• All previous payments forfeited as liquidated damages
+• Seller retains property and all funds paid to date
+
+Cure Period:
+• Buyer may cure by paying full amount owed + late fees
+• Must be paid IN FULL before Day 7 to avoid default
+• Communication alone does not stop eviction - only payment
 
 Property Maintenance:
 • Buyer responsible for all maintenance
@@ -6177,7 +6184,7 @@ Transfer of Ownership:
 
 Early Payoff:
 • Allowed without penalty
-• $${calc.finalPaymentFee.toLocaleString()} City Transfer Fee still applies upon transfer
+• $${calc.finalPaymentFee.toLocaleString()} Government Transfer Fee still applies upon transfer
 
 DOCUMENT IDENTIFIERS
 ────────────────────────────────────────────────────────────────
@@ -6563,7 +6570,8 @@ window.downloadRTOContractImage = async function() {
     drawText('KEY CONTRACT TERMS', margin, 16, '#f59e0b', 'Arial Black');
     drawText(`• Monthly payments due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month`, margin, 11, '#ffffff');
     drawText('• 3-day grace period before $50,000 late fee', margin, 11, '#ffffff');
-    drawText('• Two consecutive missed payments = default', margin, 11, '#ffffff');
+    drawText('• Day 7 without payment = DEFAULT & eviction', margin, 11, '#ef4444');
+    drawText('• All payments forfeited upon default', margin, 11, '#ffffff');
     drawText('• Full ownership transfers upon final payment', margin, 11, '#ffffff');
     y += 10;
     
