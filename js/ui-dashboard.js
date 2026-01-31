@@ -178,6 +178,53 @@ window.showDeletedAccountToast = function() {
 };
 
 // ==================== CALCULATIONS ====================
+
+/**
+ * Get properties where current user is assigned as agent (but NOT owner)
+ * @returns {Array} Properties managed by user as agent
+ */
+function getManagedProperties() {
+    const user = auth.currentUser;
+    if (!user) return [];
+    
+    const userEmail = user.email.toLowerCase();
+    
+    return properties.filter(p => {
+        const ownerEmail = (p.ownerEmail || propertyOwnerEmail[p.id] || '').toLowerCase();
+        const agents = p.agents || [];
+        const isOwner = ownerEmail === userEmail;
+        const isAgent = agents.some(a => a.toLowerCase() === userEmail);
+        
+        // Return properties where user is agent but NOT owner
+        return isAgent && !isOwner;
+    });
+}
+
+/**
+ * Get all properties user has visibility into (owned OR managed as agent)
+ * @returns {Array} Combined owned + managed properties
+ */
+function getOwnedAndManagedProperties() {
+    const owned = getOwnedProperties();
+    const managed = getManagedProperties();
+    
+    // Combine and dedupe by ID
+    const combined = [...owned];
+    const ownedIds = new Set(owned.map(p => p.id));
+    
+    managed.forEach(p => {
+        if (!ownedIds.has(p.id)) {
+            combined.push(p);
+        }
+    });
+    
+    return combined;
+}
+
+// Make available globally
+window.getManagedProperties = getManagedProperties;
+window.getOwnedAndManagedProperties = getOwnedAndManagedProperties;
+
 function getAvailableCount() {
     // Use owned properties for financial counts, not all visible properties
     const ownedProps = getOwnedProperties();
@@ -187,9 +234,11 @@ function getAvailableCount() {
 /**
  * Calculate dashboard totals for active renters grouped by payment frequency
  * Shows current income rates (not historical), plus RTO and House Sales
+ * NOW INCLUDES: Managed properties (where user is agent)
  */
 async function calculateTotalsAsync() {
     const ownedProps = getOwnedProperties();
+    const managedProps = getManagedProperties();
     
     // Initialize data structure
     const data = {
@@ -207,13 +256,19 @@ async function calculateTotalsAsync() {
             biweekly: 0,
             monthly: 0
         },
-        // Property info
+        // Property info (OWNED)
         rented: [],
         available: [],
         premium: [],
+        // NEW: Managed properties (where user is agent, not owner)
+        managed: [],
+        managedRented: [],
+        managedAvailable: [],
         // RTO Income (historical - actual collected)
         rtoTotal: 0,
         rtoContracts: [],
+        rtoAsOwner: 0,
+        rtoAsAgent: 0,
         // House Sales (historical - actual collected)
         houseSalesTotal: 0,
         houseSales: []
@@ -242,7 +297,8 @@ async function calculateTotalsAsync() {
             isPremium,
             isPremiumTrial,
             premiumWeeklyFee,
-            isSold
+            isSold,
+            isManaged: false // Owned property
         };
         
         // Track premium properties
@@ -287,6 +343,48 @@ async function calculateTotalsAsync() {
             }
         } else {
             data.available.push(propInfo);
+        }
+    });
+    
+    // Process MANAGED properties (where user is agent, not owner)
+    managedProps.forEach(p => {
+        const isRented = state.availability[p.id] === false;
+        const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
+        const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+        const ownerEmail = (p.ownerEmail || propertyOwnerEmail[p.id] || '').toLowerCase();
+        const ownerName = p.ownerName || ownerEmail.split('@')[0] || 'Unknown Owner';
+        
+        // Get prices for each frequency
+        const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+        const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice || 0);
+        const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+        const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+        
+        // Determine rent amount based on frequency
+        let rentAmount = 0;
+        if (paymentFrequency === 'daily') rentAmount = dailyPrice;
+        else if (paymentFrequency === 'weekly') rentAmount = weeklyPrice;
+        else if (paymentFrequency === 'biweekly') rentAmount = biweeklyPrice;
+        else if (paymentFrequency === 'monthly') rentAmount = monthlyPrice;
+        
+        const managedInfo = {
+            id: p.id,
+            title: p.title,
+            renterName,
+            ownerName,
+            ownerEmail,
+            paymentFrequency,
+            rentAmount,
+            isManaged: true,
+            isRented
+        };
+        
+        data.managed.push(managedInfo);
+        
+        if (isRented) {
+            data.managedRented.push(managedInfo);
+        } else {
+            data.managedAvailable.push(managedInfo);
         }
     });
     
@@ -509,6 +607,26 @@ function updateDashboardTiles(totals) {
     $('propertiesSubtitle').textContent = `${rentedCount} rented • ${availableCount} available${soldCount > 0 ? ` • ${soldCount} sold` : ''}`;
     $('totalListingsBreakdown').innerHTML = renderAllPropertiesListNew([...(data.rented || []), ...(data.available || [])]);
     
+    // Managed Properties (where user is agent, not owner)
+    const managedCount = data.managed?.length || 0;
+    const managedRentedCount = data.managedRented?.length || 0;
+    const managedAvailableCount = data.managedAvailable?.length || 0;
+    const managedTileEl = $('managedPropertiesTile');
+    const managedDisplayEl = $('managedPropertiesDisplay');
+    const managedSubtitleEl = $('managedPropertiesSubtitle');
+    const managedBreakdownEl = $('managedPropertiesBreakdown');
+    
+    if (managedCount > 0) {
+        // Show the managed properties tile
+        if (managedTileEl) managedTileEl.classList.remove('hidden');
+        if (managedDisplayEl) managedDisplayEl.textContent = managedCount;
+        if (managedSubtitleEl) managedSubtitleEl.textContent = `${managedRentedCount} rented • ${managedAvailableCount} available`;
+        if (managedBreakdownEl) managedBreakdownEl.innerHTML = renderManagedPropertiesBreakdown(data.managed || []);
+    } else {
+        // Hide the managed properties tile if no managed properties
+        if (managedTileEl) managedTileEl.classList.add('hidden');
+    }
+    
     // RTO Income
     const rtoIncomeEl = $('rtoIncomeDisplay');
     const rtoCountEl = $('rtoIncomeCount');
@@ -681,6 +799,30 @@ function renderRTOBreakdown(contracts) {
             <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
                 <span class="truncate mr-2">${statusBadge} ${c.propertyTitle}${roleBadge}</span>
                 <span class="font-bold whitespace-nowrap">$${incomeDisplay.toLocaleString()}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render managed properties breakdown (properties where user is agent, not owner)
+function renderManagedPropertiesBreakdown(managed) {
+    if (!managed || managed.length === 0) {
+        return '<div class="opacity-70 italic">No managed properties</div>';
+    }
+    
+    return managed.map((p, i) => {
+        const statusIcon = p.isRented ? '🔴' : '🟢';
+        const statusText = p.isRented ? 'Rented' : 'Available';
+        const renterInfo = p.isRented && p.renterName ? `<span class="text-gray-500 text-[10px]">${p.renterName}</span>` : '';
+        const rentDisplay = p.isRented && p.rentAmount > 0 ? `$${p.rentAmount.toLocaleString()}` : statusText;
+        
+        return `
+            <div class="flex justify-between py-1 border-b border-white/10 last:border-0 cursor-pointer hover:bg-white/5" onclick="viewPropertyStats(${p.id})">
+                <span class="truncate mr-2">
+                    ${statusIcon} ${sanitize(p.title)}
+                    ${renterInfo}
+                </span>
+                <span class="font-bold whitespace-nowrap text-purple-400">${rentDisplay}</span>
             </div>
         `;
     }).join('');

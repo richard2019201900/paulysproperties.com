@@ -855,10 +855,13 @@
         const propertyTitle = rent.title || `Property ${propertyId}`;
         const dueDisplay = rent.dueDate ? new Date(rent.dueDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Unknown';
         
+        // Show badge if this is a managed property (agent, not owner)
+        const managedBadge = rent.isManaged ? `<span class="text-purple-400 text-xs ml-2 bg-purple-900/50 px-2 py-0.5 rounded">🏢 Agent</span>` : '';
+        
         return `
             <div id="rent-item-${propertyId}" class="bg-gray-800/50 rounded-lg border border-gray-700 border-l-4 ${borderColors[status]} p-3 flex items-center justify-between gap-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats('${propertyId}')">
                 <div class="flex-1 min-w-0" style="outline: none;">
-                    <div class="text-white font-medium truncate">${propertyTitle}</div>
+                    <div class="text-white font-medium truncate">${propertyTitle}${managedBadge}</div>
                     <div class="text-gray-400 text-sm">Renter: ${renterName}</div>
                     <div class="${statusColors[status]} text-xs">Due: ${dueDisplay}</div>
                 </div>
@@ -1256,9 +1259,15 @@
                     return;
                 }
                 
-                // Rent alerts are ALWAYS filtered to current user's properties only
-                // Even admins only see their own rent alerts (they can view all in admin panel)
-                if (prop.ownerEmail !== currentUser.email) return;
+                // Rent alerts are shown for OWNED properties AND MANAGED properties (where user is agent)
+                const currentUserEmail = currentUser.email.toLowerCase();
+                const ownerEmail = (prop.ownerEmail || '').toLowerCase();
+                const agents = prop.agents || [];
+                const isOwner = ownerEmail === currentUserEmail;
+                const isAgent = agents.some(a => a.toLowerCase() === currentUserEmail);
+                
+                // Skip if user is neither owner nor agent
+                if (!isOwner && !isAgent) return;
                 
                 // Calculate next rent due date from lastPaymentDate + paymentFrequency
                 // Parse the lastPaymentDate (format: YYYY-MM-DD)
@@ -1309,7 +1318,10 @@
                     dueDate,
                     nextRentDue: dueDate,
                     rentAmount,
-                    daysUntilDue
+                    daysUntilDue,
+                    // Track if this is a managed property (agent) vs owned
+                    isManaged: isAgent && !isOwner,
+                    ownerEmail: ownerEmail
                 };
                 
                 if (daysUntilDue < 0) {
