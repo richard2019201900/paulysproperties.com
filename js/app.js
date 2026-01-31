@@ -2323,10 +2323,20 @@ window.logPayment = async function(propertyId, paymentData) {
         } else {
         }
         
-        // Add new payment
+        // Determine user role for this property (for RTO income calculations)
+        const currentUserEmail = (auth.currentUser?.email || '').toLowerCase();
+        const userRole = getUserRoleForProperty(propertyId, currentUserEmail);
+        const commissionEarned = calculateCommissionEarned(paymentData.amount || 0, userRole);
+        
+        // Add new payment with enhanced tracking
         const newPayment = {
             ...paymentData,
-            id: Date.now().toString() // Unique ID for this payment
+            id: Date.now().toString(), // Unique ID for this payment
+            // Enhanced fields for data integrity
+            userRole: userRole,
+            commissionEarned: commissionEarned,
+            loggedBy: currentUserEmail,
+            xpAwarded: 0 // Will be updated after XP is awarded
         };
         payments.push(newPayment);
         // Save back to Firestore
@@ -2335,7 +2345,28 @@ window.logPayment = async function(propertyId, paymentData) {
             payments: payments,
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
-        return true;
+        
+        // Award XP and update the payment record with xpAwarded
+        const user = auth.currentUser;
+        if (user && typeof GamificationService !== 'undefined' && paymentData.amount > 0) {
+            try {
+                const property = properties.find(p => p.id === propertyId);
+                const propertyTitle = property?.title || `Property ${propertyId}`;
+                await GamificationService.awardXP(user.uid, 100, `Collected $${paymentData.amount.toLocaleString()} on ${propertyTitle}`);
+                
+                // Update the payment record with xpAwarded
+                newPayment.xpAwarded = 100;
+                await db.collection('paymentHistory').doc(String(propertyId)).set({
+                    propertyId: propertyId,
+                    payments: payments,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (xpError) {
+                console.error('[PaymentLog] Error awarding XP:', xpError);
+            }
+        }
+        
+        return { success: true, paymentId: newPayment.id };
     } catch (error) {
         console.error('[PaymentLog] Error logging payment:', error);
         console.error('[PaymentLog] Error details:', error.code, error.message);
@@ -2344,8 +2375,375 @@ window.logPayment = async function(propertyId, paymentData) {
         if (typeof showToast === 'function') {
             showToast('⚠️ Payment may not have been logged: ' + error.message, 'error');
         }
-        return false;
+        return { success: false, error: error.message };
     }
+};
+
+// ==================== USER ROLE & COMMISSION UTILITIES ====================
+
+/**
+ * Determine user's role for a specific property
+ * @param {number|string} propertyId 
+ * @param {string} userEmail 
+ * @returns {'owner' | 'agent' | 'owner_agent' | 'none'}
+ */
+window.getUserRoleForProperty = function(propertyId, userEmail) {
+    if (!userEmail) return 'none';
+    
+    const email = userEmail.toLowerCase();
+    const property = properties.find(p => p.id == propertyId);
+    if (!property) return 'none';
+    
+    const ownerEmail = (property.ownerEmail || propertyOwnerEmail[propertyId] || '').toLowerCase();
+    const agents = property.agents || [];
+    const isOwner = ownerEmail === email;
+    const isAgent = agents.some(a => a.toLowerCase() === email);
+    
+    if (isOwner && isAgent) return 'owner_agent';
+    if (isOwner) return 'owner';
+    if (isAgent) return 'agent';
+    return 'none';
+};
+
+/**
+ * Calculate commission earned based on user role
+ * - Owner: Full amount (their money)
+ * - Agent: 10% commission
+ * - Owner+Agent: Full amount (they own it)
+ * @param {number} amount 
+ * @param {string} userRole 
+ * @returns {number}
+ */
+window.calculateCommissionEarned = function(amount, userRole) {
+    if (!amount || amount <= 0) return 0;
+    
+    switch (userRole) {
+        case 'owner':
+        case 'owner_agent':
+            return amount; // Full amount is their income
+        case 'agent':
+            return Math.round(amount * 0.10); // 10% commission
+        default:
+            return 0;
+    }
+};
+
+/**
+ * Delete RTO payment with full ACID compliance
+ * Updates: Payment ledger, Contract, XP, Contract status
+ * @param {number|string} propertyId 
+ * @param {string} paymentId 
+ * @param {object} options - { isRTOPayment, isRTODeposit, rtoContractId }
+ */
+window.deleteRTOPaymentAtomic = async function(propertyId, paymentId, options = {}) {
+    const { isRTOPayment, isRTODeposit, rtoContractId } = options;
+    
+    try {
+        // 1. Get the payment record first (to know how much XP to reverse)
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        if (!historyDoc.exists) {
+            throw new Error('Payment history not found');
+        }
+        
+        let payments = historyDoc.data().payments || [];
+        const paymentToDelete = payments.find(p => p.id === paymentId);
+        
+        if (!paymentToDelete) {
+            throw new Error('Payment not found');
+        }
+        
+        const deletedAmount = paymentToDelete.amount || 0;
+        const xpToDeduct = paymentToDelete.xpAwarded || 0; // Only deduct what was actually awarded
+        
+        // 2. Remove from payment ledger
+        payments = payments.filter(p => p.id !== paymentId);
+        await db.collection('paymentHistory').doc(String(propertyId)).set({
+            propertyId: propertyId,
+            payments: payments,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // 3. Reverse XP (only if it was awarded)
+        const user = auth.currentUser;
+        if (user && xpToDeduct > 0 && typeof GamificationService !== 'undefined') {
+            try {
+                const property = properties.find(p => p.id === propertyId);
+                const propertyTitle = property?.title || `Property ${propertyId}`;
+                await GamificationService.deductXP(user.uid, xpToDeduct, `Payment deleted for ${propertyTitle}`);
+            } catch (xpError) {
+                console.error('[DeletePayment] Error reversing XP:', xpError);
+            }
+        }
+        
+        // 4. Update RTO contract if applicable
+        if (isRTOPayment && rtoContractId) {
+            const contractDoc = await db.collection('rentToOwnContracts').doc(rtoContractId).get();
+            if (contractDoc.exists) {
+                const contractData = contractDoc.data();
+                
+                if (isRTODeposit) {
+                    // Revert to awaiting deposit state
+                    await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                        depositPaid: false,
+                        depositPaidDate: null,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Also update property
+                    await PropertyDataService.writeMultiple(propertyId, {
+                        rtoDepositPaid: false,
+                        rtoDepositPaidDate: null
+                    });
+                } else {
+                    // Monthly payment - recalculate contract state
+                    let rtoPaymentHistory = contractData.rtoPaymentHistory || [];
+                    const currentPaymentNumber = contractData.currentPaymentNumber || 0;
+                    const remainingBalance = contractData.remainingBalance || 0;
+                    
+                    // Remove from contract payment history (match by date and amount)
+                    rtoPaymentHistory = rtoPaymentHistory.filter(p => 
+                        !(p.actual === deletedAmount && p.date === paymentToDelete.paymentDate)
+                    );
+                    
+                    // Recalculate remaining balance (add back the deleted amount)
+                    const newRemainingBalance = remainingBalance + deletedAmount;
+                    const newPaymentNumber = Math.max(0, currentPaymentNumber - 1);
+                    
+                    await db.collection('rentToOwnContracts').doc(rtoContractId).update({
+                        currentPaymentNumber: newPaymentNumber,
+                        remainingBalance: newRemainingBalance,
+                        rtoPaymentHistory: rtoPaymentHistory,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Also update property
+                    await PropertyDataService.writeMultiple(propertyId, {
+                        rtoCurrentPayment: newPaymentNumber,
+                        rtoRemainingBalance: newRemainingBalance
+                    });
+                }
+            }
+        }
+        
+        return { 
+            success: true, 
+            deletedAmount, 
+            xpDeducted: xpToDeduct,
+            wasDeposit: isRTODeposit
+        };
+        
+    } catch (error) {
+        console.error('[DeletePayment] Error:', error);
+        throw error;
+    }
+};
+
+/**
+ * Calculate RTO income for dashboard with proper owner/agent logic
+ * @param {string} userEmail 
+ * @returns {Promise<{total: number, asOwner: number, asAgent: number, contracts: Array}>}
+ */
+window.calculateRTOIncomeForUser = async function(userEmail) {
+    if (!userEmail) return { total: 0, asOwner: 0, asAgent: 0, contracts: [] };
+    
+    const email = userEmail.toLowerCase();
+    const result = {
+        total: 0,
+        asOwner: 0,
+        asAgent: 0,
+        contracts: []
+    };
+    
+    try {
+        // Get all RTO contracts where user is creator OR is the property owner/agent
+        const createdBySnapshot = await db.collection('rentToOwnContracts')
+            .where('createdBy', '==', email)
+            .get();
+        
+        const processedContractIds = new Set();
+        
+        for (const doc of createdBySnapshot.docs) {
+            const contract = { id: doc.id, ...doc.data() };
+            processedContractIds.add(doc.id);
+            
+            const propertyId = contract.propertyId;
+            const userRole = getUserRoleForProperty(propertyId, email);
+            
+            // Calculate income from this contract based on role
+            const history = contract.rtoPaymentHistory || [];
+            const depositAmount = contract.depositPaid ? (contract.depositAmount || 0) : 0;
+            const monthlyTotal = history.reduce((sum, pay) => sum + (pay.actual || 0), 0);
+            const grossTotal = depositAmount + monthlyTotal;
+            
+            let income = 0;
+            if (userRole === 'owner' || userRole === 'owner_agent') {
+                income = grossTotal;
+                result.asOwner += income;
+            } else if (userRole === 'agent') {
+                income = Math.round(grossTotal * 0.10);
+                result.asAgent += income;
+            }
+            
+            result.total += income;
+            
+            if (income > 0 || contract.status === 'active') {
+                result.contracts.push({
+                    id: contract.documentId || doc.id,
+                    propertyId: propertyId,
+                    propertyTitle: contract.propertyTitle,
+                    buyer: contract.buyer,
+                    grossTotal: grossTotal,
+                    income: income,
+                    userRole: userRole,
+                    status: contract.status
+                });
+            }
+        }
+        
+        // Also check properties where user is agent but didn't create the contract
+        const ownedAndManagedProps = properties.filter(p => {
+            const ownerEmail = (p.ownerEmail || propertyOwnerEmail[p.id] || '').toLowerCase();
+            const agents = p.agents || [];
+            return ownerEmail === email || agents.some(a => a.toLowerCase() === email);
+        });
+        
+        for (const prop of ownedAndManagedProps) {
+            if (prop.rtoContractId && !processedContractIds.has(prop.rtoContractId)) {
+                try {
+                    const contractDoc = await db.collection('rentToOwnContracts').doc(prop.rtoContractId).get();
+                    if (contractDoc.exists) {
+                        const contract = { id: contractDoc.id, ...contractDoc.data() };
+                        const userRole = getUserRoleForProperty(prop.id, email);
+                        
+                        const history = contract.rtoPaymentHistory || [];
+                        const depositAmount = contract.depositPaid ? (contract.depositAmount || 0) : 0;
+                        const monthlyTotal = history.reduce((sum, pay) => sum + (pay.actual || 0), 0);
+                        const grossTotal = depositAmount + monthlyTotal;
+                        
+                        let income = 0;
+                        if (userRole === 'owner' || userRole === 'owner_agent') {
+                            income = grossTotal;
+                            result.asOwner += income;
+                        } else if (userRole === 'agent') {
+                            income = Math.round(grossTotal * 0.10);
+                            result.asAgent += income;
+                        }
+                        
+                        result.total += income;
+                        
+                        if (income > 0) {
+                            result.contracts.push({
+                                id: contract.documentId || contractDoc.id,
+                                propertyId: prop.id,
+                                propertyTitle: contract.propertyTitle,
+                                buyer: contract.buyer,
+                                grossTotal: grossTotal,
+                                income: income,
+                                userRole: userRole,
+                                status: contract.status
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[RTOIncome] Error fetching contract:', e);
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('[RTOIncome] Error calculating RTO income:', error);
+    }
+    
+    return result;
+};
+
+/**
+ * MIGRATION: Recalculate all payment history records with proper userRole and commissionEarned
+ * Run this once to fix existing data
+ * @returns {Promise<{processed: number, updated: number, errors: number}>}
+ */
+window.migratePaymentHistoryWithRoles = async function() {
+    const stats = { processed: 0, updated: 0, errors: 0 };
+    
+    if (!confirm('This will update all payment history records with proper owner/agent role data. Continue?')) {
+        return stats;
+    }
+    
+    showToast('🔄 Starting payment history migration...', 'info');
+    
+    try {
+        // Get all payment history documents
+        const historySnapshot = await db.collection('paymentHistory').get();
+        
+        for (const doc of historySnapshot.docs) {
+            stats.processed++;
+            const propertyId = doc.id;
+            const data = doc.data();
+            let payments = data.payments || [];
+            let needsUpdate = false;
+            
+            // Update each payment with role info if missing
+            payments = payments.map(payment => {
+                if (!payment.userRole || payment.commissionEarned === undefined) {
+                    needsUpdate = true;
+                    const loggedBy = payment.loggedBy || payment.recordedBy || auth.currentUser?.email || '';
+                    const userRole = getUserRoleForProperty(propertyId, loggedBy);
+                    const commissionEarned = calculateCommissionEarned(payment.amount || 0, userRole);
+                    
+                    return {
+                        ...payment,
+                        userRole: userRole,
+                        commissionEarned: commissionEarned,
+                        loggedBy: loggedBy.toLowerCase(),
+                        xpAwarded: payment.xpAwarded || 0 // Preserve or default to 0
+                    };
+                }
+                return payment;
+            });
+            
+            if (needsUpdate) {
+                try {
+                    await db.collection('paymentHistory').doc(propertyId).update({
+                        payments: payments,
+                        lastMigrated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    stats.updated++;
+                } catch (updateError) {
+                    console.error(`[Migration] Error updating property ${propertyId}:`, updateError);
+                    stats.errors++;
+                }
+            }
+        }
+        
+        showToast(`✅ Migration complete: ${stats.updated}/${stats.processed} records updated`, 'success');
+        
+    } catch (error) {
+        console.error('[Migration] Error:', error);
+        showToast('❌ Migration failed: ' + error.message, 'error');
+    }
+    
+    return stats;
+};
+
+/**
+ * ADMIN: Recalculate RTO income for current user (debug/verification)
+ */
+window.debugRTOIncome = async function() {
+    const email = auth.currentUser?.email;
+    if (!email) {
+        console.log('Not logged in');
+        return;
+    }
+    
+    console.log('Calculating RTO income for:', email);
+    const result = await calculateRTOIncomeForUser(email);
+    console.log('RTO Income Result:', result);
+    console.log('Total:', '$' + result.total.toLocaleString());
+    console.log('As Owner:', '$' + result.asOwner.toLocaleString());
+    console.log('As Agent:', '$' + result.asAgent.toLocaleString());
+    console.log('Contracts:', result.contracts);
+    
+    return result;
 };
 
 // Show payment confirmation modal with copyable thank you message
@@ -2503,37 +2901,59 @@ window.deletePayment = async function(propertyId, paymentId) {
         }
         
         let payments = historyDoc.data().payments || [];
-        const originalCount = payments.length;
+        const paymentToDelete = payments.find(p => p.id === paymentId);
         
-        // Find and remove the payment
-        payments = payments.filter(p => p.id !== paymentId);
-        
-        if (payments.length === originalCount) {
+        if (!paymentToDelete) {
             showToast('❌ Payment not found', 'error');
             return;
         }
         
-        // Save back to Firestore
-        await db.collection('paymentHistory').doc(String(propertyId)).set({
-            propertyId: propertyId,
-            payments: payments,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Reverse the XP that was awarded for this payment
-        const user = auth.currentUser;
-        if (user && typeof GamificationService !== 'undefined') {
+        // Check if this is an RTO payment - use atomic delete if so
+        if (paymentToDelete.isRTOPayment) {
+            const property = properties.find(p => p.id === propertyId);
+            const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', property?.rtoContractId || '');
+            
             try {
-                const property = properties.find(p => p.id === propertyId);
-                const propertyTitle = property?.title || `Property ${propertyId}`;
-                await GamificationService.deductXP(user.uid, 100, `Payment deleted for ${propertyTitle}`);
-                showToast('🗑️ Payment deleted, 100 XP reversed', 'success');
-            } catch (xpError) {
-                console.error('[PaymentLog] Error reversing XP:', xpError);
-                showToast('🗑️ Payment deleted (XP reversal failed)', 'warning');
+                const result = await deleteRTOPaymentAtomic(propertyId, paymentId, {
+                    isRTOPayment: true,
+                    isRTODeposit: paymentToDelete.isRTODeposit,
+                    rtoContractId: rtoContractId
+                });
+                
+                const xpMsg = result.xpDeducted > 0 ? `, ${result.xpDeducted} XP reversed` : '';
+                const depositMsg = result.wasDeposit ? ' (deposit reverted)' : '';
+                showToast(`🗑️ RTO payment deleted${xpMsg}${depositMsg}`, 'success');
+            } catch (error) {
+                showToast('❌ Error deleting RTO payment: ' + error.message, 'error');
+                return;
             }
         } else {
-            showToast('🗑️ Payment deleted - refreshing stats...', 'success');
+            // Non-RTO payment - simple delete
+            const xpToDeduct = paymentToDelete.xpAwarded || 0;
+            payments = payments.filter(p => p.id !== paymentId);
+            
+            // Save back to Firestore
+            await db.collection('paymentHistory').doc(String(propertyId)).set({
+                propertyId: propertyId,
+                payments: payments,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Reverse XP only if it was awarded
+            const user = auth.currentUser;
+            if (user && xpToDeduct > 0 && typeof GamificationService !== 'undefined') {
+                try {
+                    const property = properties.find(p => p.id === propertyId);
+                    const propertyTitle = property?.title || `Property ${propertyId}`;
+                    await GamificationService.deductXP(user.uid, xpToDeduct, `Payment deleted for ${propertyTitle}`);
+                    showToast(`🗑️ Payment deleted, ${xpToDeduct} XP reversed`, 'success');
+                } catch (xpError) {
+                    console.error('[PaymentLog] Error reversing XP:', xpError);
+                    showToast('🗑️ Payment deleted (XP reversal failed)', 'warning');
+                }
+            } else {
+                showToast('🗑️ Payment deleted', 'success');
+            }
         }
         
         // Refresh the analytics view
@@ -3101,34 +3521,58 @@ window.deletePaymentFromModal = async function(propertyId, paymentId) {
         }
         
         let payments = historyDoc.data().payments || [];
-        const originalCount = payments.length;
-        payments = payments.filter(p => p.id !== paymentId);
+        const paymentToDelete = payments.find(p => p.id === paymentId);
         
-        if (payments.length === originalCount) {
+        if (!paymentToDelete) {
             showToast('❌ Payment not found', 'error');
             return;
         }
         
-        await db.collection('paymentHistory').doc(String(propertyId)).set({
-            propertyId: propertyId,
-            payments: payments,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Reverse the XP that was awarded for this payment
-        const user = auth.currentUser;
-        if (user && typeof GamificationService !== 'undefined') {
+        // Check if this is an RTO payment - use atomic delete if so
+        if (paymentToDelete.isRTOPayment) {
+            const property = properties.find(p => p.id === propertyId);
+            const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', property?.rtoContractId || '');
+            
             try {
-                const property = properties.find(p => p.id === propertyId);
-                const propertyTitle = property?.title || `Property ${propertyId}`;
-                await GamificationService.deductXP(user.uid, 100, `Payment deleted for ${propertyTitle}`);
-                showToast('🗑️ Payment deleted, 100 XP reversed', 'success');
-            } catch (xpError) {
-                console.error('[PaymentLog] Error reversing XP:', xpError);
-                showToast('🗑️ Payment deleted (XP reversal failed)', 'warning');
+                const result = await deleteRTOPaymentAtomic(propertyId, paymentId, {
+                    isRTOPayment: true,
+                    isRTODeposit: paymentToDelete.isRTODeposit,
+                    rtoContractId: rtoContractId
+                });
+                
+                const xpMsg = result.xpDeducted > 0 ? `, ${result.xpDeducted} XP reversed` : '';
+                const depositMsg = result.wasDeposit ? ' (deposit reverted)' : '';
+                showToast(`🗑️ RTO payment deleted${xpMsg}${depositMsg}`, 'success');
+            } catch (error) {
+                showToast('❌ Error deleting RTO payment: ' + error.message, 'error');
+                return;
             }
         } else {
-            showToast('🗑️ Payment deleted', 'success');
+            // Non-RTO payment - simple delete
+            const xpToDeduct = paymentToDelete.xpAwarded || 0;
+            payments = payments.filter(p => p.id !== paymentId);
+            
+            await db.collection('paymentHistory').doc(String(propertyId)).set({
+                propertyId: propertyId,
+                payments: payments,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Reverse XP only if it was awarded
+            const user = auth.currentUser;
+            if (user && xpToDeduct > 0 && typeof GamificationService !== 'undefined') {
+                try {
+                    const property = properties.find(p => p.id === propertyId);
+                    const propertyTitle = property?.title || `Property ${propertyId}`;
+                    await GamificationService.deductXP(user.uid, xpToDeduct, `Payment deleted for ${propertyTitle}`);
+                    showToast(`🗑️ Payment deleted, ${xpToDeduct} XP reversed`, 'success');
+                } catch (xpError) {
+                    console.error('[PaymentLog] Error reversing XP:', xpError);
+                    showToast('🗑️ Payment deleted (XP reversal failed)', 'warning');
+                }
+            } else {
+                showToast('🗑️ Payment deleted', 'success');
+            }
         }
         
         // Refresh the modal

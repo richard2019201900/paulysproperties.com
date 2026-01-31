@@ -13,6 +13,17 @@
  * ============================================================================
  */
 
+// Format price as shortened version (e.g., $1.5M, $500K)
+function formatPriceShort(amount) {
+    if (!amount || amount === 0) return '$0';
+    if (amount >= 1000000) {
+        return '$' + (amount / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    } else if (amount >= 1000) {
+        return '$' + (amount / 1000).toFixed(0) + 'K';
+    }
+    return '$' + amount.toLocaleString();
+}
+
 // ==================== AUTH FUNCTIONS ====================
 window.showOwnerLoginForm = function() {
     hideElement($('loginOptions'));
@@ -279,21 +290,22 @@ async function calculateTotalsAsync() {
         }
     });
     
-    // Fetch RTO contracts for this owner
-    let rtoContracts = [];
+    // Fetch RTO income using proper owner/agent logic
+    let rtoIncomeData = { total: 0, asOwner: 0, asAgent: 0, contracts: [] };
     try {
         const currentUserEmail = auth.currentUser?.email;
-        if (currentUserEmail) {
-            const rtoSnapshot = await db.collection('rentToOwnContracts')
-                .where('createdBy', '==', currentUserEmail)
-                .get();
-            rtoSnapshot.forEach(doc => {
-                rtoContracts.push({ id: doc.id, ...doc.data() });
-            });
+        if (currentUserEmail && typeof calculateRTOIncomeForUser === 'function') {
+            rtoIncomeData = await calculateRTOIncomeForUser(currentUserEmail);
         }
     } catch (e) {
-        console.warn('[Dashboard] Could not fetch RTO contracts:', e);
+        console.warn('[Dashboard] Could not calculate RTO income:', e);
     }
+    
+    // Set RTO data from calculated income
+    data.rtoTotal = rtoIncomeData.total;
+    data.rtoContracts = rtoIncomeData.contracts;
+    data.rtoAsOwner = rtoIncomeData.asOwner;
+    data.rtoAsAgent = rtoIncomeData.asAgent;
     
     // Fetch house sales for this owner
     let houseSales = [];
@@ -310,27 +322,6 @@ async function calculateTotalsAsync() {
     } catch (e) {
         console.warn('[Dashboard] Could not fetch house sales:', e);
     }
-    
-    // Calculate RTO income (deposits + monthly payments - historical)
-    rtoContracts.forEach(contract => {
-        const history = contract.rtoPaymentHistory || [];
-        const depositPaid = contract.depositPaid ? (contract.depositAmount || 0) : 0;
-        const monthlyPayments = history.reduce((sum, pay) => sum + (pay.actual || 0), 0);
-        const contractTotal = depositPaid + monthlyPayments;
-        
-        data.rtoTotal += contractTotal;
-        if (contractTotal > 0 || contract.status === 'active') {
-            data.rtoContracts.push({
-                id: contract.documentId,
-                propertyTitle: contract.propertyTitle,
-                buyer: contract.buyer,
-                total: contractTotal,
-                depositPaid: depositPaid,
-                monthlyPaid: monthlyPayments,
-                status: contract.status
-            });
-        }
-    });
     
     // Calculate house sales (historical)
     houseSales.forEach(sale => {
@@ -527,9 +518,18 @@ function updateDashboardTiles(totals) {
     }
     if (rtoCountEl) {
         const activeContracts = (data.rtoContracts || []).filter(c => c.status === 'active').length;
-        rtoCountEl.textContent = activeContracts > 0 
-            ? `Rent-to-Own • ${activeContracts} active` 
-            : 'Rent-to-Own income';
+        // Show breakdown if both owner and agent income exist
+        let countText = '';
+        if (data.rtoAsOwner > 0 && data.rtoAsAgent > 0) {
+            countText = `Owner: $${formatPriceShort(data.rtoAsOwner)} • Agent: $${formatPriceShort(data.rtoAsAgent)}`;
+        } else if (data.rtoAsAgent > 0) {
+            countText = `Agent commission • ${activeContracts} active`;
+        } else if (activeContracts > 0) {
+            countText = `Rent-to-Own • ${activeContracts} active`;
+        } else {
+            countText = 'Rent-to-Own income';
+        }
+        rtoCountEl.textContent = countText;
     }
     if (rtoBreakdownEl) {
         rtoBreakdownEl.innerHTML = renderRTOBreakdown(data.rtoContracts || []);
@@ -665,10 +665,22 @@ function renderRTOBreakdown(contracts) {
         const statusBadge = c.status === 'active' 
             ? '<span class="text-green-400 text-[10px]">●</span>' 
             : '<span class="text-gray-400 text-[10px]">○</span>';
+        
+        // Show role badge
+        let roleBadge = '';
+        if (c.userRole === 'agent') {
+            roleBadge = '<span class="text-purple-400 text-[9px] ml-1">(10% comm)</span>';
+        } else if (c.userRole === 'owner') {
+            roleBadge = '<span class="text-green-400 text-[9px] ml-1">(owner)</span>';
+        }
+        
+        // Show income (commission if agent, full amount if owner)
+        const incomeDisplay = c.income || c.total || 0;
+        
         return `
             <div class="flex justify-between py-1 border-b border-white/10 last:border-0">
-                <span class="truncate mr-2">${statusBadge} ${c.propertyTitle}</span>
-                <span class="font-bold whitespace-nowrap">$${c.total.toLocaleString()}</span>
+                <span class="truncate mr-2">${statusBadge} ${c.propertyTitle}${roleBadge}</span>
+                <span class="font-bold whitespace-nowrap">$${incomeDisplay.toLocaleString()}</span>
             </div>
         `;
     }).join('');
