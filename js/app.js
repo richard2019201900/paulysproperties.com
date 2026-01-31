@@ -2431,31 +2431,29 @@ window.showPaymentConfirmationModal = function(renterName, nextDueDate, amount, 
 
 window.copyThankYouMessage = async function() {
     try {
-        await navigator.clipboard.writeText(window.currentThankYouMessage);
+        await navigator.clipboard.writeText(window.currentThankYouMessage || window.currentRenterMessage);
         
-        // Update button to show success
+        // Update button to show success (no toast)
         const btn = document.querySelector('#paymentConfirmModal button');
         if (btn) {
+            const originalText = btn.innerHTML;
             btn.innerHTML = '<span>✅</span> Copied!';
             btn.classList.remove('from-green-500', 'to-emerald-600');
-            btn.classList.add('from-blue-500', 'to-purple-600');
-        }
-        
-        if (typeof showToast === 'function') {
-            showToast('📋 Message copied to clipboard!', 'success');
+            btn.classList.add('from-gray-600', 'to-gray-700');
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.classList.remove('from-gray-600', 'to-gray-700');
+                btn.classList.add('from-green-500', 'to-emerald-600');
+            }, 2000);
         }
     } catch (e) {
         // Fallback for older browsers
         const textarea = document.createElement('textarea');
-        textarea.value = window.currentThankYouMessage;
+        textarea.value = window.currentThankYouMessage || window.currentRenterMessage;
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        
-        if (typeof showToast === 'function') {
-            showToast('📋 Message copied!', 'success');
-        }
     }
 };
 
@@ -7314,50 +7312,34 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     
     const propertyTitle = info.propertyTitle || 'your property';
     const hasAgent = info.hasAgent || false;
-    const agentName = info.agentName || '';
+    const agentName = info.agentName || 'PaulysProperties.com';
     const agentFee = hasAgent ? Math.round(actualAmount * 0.10) : 0;
     const netToSeller = actualAmount - agentFee;
     
-    let thankYouMessage, headerText, badgeText, agentFeeHtml = '';
+    // Fix: Use remaining balance for final payment info when next monthly is $0
+    const nextPaymentAmount = info.nextExpectedAmount > 0 ? info.nextExpectedAmount : info.remainingBalance;
+    const nextPaymentLabel = info.nextExpectedAmount > 0 ? 'monthly payment' : 'final payment';
     
-    if (hasAgent) {
-        agentFeeHtml = `
-            <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3 mt-3">
-                <div class="text-purple-400 text-xs font-bold mb-1">🏢 Agent Commission Breakdown (via PaulysProperties.com)</div>
-                <div class="text-sm space-y-1">
-                    <div class="flex justify-between">
-                        <span class="text-gray-400">Payment Received:</span>
-                        <span class="text-white">$${actualAmount.toLocaleString()}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-purple-400">Agent Commission (10%):</span>
-                        <span class="text-purple-400">−$${agentFee.toLocaleString()}</span>
-                    </div>
-                    <div class="flex justify-between border-t border-purple-500/30 pt-1">
-                        <span class="text-gray-300">Net to Property Owner:</span>
-                        <span class="text-green-400 font-bold">$${netToSeller.toLocaleString()}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+    let renterMessage, ownerMessage, headerText, badgeText;
     
+    // === RENTER MESSAGE (Simple, no commission details) ===
     if (info.type === 'deposit') {
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
-        if (hasAgent) {
-            thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Commission (10% via PaulysProperties.com): −$${agentFee.toLocaleString()}\n• Net to Property Owner: $${netToSeller.toLocaleString()}\n\nYour remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
-        } else {
-            thankYouMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received. Your remaining balance is $${info.remainingBalance.toLocaleString()}. Your first monthly payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
-        }
+        renterMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received.\n\nYour remaining balance is $${info.remainingBalance.toLocaleString()}. Your first ${nextPaymentLabel} of $${nextPaymentAmount.toLocaleString()} is due on ${info.nextDueDate}.\n\nLet me know if you have any questions!`;
     } else {
         headerText = 'Payment Logged!';
         badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
-        if (hasAgent) {
-            thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received.\n\n💼 Payment Breakdown:\n• Gross Payment: $${actualAmount.toLocaleString()}\n• Agent Commission (10% via PaulysProperties.com): −$${agentFee.toLocaleString()}\n• Net to Property Owner: $${netToSeller.toLocaleString()}\n\nYour remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
-        } else {
-            thankYouMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received. Your remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next payment of $${info.nextExpectedAmount.toLocaleString()} is due on ${info.nextDueDate}. Let me know if you have any questions!`;
-        }
+        renterMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received.\n\nYour remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next ${nextPaymentLabel} of $${nextPaymentAmount.toLocaleString()} is due on ${info.nextDueDate}.\n\nLet me know if you have any questions!`;
+    }
+    
+    // === OWNER MESSAGE (With full commission breakdown) ===
+    if (hasAgent) {
+        const paymentType = info.type === 'deposit' ? 'Deposit' : `Month ${info.paymentNumber} of ${info.totalPayments}`;
+        ownerMessage = `📋 OWNER PAYMENT CONFIRMATION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProperty: ${propertyTitle}\nBuyer: ${renterName}\nPayment Type: ${paymentType}\n\n💰 FINANCIAL BREAKDOWN:\n• Amount Collected: $${actualAmount.toLocaleString()}\n• Agent Commission (10%): −$${agentFee.toLocaleString()}\n• Net to Property Owner: $${netToSeller.toLocaleString()}\n\n📊 CONTRACT STATUS:\n• Remaining Balance: $${info.remainingBalance.toLocaleString()}\n• Next Payment Due: ${info.nextDueDate}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProcessed via PaulysProperties.com`;
+    } else {
+        const paymentType = info.type === 'deposit' ? 'Deposit' : `Month ${info.paymentNumber} of ${info.totalPayments}`;
+        ownerMessage = `📋 OWNER PAYMENT CONFIRMATION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProperty: ${propertyTitle}\nBuyer: ${renterName}\nPayment Type: ${paymentType}\n\n💰 FINANCIAL BREAKDOWN:\n• Amount Collected: $${actualAmount.toLocaleString()}\n• Net to Property Owner: $${actualAmount.toLocaleString()}\n\n📊 CONTRACT STATUS:\n• Remaining Balance: $${info.remainingBalance.toLocaleString()}\n• Next Payment Due: ${info.nextDueDate}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProcessed via PaulysProperties.com`;
     }
     
     // Show variance if different from expected
@@ -7367,9 +7349,30 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
         </div>
     ` : '';
     
+    // Agent commission summary for admin view (shown in modal header area)
+    const agentSummaryHtml = hasAgent ? `
+        <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3 mt-3">
+            <div class="text-purple-400 text-xs font-bold mb-1">🏢 Agent Commission Summary</div>
+            <div class="text-sm space-y-1">
+                <div class="flex justify-between">
+                    <span class="text-gray-400">Amount Collected:</span>
+                    <span class="text-white">$${actualAmount.toLocaleString()}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-purple-400">Agent Commission (10%):</span>
+                    <span class="text-purple-400">−$${agentFee.toLocaleString()}</span>
+                </div>
+                <div class="flex justify-between border-t border-purple-500/30 pt-1">
+                    <span class="text-gray-300">Net to Owner:</span>
+                    <span class="text-green-400 font-bold">$${netToSeller.toLocaleString()}</span>
+                </div>
+            </div>
+        </div>
+    ` : '';
+    
     const modalHTML = `
         <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div class="bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-green-500/30 shadow-2xl relative">
+            <div class="bg-gray-900 rounded-2xl max-w-xl w-full p-6 border border-green-500/30 shadow-2xl relative max-h-[90vh] overflow-y-auto">
                 <!-- X Close Button -->
                 <button onclick="closePaymentConfirmModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -7384,25 +7387,37 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
                     ${hasAgent ? `<p class="text-purple-400 text-xs mt-1">🏢 Agent: ${agentName}</p>` : ''}
                 </div>
                 
-                ${agentFeeHtml}
+                ${agentSummaryHtml}
                 
+                <!-- RENTER MESSAGE -->
                 <div class="bg-gray-800 rounded-xl p-4 mb-4 mt-4">
                     <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-gray-400 font-medium">📋 Copy this message to send to ${displayName}:</span>
+                        <span class="text-sm text-green-400 font-bold">📱 Message for ${displayName} (Renter):</span>
                     </div>
-                    <div id="thankYouMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600 whitespace-pre-wrap">
-                        ${thankYouMessage}
+                    <div id="renterMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                        ${renterMessage}
                     </div>
+                    <button id="copyRenterBtn" onclick="copyRenterMessage()" class="w-full mt-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 px-4 rounded-lg font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Renter Message
+                    </button>
                 </div>
                 
-                <div class="flex gap-3">
-                    <button onclick="copyThankYouMessage()" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-4 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                        <span>📋</span> Copy Message
-                    </button>
-                    <button onclick="closePaymentConfirmModal()" class="flex-1 bg-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:bg-gray-600 transition">
-                        Close
+                <!-- OWNER MESSAGE -->
+                <div class="bg-gray-800 rounded-xl p-4 mb-4 border border-purple-500/30">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm text-purple-400 font-bold">🏢 Message for Property Owner (Audit):</span>
+                    </div>
+                    <div id="ownerMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-purple-500/30 whitespace-pre-wrap max-h-32 overflow-y-auto font-mono text-xs">
+                        ${ownerMessage}
+                    </div>
+                    <button id="copyOwnerBtn" onclick="copyOwnerMessage()" class="w-full mt-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-2 px-4 rounded-lg font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Owner Message
                     </button>
                 </div>
+                
+                <button onclick="closePaymentConfirmModal()" class="w-full bg-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:bg-gray-600 transition">
+                    Close
+                </button>
             </div>
         </div>
     `;
@@ -7413,8 +7428,69 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
-    // Store message for copy function
-    window.currentThankYouMessage = thankYouMessage;
+    // Store messages for copy functions
+    window.currentRenterMessage = renterMessage;
+    window.currentOwnerMessage = ownerMessage;
+};
+
+/**
+ * Copy renter message to clipboard (no toast, button changes to "Copied")
+ */
+window.copyRenterMessage = async function() {
+    const btn = document.getElementById('copyRenterBtn');
+    try {
+        await navigator.clipboard.writeText(window.currentRenterMessage);
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.remove('from-green-500', 'to-emerald-600');
+            btn.classList.add('from-gray-600', 'to-gray-700');
+            setTimeout(() => {
+                btn.innerHTML = '<span>📋</span> Copy Renter Message';
+                btn.classList.remove('from-gray-600', 'to-gray-700');
+                btn.classList.add('from-green-500', 'to-emerald-600');
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window.currentRenterMessage;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+        }
+    }
+};
+
+/**
+ * Copy owner message to clipboard (no toast, button changes to "Copied")
+ */
+window.copyOwnerMessage = async function() {
+    const btn = document.getElementById('copyOwnerBtn');
+    try {
+        await navigator.clipboard.writeText(window.currentOwnerMessage);
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.remove('from-purple-500', 'to-pink-600');
+            btn.classList.add('from-gray-600', 'to-gray-700');
+            setTimeout(() => {
+                btn.innerHTML = '<span>📋</span> Copy Owner Message';
+                btn.classList.remove('from-gray-600', 'to-gray-700');
+                btn.classList.add('from-purple-500', 'to-pink-600');
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window.currentOwnerMessage;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+        }
+    }
 };
 
 /**
