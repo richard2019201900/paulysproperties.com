@@ -2862,6 +2862,44 @@ window.closePaymentConfirmModal = function() {
         modal.style.transition = 'opacity 0.2s';
         setTimeout(() => modal.remove(), 200);
     }
+    
+    // CRITICAL: Refresh all data after payment confirmation modal closes
+    // This fixes the "notifications not clearing" and "ledger not updating" issues
+    setTimeout(async () => {
+        try {
+            // 1. Refresh notification badge and rent alerts
+            if (typeof NotificationManager !== 'undefined' && NotificationManager.refresh) {
+                await NotificationManager.refresh();
+            } else if (typeof updateNotificationBadge === 'function') {
+                updateNotificationBadge();
+            }
+            
+            // 2. Refresh rent collection panel if visible
+            if (typeof renderRentAlertsPanel === 'function') {
+                renderRentAlertsPanel();
+            }
+            
+            // 3. Refresh property stats if we're viewing a specific property
+            const propertyId = window._rtoConfirmPropertyId;
+            if (propertyId && typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+            
+            // 4. Refresh dashboard if visible
+            if (typeof calculateTotalsAsync === 'function' && document.querySelector('.dashboard-content')) {
+                const result = await calculateTotalsAsync();
+                if (typeof updateDashboardUI === 'function') {
+                    updateDashboardUI(result.data);
+                }
+            }
+            
+            // 5. Clear the stored property ID
+            window._rtoConfirmPropertyId = null;
+            
+        } catch (e) {
+            console.warn('[PaymentConfirm] Refresh error:', e);
+        }
+    }, 300);
 };
 
 // Get payment history for a property
@@ -7604,6 +7642,7 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             // Show confirmation
             showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
                 type: 'deposit',
+                propertyId: propertyId,
                 propertyTitle: propertyTitle,
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: rtoExpectedMonthly,
@@ -7703,6 +7742,7 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             // Show confirmation
             showRTOPaymentConfirmation(renterName, actualAmount, expectedAmount, {
                 type: 'monthly',
+                propertyId: propertyId,
                 propertyTitle: propertyTitle,
                 paymentNumber: newPaymentNumber,
                 totalPayments: rtoTotalPayments - 1, // -1 for final payment
@@ -7736,7 +7776,8 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
 };
 
 /**
- * Show RTO payment confirmation modal with detailed message
+ * Show RTO payment confirmation modal - COMPACT VERSION
+ * Clean text formatting for copy/paste, proper refresh on close
  */
 window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedAmount, info) {
     // Get display name - handle titles like Dr., Mr., Mrs., Ms.
@@ -7745,12 +7786,10 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     let displayName;
     
     if (nameParts.length >= 2 && titles.includes(nameParts[0].toLowerCase())) {
-        // Has a title - use "Title Lastname" (e.g., "Dr. Smith")
         const title = nameParts[0];
         const lastName = nameParts[nameParts.length - 1];
         displayName = `${title} ${lastName}`;
     } else {
-        // No title - just use first name
         displayName = nameParts[0];
     }
     
@@ -7766,102 +7805,75 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     
     let renterMessage, ownerMessage, headerText, badgeText;
     
-    // === RENTER MESSAGE (Simple, no commission details) ===
+    // === RENTER MESSAGE (Simple text - no special characters) ===
     if (info.type === 'deposit') {
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
-        renterMessage = `Thanks ${displayName}! 🙏 Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own agreement) has been received.\n\nYour remaining balance is $${info.remainingBalance.toLocaleString()}. Your first ${nextPaymentLabel} of $${nextPaymentAmount.toLocaleString()} is due on ${info.nextDueDate}.\n\nLet me know if you have any questions!`;
+        renterMessage = `Thanks ${displayName}! Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. Remaining balance: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}. Questions? Let me know!`;
     } else {
         headerText = 'Payment Logged!';
-        badgeText = `📋 Month ${info.paymentNumber} of ${info.totalPayments}`;
-        renterMessage = `Thanks ${displayName}! 🙏 Your payment of $${actualAmount.toLocaleString()} for ${propertyTitle} (Month ${info.paymentNumber} of ${info.totalPayments} in your Rent-to-Own agreement) has been received.\n\nYour remaining balance is now $${info.remainingBalance.toLocaleString()}. Your next ${nextPaymentLabel} of $${nextPaymentAmount.toLocaleString()} is due on ${info.nextDueDate}.\n\nLet me know if you have any questions!`;
+        badgeText = `📋 Month ${info.paymentNumber}/${info.totalPayments}`;
+        renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
     }
     
-    // === OWNER MESSAGE (With full commission breakdown) ===
+    // === OWNER MESSAGE (Clean, no special chars - just plain text) ===
+    const paymentType = info.type === 'deposit' ? 'Deposit' : `Month ${info.paymentNumber}/${info.totalPayments}`;
     if (hasAgent) {
-        const paymentType = info.type === 'deposit' ? 'Deposit' : `Month ${info.paymentNumber} of ${info.totalPayments}`;
-        ownerMessage = `📋 OWNER PAYMENT CONFIRMATION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProperty: ${propertyTitle}\nBuyer: ${renterName}\nPayment Type: ${paymentType}\n\n💰 FINANCIAL BREAKDOWN:\n• Amount Collected: $${actualAmount.toLocaleString()}\n• Agent Commission (10%): −$${agentFee.toLocaleString()}\n• Net to Property Owner: $${netToSeller.toLocaleString()}\n\n📊 CONTRACT STATUS:\n• Remaining Balance: $${info.remainingBalance.toLocaleString()}\n• Next Payment Due: ${info.nextDueDate}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProcessed via PaulysProperties.com`;
+        ownerMessage = `PAYMENT CONFIRMATION\n${propertyTitle} - ${renterName}\nType: ${paymentType}\n\nCollected: $${actualAmount.toLocaleString()}\nAgent (10%): -$${agentFee.toLocaleString()}\nNet to Owner: $${netToSeller.toLocaleString()}\n\nBalance: $${info.remainingBalance.toLocaleString()}\nNext Due: ${info.nextDueDate}\n\nPaulysProperties.com`;
     } else {
-        const paymentType = info.type === 'deposit' ? 'Deposit' : `Month ${info.paymentNumber} of ${info.totalPayments}`;
-        ownerMessage = `📋 OWNER PAYMENT CONFIRMATION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProperty: ${propertyTitle}\nBuyer: ${renterName}\nPayment Type: ${paymentType}\n\n💰 FINANCIAL BREAKDOWN:\n• Amount Collected: $${actualAmount.toLocaleString()}\n• Net to Property Owner: $${actualAmount.toLocaleString()}\n\n📊 CONTRACT STATUS:\n• Remaining Balance: $${info.remainingBalance.toLocaleString()}\n• Next Payment Due: ${info.nextDueDate}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nProcessed via PaulysProperties.com`;
+        ownerMessage = `PAYMENT CONFIRMATION\n${propertyTitle} - ${renterName}\nType: ${paymentType}\n\nCollected: $${actualAmount.toLocaleString()}\n\nBalance: $${info.remainingBalance.toLocaleString()}\nNext Due: ${info.nextDueDate}\n\nPaulysProperties.com`;
     }
     
     // Show variance if different from expected
     const varianceHtml = actualAmount !== expectedAmount ? `
-        <div class="text-xs mt-1 ${actualAmount > expectedAmount ? 'text-green-400' : 'text-amber-400'}">
-            ${actualAmount > expectedAmount ? '↑' : '↓'} ${actualAmount > expectedAmount ? 'Overpaid' : 'Underpaid'} by $${Math.abs(actualAmount - expectedAmount).toLocaleString()} (Expected: $${expectedAmount.toLocaleString()})
-        </div>
+        <span class="text-xs ml-2 ${actualAmount > expectedAmount ? 'text-green-400' : 'text-amber-400'}">
+            (${actualAmount > expectedAmount ? '+' : ''}$${(actualAmount - expectedAmount).toLocaleString()})
+        </span>
     ` : '';
     
-    // Agent commission summary for admin view (shown in modal header area)
-    const agentSummaryHtml = hasAgent ? `
-        <div class="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3 mt-3">
-            <div class="text-purple-400 text-xs font-bold mb-1">🏢 Agent Commission Summary</div>
-            <div class="text-sm space-y-1">
-                <div class="flex justify-between">
-                    <span class="text-gray-400">Amount Collected:</span>
-                    <span class="text-white">$${actualAmount.toLocaleString()}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-purple-400">Agent Commission (10%):</span>
-                    <span class="text-purple-400">−$${agentFee.toLocaleString()}</span>
-                </div>
-                <div class="flex justify-between border-t border-purple-500/30 pt-1">
-                    <span class="text-gray-300">Net to Owner:</span>
-                    <span class="text-green-400 font-bold">$${netToSeller.toLocaleString()}</span>
-                </div>
-            </div>
-        </div>
-    ` : '';
+    // Store property ID for refresh on close
+    window._rtoConfirmPropertyId = info.propertyId;
     
     const modalHTML = `
         <div id="paymentConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div class="bg-gray-900 rounded-2xl max-w-xl w-full p-6 border border-green-500/30 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full p-5 border border-green-500/30 shadow-2xl relative">
                 <!-- X Close Button -->
-                <button onclick="closePaymentConfirmModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <button onclick="closePaymentConfirmModal()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
                 
-                <div class="text-center mb-4">
-                    <div class="text-5xl mb-3">✅</div>
-                    <h3 class="text-2xl font-bold text-green-400">${headerText}</h3>
-                    <p class="text-gray-400 mt-1">$${actualAmount.toLocaleString()} from ${renterName}</p>
-                    ${varianceHtml}
-                    <p class="text-amber-400 text-sm mt-2">${badgeText}</p>
-                    ${hasAgent ? `<p class="text-purple-400 text-xs mt-1">🏢 Agent: ${agentName}</p>` : ''}
+                <!-- Header -->
+                <div class="text-center mb-3">
+                    <div class="text-4xl mb-2">✅</div>
+                    <h3 class="text-xl font-bold text-green-400">${headerText}</h3>
+                    <p class="text-gray-400 text-sm">$${actualAmount.toLocaleString()} from ${renterName}${varianceHtml}</p>
+                    <p class="text-amber-400 text-xs mt-1">${badgeText}${hasAgent ? ` • Agent: ${agentName}` : ''}</p>
                 </div>
                 
-                ${agentSummaryHtml}
+                ${hasAgent ? `
+                <!-- Agent Summary (compact) -->
+                <div class="bg-purple-900/20 border border-purple-500/20 rounded-lg p-2 mb-3 text-xs">
+                    <div class="flex justify-between"><span class="text-gray-400">Collected:</span><span class="text-white">$${actualAmount.toLocaleString()}</span></div>
+                    <div class="flex justify-between"><span class="text-purple-400">Agent 10%:</span><span class="text-purple-400">-$${agentFee.toLocaleString()}</span></div>
+                    <div class="flex justify-between border-t border-purple-500/20 pt-1 mt-1"><span class="text-gray-300">Net:</span><span class="text-green-400 font-bold">$${netToSeller.toLocaleString()}</span></div>
+                </div>
+                ` : ''}
                 
-                <!-- RENTER MESSAGE -->
-                <div class="bg-gray-800 rounded-xl p-4 mb-4 mt-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-green-400 font-bold">📱 Message for ${displayName} (Renter):</span>
-                    </div>
-                    <div id="renterMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">
-                        ${renterMessage}
-                    </div>
-                    <button id="copyRenterBtn" onclick="copyRenterMessage()" class="w-full mt-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-2 px-4 rounded-lg font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                        <span>📋</span> Copy Renter Message
-                    </button>
+                <!-- Renter Message -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3">
+                    <div class="text-xs text-green-400 font-bold mb-1">📱 For ${displayName}:</div>
+                    <div id="renterMessageText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-gray-600">${renterMessage}</div>
+                    <button id="copyRenterBtn" onclick="copyRenterMessage()" class="w-full mt-2 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy</button>
                 </div>
                 
-                <!-- OWNER MESSAGE -->
-                <div class="bg-gray-800 rounded-xl p-4 mb-4 border border-purple-500/30">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm text-purple-400 font-bold">🏢 Message for Property Owner (Audit):</span>
-                    </div>
-                    <div id="ownerMessageText" class="bg-gray-700/50 rounded-lg p-3 text-white text-sm leading-relaxed border border-purple-500/30 whitespace-pre-wrap max-h-32 overflow-y-auto font-mono text-xs">
-                        ${ownerMessage}
-                    </div>
-                    <button id="copyOwnerBtn" onclick="copyOwnerMessage()" class="w-full mt-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-2 px-4 rounded-lg font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                        <span>📋</span> Copy Owner Message
-                    </button>
+                <!-- Owner Message -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-purple-500/20">
+                    <div class="text-xs text-purple-400 font-bold mb-1">🏢 For Owner/Records:</div>
+                    <div id="ownerMessageText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-purple-500/20 whitespace-pre-line">${ownerMessage}</div>
+                    <button id="copyOwnerBtn" onclick="copyOwnerMessage()" class="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy</button>
                 </div>
                 
-                <button onclick="closePaymentConfirmModal()" class="w-full bg-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:bg-gray-600 transition">
-                    Close
-                </button>
+                <button onclick="closePaymentConfirmModal()" class="w-full bg-gray-700 text-white py-2 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
             </div>
         </div>
     `;
@@ -8317,7 +8329,7 @@ window.saveRTOPaymentEdit = async function(propertyId, contractId, paymentIndex)
  * Delete a monthly payment entry
  */
 window.deleteRTOPaymentEntry = async function(propertyId, contractId, paymentIndex) {
-    if (!confirm('Are you sure you want to delete this payment? This will recalculate the remaining balance.')) {
+    if (!confirm('Are you sure you want to delete this payment? This will recalculate the remaining balance and reverse any XP earned.')) {
         return;
     }
     
@@ -8330,14 +8342,19 @@ window.deleteRTOPaymentEntry = async function(propertyId, contractId, paymentInd
         const history = contract.rtoPaymentHistory || [];
         const deletedPayment = history[paymentIndex];
         
-        // Remove payment from history
+        if (!deletedPayment) {
+            showToast('Payment not found', 'error');
+            return;
+        }
+        
+        // Remove payment from contract history
         history.splice(paymentIndex, 1);
         
         // Recalculate remaining balance (add back the deleted payment)
         const newRemainingBalance = contract.remainingBalance + deletedPayment.actual;
         
         // Update payment counter
-        const newPaymentNumber = contract.currentPaymentNumber - 1;
+        const newPaymentNumber = Math.max(0, contract.currentPaymentNumber - 1);
         
         // Recalculate expected monthly
         const remainingMonths = (contract.totalPayments - 1) - newPaymentNumber;
@@ -8366,6 +8383,45 @@ window.deleteRTOPaymentEntry = async function(propertyId, contractId, paymentInd
             monthlyPrice: newExpectedMonthly
         });
         
+        // Also remove from general payment history and reverse XP
+        try {
+            const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+            if (historyDoc.exists) {
+                let payments = historyDoc.data().payments || [];
+                // Find matching RTO payment by date and amount
+                const matchIndex = payments.findIndex(p => 
+                    p.isRTOPayment && 
+                    !p.isRTODeposit && 
+                    p.amount === deletedPayment.actual && 
+                    p.paymentDate === deletedPayment.date
+                );
+                
+                if (matchIndex >= 0) {
+                    const paymentRecord = payments[matchIndex];
+                    const xpToDeduct = paymentRecord.xpAwarded || 0;
+                    
+                    // Remove from payment history
+                    payments.splice(matchIndex, 1);
+                    await db.collection('paymentHistory').doc(String(propertyId)).set({
+                        propertyId: propertyId,
+                        payments: payments,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Reverse XP if awarded
+                    if (xpToDeduct > 0 && typeof GamificationService !== 'undefined') {
+                        const user = auth.currentUser;
+                        if (user) {
+                            const property = properties.find(p => p.id == propertyId);
+                            await GamificationService.deductXP(user.uid, xpToDeduct, `Payment deleted for ${property?.title || 'property'}`);
+                        }
+                    }
+                }
+            }
+        } catch (historyError) {
+            console.warn('Could not sync payment history:', historyError);
+        }
+        
         // Close history modal
         document.getElementById('rtoHistoryModal')?.remove();
         
@@ -8382,6 +8438,87 @@ window.deleteRTOPaymentEntry = async function(propertyId, contractId, paymentInd
     } catch (error) {
         console.error('Error deleting payment:', error);
         showToast('Failed to delete: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Delete RTO deposit and revert contract to awaiting deposit state
+ */
+window.deleteRTODeposit = async function(propertyId, contractId) {
+    if (!confirm('Are you sure you want to delete the deposit payment? The contract will revert to "Awaiting Deposit" status.')) {
+        return;
+    }
+    
+    try {
+        showToast('🗑️ Reverting deposit...', 'info');
+        
+        // Get contract for deposit amount
+        const contractDoc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        const contract = contractDoc.data();
+        
+        // Update contract - revert deposit status
+        await db.collection('rentToOwnContracts').doc(contractId).update({
+            depositPaid: false,
+            depositPaidDate: null,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Update property - revert deposit status
+        await PropertyDataService.writeMultiple(propertyId, {
+            rtoDepositPaid: false,
+            rtoDepositPaidDate: null
+        });
+        
+        // Remove deposit from general payment history and reverse XP
+        try {
+            const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+            if (historyDoc.exists) {
+                let payments = historyDoc.data().payments || [];
+                // Find the deposit payment
+                const depositIndex = payments.findIndex(p => p.isRTOPayment && p.isRTODeposit);
+                
+                if (depositIndex >= 0) {
+                    const depositRecord = payments[depositIndex];
+                    const xpToDeduct = depositRecord.xpAwarded || 0;
+                    
+                    // Remove from payment history
+                    payments.splice(depositIndex, 1);
+                    await db.collection('paymentHistory').doc(String(propertyId)).set({
+                        propertyId: propertyId,
+                        payments: payments,
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Reverse XP if awarded
+                    if (xpToDeduct > 0 && typeof GamificationService !== 'undefined') {
+                        const user = auth.currentUser;
+                        if (user) {
+                            const property = properties.find(p => p.id == propertyId);
+                            await GamificationService.deductXP(user.uid, xpToDeduct, `Deposit deleted for ${property?.title || 'property'}`);
+                        }
+                    }
+                }
+            }
+        } catch (historyError) {
+            console.warn('Could not sync payment history:', historyError);
+        }
+        
+        // Close any open modals
+        document.getElementById('rtoHistoryModal')?.remove();
+        document.getElementById('editDepositModal')?.remove();
+        
+        showToast('✅ Deposit reverted - contract now awaiting deposit', 'success');
+        
+        // Refresh
+        setTimeout(() => {
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(propertyId);
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('Error deleting deposit:', error);
+        showToast('Failed to delete deposit: ' + error.message, 'error');
     }
 };
 
