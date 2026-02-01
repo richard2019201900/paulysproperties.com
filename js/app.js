@@ -8080,6 +8080,7 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     </td>
                     <td class="py-3 px-4 text-right">
                         ${depositPaid ? `
+                            <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'deposit', ${depositAmount})" class="text-cyan-400 hover:text-cyan-300 text-sm mr-2" title="Resend confirmation">📋</button>
                             <button onclick="editRTODeposit(${propertyId}, '${rtoContractId}')" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
                             <button onclick="deleteRTODeposit(${propertyId}, '${rtoContractId}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                         ` : ''}
@@ -8102,6 +8103,7 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     <td class="py-3 px-4 text-gray-400">${payment.date}</td>
                     <td class="py-3 px-4 text-green-400">✓ Paid</td>
                     <td class="py-3 px-4 text-right">
+                        <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'monthly', ${payment.actual}, ${payment.month})" class="text-cyan-400 hover:text-cyan-300 text-sm mr-2" title="Resend confirmation">📋</button>
                         <button onclick="editRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
                         <button onclick="deleteRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                     </td>
@@ -8137,7 +8139,8 @@ window.showRTOPaymentHistory = async function(propertyId) {
                             </div>
                             <div class="bg-gray-800 rounded-xl p-4">
                                 <div class="text-gray-400 text-sm">Next Expected Payment</div>
-                                <div class="text-2xl font-bold text-green-400">$${(contract.expectedMonthlyPayment || 0).toLocaleString()}</div>
+                                <div class="text-2xl font-bold text-green-400">$${((contract.expectedMonthlyPayment || 0) > 0 ? contract.expectedMonthlyPayment : contract.remainingBalance || 0).toLocaleString()}</div>
+                                ${(contract.expectedMonthlyPayment || 0) === 0 && (contract.remainingBalance || 0) > 0 ? '<div class="text-amber-400 text-xs mt-1">Final Payment</div>' : ''}
                             </div>
                         </div>
                         
@@ -8172,6 +8175,73 @@ window.showRTOPaymentHistory = async function(propertyId) {
     } catch (error) {
         console.error('Error loading payment history:', error);
         showToast('Failed to load payment history: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Regenerate and display RTO payment confirmation for a previous payment
+ * Allows user to resend confirmation messages to renter/owner
+ */
+window.regenerateRTOConfirmation = async function(propertyId, contractId, paymentType, amount, paymentNumber = 0) {
+    try {
+        // Get contract data
+        const contractDoc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        if (!contractDoc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = contractDoc.data();
+        const p = properties.find(prop => prop.id == propertyId);
+        const propertyTitle = p?.title || contract.propertyTitle || 'Property';
+        const renterName = contract.buyer || PropertyDataService.getValue(propertyId, 'renterName', '') || 'Renter';
+        
+        // Check for agent
+        const propertyAgents = p?.agents || [];
+        const hasAgent = propertyAgents.length > 0;
+        let agentName = 'PaulysProperties.com';
+        if (hasAgent) {
+            const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+            if (agentDisplayNames && propertyAgents[0]) {
+                agentName = agentDisplayNames[propertyAgents[0].toLowerCase()] || propertyAgents[0].split('@')[0];
+            } else {
+                agentName = propertyAgents[0].split('@')[0];
+            }
+            if (propertyAgents[0].toLowerCase() === 'richard2019201900@gmail.com') {
+                agentName = 'Pauly Amato';
+            }
+        }
+        
+        // Calculate next due date (approximate - use current remaining balance info)
+        const nextDate = new Date();
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        
+        // Get next expected amount
+        const remainingBalance = contract.remainingBalance || 0;
+        const expectedMonthly = contract.expectedMonthlyPayment || 0;
+        const nextExpectedAmount = expectedMonthly > 0 ? expectedMonthly : remainingBalance;
+        
+        // Build info object
+        const info = {
+            type: paymentType,
+            propertyId: propertyId,
+            propertyTitle: propertyTitle,
+            nextDueDate: nextDueDateStr,
+            nextExpectedAmount: nextExpectedAmount,
+            remainingBalance: remainingBalance,
+            hasAgent: hasAgent,
+            agentName: agentName,
+            paymentNumber: paymentNumber,
+            totalPayments: (contract.totalPayments || 1) - 1
+        };
+        
+        // Show the confirmation modal
+        showRTOPaymentConfirmation(renterName, amount, amount, info);
+        
+    } catch (error) {
+        console.error('Error regenerating confirmation:', error);
+        showToast('Failed to regenerate confirmation: ' + error.message, 'error');
     }
 };
 

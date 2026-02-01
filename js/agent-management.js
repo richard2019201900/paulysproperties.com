@@ -59,56 +59,66 @@ window.loadAgents = async function(forceRefresh) {
         var seenEmails = {}; // Track emails to prevent duplicates
         var tempAgents = [];
         
-        // First, always fetch and add master admin at the top
-        var masterSnapshot = await db.collection('users')
-            .where('email', '==', masterAdminEmail)
-            .limit(1)
-            .get();
-        
-        if (!masterSnapshot.empty) {
-            var masterData = masterSnapshot.docs[0].data();
-            tempAgents.push({
-                odId: masterSnapshot.docs[0].id,
-                email: masterAdminEmail,
-                username: 'Pauly Amato', // Always use consistent name for master admin
-                phone: masterData.phone || '2057028233',
-                tier: 'owner',
-                isAgent: true,
-                agentSince: 'System Default'
-            });
-            seenEmails[masterAdminLower] = true;
-        }
-        
-        // Then fetch all other agents
-        var snapshot = await db.collection('users').where('isAgent', '==', true).get();
-        
-        snapshot.forEach(function(doc) {
-            var data = doc.data();
-            var emailLower = (data.email || '').toLowerCase();
-            
-            // Skip if we've already seen this email (case-insensitive)
-            // This will skip master admin if they have isAgent: true
-            if (seenEmails[emailLower]) {
-                return;
-            }
-            seenEmails[emailLower] = true;
-            
-            tempAgents.push({
-                odId: doc.id,
-                email: data.email,
-                username: data.username || data.email.split('@')[0],
-                phone: data.phone || '',
-                tier: data.tier || 'free',
-                isAgent: true,
-                agentSince: data.agentSince || null
-            });
+        // ALWAYS add Pauly Amato as default agent (hardcoded fallback)
+        // This ensures the dropdown is never empty even if Firestore queries fail
+        tempAgents.push({
+            odId: 'master-admin',
+            email: masterAdminEmail,
+            username: 'Pauly Amato',
+            phone: '2057028233',
+            tier: 'owner',
+            isAgent: true,
+            agentSince: 'System Default'
         });
+        seenEmails[masterAdminLower] = true;
+        
+        // Try to fetch additional agents from Firestore
+        try {
+            var snapshot = await db.collection('users').where('isAgent', '==', true).get();
+            
+            snapshot.forEach(function(doc) {
+                var data = doc.data();
+                var emailLower = (data.email || '').toLowerCase();
+                
+                // Skip if we've already seen this email (case-insensitive)
+                if (seenEmails[emailLower]) {
+                    return;
+                }
+                seenEmails[emailLower] = true;
+                
+                tempAgents.push({
+                    odId: doc.id,
+                    email: data.email,
+                    username: data.username || data.email.split('@')[0],
+                    phone: data.phone || '',
+                    tier: data.tier || 'free',
+                    isAgent: true,
+                    agentSince: data.agentSince || null
+                });
+            });
+        } catch (queryError) {
+            console.warn('[Agents] Could not query additional agents:', queryError.message);
+            // Continue with just Pauly Amato
+        }
         
         agentsCache = tempAgents;
         agentsCacheTime = Date.now();
+        console.log('[Agents] Loaded', tempAgents.length, 'agents');
         return agentsCache;
     } catch (error) {
         console.error('[Agents] Error loading agents:', error);
+        // Return at least Pauly Amato as fallback
+        if (agentsCache.length === 0) {
+            agentsCache = [{
+                odId: 'master-admin',
+                email: 'richard2019201900@gmail.com',
+                username: 'Pauly Amato',
+                phone: '2057028233',
+                tier: 'owner',
+                isAgent: true,
+                agentSince: 'System Default'
+            }];
+        }
         return agentsCache;
     }
 };
