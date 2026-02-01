@@ -7816,12 +7816,12 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
         renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
     }
     
-    // === OWNER MESSAGE (Clean, no special chars - just plain text) ===
-    const paymentType = info.type === 'deposit' ? 'Deposit' : `Month ${info.paymentNumber}/${info.totalPayments}`;
+    // === OWNER MESSAGE (Clean, conversational format) ===
+    const paymentTypeLabel = info.type === 'deposit' ? 'deposit' : `payment ${info.paymentNumber}/${info.totalPayments}`;
     if (hasAgent) {
-        ownerMessage = `PAYMENT CONFIRMATION\n${propertyTitle} - ${renterName}\nType: ${paymentType}\n\nCollected: $${actualAmount.toLocaleString()}\nAgent (10%): -$${agentFee.toLocaleString()}\nNet to Owner: $${netToSeller.toLocaleString()}\n\nBalance: $${info.remainingBalance.toLocaleString()}\nNext Due: ${info.nextDueDate}\n\nPaulysProperties.com`;
+        ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. After the 10% PaulysProperties.com agent fee of $${agentFee.toLocaleString()}, you are set to receive $${netToSeller.toLocaleString()} net. The remaining renter balance of $${info.remainingBalance.toLocaleString()} is due ${info.nextDueDate}. Reach out if you have any questions.`;
     } else {
-        ownerMessage = `PAYMENT CONFIRMATION\n${propertyTitle} - ${renterName}\nType: ${paymentType}\n\nCollected: $${actualAmount.toLocaleString()}\n\nBalance: $${info.remainingBalance.toLocaleString()}\nNext Due: ${info.nextDueDate}\n\nPaulysProperties.com`;
+        ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. The remaining renter balance of $${info.remainingBalance.toLocaleString()} is due ${info.nextDueDate}. Reach out if you have any questions.`;
     }
     
     // Show variance if different from expected
