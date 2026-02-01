@@ -132,6 +132,10 @@ window.filterProperties = function(type, btn) {
 
 /**
  * Apply all active filters
+ * 
+ * IMPORTANT: hideUnavailable defaults to TRUE even if checkbox not found.
+ * This prevents the race condition where properties render before the DOM is ready.
+ * The checkbox has checked="checked" in HTML, so we respect that as the default.
  */
 window.applyAllFilters = function() {
     var filtered = properties.slice();
@@ -160,9 +164,11 @@ window.applyAllFilters = function() {
         });
     }
     
-    // Hide Unavailable
+    // Hide Unavailable - DEFAULT TO TRUE if checkbox not found (prevents race condition)
     var hideUnavailable = $('hideUnavailable');
-    if (hideUnavailable && hideUnavailable.checked) {
+    var shouldHideUnavailable = hideUnavailable ? hideUnavailable.checked : true;
+    
+    if (shouldHideUnavailable) {
         filtered = filtered.filter(function(p) {
             var availability = state.availability[p.id];
             if (availability !== undefined) {

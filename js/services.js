@@ -753,11 +753,12 @@ function setupRealtimeListener() {
                 OwnershipService.rebuildOwnerPropertyMap();
                 
                 if (hasChanges) {
-                    state.filteredProperties = [...properties];
-                    // Apply filters including hideUnavailable if checked
+                    // Apply filters (applyAllFilters will set state.filteredProperties)
+                    // Don't reset filteredProperties here - let applyAllFilters handle it
                     if (typeof applyAllFilters === 'function') {
                         applyAllFilters();
                     } else {
+                        state.filteredProperties = [...properties];
                         renderProperties(state.filteredProperties);
                     }
                     if (state.currentUser === 'owner') renderOwnerDashboard();
