@@ -2468,11 +2468,12 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             ${user.managedServicesInterest ? `<span class="px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold flex items-center gap-1 animate-pulse" title="Interested in Managed Services">
                                 🚀 VIP LEAD
                             </span>` : ''}
-                            ${user.phone ? `<span class="text-gray-400 flex items-center gap-1">
-                                📱 ${user.phone}
-                                <button onclick="event.stopPropagation(); copyPhoneNumber('${(user.phone || '').replace(/[^0-9]/g, '')}')" 
-                                        class="text-cyan-400 hover:text-cyan-300" title="Copy phone number">📋</button>
-                            </span>` : ''}
+                            <span class="text-gray-400 flex items-center gap-1">
+                                📱 <span onclick="event.stopPropagation(); editUserPhone('${escapedId}', '${escapeHtml(user.phone || '')}')" 
+                                         class="cursor-pointer hover:text-cyan-400 transition" title="Click to edit phone">${user.phone || 'No phone'}</span>
+                                ${user.phone ? `<button onclick="event.stopPropagation(); copyPhoneNumber('${(user.phone || '').replace(/[^0-9]/g, '')}')" 
+                                        class="text-cyan-400 hover:text-cyan-300" title="Copy phone number">📋</button>` : ''}
+                            </span>
                             <span class="text-gray-400">${listingCount}/${maxListings} listings</span>
                             <button onclick="toggleUserProperties('${escapedId}')" class="text-cyan-400 hover:underline flex items-center gap-1">
                                 <span id="propToggle_${escapedId}">▶</span> Properties (${listingCount})

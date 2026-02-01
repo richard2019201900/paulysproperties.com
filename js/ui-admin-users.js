@@ -1937,6 +1937,40 @@ window.copyPhoneNumber = function(phone) {
     });
 };
 
+// Edit user phone number (admin only)
+window.editUserPhone = async function(odId, currentPhone) {
+    const newPhone = prompt('Enter new phone number:', currentPhone || '');
+    
+    if (newPhone === null) return; // Cancelled
+    
+    // Clean and validate
+    const cleanPhone = (newPhone || '').replace(/[^0-9]/g, '');
+    
+    if (cleanPhone && cleanPhone.length < 10) {
+        showToast('❌ Phone number must be at least 10 digits', 'error');
+        return;
+    }
+    
+    try {
+        // Update user document
+        await db.collection('users').doc(odId).update({
+            phone: cleanPhone || null,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('✅ Phone number updated!', 'success');
+        
+        // Refresh the admin user list
+        if (typeof renderRegisteredUsers === 'function') {
+            renderRegisteredUsers();
+        }
+        
+    } catch (error) {
+        console.error('[Admin] Error updating phone:', error);
+        showToast('❌ Failed to update phone: ' + error.message, 'error');
+    }
+};
+
 // Copy premium reminder message to clipboard - builds message from parameters
 window.copyPremiumReminder = function(title, weeklyFee, nextDue) {
     // Decode HTML entities in title

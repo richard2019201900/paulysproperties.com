@@ -450,12 +450,25 @@
                 break;
                 
             case 'subscription':
-                // Navigate to My Properties tab (where subscription alerts are shown), scroll to subscription panel
-                if (typeof window.switchDashboardTab === 'function') {
-                    window.switchDashboardTab('myProperties');
-                    await sleep(200);
+                // For admins: Navigate to Admin Panel (All Users tab where overdue trials are shown)
+                // The "2" badge on All Users shows count of overdue trial users
+                const isAdmin = typeof TierService !== 'undefined' && TierService.isMasterAdmin(auth?.currentUser?.email);
+                if (isAdmin) {
+                    // Go to Admin Panel
+                    if (typeof window.showAdminPanel === 'function') {
+                        window.showAdminPanel();
+                        await sleep(300);
+                    }
+                    // Scroll to first overdue user card
+                    await scrollToAndHighlight('.admin-user-card', 'rent');
+                } else {
+                    // Non-admin: Go to My Properties tab (where their own subscription alerts are shown)
+                    if (typeof window.switchDashboardTab === 'function') {
+                        window.switchDashboardTab('myProperties');
+                        await sleep(200);
+                    }
+                    await scrollToAndHighlight('#subscriptionNotificationsPanel', 'rent');
                 }
-                await scrollToAndHighlight('#subscriptionNotificationsPanel', 'rent'); // Use rent colors (red)
                 break;
                 
             default:
