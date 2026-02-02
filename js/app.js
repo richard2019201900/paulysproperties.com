@@ -623,16 +623,37 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
 };
 
 // Load owner name for stats page (always shows real owner, not anonymized)
-async function loadStatsOwnerName(propertyId) {
+async function loadStatsOwnerName(propertyId, retryCount = 0) {
     const ownerEl = $(`stats-owner-${propertyId}`);
     if (!ownerEl) {
         // Element doesn't exist yet - retry after a short delay
-        setTimeout(() => loadStatsOwnerName(propertyId), 200);
+        if (retryCount < 5) {
+            setTimeout(() => loadStatsOwnerName(propertyId, retryCount + 1), 200);
+        }
         return;
     }
     
     const spanEl = ownerEl.querySelector('span');
     if (!spanEl) return;
+    
+    // CRITICAL FIX: Wait for auth to be ready before Firestore queries
+    if (!window.isAuthReady) {
+        console.log('[OwnerName] Waiting for auth...');
+        try {
+            await Promise.race([
+                window.authReady,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000))
+            ]);
+        } catch (e) {
+            console.warn('[OwnerName] Auth timeout');
+        }
+    }
+    
+    // If still no user after auth ready, retry a few times
+    if (!auth.currentUser && retryCount < 3) {
+        setTimeout(() => loadStatsOwnerName(propertyId, retryCount + 1), 300);
+        return;
+    }
     
     try {
         // Use tier-aware username lookup with forceShowOwner to bypass agent anonymization
@@ -3143,6 +3164,37 @@ window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
         return;
     }
     
+    // CRITICAL FIX: Wait for auth to be ready before attempting Firestore queries
+    // This prevents the "Loading..." stuck state when auth hasn't initialized yet
+    if (!window.isAuthReady) {
+        console.log('[Analytics] Waiting for auth to be ready...');
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <div class="text-4xl mb-4 animate-pulse">📊</div>
+                <p class="text-gray-400">Initializing...</p>
+            </div>
+        `;
+        
+        // Wait for auth, then retry
+        try {
+            await Promise.race([
+                window.authReady,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000))
+            ]);
+            // Auth is ready, retry immediately
+            return renderPropertyAnalytics(propertyId, retryCount);
+        } catch (e) {
+            console.warn('[Analytics] Auth timeout, proceeding anyway');
+        }
+    }
+    
+    // Additional check: if no current user, wait a bit more (auth may still be processing)
+    if (!auth.currentUser && retryCount < 3) {
+        console.log('[Analytics] No current user yet, retrying...', retryCount + 1);
+        setTimeout(() => renderPropertyAnalytics(propertyId, retryCount + 1), 500);
+        return;
+    }
+    
     const p = properties.find(prop => prop.id === propertyId);
     if (!p) {
         console.warn('[Analytics] Property not found:', propertyId);
@@ -4390,12 +4442,24 @@ window.copyRenterPhone = function(phoneNumber, btn) {
 };
 
 // ==================== INITIALIZE ====================
+// Global auth-ready promise - resolves when auth state is determined
+let authReadyResolve;
+window.authReady = new Promise(resolve => { authReadyResolve = resolve; });
+window.isAuthReady = false;
+
 async function init() {
     await initFirestore();
     setupRealtimeListener();
     
     // Listen for auth state changes (including on page load)
     auth.onAuthStateChanged(async (user) => {
+        // Mark auth as ready (even if no user)
+        window.isAuthReady = true;
+        if (authReadyResolve) {
+            authReadyResolve(user);
+            authReadyResolve = null; // Only resolve once
+        }
+        
         // Check disclaimer acceptance (for both logged-in and logged-out users)
         if (typeof checkDisclaimerForUser === 'function') {
             await checkDisclaimerForUser(user);
