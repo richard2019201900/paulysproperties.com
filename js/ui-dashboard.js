@@ -1104,6 +1104,22 @@ window.renderOwnerDashboard = function() {
         }
     }
     
+    // Render Agent Properties section (properties where user is agent, not owner)
+    const agentProps = getManagedProperties();
+    const agentSection = $('agentPropertiesSection');
+    const agentList = $('agentPropertiesList');
+    const agentCount = $('agentPropertiesCount');
+    
+    if (agentProps.length === 0) {
+        if (agentSection) agentSection.classList.add('hidden');
+    } else {
+        if (agentSection) agentSection.classList.remove('hidden');
+        if (agentCount) agentCount.textContent = `(${agentProps.length})`;
+        if (agentList) {
+            agentList.innerHTML = agentProps.map(p => renderAgentPropertyRow(p)).join('');
+        }
+    }
+    
     // Handle empty state (no properties at all)
     if (ownedProps.length === 0) {
         if (rentedList) {
@@ -1314,6 +1330,129 @@ function renderPropertyRow(property, isAvailable) {
                             📋 Copy Reminder
                         </button>
                     ` : '<div class="w-24"></div>'}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render a property row for Agent Properties section
+ * Shows properties where user is agent (not owner)
+ * Includes owner info, renter info, and rent due status
+ */
+function renderAgentPropertyRow(property) {
+    const p = property;
+    const renterName = PropertyDataService.getValue(p.id, 'renterName', p.renterName || '');
+    const ownerEmail = PropertyDataService.getValue(p.id, 'ownerEmail', p.ownerEmail || '');
+    const ownerDisplayName = PropertyDataService.getValue(p.id, 'ownerDisplayName', null);
+    const ownerName = ownerDisplayName || ownerEmail?.split('@')[0] || 'Unknown Owner';
+    const paymentFrequency = PropertyDataService.getValue(p.id, 'paymentFrequency', p.paymentFrequency || '');
+    const lastPaymentDate = PropertyDataService.getValue(p.id, 'lastPaymentDate', p.lastPaymentDate || '');
+    const weeklyPrice = PropertyDataService.getValue(p.id, 'weeklyPrice', p.weeklyPrice);
+    const dailyPrice = PropertyDataService.getValue(p.id, 'dailyPrice', p.dailyPrice || 0);
+    const biweeklyPrice = PropertyDataService.getValue(p.id, 'biweeklyPrice', p.biweeklyPrice || 0);
+    const monthlyPrice = PropertyDataService.getValue(p.id, 'monthlyPrice', p.monthlyPrice || 0);
+    const propertyType = PropertyDataService.getValue(p.id, 'type', p.type || '');
+    const isRented = state.availability[p.id] === false;
+    
+    // Calculate next due date and status (for rented properties)
+    let nextDueDate = '';
+    let daysUntilDue = null;
+    let dueDateDisplay = '';
+    let borderColor = 'border-l-purple-500'; // Purple for agent properties
+    
+    if (isRented && lastPaymentDate && paymentFrequency) {
+        const lastDate = parseLocalDate(lastPaymentDate);
+        const nextDate = new Date(lastDate);
+        
+        if (paymentFrequency === 'daily') {
+            nextDate.setDate(nextDate.getDate() + 1);
+        } else if (paymentFrequency === 'weekly') {
+            nextDate.setDate(nextDate.getDate() + 7);
+        } else if (paymentFrequency === 'biweekly') {
+            nextDate.setDate(nextDate.getDate() + 14);
+        } else {
+            nextDate.setMonth(nextDate.getMonth() + 1);
+        }
+        
+        nextDueDate = nextDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        nextDate.setHours(0, 0, 0, 0);
+        daysUntilDue = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+        
+        // Status color based on due date
+        if (daysUntilDue < 0) {
+            borderColor = 'border-l-red-500';
+            dueDateDisplay = `<span class="text-red-400 font-bold">${Math.abs(daysUntilDue)}d overdue</span>`;
+        } else if (daysUntilDue === 0) {
+            borderColor = 'border-l-orange-500';
+            dueDateDisplay = `<span class="text-orange-400 font-bold">Due today</span>`;
+        } else if (daysUntilDue === 1) {
+            borderColor = 'border-l-yellow-500';
+            dueDateDisplay = `<span class="text-yellow-400 font-bold">Due tomorrow</span>`;
+        } else if (daysUntilDue <= 3) {
+            borderColor = 'border-l-yellow-600';
+            dueDateDisplay = `<span class="text-yellow-400">${daysUntilDue}d left</span>`;
+        } else {
+            borderColor = 'border-l-purple-500';
+            dueDateDisplay = `<span class="text-green-400">${daysUntilDue}d left</span>`;
+        }
+    }
+    
+    // Get rent amount for display
+    let displayAmount = weeklyPrice;
+    let frequencyLabel = '/wk';
+    if (paymentFrequency === 'daily') {
+        displayAmount = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
+        frequencyLabel = '/day';
+    } else if (paymentFrequency === 'biweekly') {
+        displayAmount = biweeklyPrice > 0 ? biweeklyPrice : weeklyPrice * 2;
+        frequencyLabel = '/2wk';
+    } else if (paymentFrequency === 'monthly') {
+        displayAmount = monthlyPrice > 0 ? monthlyPrice : weeklyPrice * 4;
+        frequencyLabel = '/mo';
+    }
+    
+    // Calculate 10% commission
+    const commission = Math.round(displayAmount * 0.10);
+    
+    const statusBadge = isRented 
+        ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 font-bold">RENTED</span>`
+        : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/30 text-green-300 font-bold">AVAILABLE</span>`;
+    
+    return `
+        <div class="bg-gray-800/50 rounded-lg border border-purple-500/30 border-l-4 ${borderColor} p-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${p.id})">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <!-- Property info -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-medium text-white truncate">${sanitize(p.title)}</span>
+                        ${statusBadge}
+                        ${propertyType ? `<span class="text-gray-500 text-xs capitalize hidden sm:inline">${propertyType}</span>` : ''}
+                    </div>
+                    <div class="text-gray-400 text-xs mt-0.5">
+                        <span class="text-purple-400">Owner:</span> ${sanitize(ownerName)}
+                        ${isRented ? `
+                            <span class="text-gray-600 mx-1">•</span>
+                            <span class="text-gray-400">Renter:</span> ${renterName || 'N/A'}
+                            ${nextDueDate ? `
+                                <span class="text-gray-600 mx-1">•</span>
+                                <span class="text-gray-500">${nextDueDate}</span>
+                                ${dueDateDisplay ? `<span class="ml-1">${dueDateDisplay}</span>` : ''}
+                            ` : ''}
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <!-- Amount and commission -->
+                <div class="flex items-center gap-3 sm:gap-4 flex-shrink-0">
+                    <div class="text-right">
+                        <div class="text-purple-400 font-bold">$${displayAmount.toLocaleString()}<span class="text-gray-500 text-xs">${frequencyLabel}</span></div>
+                        <div class="text-green-400 text-xs">+$${commission.toLocaleString()} comm</div>
+                    </div>
                 </div>
             </div>
         </div>

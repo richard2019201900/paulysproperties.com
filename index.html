@@ -1841,17 +1841,29 @@
             
             <!-- Available Properties (Collapsible Accordion) -->
             <div id="availablePropertiesSection" class="hidden glass-effect rounded-2xl shadow-2xl p-4 md:p-6 mt-6">
-                <button onclick="toggleAvailableProperties()" class="w-full flex items-center justify-between text-left">
-                    <h3 class="text-lg md:text-xl font-bold text-gray-400">
-                        <span id="availablePropertiesIcon">▼</span> 
-                        Available Properties 
-                        <span id="availablePropertiesCount" class="text-gray-500">(0)</span>
-                    </h3>
-                    <span class="text-gray-500 text-sm">Click to collapse</span>
-                </button>
+                <h3 class="text-lg md:text-xl font-bold text-gray-400 mb-4">
+                    🟢 Available Properties 
+                    <span id="availablePropertiesCount" class="text-gray-500">(0)</span>
+                </h3>
                 
-                <!-- Available Properties List (expanded by default) -->
-                <div id="availablePropertiesList" class="mt-4 space-y-2">
+                <!-- Available Properties List (always visible) -->
+                <div id="availablePropertiesList" class="space-y-2">
+                    <!-- Properties rendered by JS -->
+                </div>
+            </div>
+            
+            <!-- Agent Properties Section (properties where user is agent, not owner) -->
+            <div id="agentPropertiesSection" class="hidden glass-effect rounded-2xl shadow-2xl p-4 md:p-6 mt-6">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
+                    <h3 class="text-lg md:text-xl font-bold text-purple-400">
+                        🏢 Properties You Manage (Agent)
+                        <span id="agentPropertiesCount" class="text-gray-500">(0)</span>
+                    </h3>
+                    <span class="text-purple-400/70 text-xs">10% commission on all sales</span>
+                </div>
+                
+                <!-- Agent Properties List -->
+                <div id="agentPropertiesList" class="space-y-2">
                     <!-- Properties rendered by JS -->
                 </div>
             </div>
