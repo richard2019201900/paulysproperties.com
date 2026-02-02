@@ -7799,9 +7799,30 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     const agentFee = hasAgent ? Math.round(actualAmount * 0.10) : 0;
     const netToSeller = actualAmount - agentFee;
     
-    // Fix: Use remaining balance for final payment info when next monthly is $0
-    const nextPaymentAmount = info.nextExpectedAmount > 0 ? info.nextExpectedAmount : info.remainingBalance;
-    const nextPaymentLabel = info.nextExpectedAmount > 0 ? 'monthly payment' : 'final payment';
+    // Determine if current user is the owner (not just an agent)
+    // If hasAgent is true, user is managing as agent, so show owner message
+    // If hasAgent is false, user IS the owner, so hide owner message
+    const showOwnerMessage = hasAgent;
+    
+    // Fix: Use expected amount or actual amount for next payment, NOT remaining balance
+    // Only fall back to remaining balance if this is the FINAL payment
+    let nextPaymentAmount;
+    const isLastPayment = info.type === 'monthly' && info.paymentNumber >= info.totalPayments;
+    
+    if (isLastPayment || info.remainingBalance === 0) {
+        // This was the last payment, no next payment
+        nextPaymentAmount = 0;
+    } else if (info.nextExpectedAmount > 0) {
+        // Use the calculated next expected amount
+        nextPaymentAmount = info.nextExpectedAmount;
+    } else if (actualAmount > 0 && info.remainingBalance > actualAmount) {
+        // Fallback: use the actual payment amount as estimate for next payment
+        // This handles cases where expectedMonthly calculated to 0 incorrectly
+        nextPaymentAmount = actualAmount;
+    } else {
+        // Final fallback: remaining balance (this IS the final payment)
+        nextPaymentAmount = info.remainingBalance;
+    }
     
     let renterMessage, ownerMessage, headerText, badgeText;
     
@@ -7813,15 +7834,20 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     } else {
         headerText = 'Payment Logged!';
         badgeText = `📋 Month ${info.paymentNumber}/${info.totalPayments}`;
-        renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+        if (info.remainingBalance <= 0) {
+            // Final payment - contract complete
+            renterMessage = `Thanks ${displayName}! Final payment of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Congratulations - your Rent-to-Own contract is now complete! 🎉`;
+        } else {
+            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+        }
     }
     
-    // === OWNER MESSAGE (Clean, conversational format) ===
+    // === OWNER MESSAGE (Only shown when user is agent, not owner) ===
     const paymentTypeLabel = info.type === 'deposit' ? 'deposit' : `payment ${info.paymentNumber}/${info.totalPayments}`;
     if (hasAgent) {
         ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. After the 10% PaulysProperties.com agent fee of $${agentFee.toLocaleString()}, you are set to receive $${netToSeller.toLocaleString()} net. The remaining renter balance of $${info.remainingBalance.toLocaleString()} is due ${info.nextDueDate}. Reach out if you have any questions.`;
     } else {
-        ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. The remaining renter balance of $${info.remainingBalance.toLocaleString()} is due ${info.nextDueDate}. Reach out if you have any questions.`;
+        ownerMessage = ''; // Not needed when user is the owner
     }
     
     // Show variance if different from expected
@@ -7863,15 +7889,17 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
                 <div class="bg-gray-800 rounded-lg p-3 mb-3">
                     <div class="text-xs text-green-400 font-bold mb-1">📱 For ${displayName}:</div>
                     <div id="renterMessageText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-gray-600">${renterMessage}</div>
-                    <button id="copyRenterBtn" onclick="copyRenterMessage()" class="w-full mt-2 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy</button>
+                    <button id="copyRenterBtn" onclick="copyRenterMessage()" class="w-full mt-2 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Renter Message</button>
                 </div>
                 
-                <!-- Owner Message -->
+                ${showOwnerMessage ? `
+                <!-- Owner Message (only shown when user is agent, not owner) -->
                 <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-purple-500/20">
                     <div class="text-xs text-purple-400 font-bold mb-1">🏢 For Owner/Records:</div>
                     <div id="ownerMessageText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-purple-500/20 whitespace-pre-line">${ownerMessage}</div>
                     <button id="copyOwnerBtn" onclick="copyOwnerMessage()" class="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy</button>
                 </div>
+                ` : ''}
                 
                 <button onclick="closePaymentConfirmModal()" class="w-full bg-gray-700 text-white py-2 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
             </div>
