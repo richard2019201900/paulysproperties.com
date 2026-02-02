@@ -1356,6 +1356,13 @@ function renderAgentPropertyRow(property) {
     const propertyType = PropertyDataService.getValue(p.id, 'type', p.type || '');
     const isRented = state.availability[p.id] === false;
     
+    // Check for RTO contract
+    const hasActiveRTO = PropertyDataService.getValue(p.id, 'hasActiveRTO', p.hasActiveRTO || false);
+    const rtoRemainingBalance = PropertyDataService.getValue(p.id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
+    const rtoExpectedMonthly = PropertyDataService.getValue(p.id, 'rtoExpectedMonthly', p.rtoExpectedMonthly || 0);
+    const rtoCurrentPayment = PropertyDataService.getValue(p.id, 'rtoCurrentPayment', p.rtoCurrentPayment || 0);
+    const rtoTotalPayments = PropertyDataService.getValue(p.id, 'rtoTotalPayments', p.rtoTotalPayments || 0);
+    
     // Calculate next due date and status (for rented properties)
     let nextDueDate = '';
     let daysUntilDue = null;
@@ -1402,10 +1409,25 @@ function renderAgentPropertyRow(property) {
         }
     }
     
-    // Get rent amount for display
+    // Get rent amount for display - with RTO support
     let displayAmount = weeklyPrice;
     let frequencyLabel = '/wk';
-    if (paymentFrequency === 'daily') {
+    let isRTODisplay = false;
+    
+    // For RTO contracts: show the next expected payment or remaining balance
+    if (hasActiveRTO && rtoRemainingBalance > 0) {
+        isRTODisplay = true;
+        if (rtoExpectedMonthly > 0) {
+            // Standard RTO with monthly payments
+            displayAmount = rtoExpectedMonthly;
+            frequencyLabel = '/mo';
+        } else {
+            // Non-standard RTO (large deposit + final payment only)
+            // Show the remaining balance as the "next payment"
+            displayAmount = rtoRemainingBalance;
+            frequencyLabel = ' final';
+        }
+    } else if (paymentFrequency === 'daily') {
         displayAmount = dailyPrice > 0 ? dailyPrice : Math.round(weeklyPrice / 7);
         frequencyLabel = '/day';
     } else if (paymentFrequency === 'biweekly') {
@@ -1416,12 +1438,18 @@ function renderAgentPropertyRow(property) {
         frequencyLabel = '/mo';
     }
     
-    // Calculate 10% commission
+    // Calculate 10% commission on the displayed amount
     const commission = Math.round(displayAmount * 0.10);
     
-    const statusBadge = isRented 
-        ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 font-bold">RENTED</span>`
-        : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/30 text-green-300 font-bold">AVAILABLE</span>`;
+    // Build status badge - include RTO indicator
+    let statusBadge;
+    if (hasActiveRTO && rtoRemainingBalance > 0) {
+        statusBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-bold">RTO ${rtoCurrentPayment}/${rtoTotalPayments}</span>`;
+    } else if (isRented) {
+        statusBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 font-bold">RENTED</span>`;
+    } else {
+        statusBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/30 text-green-300 font-bold">AVAILABLE</span>`;
+    }
     
     return `
         <div class="bg-gray-800/50 rounded-lg border border-purple-500/30 border-l-4 ${borderColor} p-3 hover:bg-gray-700/50 transition cursor-pointer" onclick="viewPropertyStats(${p.id})">
