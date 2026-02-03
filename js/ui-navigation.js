@@ -1007,6 +1007,12 @@ window.navigateTo = function(section) {
     // Handle home - scroll to absolute top
     if (section === 'home') {
         showElement($('renterSection'));
+        
+        // Re-apply filters to ensure checkbox state matches displayed properties
+        if (typeof applyAllFilters === 'function') {
+            applyAllFilters();
+        }
+        
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
     }
