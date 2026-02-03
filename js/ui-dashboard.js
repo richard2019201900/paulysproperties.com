@@ -639,7 +639,7 @@ function updateDashboardTiles(totals) {
         // Show breakdown if both owner and agent income exist
         let countText = '';
         if (data.rtoAsOwner > 0 && data.rtoAsAgent > 0) {
-            countText = `Owner: $${formatPriceShort(data.rtoAsOwner)} • Agent: $${formatPriceShort(data.rtoAsAgent)}`;
+            countText = `Owner: ${formatPriceShort(data.rtoAsOwner)} • Agent: ${formatPriceShort(data.rtoAsAgent)}`;
         } else if (data.rtoAsAgent > 0) {
             countText = `Agent commission • ${activeContracts} active`;
         } else if (activeContracts > 0) {

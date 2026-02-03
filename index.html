@@ -1708,27 +1708,6 @@
 
             <!-- Row 2: Totals & Other Income -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
-                <!-- Total Rental Income -->
-                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
-                    <div class="flip-card-inner">
-                        <div class="flip-card-front bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-amber-400">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm md:text-base font-bold opacity-90">Total Rental Income</h3>
-                                <span class="text-xl">💰</span>
-                            </div>
-                            <p id="totalRentalIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
-                            <p id="totalRentalIncomeCount" class="text-xs opacity-70 mt-1">0 renters total</p>
-                        </div>
-                        <div class="flip-card-back bg-gradient-to-br from-amber-600 to-orange-700 rounded-2xl shadow-2xl p-3 text-white border border-amber-400 overflow-y-auto">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold">Income Breakdown</h3>
-                                <span class="text-xs opacity-70">← flip</span>
-                            </div>
-                            <div id="totalRentalIncomeBreakdown" class="text-xs space-y-1"></div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Properties (Combined Rented + Available) -->
                 <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
                     <div class="flip-card-inner">
@@ -1788,6 +1767,27 @@
                                 <span class="text-xs opacity-70">← flip</span>
                             </div>
                             <div id="rtoIncomeBreakdown" class="text-xs space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Rental Income -->
+                <div class="flip-card cursor-pointer" onclick="flipCard(this)" title="Click to see breakdown">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-2xl p-4 md:p-6 text-white border border-amber-400">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm md:text-base font-bold opacity-90">Total Rental Income</h3>
+                                <span class="text-xl">💰</span>
+                            </div>
+                            <p id="totalRentalIncomeDisplay" class="text-2xl md:text-3xl font-black">$0</p>
+                            <p id="totalRentalIncomeCount" class="text-xs opacity-70 mt-1">0 renters total</p>
+                        </div>
+                        <div class="flip-card-back bg-gradient-to-br from-amber-600 to-orange-700 rounded-2xl shadow-2xl p-3 text-white border border-amber-400 overflow-y-auto">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold">Income Breakdown</h3>
+                                <span class="text-xs opacity-70">← flip</span>
+                            </div>
+                            <div id="totalRentalIncomeBreakdown" class="text-xs space-y-1"></div>
                         </div>
                     </div>
                 </div>
@@ -2287,4 +2287,3 @@
 
 </body>
 </html>
-<- Amber color for RTO badge vs red for regular Deploy trigger Mon Feb  2 13:53:50 PST 2026 -->
