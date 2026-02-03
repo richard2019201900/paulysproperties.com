@@ -7309,6 +7309,84 @@ window.viewRTOContract = async function(contractId) {
         }
         
         const contract = doc.data();
+        const isMasterAdmin = typeof TierService !== 'undefined' && TierService.isMasterAdmin(auth.currentUser?.email);
+        
+        // Build payment history with remittance tracking
+        const rtoPaymentHistory = contract.rtoPaymentHistory || [];
+        const hasPayments = rtoPaymentHistory.length > 0 || contract.depositPaid;
+        
+        let remittanceHTML = '';
+        if (hasPayments) {
+            let paymentRows = '';
+            
+            // Deposit row (if applicable)
+            if (contract.depositAmount > 0) {
+                const depPaid = contract.depositOwnerPaid || false;
+                const depPaidDate = contract.depositOwnerPaidDate || '';
+                const depStatusClass = depPaid ? 'text-green-400' : 'text-amber-400';
+                const depStatusIcon = depPaid ? '✅' : '⏳';
+                const depStatusText = depPaid ? `Paid ${depPaidDate ? new Date(depPaidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}` : 'Pending';
+                const depToggle = isMasterAdmin ? `onclick="toggleRemittance('${contractId}', 'deposit', ${!depPaid})"` : '';
+                const depCursor = isMasterAdmin ? 'cursor-pointer hover:bg-gray-700/50' : '';
+                
+                paymentRows += `
+                    <div class="flex items-center justify-between py-2 px-3 rounded-lg ${depCursor} transition" ${depToggle} title="${isMasterAdmin ? 'Click to toggle payment status' : ''}">
+                        <div class="flex items-center gap-3">
+                            <span class="text-amber-400 font-bold text-xs w-16">Deposit</span>
+                            <span class="text-white text-sm">$${(contract.depositAmount || 0).toLocaleString()}</span>
+                            <span class="text-gray-500 text-xs">${contract.depositPaidDate ? new Date(contract.depositPaidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="${depStatusClass} text-xs font-medium">${depStatusIcon} ${depStatusText}</span>
+                        </div>
+                    </div>`;
+            }
+            
+            // Monthly payment rows
+            rtoPaymentHistory.slice().sort((a, b) => a.month - b.month).forEach((pay, idx) => {
+                const paid = pay.ownerPaid || false;
+                const paidDate = pay.ownerPaidDate || '';
+                const statusClass = paid ? 'text-green-400' : 'text-amber-400';
+                const statusIcon = paid ? '✅' : '⏳';
+                const statusText = paid ? `Paid ${paidDate ? new Date(paidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}` : 'Pending';
+                const toggle = isMasterAdmin ? `onclick="toggleRemittance('${contractId}', ${pay.month}, ${!paid})"` : '';
+                const cursor = isMasterAdmin ? 'cursor-pointer hover:bg-gray-700/50' : '';
+                const payDate = pay.date ? new Date(pay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+                
+                paymentRows += `
+                    <div class="flex items-center justify-between py-2 px-3 rounded-lg ${cursor} transition" ${toggle} title="${isMasterAdmin ? 'Click to toggle payment status' : ''}">
+                        <div class="flex items-center gap-3">
+                            <span class="text-cyan-400 font-bold text-xs w-16">#${pay.month}</span>
+                            <span class="text-white text-sm">$${(pay.actual || 0).toLocaleString()}</span>
+                            <span class="text-gray-500 text-xs">${payDate}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="${statusClass} text-xs font-medium">${statusIcon} ${statusText}</span>
+                        </div>
+                    </div>`;
+            });
+            
+            // Count pending
+            const pendingCount = rtoPaymentHistory.filter(p => !p.ownerPaid).length + (contract.depositAmount > 0 && !contract.depositOwnerPaid ? 1 : 0);
+            const paidCount = rtoPaymentHistory.filter(p => p.ownerPaid).length + (contract.depositAmount > 0 && contract.depositOwnerPaid ? 1 : 0);
+            
+            remittanceHTML = `
+                <div class="bg-gray-800 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-cyan-400 font-bold flex items-center gap-2">
+                            💸 Owner Remittance
+                            ${isMasterAdmin ? '<span class="text-gray-500 text-xs font-normal">(click to toggle)</span>' : ''}
+                        </h4>
+                        <div class="flex items-center gap-3 text-xs">
+                            <span class="text-green-400">✅ ${paidCount} paid</span>
+                            ${pendingCount > 0 ? `<span class="text-amber-400">⏳ ${pendingCount} pending</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="space-y-1 max-h-48 overflow-y-auto">
+                        ${paymentRows}
+                    </div>
+                </div>`;
+        }
         
         // Show contract in a modal
         const modalHTML = `
@@ -7350,6 +7428,8 @@ window.viewRTOContract = async function(contractId) {
                             </div>
                         </div>
                         
+                        ${remittanceHTML}
+                        
                         <div class="bg-gray-800 rounded-xl p-4 mb-4">
                             <h4 class="text-amber-400 font-bold mb-2">Full Contract Text</h4>
                             <div class="bg-gray-900 rounded-lg p-4 max-h-60 overflow-y-auto">
@@ -7359,6 +7439,9 @@ window.viewRTOContract = async function(contractId) {
                     </div>
                     
                     <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                        <button onclick="redownloadRTOContractImage('${contractId}')" class="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                            📥 Download PNG
+                        </button>
                         <button onclick="navigator.clipboard.writeText(document.querySelector('#viewContractModal pre').textContent).then(() => showToast('📋 Contract copied!', 'success'))" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
                             📋 Copy Contract
                         </button>
@@ -7375,6 +7458,121 @@ window.viewRTOContract = async function(contractId) {
     } catch (error) {
         console.error('Error loading contract:', error);
         showToast('Failed to load contract: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Toggle remittance status for an RTO payment (owner paid/pending)
+ * @param {string} contractId - The contract document ID
+ * @param {number|string} paymentMonth - Payment month number, or 'deposit' for deposit
+ * @param {boolean} newStatus - true = paid, false = pending
+ */
+window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
+    try {
+        const contractRef = db.collection('rentToOwnContracts').doc(contractId);
+        const doc = await contractRef.get();
+        if (!doc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = doc.data();
+        const now = new Date().toISOString();
+        
+        if (paymentMonth === 'deposit') {
+            // Toggle deposit remittance
+            await contractRef.update({
+                depositOwnerPaid: newStatus,
+                depositOwnerPaidDate: newStatus ? now : null,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            // Toggle monthly payment remittance
+            const history = contract.rtoPaymentHistory || [];
+            const payIdx = history.findIndex(p => p.month === paymentMonth);
+            if (payIdx === -1) {
+                showToast('Payment not found', 'error');
+                return;
+            }
+            history[payIdx].ownerPaid = newStatus;
+            history[payIdx].ownerPaidDate = newStatus ? now : null;
+            
+            await contractRef.update({
+                rtoPaymentHistory: history,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        const statusText = newStatus ? '✅ Marked as paid to owner' : '⏳ Marked as pending';
+        showToast(statusText, 'success');
+        
+        // Refresh the modal
+        const modal = document.getElementById('viewContractModal');
+        if (modal) modal.remove();
+        viewRTOContract(contractId);
+        
+    } catch (error) {
+        console.error('Error toggling remittance:', error);
+        showToast('Failed to update: ' + error.message, 'error');
+    }
+};
+
+/**
+ * Re-download an RTO contract as a PNG image from saved Firestore data
+ * Regenerates the contract image using the same canvas drawing logic
+ */
+window.redownloadRTOContractImage = async function(contractId) {
+    try {
+        showToast('🖼️ Generating contract image...', 'info');
+        
+        const doc = await db.collection('rentToOwnContracts').doc(contractId).get();
+        if (!doc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        
+        const contract = doc.data();
+        const calc = contract.calculations || {};
+        
+        // Detect if agent was involved from seller field format
+        const sellerStr = contract.seller || '';
+        const hasAgent = sellerStr.includes('Managed by:');
+        let agentName = '';
+        if (hasAgent) {
+            // seller is like "🏢 Managed by: Pauly Amato"
+            agentName = sellerStr.replace(/.*Managed by:\s*/, '').trim();
+        }
+        
+        // Reconstruct the contract and state objects for downloadRTOContractImage
+        window.rtoGeneratedContract = {
+            documentId: contract.documentId,
+            data: {
+                calculations: calc,
+                schedule: contract.schedule || []
+            },
+            preview: contract.contractText || ''
+        };
+        
+        window.rtoWizardState = {
+            propertyId: contract.propertyId,
+            property: {
+                title: contract.propertyTitle,
+                description: contract.propertyDescription || ''
+            },
+            seller: sellerStr,
+            buyer: { name: contract.buyer },
+            financial: contract.financial || {},
+            startDate: contract.startDate,
+            hasAgent: hasAgent,
+            agentName: agentName
+        };
+        
+        // Call the existing download function
+        downloadRTOContractImage();
+        
+    } catch (error) {
+        console.error('Error regenerating contract image:', error);
+        showToast('Failed to generate image: ' + error.message, 'error');
     }
 };
 
