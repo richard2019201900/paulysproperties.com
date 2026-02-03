@@ -90,19 +90,27 @@ async function getUsernameByEmail(email) {
         return window.ownerUsernameCache[normalizedEmail];
     }
 
+    // Helper: wrap .get() with timeout to prevent hang from browser extension blocking
+    function getWithTimeout(ref, ms = 8000) {
+        return Promise.race([
+            ref.get(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), ms))
+        ]);
+    }
+
     try {
         const currentUser = auth.currentUser;
         let userData = null;
         
         // If looking up current user's own info, use UID for direct access (always permitted)
         if (currentUser && currentUser.email && currentUser.email.toLowerCase() === normalizedEmail) {
-            const userDoc = await db.collection('users').doc(currentUser.uid).get();
+            const userDoc = await getWithTimeout(db.collection('users').doc(currentUser.uid));
             if (userDoc.exists) {
                 userData = userDoc.data();
             }
         } else {
             // Looking up another user - try email query (works for admin, may fail for regular users)
-            const querySnapshot = await db.collection('users').where('email', '==', normalizedEmail).get();
+            const querySnapshot = await getWithTimeout(db.collection('users').where('email', '==', normalizedEmail));
             if (!querySnapshot.empty) {
                 userData = querySnapshot.docs[0].data();
             }
@@ -116,11 +124,16 @@ async function getUsernameByEmail(email) {
             return displayName;
         }
     } catch (error) {
+        // Timeout - use local fallbacks
+        if (error.message === 'Firestore timeout') {
+            console.warn('[getUsernameByEmail] Firestore query timed out for:', normalizedEmail);
+            // Fall through to local fallbacks below
+        }
         // Permission denied (user can only read own doc) - try getting from property data
-        if (error.code === 'permission-denied') {
+        else if (error.code === 'permission-denied') {
             // Check if we have ownerDisplayName stored on any property in Firestore settings
             try {
-                const propsDoc = await db.collection('settings').doc('properties').get();
+                const propsDoc = await getWithTimeout(db.collection('settings').doc('properties'));
                 if (propsDoc.exists) {
                     const propsData = propsDoc.data();
                     for (const propId in propsData) {
@@ -136,34 +149,36 @@ async function getUsernameByEmail(email) {
             } catch (e) {
                 // Can't read settings either, fall through to other fallbacks
             }
-            
-            // Check local OwnershipService for ownerDisplayName
-            const userProperties = typeof OwnershipService !== 'undefined' 
-                ? OwnershipService.getPropertiesForOwner(normalizedEmail)
-                : [];
-            
-            // Look for ownerDisplayName on any of their properties
-            for (const prop of userProperties) {
-                if (prop.ownerDisplayName) {
-                    window.ownerUsernameCache[normalizedEmail] = prop.ownerDisplayName;
-                    return prop.ownerDisplayName;
-                }
+        } else {
+            console.error('Error fetching username:', error);
+        }
+        
+        // LOCAL FALLBACKS (no Firestore needed):
+        
+        // Check local OwnershipService for ownerDisplayName
+        const userProperties = typeof OwnershipService !== 'undefined' 
+            ? OwnershipService.getPropertiesForOwner(normalizedEmail)
+            : [];
+        
+        // Look for ownerDisplayName on any of their properties
+        for (const prop of userProperties) {
+            if (prop.ownerDisplayName) {
+                window.ownerUsernameCache[normalizedEmail] = prop.ownerDisplayName;
+                return prop.ownerDisplayName;
             }
-            
-            // Check if master admin (we can do this without querying)
-            if (typeof TierService !== 'undefined' && TierService.isMasterAdmin(normalizedEmail)) {
-                // For master admin, use a nice default
-                const fallback = 'Pauly Amato';
-                window.ownerUsernameCache[normalizedEmail] = fallback;
-                return fallback;
-            }
-            
-            // Final fallback to email prefix
-            const fallback = email.split('@')[0];
+        }
+        
+        // Check if master admin (we can do this without querying)
+        if (typeof TierService !== 'undefined' && TierService.isMasterAdmin(normalizedEmail)) {
+            const fallback = 'Pauly Amato';
             window.ownerUsernameCache[normalizedEmail] = fallback;
             return fallback;
         }
-        console.error('Error fetching username:', error);
+        
+        // Final fallback to email prefix
+        const fallback = email.split('@')[0];
+        window.ownerUsernameCache[normalizedEmail] = fallback;
+        return fallback;
     }
     
     // User not found - might be deleted, return Unassigned
@@ -305,7 +320,10 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
     // Get tier from user doc
     let tier = 'starter';
     try {
-        const snapshot = await db.collection('users').where('email', '==', email).get();
+        const snapshot = await Promise.race([
+            db.collection('users').where('email', '==', email).get(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 8000))
+        ]);
         if (!snapshot.empty) {
             const userData = snapshot.docs[0].data();
             tier = userData.tier || 'starter';
@@ -320,8 +338,12 @@ async function getPropertyOwnerWithTier(propertyId, options = {}) {
             }
         }
     } catch (error) {
+        // Timeout or permission denied - use local fallbacks
+        if (error.message === 'Firestore timeout') {
+            console.warn('[getPropertyOwnerWithTier] Query timed out for:', email);
+        }
         // Permission denied - use default tier (can't read other users' docs)
-        if (error.code === 'permission-denied') {
+        if (error.code === 'permission-denied' || error.message === 'Firestore timeout') {
             // Check if master admin (we can do this without querying)
             if (TierService.isMasterAdmin(email)) {
                 return {

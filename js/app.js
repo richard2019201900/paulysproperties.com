@@ -517,6 +517,37 @@ window.viewPropertyAndHighlightOffers = function(id) {
     }, 100);
 };
 
+// ==================== FIRESTORE QUERY UTILITIES ====================
+/**
+ * Wraps a Firestore .get() call with a timeout to prevent infinite hangs.
+ * Browser extensions (ad blockers, privacy tools) can block Firestore's WebChannel
+ * connections, causing .get() to hang forever without resolving or rejecting.
+ * This utility ensures queries always resolve within a reasonable time.
+ */
+function firestoreGetWithTimeout(docRef, timeoutMs = 8000) {
+    return Promise.race([
+        docRef.get(),
+        new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Firestore query timed out - possible browser extension interference')), timeoutMs)
+        )
+    ]);
+}
+
+/**
+ * Same as above but for Firestore queries (.where().get())
+ */
+function firestoreQueryWithTimeout(query, timeoutMs = 8000) {
+    return Promise.race([
+        query.get(),
+        new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Firestore query timed out - possible browser extension interference')), timeoutMs)
+        )
+    ]);
+}
+
+// Owner name cache - persists across re-renders so we don't show "Loading..." again
+window._ownerNameCache = window._ownerNameCache || {};
+
 // ==================== PROPERTY STATS PAGE ====================
 /**
  * Renders the property stats page with EDITABLE tiles
@@ -594,23 +625,15 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
     renderPropertyStatsContent(propId);
     
     // Load owner name after DOM is ready
-    console.log(`[viewPropertyStats] Scheduling loadStatsOwnerName for ${propId}`);
     requestAnimationFrame(() => {
-        console.log(`[viewPropertyStats] RAF fired for loadStatsOwnerName`);
         loadStatsOwnerName(propId);
     });
     
     // Load property analytics (async - will populate the analytics section)
-    // Use requestAnimationFrame + timeout to ensure DOM is ready
-    console.log(`[viewPropertyStats] Scheduling renderPropertyAnalytics for ${propId}`);
     requestAnimationFrame(() => {
-        console.log(`[viewPropertyStats] RAF fired for renderPropertyAnalytics, setting 100ms timeout`);
         setTimeout(() => {
-            console.log(`[viewPropertyStats] Timeout fired, calling renderPropertyAnalytics`);
             if (typeof renderPropertyAnalytics === 'function') {
                 renderPropertyAnalytics(propId);
-            } else {
-                console.error('[viewPropertyStats] renderPropertyAnalytics is not a function!');
             }
         }, 100);
     });
@@ -631,64 +654,64 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
 
 // Load owner name for stats page (always shows real owner, not anonymized)
 async function loadStatsOwnerName(propertyId, retryCount = 0) {
-    console.log(`[OwnerName] Called for property ${propertyId}, retry ${retryCount}, isAuthReady: ${window.isAuthReady}, hasUser: ${!!auth.currentUser}`);
+    console.log(`[OwnerName] Called for property ${propertyId}, retry ${retryCount}`);
     
     const ownerEl = $(`stats-owner-${propertyId}`);
     if (!ownerEl) {
-        console.log(`[OwnerName] Element stats-owner-${propertyId} not found, retry ${retryCount}/5`);
-        // Element doesn't exist yet - retry after a short delay
         if (retryCount < 5) {
+            console.log(`[OwnerName] Element not found, retry ${retryCount + 1}/5`);
             setTimeout(() => loadStatsOwnerName(propertyId, retryCount + 1), 200);
         } else {
-            console.error(`[OwnerName] GAVE UP - Element never appeared after 5 retries`);
+            console.error(`[OwnerName] GAVE UP - Element never appeared`);
         }
         return;
     }
     
     const spanEl = ownerEl.querySelector('span');
     if (!spanEl) {
-        console.error(`[OwnerName] span element not found inside stats-owner-${propertyId}`);
+        console.error(`[OwnerName] span not found inside element`);
         return;
     }
     
-    // CRITICAL FIX: Wait for auth to be ready before Firestore queries
+    // If we already have a cached name, show it immediately (prevents flash of "Loading...")
+    if (window._ownerNameCache[propertyId]) {
+        spanEl.textContent = window._ownerNameCache[propertyId];
+        console.log(`[OwnerName] Used cache: ${window._ownerNameCache[propertyId]}`);
+        // Still try to refresh in background but don't block
+    }
+    
+    // Wait for auth
     if (!window.isAuthReady) {
-        console.log('[OwnerName] Waiting for auth...');
         try {
             await Promise.race([
                 window.authReady,
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000))
             ]);
-            console.log('[OwnerName] Auth ready signal received');
         } catch (e) {
-            console.warn('[OwnerName] Auth timeout after 5 seconds');
+            console.warn('[OwnerName] Auth timeout');
         }
     }
     
-    // If still no user after auth ready, retry a few times
-    if (!auth.currentUser && retryCount < 3) {
-        console.log(`[OwnerName] No current user yet, retrying ${retryCount + 1}/3`);
-        setTimeout(() => loadStatsOwnerName(propertyId, retryCount + 1), 300);
-        return;
-    }
-    
     if (!auth.currentUser) {
-        console.error('[OwnerName] FAILED - No auth user after all retries');
-        spanEl.textContent = 'Auth Error';
+        if (!window._ownerNameCache[propertyId]) {
+            const ownerEmail = propertyOwnerEmail[propertyId];
+            spanEl.textContent = ownerEmail ? ownerEmail.split('@')[0] : 'Unknown';
+        }
         return;
     }
-    
-    console.log(`[OwnerName] Proceeding with auth user: ${auth.currentUser.email}`);
     
     try {
-        // Use tier-aware username lookup with forceShowOwner to bypass agent anonymization
         const ownerInfo = await getPropertyOwnerWithTier(propertyId, { forceShowOwner: true });
-        console.log(`[OwnerName] SUCCESS - Got owner info:`, ownerInfo.display);
+        console.log(`[OwnerName] SUCCESS: ${ownerInfo.display}`);
         spanEl.textContent = ownerInfo.display;
+        // Cache it so re-renders don't flash "Loading..."
+        window._ownerNameCache[propertyId] = ownerInfo.display;
     } catch (error) {
-        console.error('[OwnerName] Error loading owner name:', error);
-        const ownerEmail = propertyOwnerEmail[propertyId];
-        spanEl.textContent = ownerEmail ? ownerEmail.split('@')[0] : 'Unknown';
+        console.error('[OwnerName] Error:', error.message);
+        if (!window._ownerNameCache[propertyId]) {
+            const ownerEmail = propertyOwnerEmail[propertyId];
+            spanEl.textContent = ownerEmail ? ownerEmail.split('@')[0] : 'Unknown';
+        }
     }
 }
 
@@ -927,7 +950,7 @@ function renderPropertyStatsContent(id) {
                         </span>
                         <span id="stats-owner-${id}" class="bg-blue-600/80 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            <span>Loading...</span>
+                            <span>${window._ownerNameCache[id] || 'Loading...'}</span>
                         </span>
                     </div>
                 </div>
@@ -3178,76 +3201,48 @@ window.calculatePropertyAnalytics = function(payments, property) {
 
 // Render analytics section on property stats page
 window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
-    console.log(`[Analytics] ========== CALLED ==========`);
-    console.log(`[Analytics] propertyId: ${propertyId}, retryCount: ${retryCount}`);
-    console.log(`[Analytics] window.isAuthReady: ${window.isAuthReady}`);
-    console.log(`[Analytics] auth.currentUser: ${auth.currentUser?.email || 'NULL'}`);
+    console.log(`[Analytics] Called for property ${propertyId}, retry ${retryCount}`);
     
     const container = $('propertyAnalyticsSection');
     if (!container) {
-        // Container doesn't exist yet - retry after a short delay (max 3 retries)
         if (retryCount < 3) {
-            console.warn(`[Analytics] Container 'propertyAnalyticsSection' not found, retrying ${retryCount + 1}/3`);
+            console.warn(`[Analytics] Container not found, retrying ${retryCount + 1}/3`);
             setTimeout(() => renderPropertyAnalytics(propertyId, retryCount + 1), 300);
         } else {
-            console.error('[Analytics] GAVE UP - Container never appeared after 3 retries');
+            console.error('[Analytics] GAVE UP - Container never appeared');
         }
         return;
     }
-    console.log('[Analytics] Container found');
     
-    // CRITICAL FIX: Wait for auth to be ready before attempting Firestore queries
-    // This prevents the "Loading..." stuck state when auth hasn't initialized yet
+    // Wait for auth if needed
     if (!window.isAuthReady) {
-        console.log('[Analytics] Auth NOT ready, waiting...');
+        console.log('[Analytics] Waiting for auth...');
         container.innerHTML = `
             <div class="text-center py-8">
                 <div class="text-4xl mb-4 animate-pulse">📊</div>
                 <p class="text-gray-400">Initializing...</p>
             </div>
         `;
-        
-        // Wait for auth, then retry
         try {
-            console.log('[Analytics] Awaiting authReady promise...');
             await Promise.race([
                 window.authReady,
                 new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000))
             ]);
-            console.log('[Analytics] Auth ready signal received, retrying...');
-            // Auth is ready, retry immediately
             return renderPropertyAnalytics(propertyId, retryCount);
         } catch (e) {
-            console.warn('[Analytics] Auth timeout after 5 seconds, proceeding anyway');
+            console.warn('[Analytics] Auth timeout, proceeding anyway');
         }
-    } else {
-        console.log('[Analytics] Auth already ready');
     }
     
-    // Additional check: if no current user, wait a bit more (auth may still be processing)
     if (!auth.currentUser && retryCount < 3) {
-        console.log(`[Analytics] No current user yet, retrying ${retryCount + 1}/3 in 500ms`);
+        console.log(`[Analytics] No current user, retrying ${retryCount + 1}/3`);
         setTimeout(() => renderPropertyAnalytics(propertyId, retryCount + 1), 500);
         return;
     }
     
-    if (!auth.currentUser) {
-        console.error('[Analytics] FAILED - No auth user after all retries');
-        container.innerHTML = `
-            <div class="text-center py-8">
-                <div class="text-4xl mb-4">⚠️</div>
-                <p class="text-red-400">Authentication Error</p>
-                <p class="text-gray-500 text-sm mt-2">Please refresh the page</p>
-            </div>
-        `;
-        return;
-    }
-    
-    console.log(`[Analytics] Auth user confirmed: ${auth.currentUser.email}`);
-    
     const p = properties.find(prop => prop.id === propertyId);
     if (!p) {
-        console.warn('[Analytics] Property not found in local array:', propertyId);
+        console.warn('[Analytics] Property not found:', propertyId);
         container.innerHTML = `
             <div class="text-center py-8">
                 <div class="text-4xl mb-4">⏳</div>
@@ -3271,7 +3266,14 @@ window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
     
     try {
         // Fetch payment history (includes tenure history)
-        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        // CRITICAL: Use timeout wrapper to prevent infinite hang when browser extensions
+        // block Firestore WebChannel connections (ERR_BLOCKED_BY_CLIENT)
+        console.log(`[Analytics] Fetching paymentHistory for property ${propertyId}...`);
+        const historyDoc = await firestoreGetWithTimeout(
+            db.collection('paymentHistory').doc(String(propertyId)),
+            8000
+        );
+        console.log(`[Analytics] Firestore query completed! exists: ${historyDoc.exists}`);
         const historyData = historyDoc.exists ? historyDoc.data() : { payments: [], tenureHistory: [], vacancyPeriods: [] };
         const payments = historyData.payments || [];
         const tenureHistory = historyData.tenureHistory || [];
@@ -3507,12 +3509,23 @@ window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
         </div>
     `;
     } catch (error) {
-        console.error('[Analytics] Error loading analytics:', error);
+        console.error('[Analytics] Error loading analytics:', error.message);
+        
+        // Auto-retry once on timeout (browser extension may have temporarily blocked)
+        if (error.message.includes('timed out') && retryCount < 1) {
+            console.log('[Analytics] Firestore query timed out, auto-retrying...');
+            setTimeout(() => renderPropertyAnalytics(propertyId, retryCount + 1), 1000);
+            return;
+        }
+        
+        const isTimeout = error.message.includes('timed out');
         container.innerHTML = `
             <div class="text-center py-8">
                 <div class="text-4xl mb-4">⚠️</div>
-                <p class="text-red-400">Error loading analytics</p>
-                <p class="text-gray-500 text-sm mt-2">${error.message || 'Please try refreshing'}</p>
+                <p class="text-red-400">${isTimeout ? 'Connection Issue' : 'Error loading analytics'}</p>
+                <p class="text-gray-500 text-sm mt-2">${isTimeout 
+                    ? 'A browser extension may be blocking the database connection. Try disabling ad blockers for this site.'
+                    : (error.message || 'Please try refreshing')}</p>
                 <button onclick="renderPropertyAnalytics(${propertyId})" class="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-semibold transition">
                     🔄 Retry
                 </button>
@@ -4497,30 +4510,17 @@ let authReadyResolve;
 window.authReady = new Promise(resolve => { authReadyResolve = resolve; });
 window.isAuthReady = false;
 
-console.log('[Init] authReady promise created, isAuthReady = false');
-
 async function init() {
-    console.log('[Init] init() called');
     await initFirestore();
-    console.log('[Init] Firestore initialized');
     setupRealtimeListener();
-    console.log('[Init] Realtime listener setup complete');
     
     // Listen for auth state changes (including on page load)
     auth.onAuthStateChanged(async (user) => {
-        console.log(`[Init] onAuthStateChanged fired! user: ${user?.email || 'NULL'}`);
-        
         // Mark auth as ready (even if no user)
         window.isAuthReady = true;
-        console.log('[Init] Set isAuthReady = true');
-        
         if (authReadyResolve) {
-            console.log('[Init] Resolving authReady promise');
             authReadyResolve(user);
             authReadyResolve = null; // Only resolve once
-            console.log('[Init] authReady promise resolved');
-        } else {
-            console.log('[Init] authReady already resolved (subsequent auth change)');
         }
         
         // Check disclaimer acceptance (for both logged-in and logged-out users)
