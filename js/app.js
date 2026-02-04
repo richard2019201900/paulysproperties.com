@@ -7024,14 +7024,15 @@ window.downloadRTOContractImage = async function() {
     const calc = contract.data.calculations;
     const startDate = new Date(state.startDate);
     
-    // Create canvas - SQUARE format
+    // Create canvas - dynamic height (draw to oversized canvas, crop after)
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
-    // Set canvas size to square
-    const size = 1000;
-    canvas.width = size;
-    canvas.height = size;
+    // Width is fixed, height will be cropped after drawing
+    const canvasWidth = 1000;
+    const maxHeight = 1400; // Oversized to fit any content
+    canvas.width = canvasWidth;
+    canvas.height = maxHeight;
     
     // Background
     ctx.fillStyle = '#1a1a2e';
@@ -7265,9 +7266,18 @@ window.downloadRTOContractImage = async function() {
     ctx.fillStyle = '#4b5563';
     ctx.fillText('This document is a legally binding agreement in San Andreas', canvas.width / 2, y);
     ctx.fillText('© PaulysProperties.com - All Rights Reserved', canvas.width / 2, y + 12);
+    y += 30; // Advance past both footer lines
+    
+    // Crop canvas to actual content height
+    const finalHeight = Math.min(y, maxHeight);
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = canvasWidth;
+    croppedCanvas.height = finalHeight;
+    const croppedCtx = croppedCanvas.getContext('2d');
+    croppedCtx.drawImage(canvas, 0, 0, canvasWidth, finalHeight, 0, 0, canvasWidth, finalHeight);
     
     // Convert to blob and download
-    canvas.toBlob((blob) => {
+    croppedCanvas.toBlob((blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
