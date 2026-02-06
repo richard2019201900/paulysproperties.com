@@ -1279,12 +1279,12 @@ function renderPropertyStatsContent(id) {
                                 <div class="text-gray-400 text-xs font-medium mb-1">Buyer</div>
                                 <div class="text-white font-semibold">${PropertyDataService.getValue(id, 'rtoBuyer', p.rtoBuyer || 'Unknown')}</div>
                             </div>
-                            <div class="bg-gray-800/80 border border-green-500/30 rounded-lg p-3">
+                            <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
                                 <div class="text-gray-400 text-xs font-medium mb-1">Payment Progress</div>
                                 <div class="text-green-400 font-bold text-lg">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
                                 <div class="text-gray-500 text-xs">${rtoCurrentPayment >= rtoTotalPayments ? 'Complete ✓' : rtoCurrentPayment >= (rtoTotalPayments - 1) ? 'Final payment remaining' : 'Total payments'}</div>
                             </div>
-                            <div class="bg-gray-800/80 border border-amber-500/30 rounded-lg p-3">
+                            <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
                                 <div class="text-gray-400 text-xs font-medium mb-1">${(() => {
                                     const regularPayments = rtoTotalPayments - 1;
                                     if (rtoCurrentPayment >= regularPayments) return 'Next Payment';
@@ -1305,7 +1305,7 @@ function renderPropertyStatsContent(id) {
                                     return 'Per cycle';
                                 })()}</div>
                             </div>
-                            <div class="bg-gray-800/80 border border-cyan-500/30 rounded-lg p-3">
+                            <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
                                 <div class="text-gray-400 text-xs font-medium mb-1">Remaining Balance</div>
                                 <div class="text-cyan-400 font-bold text-lg">${(() => {
                                     const remBal = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
@@ -1336,9 +1336,6 @@ function renderPropertyStatsContent(id) {
                             </button>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <button onclick="showRTOWelcomeMessageModal(${id})" class="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
-                                <span>💬</span> Copy Message
-                            </button>
                             <button onclick="showRentToOwnWizard(${id})" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 New Contract
@@ -7075,18 +7072,19 @@ window.saveRTOContract = async function() {
             }
         }
         
-        // Close the wizard and refresh, then show the welcome message modal
+        // Close the wizard and refresh, then open View Contract modal
         const savedPropertyId = state.propertyId;
+        const savedContractId = contract.documentId;
         setTimeout(() => {
             closeRTOWizard();
             // Refresh the property stats page
             if (typeof showPropertyStats === 'function') {
                 showPropertyStats(savedPropertyId);
             }
-            // Show welcome message modal after page refreshes
+            // Open View Contract modal so user can access congrats message + download
             setTimeout(() => {
-                if (typeof showRTOWelcomeMessageModal === 'function') {
-                    showRTOWelcomeMessageModal(savedPropertyId);
+                if (typeof viewRTOContract === 'function' && savedContractId) {
+                    viewRTOContract(savedContractId);
                 }
             }, 500);
         }, 1000);
@@ -7528,47 +7526,38 @@ window.viewRTOContract = async function(contractId) {
                             </div>
                         </div>
                         
-                        <!-- Final Payment Details (consistent with other displays) -->
+                        <!-- Final Payment Details (reads from contract data) -->
                         ${(() => {
                             const remainingBalance = contract.remainingBalance || 0;
-                            const expectedMonthly = contract.expectedMonthlyPayment || contract.calculations?.monthlyPayment || 0;
-                            const currentPayment = contract.currentPaymentNumber || 0;
-                            const totalPayments = contract.totalPayments || contract.calculations?.termMonths || 24;
-                            const paymentsLeft = totalPayments - currentPayment;
-                            const isNearFinal = paymentsLeft <= 1 || expectedMonthly === 0;
+                            if (remainingBalance <= 0) return '';
                             
-                            if (isNearFinal && remainingBalance > 0) {
-                                // Calculate final payment "out the door" (what buyer actually pays)
-                                // remainingBalance is just what goes to owner ($700k), but buyer pays more with gov tax
-                                const ownerBase = remainingBalance; // $700k to owner
-                                const govTax = 70000; // $70k government tax (should be parsed from contract)
-                                const finalPaymentOutTheDoor = ownerBase + govTax; // $770k total buyer pays
-                                
-                                // Calculate what owner receives after 10% agent fee (if applicable)
-                                const hasAgent = contract.seller?.includes('Managed by:');
-                                const agentFee = hasAgent ? Math.round(ownerBase * 0.10) : 0; // Commission on base only
-                                const ownerReceives = ownerBase - agentFee;
-                                
-                                return `
-                                    <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
-                                        <div class="flex justify-between items-center">
-                                            <div>
-                                                <div class="text-amber-400 font-bold text-sm">🎯 Final Payment (Out the Door)</div>
-                                                <div class="text-white text-xl font-bold">$${finalPaymentOutTheDoor.toLocaleString()}</div>
-                                                <div class="text-gray-400 text-xs">What buyer pays total</div>
-                                            </div>
-                                            ${hasAgent ? `
-                                                <div class="text-right">
-                                                    <div class="text-green-400 font-semibold">$${ownerReceives.toLocaleString()}</div>
-                                                    <div class="text-gray-400 text-xs">Owner receives</div>
-                                                    <div class="text-purple-400 text-xs">-$${agentFee.toLocaleString()} agent fee</div>
-                                                </div>
-                                            ` : ''}
+                            const fpBase = contract.finalPaymentBase || contract.calculations?.finalPaymentBase || 0;
+                            const fpGovFee = Math.round(fpBase * 0.10);
+                            const finalPaymentOutTheDoor = fpBase + fpGovFee;
+                            
+                            // Check for agent via property data
+                            const fpAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(contract.propertyId) : [];
+                            const fpHasAgent = fpAgents.length > 0;
+                            const fpAgentFee = fpHasAgent ? Math.round(fpBase * 0.10) : 0;
+                            const fpOwnerReceives = fpBase - fpAgentFee;
+                            
+                            return `
+                                <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <div class="text-amber-400 font-bold text-sm">🎯 Final Payment (Out the Door)</div>
+                                            <div class="text-white text-xl font-bold">$${finalPaymentOutTheDoor.toLocaleString()}</div>
+                                            <div class="text-gray-400 text-xs">What buyer pays total</div>
+                                        </div>
+                                        <div class="text-right text-xs">
+                                            <div class="text-green-400 font-semibold">$${fpOwnerReceives.toLocaleString()}</div>
+                                            <div class="text-gray-400">Owner receives</div>
+                                            ${fpHasAgent ? `<div class="text-purple-400">-$${fpAgentFee.toLocaleString()} commission</div>` : ''}
+                                            <div class="text-orange-400">-$${fpGovFee.toLocaleString()} gov fee</div>
                                         </div>
                                     </div>
-                                `;
-                            }
-                            return '';
+                                </div>
+                            `;
                         })()}
                         
                         ${remittanceHTML}
@@ -7581,14 +7570,17 @@ window.viewRTOContract = async function(contractId) {
                         </div>
                     </div>
                     
-                    <div class="px-6 py-4 bg-gray-800/50 flex gap-3">
+                    <div class="px-6 py-4 bg-gray-800/50 flex flex-wrap gap-3">
                         <button onclick="redownloadRTOContractImage('${contractId}')" class="flex-1 bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
                             📥 Download PNG
                         </button>
                         <button onclick="navigator.clipboard.writeText(document.querySelector('#viewContractModal pre').textContent).then(() => showToast('📋 Contract copied!', 'success'))" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
                             📋 Copy Contract
                         </button>
-                        <button onclick="document.getElementById('viewContractModal').remove()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
+                        <button onclick="document.getElementById('viewContractModal').remove(); showRTOWelcomeMessageModal(${contract.propertyId || 0})" class="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                            💬 RTO Congrats Message
+                        </button>
+                        <button onclick="document.getElementById('viewContractModal').remove()" class="w-full bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
                             Close
                         </button>
                     </div>
@@ -8933,8 +8925,8 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     <td class="py-3 px-4 text-right">
                         ${depositPaid ? `
                             <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'deposit', ${depositAmount})" class="text-cyan-400 hover:text-cyan-300 text-xs bg-cyan-900/30 border border-cyan-500/30 px-2 py-1 rounded mr-1" title="Copy payment confirmation message">💬 Msg</button>
-                            <button onclick="editRTODeposit(${propertyId}, '${rtoContractId}')" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
-                            <button onclick="deleteRTODeposit(${propertyId}, '${rtoContractId}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                            <button onclick="editRTODeposit(${propertyId}, '${rtoContractId}')" class="text-blue-400 hover:text-blue-300 text-xs bg-blue-900/30 border border-blue-500/30 px-2 py-1 rounded mr-1">Edit</button>
+                            <button onclick="deleteRTODeposit(${propertyId}, '${rtoContractId}')" class="text-red-400 hover:text-red-300 text-xs bg-red-900/30 border border-red-500/30 px-2 py-1 rounded">Delete</button>
                         ` : ''}
                     </td>
                 </tr>
@@ -8956,8 +8948,8 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     <td class="py-3 px-4 text-green-400">✓ Paid</td>
                     <td class="py-3 px-4 text-right">
                         <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'monthly', ${payment.actual}, ${payment.month})" class="text-cyan-400 hover:text-cyan-300 text-xs bg-cyan-900/30 border border-cyan-500/30 px-2 py-1 rounded mr-1" title="Copy payment confirmation message">💬 Msg</button>
-                        <button onclick="editRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
-                        <button onclick="deleteRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                        <button onclick="editRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-blue-400 hover:text-blue-300 text-xs bg-blue-900/30 border border-blue-500/30 px-2 py-1 rounded mr-1">Edit</button>
+                        <button onclick="deleteRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-red-400 hover:text-red-300 text-xs bg-red-900/30 border border-red-500/30 px-2 py-1 rounded">Delete</button>
                     </td>
                 </tr>
             `;
