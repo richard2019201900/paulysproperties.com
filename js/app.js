@@ -8821,7 +8821,7 @@ window.showFinalPaymentReadyModal = async function(propertyId) {
     // Build transfer request text
     const ownerSSNVal = PropertyDataService.getValue(propertyId, 'ownerSSN', p.ownerSSN || '');
     const renterSSNVal = PropertyDataService.getValue(propertyId, 'renterSSN', p.renterSSN || '');
-    const transferText = `${propertyTitle}\nSeller: ${ownerFullName || 'Unknown'}\nBuyer: ${buyerName}\nPrice: $${finalPaymentBase.toLocaleString()}\nFee: $${govFee.toLocaleString()}\n\n${ownerFullName || 'Unknown'} ${ownerSSNVal || '[SSN not set]'}\n${buyerName} ${renterSSNVal || '[SSN not set]'}`;
+    const transferText = `Assisting the following two paulysproperties.com clients with a property sale.\n\n${propertyTitle}\nSeller: ${ownerFullName || 'Unknown'}\nBuyer: ${buyerName}\nPrice: $${finalPaymentBase.toLocaleString()}\nFee: $${govFee.toLocaleString()}\n\n${ownerFullName || 'Unknown'} ${ownerSSNVal || '[SSN not set]'}\n${buyerName} ${renterSSNVal || '[SSN not set]'}`;
     const hasSSNData = ownerSSNVal && renterSSNVal;
     
     const modalHTML = `
