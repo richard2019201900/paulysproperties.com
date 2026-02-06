@@ -1268,15 +1268,39 @@ function renderPropertyStatsContent(id) {
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs">Payment Progress</div>
                                 <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments - 1}</div>
+                                <div class="text-gray-500 text-xs">Monthly payments</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Next Payment</div>
+                                <div class="text-gray-400 text-xs">Monthly Payment</div>
                                 <div class="text-amber-400 font-semibold">$${PropertyDataService.getValue(id, 'rtoExpectedMonthly', p.rtoExpectedMonthly || monthlyPrice).toLocaleString()}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs">Remaining Balance</div>
                                 <div class="text-cyan-400 font-semibold">$${PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0).toLocaleString()}</div>
                             </div>
+                        </div>
+                        
+                        <!-- Final Payment "Out the Door" Amount -->
+                        <div class="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 rounded-lg p-3 mt-3">
+                            <div class="text-purple-300 text-xs font-bold mb-1">💰 Final Payment (Out the Door)</div>
+                            <div class="text-purple-100 font-bold text-lg">$${(() => {
+                                const remaining = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
+                                const expectedMonthly = PropertyDataService.getValue(id, 'rtoExpectedMonthly', p.rtoExpectedMonthly || monthlyPrice);
+                                const totalPayments = rtoTotalPayments - 1; // Monthly payments only
+                                const paymentsLeft = totalPayments - rtoCurrentPayment;
+                                let finalPayment = 0;
+                                
+                                if (paymentsLeft === 1) {
+                                    // This IS the final payment - show remaining balance
+                                    finalPayment = remaining;
+                                } else if (paymentsLeft > 1) {
+                                    // Calculate estimated final payment
+                                    finalPayment = remaining - (expectedMonthly * (paymentsLeft - 1));
+                                }
+                                
+                                return finalPayment > 0 ? finalPayment.toLocaleString() : '0';
+                            })()}</div>
+                            <div class="text-purple-400 text-xs">Total amount buyer pays (includes all fees)</div>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <button onclick="viewRTOContract('${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
@@ -7451,12 +7475,52 @@ window.viewRTOContract = async function(contractId) {
                             <div class="bg-gray-800 rounded-xl p-4">
                                 <div class="text-gray-400 text-xs mb-1">Payment Progress</div>
                                 <div class="text-amber-400 font-bold">${contract.currentPaymentNumber || 0} of ${contract.totalPayments || contract.calculations?.termMonths || 24}</div>
+                                <div class="text-gray-500 text-xs">Monthly payments</div>
                             </div>
                             <div class="bg-gray-800 rounded-xl p-4">
                                 <div class="text-gray-400 text-xs mb-1">Monthly Payment</div>
                                 <div class="text-green-400 font-bold">$${(contract.calculations?.monthlyPayment || 0).toLocaleString()}</div>
                             </div>
                         </div>
+                        
+                        <!-- Final Payment Details (consistent with other displays) -->
+                        ${(() => {
+                            const remainingBalance = contract.remainingBalance || 0;
+                            const expectedMonthly = contract.expectedMonthlyPayment || contract.calculations?.monthlyPayment || 0;
+                            const currentPayment = contract.currentPaymentNumber || 0;
+                            const totalPayments = contract.totalPayments || contract.calculations?.termMonths || 24;
+                            const paymentsLeft = totalPayments - currentPayment;
+                            const isNearFinal = paymentsLeft <= 1 || expectedMonthly === 0;
+                            
+                            if (isNearFinal && remainingBalance > 0) {
+                                // Calculate final payment "out the door" (what buyer actually pays)
+                                const finalPaymentOutTheDoor = remainingBalance;
+                                // Calculate what owner receives after 10% agent fee (if applicable)
+                                const hasAgent = contract.seller?.includes('Managed by:');
+                                const agentFee = hasAgent ? Math.round(finalPaymentOutTheDoor * 0.10) : 0;
+                                const ownerReceives = finalPaymentOutTheDoor - agentFee;
+                                
+                                return `
+                                    <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl p-4 mb-4">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <div class="text-amber-400 font-bold text-sm">🎯 Final Payment (Out the Door)</div>
+                                                <div class="text-white text-xl font-bold">$${finalPaymentOutTheDoor.toLocaleString()}</div>
+                                                <div class="text-gray-400 text-xs">What buyer pays total</div>
+                                            </div>
+                                            ${hasAgent ? `
+                                                <div class="text-right">
+                                                    <div class="text-green-400 font-semibold">$${ownerReceives.toLocaleString()}</div>
+                                                    <div class="text-gray-400 text-xs">Owner receives</div>
+                                                    <div class="text-purple-400 text-xs">-$${agentFee.toLocaleString()} agent fee</div>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                            return '';
+                        })()}
                         
                         ${remittanceHTML}
                         
@@ -8475,10 +8539,82 @@ window.closeRTOCompletionModal = function() {
 /**
  * Finalize RTO as a house sale
  */
-window.finalizeRTOSale = function(propertyId, rtoContractId) {
+window.finalizeRTOSale = async function(propertyId, rtoContractId) {
     closeRTOCompletionModal();
-    // Open the log sale modal pre-filled for RTO completion
-    showLogSaleModal(propertyId, rtoContractId);
+    
+    try {
+        // Get property and buyer information
+        const p = properties.find(prop => prop.id === propertyId);
+        const buyerName = PropertyDataService.getValue(propertyId, 'rtoBuyer', p?.rtoBuyer || 'Unknown');
+        const propertyTitle = p?.title || `Property #${propertyId}`;
+        const remainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
+        const finalCommission = Math.round(remainingBalance * 0.10);
+        
+        // Show house sale completion confirmation modal
+        showHouseSaleCompletionConfirmation(buyerName, propertyTitle, remainingBalance, finalCommission);
+        
+    } catch (error) {
+        console.error('Error in finalizeRTOSale:', error);
+        // Fallback to original behavior
+        showLogSaleModal(propertyId, rtoContractId);
+    }
+};
+
+/**
+ * Show house sale completion confirmation message
+ */
+window.showHouseSaleCompletionConfirmation = function(buyerName, propertyTitle, remainingBalance, finalCommission) {
+    const completionMessage = `Congrats! Your house has been sold! 🎉 I'm opening a prayer and adding you to it and let's all 3 try to find a time that we can meet at courthouse with the government agent to finalize the deal. The buyer will transfer the remaining amount of $${remainingBalance.toLocaleString()} to you directly. After that is done, please transfer $${finalCommission.toLocaleString()} to cover my final commission payment. Let me know if you have any questions.`;
+    
+    const modalHTML = `
+        <div id="houseSaleCompletionModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-lg w-full border border-green-500/30 shadow-2xl">
+                <div class="text-center p-6">
+                    <div class="text-6xl mb-4">🏡✨</div>
+                    <h3 class="text-2xl font-bold text-green-400 mb-2">House Sale Complete!</h3>
+                    <p class="text-gray-400 mb-4">${propertyTitle}</p>
+                    <p class="text-lg text-white font-semibold mb-4">Sold to: ${buyerName}</p>
+                </div>
+                
+                <div class="bg-gray-800 rounded-xl m-6 p-4">
+                    <div class="text-green-400 font-bold text-sm mb-2">📱 Message for Property Owner:</div>
+                    <div class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-gray-600">
+                        ${completionMessage}
+                    </div>
+                    <button onclick="copyHouseSaleMessage()" class="w-full mt-3 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Message</button>
+                </div>
+                
+                <div class="p-6 pt-0">
+                    <button onclick="closeHouseSaleCompletionModal()" class="w-full bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    window.currentHouseSaleMessage = completionMessage;
+};
+
+window.copyHouseSaleMessage = async function() {
+    try {
+        await navigator.clipboard.writeText(window.currentHouseSaleMessage);
+        const btn = document.querySelector('#houseSaleCompletionModal button');
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.add('bg-green-500');
+            setTimeout(() => {
+                btn.innerHTML = '<span>📋</span> Copy Message';
+                btn.classList.remove('bg-green-500');
+            }, 2000);
+        }
+    } catch (e) {
+        console.error('Copy failed:', e);
+    }
+};
+
+window.closeHouseSaleCompletionModal = function() {
+    const modal = document.getElementById('houseSaleCompletionModal');
+    if (modal) modal.remove();
 };
 
 // ==================== RTO PAYMENT HISTORY ====================
@@ -8578,7 +8714,7 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     </div>
                     
                     <div class="p-6 max-h-[60vh] overflow-y-auto">
-                        <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="grid grid-cols-3 gap-4 mb-4">
                             <div class="bg-gray-800 rounded-xl p-4">
                                 <div class="text-gray-400 text-sm">Remaining Balance</div>
                                 <div class="text-2xl font-bold text-white">$${(contract.remainingBalance || 0).toLocaleString()}</div>
@@ -8587,6 +8723,24 @@ window.showRTOPaymentHistory = async function(propertyId) {
                                 <div class="text-gray-400 text-sm">Next Expected Payment</div>
                                 <div class="text-2xl font-bold text-green-400">$${((contract.expectedMonthlyPayment || 0) > 0 ? contract.expectedMonthlyPayment : contract.remainingBalance || 0).toLocaleString()}</div>
                                 ${(contract.expectedMonthlyPayment || 0) === 0 && (contract.remainingBalance || 0) > 0 ? '<div class="text-amber-400 text-xs mt-1">Final Payment</div>' : ''}
+                            </div>
+                            <div class="bg-gradient-to-r from-purple-800/50 to-pink-800/50 border border-purple-500/30 rounded-xl p-4">
+                                <div class="text-purple-300 text-sm">💰 Final Payment (Out the Door)</div>
+                                <div class="text-2xl font-bold text-purple-100">$${(() => {
+                                    const remaining = contract.remainingBalance || 0;
+                                    const expectedMonthly = contract.expectedMonthlyPayment || 0;
+                                    if (expectedMonthly === 0) {
+                                        return remaining.toLocaleString(); // This IS the final payment
+                                    } else {
+                                        // Estimate final payment (remaining minus next monthly payments)
+                                        const totalMonthly = contract.totalPayments || contract.calculations?.termMonths || 24;
+                                        const currentPayments = (contract.rtoPaymentHistory || []).length;
+                                        const paymentsLeft = totalMonthly - currentPayments;
+                                        const finalPayment = paymentsLeft > 1 ? remaining - (expectedMonthly * (paymentsLeft - 1)) : remaining;
+                                        return Math.max(0, finalPayment).toLocaleString();
+                                    }
+                                })()}</div>
+                                <div class="text-purple-400 text-xs">Includes all fees</div>
                             </div>
                         </div>
                         
