@@ -8134,6 +8134,61 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
  * Show RTO payment confirmation modal - COMPACT VERSION
  * Clean text formatting for copy/paste, proper refresh on close
  */
+/**
+ * Show separate contract creation confirmation with structured template messages
+ */
+window.showRTOContractCreatedConfirmation = function(contractInfo) {
+    const { totalAmount, months, regularPayment, finalPayment, propertyTitle, renterName } = contractInfo;
+    
+    // Message 1 - Contract Confirmation for Owner
+    const contractMessage = `Congrats! A rent-to-own contract for $${totalAmount.toLocaleString()} was created for ${months} months. The first ${months - 1} months will be $${regularPayment.toLocaleString()} each, and the final lump sum payment will be $${finalPayment.toLocaleString()}.`;
+    
+    const modalHTML = `
+        <div id="contractCreatedModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full p-5 border border-blue-500/30 shadow-2xl">
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">📋</div>
+                    <h3 class="text-xl font-bold text-blue-400">Contract Created!</h3>
+                    <p class="text-gray-400 text-sm">RTO contract for ${renterName}</p>
+                </div>
+                
+                <div class="bg-gray-800 rounded-lg p-3 mb-3">
+                    <div class="text-xs text-blue-400 font-bold mb-1">📱 Contract Confirmation:</div>
+                    <div class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-gray-600">${contractMessage}</div>
+                    <button onclick="copyContractMessage()" class="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Contract Message</button>
+                </div>
+                
+                <button onclick="closeContractCreatedModal()" class="w-full bg-gray-700 text-white py-2 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    window.currentContractMessage = contractMessage;
+};
+
+window.copyContractMessage = async function() {
+    try {
+        await navigator.clipboard.writeText(window.currentContractMessage);
+        const btn = document.querySelector('#contractCreatedModal button');
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.add('bg-green-600');
+            setTimeout(() => {
+                btn.innerHTML = '<span>📋</span> Copy Contract Message';
+                btn.classList.remove('bg-green-600');
+            }, 2000);
+        }
+    } catch (e) {
+        console.error('Copy failed:', e);
+    }
+};
+
+window.closeContractCreatedModal = function() {
+    const modal = document.getElementById('contractCreatedModal');
+    if (modal) modal.remove();
+};
+
 window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedAmount, info) {
     // Get display name - handle titles like Dr., Mr., Mrs., Ms.
     const nameParts = renterName.trim().split(' ');
@@ -8188,12 +8243,20 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
         renterMessage = `Thanks ${displayName}! Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. Remaining balance: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}. Questions? Let me know!`;
     } else {
         headerText = 'Payment Logged!';
-        badgeText = `📋 Month ${info.paymentNumber}/${info.totalPayments}`;
+        // Fix: Show actual payment structure more clearly
+        const isLastPayment = info.remainingBalance <= 0;
+        const totalMonthlyPayments = info.totalPayments; // This should be total monthly payments only
+        
+        if (isLastPayment) {
+            badgeText = `📋 Final Payment Complete${hasAgent ? ` • Agent: ${agentName}` : ''}`;
+        } else {
+            badgeText = `📋 Month ${info.paymentNumber}/${totalMonthlyPayments}${hasAgent ? ` • Agent: ${agentName}` : ''}`;
+        }
         if (info.remainingBalance <= 0) {
             // Final payment - contract complete
             renterMessage = `Thanks ${displayName}! Final payment of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Congratulations - your Rent-to-Own contract is now complete! 🎉`;
         } else {
-            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${totalMonthlyPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
         }
     }
     
