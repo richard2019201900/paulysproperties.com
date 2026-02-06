@@ -1335,10 +1335,10 @@ function renderPropertyStatsContent(id) {
                                 Payment History
                             </button>
                         </div>
-                        <button onclick="showRTOWelcomeMessageModal(${id})" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
-                            <span>💬</span> Copy Welcome Message
-                        </button>
                         <div class="flex flex-wrap gap-2">
+                            <button onclick="showRTOWelcomeMessageModal(${id})" class="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                                <span>💬</span> Copy Message
+                            </button>
                             <button onclick="showRentToOwnWizard(${id})" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 New Contract
@@ -8897,6 +8897,28 @@ window.showRTOPaymentHistory = async function(propertyId) {
         // Build payment rows
         let historyRows = '';
         
+        // Get financial data for correct calculations
+        const finalPaymentBase = contract.finalPaymentBase || contract.calculations?.finalPaymentBase || 0;
+        const govFee = Math.round(finalPaymentBase * 0.10);
+        const totalPaymentsCount = contract.totalPayments || contract.calculations?.termMonths || 0;
+        const regularPaymentsCount = totalPaymentsCount - 1;
+        const currentPaymentNum = contract.currentPaymentNumber || 0;
+        const remainingBal = contract.remainingBalance || 0;
+        const expectedMonthly = contract.expectedMonthlyPayment || 0;
+        const totalRemainingWithGov = remainingBal > 0 ? remainingBal + govFee : 0;
+        
+        // Determine what the next payment is
+        const allRegularDone = currentPaymentNum >= regularPaymentsCount;
+        const finalPaymentTotal = finalPaymentBase + govFee;
+        const nextPaymentAmount = allRegularDone ? finalPaymentTotal : (expectedMonthly > 0 ? expectedMonthly : remainingBal);
+        const nextPaymentLabel = allRegularDone ? 'Final Payment' : `Month ${currentPaymentNum + 1}`;
+        
+        // Check for agent
+        const propertyAgentsForHistory = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
+        const hasAgentForHistory = propertyAgentsForHistory.length > 0;
+        const agentCommissionFinal = hasAgentForHistory ? Math.round(finalPaymentBase * 0.10) : 0;
+        const ownerNetFinal = finalPaymentBase - agentCommissionFinal;
+        
         // Add deposit row if applicable
         if (depositAmount > 0) {
             historyRows += `
@@ -8910,7 +8932,7 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     </td>
                     <td class="py-3 px-4 text-right">
                         ${depositPaid ? `
-                            <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'deposit', ${depositAmount})" class="text-cyan-400 hover:text-cyan-300 text-sm mr-2" title="Resend confirmation">📋</button>
+                            <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'deposit', ${depositAmount})" class="text-cyan-400 hover:text-cyan-300 text-xs bg-cyan-900/30 border border-cyan-500/30 px-2 py-1 rounded mr-1" title="Copy payment confirmation message">💬 Msg</button>
                             <button onclick="editRTODeposit(${propertyId}, '${rtoContractId}')" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
                             <button onclick="deleteRTODeposit(${propertyId}, '${rtoContractId}')" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                         ` : ''}
@@ -8933,7 +8955,7 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     <td class="py-3 px-4 text-gray-400">${payment.date}</td>
                     <td class="py-3 px-4 text-green-400">✓ Paid</td>
                     <td class="py-3 px-4 text-right">
-                        <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'monthly', ${payment.actual}, ${payment.month})" class="text-cyan-400 hover:text-cyan-300 text-sm mr-2" title="Resend confirmation">📋</button>
+                        <button onclick="regenerateRTOConfirmation(${propertyId}, '${rtoContractId}', 'monthly', ${payment.actual}, ${payment.month})" class="text-cyan-400 hover:text-cyan-300 text-xs bg-cyan-900/30 border border-cyan-500/30 px-2 py-1 rounded mr-1" title="Copy payment confirmation message">💬 Msg</button>
                         <button onclick="editRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-blue-400 hover:text-blue-300 text-sm mr-2">Edit</button>
                         <button onclick="deleteRTOPaymentEntry(${propertyId}, '${rtoContractId}', ${index})" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                     </td>
@@ -8963,37 +8985,24 @@ window.showRTOPaymentHistory = async function(propertyId) {
                     
                     <div class="p-6 max-h-[60vh] overflow-y-auto">
                         <div class="grid grid-cols-3 gap-4 mb-4">
-                            <div class="bg-gray-800 rounded-xl p-4">
+                            <div class="bg-gray-800 border border-cyan-500/30 rounded-xl p-4">
                                 <div class="text-gray-400 text-sm">Remaining Balance</div>
-                                <div class="text-2xl font-bold text-white">$${(contract.remainingBalance || 0).toLocaleString()}</div>
+                                <div class="text-2xl font-bold text-cyan-400">$${totalRemainingWithGov.toLocaleString()}</div>
+                                ${remainingBal > 0 ? `<div class="text-gray-500 text-xs">Incl. $${govFee.toLocaleString()} gov fee</div>` : ''}
                             </div>
-                            <div class="bg-gray-800 rounded-xl p-4">
-                                <div class="text-gray-400 text-sm">Next Expected Payment</div>
-                                <div class="text-2xl font-bold text-green-400">$${((contract.expectedMonthlyPayment || 0) > 0 ? contract.expectedMonthlyPayment : contract.remainingBalance || 0).toLocaleString()}</div>
-                                ${(contract.expectedMonthlyPayment || 0) === 0 && (contract.remainingBalance || 0) > 0 ? '<div class="text-amber-400 text-xs mt-1">Final Payment</div>' : ''}
+                            <div class="bg-gray-800 border border-amber-500/30 rounded-xl p-4">
+                                <div class="text-gray-400 text-sm">Next Payment</div>
+                                <div class="text-2xl font-bold text-amber-400">$${nextPaymentAmount.toLocaleString()}</div>
+                                <div class="text-gray-500 text-xs">${nextPaymentLabel}</div>
                             </div>
-                            <div class="bg-gradient-to-r from-purple-800/50 to-pink-800/50 border border-purple-500/30 rounded-xl p-4">
+                            <div class="bg-gray-800 border border-purple-500/30 rounded-xl p-4">
                                 <div class="text-purple-300 text-sm">💰 Final Payment (Out the Door)</div>
-                                <div class="text-2xl font-bold text-purple-100">$${(() => {
-                                    const remaining = contract.remainingBalance || 0;
-                                    const expectedMonthly = contract.expectedMonthlyPayment || 0;
-                                    if (expectedMonthly === 0) {
-                                        // This IS the final payment - show TOTAL buyer pays (base + gov tax)
-                                        // The $700k is just what goes to owner, but buyer pays $770k total
-                                        const ownerBase = remaining; // $700k
-                                        const govTax = 70000; // $70k government tax
-                                        const totalBuyerPayment = ownerBase + govTax; // $770k total
-                                        return totalBuyerPayment.toLocaleString(); 
-                                    } else {
-                                        // Estimate final payment (remaining minus next monthly payments)
-                                        const totalMonthly = contract.totalPayments || contract.calculations?.termMonths || 24;
-                                        const currentPayments = (contract.rtoPaymentHistory || []).length;
-                                        const paymentsLeft = totalMonthly - currentPayments;
-                                        const finalPayment = paymentsLeft > 1 ? remaining - (expectedMonthly * (paymentsLeft - 1)) : remaining;
-                                        return Math.max(0, finalPayment).toLocaleString();
-                                    }
-                                })()}</div>
-                                <div class="text-purple-400 text-xs">Includes all fees</div>
+                                <div class="text-2xl font-bold text-white">$${finalPaymentTotal.toLocaleString()}</div>
+                                <div class="text-xs mt-1 space-y-0.5">
+                                    <div class="text-green-400">Owner: $${ownerNetFinal.toLocaleString()}</div>
+                                    ${hasAgentForHistory ? `<div class="text-purple-400">Commission: -$${agentCommissionFinal.toLocaleString()}</div>` : ''}
+                                    <div class="text-orange-400">Gov fee: -$${govFee.toLocaleString()}</div>
+                                </div>
                             </div>
                         </div>
                         
@@ -9086,7 +9095,8 @@ window.regenerateRTOConfirmation = async function(propertyId, contractId, paymen
             hasAgent: hasAgent,
             agentName: agentName,
             paymentNumber: paymentNumber,
-            totalPayments: (contract.totalPayments || 1) - 1
+            totalPayments: contract.totalPayments || 1,
+            finalPaymentBase: contract.finalPaymentBase || contract.calculations?.finalPaymentBase || 0
         };
         
         // Show the confirmation modal
