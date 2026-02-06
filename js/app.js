@@ -548,6 +548,10 @@ function firestoreQueryWithTimeout(query, timeoutMs = 8000) {
 // Owner name cache - persists across re-renders so we don't show "Loading..." again
 window._ownerNameCache = window._ownerNameCache || {};
 
+// Analytics HTML cache - persists across re-renders so PropertyDataService changes
+// don't wipe successfully loaded analytics content
+window._analyticsCache = window._analyticsCache || {};
+
 // ==================== PROPERTY STATS PAGE ====================
 /**
  * Renders the property stats page with EDITABLE tiles
@@ -741,6 +745,16 @@ async function loadStatsOwnerName(propertyId, retryCount = 0) {
 function renderPropertyStatsContent(id) {
     const p = properties.find(prop => prop.id === id);
     if (!p) return;
+    
+    // ARCHITECTURAL FIX: Preserve loaded analytics content before innerHTML wipe.
+    // renderPropertyStatsContent is called 30+ times (subscription changes, tile edits, 
+    // availability toggles, etc.) and each call resets the analytics section to "Loading...".
+    // Meanwhile, renderPropertyAnalytics() is only called once on initial page load.
+    // This caused analytics to permanently hang on "Loading..." after any re-render.
+    const existingAnalytics = $('propertyAnalyticsSection');
+    if (existingAnalytics && !existingAnalytics.innerHTML.includes('Loading analytics')) {
+        window._analyticsCache[id] = existingAnalytics.innerHTML;
+    }
     
     const isAvailable = state.availability[id] !== false;
     const statusClass = isAvailable ? 'from-green-600 to-emerald-600' : 'from-red-600 to-pink-600';
@@ -1642,6 +1656,14 @@ function renderPropertyStatsContent(id) {
                 agentSection.innerHTML = html;
             }
         });
+    }
+    
+    // ARCHITECTURAL FIX: Restore cached analytics content after innerHTML wipe.
+    // This prevents the analytics section from being stuck on "Loading..." after
+    // every re-render triggered by PropertyDataService changes, tile edits, etc.
+    const restoredAnalytics = $('propertyAnalyticsSection');
+    if (restoredAnalytics && window._analyticsCache[id]) {
+        restoredAnalytics.innerHTML = window._analyticsCache[id];
     }
 }
 
@@ -3151,22 +3173,17 @@ window.refreshPropertyAnalytics = async function(propertyId) {
         return;
     }
     
-    // Re-fetch payment history
-    const payments = await getPaymentHistory(propertyId);
+    // Invalidate cache so fresh data is fetched
+    delete window._analyticsCache[propertyId];
     
-    // Recalculate analytics
-    const analytics = calculatePropertyAnalytics(payments, property);
-    
-    // Update the analytics container if it exists
-    const analyticsContainer = document.getElementById(`propertyAnalytics-${propertyId}`);
-    if (analyticsContainer) {
-        analyticsContainer.innerHTML = renderPropertyAnalytics(property, payments, analytics);
-    }
-    
-    // Also refresh the stats page if we're viewing this property
+    // Re-render the stats page content (will show loading state for analytics since cache is cleared)
     if (state && state.currentPropertyId === propertyId) {
-        // Re-render the stats page content
         renderPropertyStatsContent(propertyId);
+        
+        // Re-trigger full analytics fetch with fresh Firestore data
+        requestAnimationFrame(() => {
+            renderPropertyAnalytics(propertyId);
+        });
     }
 };
 
@@ -3271,6 +3288,10 @@ window.calculatePropertyAnalytics = function(payments, property) {
 // Render analytics section on property stats page
 window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
     console.log(`[Analytics] Called for property ${propertyId}, retry ${retryCount}`);
+    
+    // Invalidate cache so we fetch fresh data (handles Refresh button clicks, 
+    // post-payment-mutation calls, etc.)
+    delete window._analyticsCache[propertyId];
     
     const container = $('propertyAnalyticsSection');
     if (!container) {
@@ -3577,6 +3598,11 @@ window.renderPropertyAnalytics = async function(propertyId, retryCount = 0) {
             ` : ''}
         </div>
     `;
+    
+    // Cache the successfully loaded analytics HTML so re-renders don't wipe it
+    window._analyticsCache[propertyId] = container.innerHTML;
+    console.log(`[Analytics] Successfully rendered and cached for property ${propertyId}`);
+    
     } catch (error) {
         console.error('[Analytics] Error loading analytics:', error.message);
         
