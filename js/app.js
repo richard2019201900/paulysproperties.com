@@ -8578,89 +8578,64 @@ window.showRTOWelcomeMessageModal = async function(propertyId) {
         return;
     }
     
-    // Gather contract data from property
+    // Gather contract data
     const buyerName = PropertyDataService.getValue(propertyId, 'rtoBuyer', p.rtoBuyer || 'Unknown');
     const propertyTitle = p.title || `Property #${propertyId}`;
     const totalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p.rtoTotalPayments || 0);
-    const expectedMonthly = PropertyDataService.getValue(propertyId, 'rtoExpectedMonthly', p.rtoExpectedMonthly || 0);
-    const finalPaymentBase = PropertyDataService.getValue(propertyId, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
-    const govFee = Math.round(finalPaymentBase * 0.10);
-    const finalPaymentTotal = finalPaymentBase + govFee;
-    const startDate = PropertyDataService.getValue(propertyId, 'rtoStartDate', p.rtoStartDate || '');
-    const depositAmount = PropertyDataService.getValue(propertyId, 'rtoDepositAmount', p.rtoDepositAmount || 0);
     
-    // Calculate total purchase price from contract
+    // Get total purchase price from contract
     let totalPurchasePrice = 0;
+    let contractSeller = '';
     try {
         const contractDoc = await db.collection('rentToOwnContracts').doc(rtoContractId).get();
         if (contractDoc.exists) {
             const contractData = contractDoc.data();
             totalPurchasePrice = contractData.calculations?.purchasePrice || 0;
+            contractSeller = contractData.seller || '';
         }
     } catch (e) {
         console.warn('[RTO] Could not fetch contract for welcome message:', e);
     }
     
-    // Calculate first due date (1 month from start)
-    let firstDueDateStr = '';
-    if (startDate) {
-        const start = parseLocalDate(startDate);
-        const firstDue = new Date(start);
-        firstDue.setMonth(firstDue.getMonth() + 1);
-        firstDueDateStr = firstDue.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-    }
-    
-    // Get buyer display name (first name for casual message)
-    const nameParts = buyerName.trim().split(' ');
+    // Get buyer first name
+    const buyerParts = buyerName.trim().split(' ');
     const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'miss', 'prof.', 'prof'];
-    let displayName;
-    if (nameParts.length >= 2 && titles.includes(nameParts[0].toLowerCase())) {
-        displayName = `${nameParts[0]} ${nameParts[nameParts.length - 1]}`;
+    let buyerDisplayName;
+    if (buyerParts.length >= 2 && titles.includes(buyerParts[0].toLowerCase())) {
+        buyerDisplayName = `${buyerParts[0]} ${buyerParts[buyerParts.length - 1]}`;
     } else {
-        displayName = nameParts[0];
+        buyerDisplayName = buyerParts[0];
     }
     
-    // Regular monthly payments count (total - 1 for final)
-    const regularPayments = totalPayments - 1;
-    const termMonths = totalPayments;
-    
-    // Build renter message
-    const renterMessage = `Congratulations ${displayName}! 🎉🏠 Your Rent-to-Own agreement for ${propertyTitle} is officially set up! Here are the key details:\n\n` +
-        `📋 Total Purchase Price: $${totalPurchasePrice.toLocaleString()}\n` +
-        (depositAmount > 0 ? `💰 Down Payment: $${depositAmount.toLocaleString()}\n` : '') +
-        `📅 Term: ${termMonths} months\n` +
-        (regularPayments > 0 ? `💵 Monthly Payments (${regularPayments}): $${expectedMonthly.toLocaleString()}/month\n` : '') +
-        `🏁 Final Payment: $${finalPaymentTotal.toLocaleString()} (includes $${govFee.toLocaleString()} government transfer fee)\n` +
-        (firstDueDateStr ? `\n⏰ Your first payment is due: ${firstDueDateStr}\n` : '') +
-        `\nI'll be sending you the full contract document shortly. Let me know if you have any questions!`;
+    // Build renter message (conversational paragraph style)
+    const renterMessage = `Congratulations ${buyerDisplayName}! 🎉 We're all set with your Rent-to-Own agreement for ${propertyTitle}. The total purchase price over ${totalPayments} months is $${totalPurchasePrice.toLocaleString()}. I'll send another confirmation over once the initial payment has been secured.`;
     
     // Check if property has an agent (only show owner message if agent exists)
     const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
     const hasAgent = propertyAgents.length > 0;
     
     let ownerMessage = '';
+    let ownerDisplayName = '';
     if (hasAgent) {
-        // Get agent display name
-        let agentName = 'PaulysProperties.com';
-        const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
-        if (agentDisplayNames && propertyAgents[0]) {
-            agentName = agentDisplayNames[propertyAgents[0].toLowerCase()] || propertyAgents[0].split('@')[0];
-        }
-        if (propertyAgents[0]?.toLowerCase() === 'richard2019201900@gmail.com') {
-            agentName = 'Pauly Amato';
+        // Get owner display name from cache or contract seller field
+        // Strip tier emojis from cached name (e.g., "🌱 Helena Black" → "Helena Black")
+        let ownerFullName = window._ownerNameCache[propertyId] || contractSeller || '';
+        ownerFullName = ownerFullName.replace(/^[\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Component}\s]+/u, '').trim();
+        
+        // If still empty or it's the managed-by string, try to get a clean name
+        if (ownerFullName.includes('Managed by:')) {
+            ownerFullName = ownerFullName.replace(/.*Managed by:\s*/i, '').trim();
         }
         
-        // Calculate agent commission on sale
-        const totalAgentCommission = Math.round(totalPurchasePrice * 0.10);
+        // Get first name for greeting
+        const ownerParts = ownerFullName.split(' ');
+        if (ownerParts.length >= 2 && titles.includes(ownerParts[0].toLowerCase())) {
+            ownerDisplayName = `${ownerParts[0]} ${ownerParts[ownerParts.length - 1]}`;
+        } else {
+            ownerDisplayName = ownerParts[0] || 'there';
+        }
         
-        ownerMessage = `Congrats! 🎉 A new Rent-to-Own agreement has been generated for ${propertyTitle}.\n\n` +
-            `📋 Total Sale Price: $${totalPurchasePrice.toLocaleString()}\n` +
-            `👤 Buyer: ${buyerName}\n` +
-            `📅 Term: ${termMonths} months\n` +
-            (regularPayments > 0 ? `💵 Monthly Payments: $${expectedMonthly.toLocaleString()}/month (${regularPayments} payments)\n` : '') +
-            `🏁 Final Payment: $${finalPaymentTotal.toLocaleString()} (incl. $${govFee.toLocaleString()} gov fee)\n` +
-            `💼 Total Agent Commission (10%): $${totalAgentCommission.toLocaleString()} (via ${agentName} / PaulysProperties.com)\n` +
-            `\nThe full contract document will be provided for review and signatures. Reach out with any questions!`;
+        ownerMessage = `Congratulations ${ownerDisplayName}! 🎉 A new Rent-to-Own agreement for ${propertyTitle} has been generated. The total purchase price over ${totalPayments} months is $${totalPurchasePrice.toLocaleString()}. I'll send another confirmation over once the initial payment has been secured.`;
     }
     
     const modalHTML = `
@@ -8679,22 +8654,26 @@ window.showRTOWelcomeMessageModal = async function(propertyId) {
                 </div>
                 
                 <!-- Renter Message -->
-                <div class="bg-gray-800 rounded-lg p-3 mb-3">
-                    <div class="text-xs text-emerald-400 font-bold mb-1">📱 For ${displayName} (Buyer):</div>
-                    <div id="rtoWelcomeRenterText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-gray-600 whitespace-pre-line">${renterMessage}</div>
-                    <button id="copyWelcomeRenterBtn" onclick="copyRTOWelcomeRenter()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Renter Message</button>
+                <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-emerald-500/20">
+                    <div class="text-xs text-emerald-400 font-bold mb-2">📱 For ${buyerDisplayName} (Buyer):</div>
+                    <div id="rtoWelcomeRenterText" class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-emerald-500/10">${renterMessage}</div>
+                    <button id="copyWelcomeRenterBtn" onclick="copyRTOWelcomeRenter()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Renter Message
+                    </button>
                 </div>
                 
                 ${hasAgent ? `
                 <!-- Owner Message (only when property has agent) -->
                 <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-purple-500/20">
-                    <div class="text-xs text-purple-400 font-bold mb-1">🏢 For Property Owner:</div>
-                    <div id="rtoWelcomeOwnerText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-purple-500/20 whitespace-pre-line">${ownerMessage}</div>
-                    <button id="copyWelcomeOwnerBtn" onclick="copyRTOWelcomeOwner()" class="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Owner Message</button>
+                    <div class="text-xs text-purple-400 font-bold mb-2">🏢 For ${ownerDisplayName} (Owner):</div>
+                    <div id="rtoWelcomeOwnerText" class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-purple-500/10">${ownerMessage}</div>
+                    <button id="copyWelcomeOwnerBtn" onclick="copyRTOWelcomeOwner()" class="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Owner Message
+                    </button>
                 </div>
                 ` : ''}
                 
-                <button onclick="closeRTOWelcomeModal()" class="w-full bg-gray-700 text-white py-2 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
+                <button onclick="closeRTOWelcomeModal()" class="w-full bg-gray-700 text-white py-2.5 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
             </div>
         </div>
     `;
