@@ -1275,22 +1275,22 @@ function renderPropertyStatsContent(id) {
                         })()}
                         
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                            <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Buyer</div>
+                            <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
+                                <div class="text-gray-400 text-xs font-medium mb-1">Buyer</div>
                                 <div class="text-white font-semibold">${PropertyDataService.getValue(id, 'rtoBuyer', p.rtoBuyer || 'Unknown')}</div>
                             </div>
-                            <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Payment Progress</div>
-                                <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
+                            <div class="bg-gray-800/80 border border-green-500/30 rounded-lg p-3">
+                                <div class="text-gray-400 text-xs font-medium mb-1">Payment Progress</div>
+                                <div class="text-green-400 font-bold text-lg">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
                                 <div class="text-gray-500 text-xs">${rtoCurrentPayment >= rtoTotalPayments ? 'Complete ✓' : rtoCurrentPayment >= (rtoTotalPayments - 1) ? 'Final payment remaining' : 'Total payments'}</div>
                             </div>
-                            <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">${(() => {
+                            <div class="bg-gray-800/80 border border-amber-500/30 rounded-lg p-3">
+                                <div class="text-gray-400 text-xs font-medium mb-1">${(() => {
                                     const regularPayments = rtoTotalPayments - 1;
                                     if (rtoCurrentPayment >= regularPayments) return 'Next Payment';
                                     return 'Monthly Payment';
                                 })()}</div>
-                                <div class="text-amber-400 font-semibold">${(() => {
+                                <div class="text-amber-400 font-bold text-lg">${(() => {
                                     const regularPayments = rtoTotalPayments - 1;
                                     const rtoFPBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
                                     const rtoFPFee = Math.round(rtoFPBase * 0.10);
@@ -1305,15 +1305,13 @@ function renderPropertyStatsContent(id) {
                                     return 'Per cycle';
                                 })()}</div>
                             </div>
-                            <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Remaining Balance</div>
-                                <div class="text-cyan-400 font-semibold">${(() => {
+                            <div class="bg-gray-800/80 border border-cyan-500/30 rounded-lg p-3">
+                                <div class="text-gray-400 text-xs font-medium mb-1">Remaining Balance</div>
+                                <div class="text-cyan-400 font-bold text-lg">${(() => {
                                     const remBal = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
                                     if (remBal <= 0) return '$0';
                                     const rtoFPBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
                                     const rtoFPFee = Math.round(rtoFPBase * 0.10);
-                                    // If remaining balance equals the final payment base, buyer owes base + gov fee
-                                    // Otherwise, buyer owes remaining + gov fee (gov fee always applies on final)
                                     const totalOwed = remBal + rtoFPFee;
                                     return '$' + totalOwed.toLocaleString();
                                 })()}</div>
@@ -1327,43 +1325,6 @@ function renderPropertyStatsContent(id) {
                             </div>
                         </div>
                         
-                        <!-- Final Payment Box (reads from contract data stored on property) -->
-                        ${(() => {
-                            const rtoContractId = PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '');
-                            if (!rtoContractId) return '';
-                            
-                            const remainingBalance = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
-                            if (remainingBalance <= 0) return '';
-                            
-                            // Read actual contract financial data from property
-                            const finalPaymentBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
-                            const govFee = Math.round(finalPaymentBase * 0.10);
-                            const finalPaymentTotal = finalPaymentBase + govFee;
-                            
-                            // Check if property has an agent for commission display
-                            const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(id) : [];
-                            const hasPropertyAgent = propertyAgents.length > 0;
-                            const agentCommission = hasPropertyAgent ? Math.round(finalPaymentBase * 0.10) : 0;
-                            const ownerNet = finalPaymentBase - agentCommission;
-                            
-                            return `
-                                <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-lg p-3 mt-3">
-                                    <div class="flex justify-between items-center">
-                                        <div>
-                                            <div class="text-amber-400 font-bold text-sm">🎯 Final Payment (Out the Door)</div>
-                                            <div class="text-white text-lg font-bold">$${finalPaymentTotal.toLocaleString()}</div>
-                                            <div class="text-gray-400 text-xs">Total buyer pays (Month ${rtoTotalPayments})</div>
-                                        </div>
-                                        <div class="text-right text-xs">
-                                            <div class="text-green-400 font-semibold">$${ownerNet.toLocaleString()}</div>
-                                            <div class="text-gray-400">Owner receives</div>
-                                            ${hasPropertyAgent ? `<div class="text-purple-400">-$${agentCommission.toLocaleString()} commission</div>` : ''}
-                                            <div class="text-orange-400">-$${govFee.toLocaleString()} gov fee</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        })()}
                         <div class="flex flex-wrap gap-2">
                             <button onclick="viewRTOContract('${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
@@ -8657,7 +8618,7 @@ window.showRTOWelcomeMessageModal = async function(propertyId) {
                 <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-emerald-500/20">
                     <div class="text-xs text-emerald-400 font-bold mb-2">📱 For ${buyerDisplayName} (Buyer):</div>
                     <div id="rtoWelcomeRenterText" class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-emerald-500/10">${renterMessage}</div>
-                    <button id="copyWelcomeRenterBtn" onclick="copyRTOWelcomeRenter()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                    <button id="copyWelcomeRenterBtn" onclick="copyRTOWelcomeRenter()" class="w-full mt-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                         <span>📋</span> Copy Renter Message
                     </button>
                 </div>
@@ -8667,7 +8628,7 @@ window.showRTOWelcomeMessageModal = async function(propertyId) {
                 <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-purple-500/20">
                     <div class="text-xs text-purple-400 font-bold mb-2">🏢 For ${ownerDisplayName} (Owner):</div>
                     <div id="rtoWelcomeOwnerText" class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-purple-500/10">${ownerMessage}</div>
-                    <button id="copyWelcomeOwnerBtn" onclick="copyRTOWelcomeOwner()" class="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                    <button id="copyWelcomeOwnerBtn" onclick="copyRTOWelcomeOwner()" class="w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                         <span>📋</span> Copy Owner Message
                     </button>
                 </div>
@@ -8703,13 +8664,12 @@ window.copyRTOWelcomeRenter = async function() {
     try {
         await navigator.clipboard.writeText(window._rtoWelcomeRenterMsg);
         if (btn) {
+            const origHTML = btn.innerHTML;
             btn.innerHTML = '<span>✅</span> Copied!';
-            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-            btn.classList.add('bg-gray-600');
+            btn.className = 'w-full mt-2 bg-gray-600 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
             setTimeout(() => {
-                btn.innerHTML = '📋 Copy Renter Message';
-                btn.classList.remove('bg-gray-600');
-                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+                btn.innerHTML = origHTML;
+                btn.className = 'w-full mt-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
             }, 2000);
         }
     } catch (e) {
@@ -8728,13 +8688,12 @@ window.copyRTOWelcomeOwner = async function() {
     try {
         await navigator.clipboard.writeText(window._rtoWelcomeOwnerMsg);
         if (btn) {
+            const origHTML = btn.innerHTML;
             btn.innerHTML = '<span>✅</span> Copied!';
-            btn.classList.remove('bg-purple-600', 'hover:bg-purple-500');
-            btn.classList.add('bg-gray-600');
+            btn.className = 'w-full mt-2 bg-gray-600 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
             setTimeout(() => {
-                btn.innerHTML = '📋 Copy Owner Message';
-                btn.classList.remove('bg-gray-600');
-                btn.classList.add('bg-purple-600', 'hover:bg-purple-500');
+                btn.innerHTML = origHTML;
+                btn.className = 'w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
             }, 2000);
         }
     } catch (e) {
