@@ -798,6 +798,8 @@ function renderPropertyStatsContent(id) {
     const renterPhoneRaw = PropertyDataService.getValue(id, 'renterPhone', p.renterPhone || '');
     const renterPhone = renterPhoneRaw ? renterPhoneRaw.replace(/\D/g, '') : '';
     const renterNotes = PropertyDataService.getValue(id, 'renterNotes', p.renterNotes || '');
+    const renterSSN = PropertyDataService.getValue(id, 'renterSSN', p.renterSSN || '');
+    const ownerSSN = PropertyDataService.getValue(id, 'ownerSSN', p.ownerSSN || '');
     const paymentFrequency = PropertyDataService.getValue(id, 'paymentFrequency', p.paymentFrequency || '');
     const lastPaymentDate = PropertyDataService.getValue(id, 'lastPaymentDate', p.lastPaymentDate || '');
     
@@ -1085,7 +1087,7 @@ function renderPropertyStatsContent(id) {
                 <h3 class="text-xl font-bold text-gray-200 mb-4">Renter & Payment Info <span class="text-sm text-purple-400">(Click to edit)</span></h3>
                 
                 <!-- Renter Info Row -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <!-- Renter Name -->
                     <div id="tile-renterName-${id}" 
                          class="stat-tile p-4 bg-gradient-to-br from-sky-600 to-sky-800 rounded-xl border border-sky-500 cursor-pointer"
@@ -1126,7 +1128,39 @@ function renderPropertyStatsContent(id) {
                         </div>
                     </div>
                     
-                    <!-- Renter Notes -->
+                    <!-- Renter SSN -->
+                    <div id="tile-renterSSN-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-orange-600 to-orange-800 rounded-xl border border-orange-500 cursor-pointer"
+                         onclick="startEditTile('renterSSN', ${id}, 'text')"
+                         data-field="renterSSN"
+                         data-original-value="${sanitize(renterSSN)}">
+                        <div class="flex items-center gap-3 mb-1">
+                            <svg class="w-6 h-6 text-orange-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path></svg>
+                            <span class="text-orange-200 font-semibold">Renter SSN</span>
+                        </div>
+                        <div class="text-xs text-orange-300 mb-2 opacity-80">🔒 Only you can see this</div>
+                        <div id="value-renterSSN-${id}" class="text-lg font-bold text-white">${renterSSN || '<span class="text-orange-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-orange-300 mt-2 opacity-70">Click to edit</div>
+                    </div>
+                    
+                    <!-- Owner SSN -->
+                    <div id="tile-ownerSSN-${id}" 
+                         class="stat-tile p-4 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl border border-blue-500 cursor-pointer"
+                         onclick="startEditTile('ownerSSN', ${id}, 'text')"
+                         data-field="ownerSSN"
+                         data-original-value="${sanitize(ownerSSN)}">
+                        <div class="flex items-center gap-3 mb-1">
+                            <svg class="w-6 h-6 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path></svg>
+                            <span class="text-blue-200 font-semibold">Owner SSN</span>
+                        </div>
+                        <div class="text-xs text-blue-300 mb-2 opacity-80">🔒 Only you can see this</div>
+                        <div id="value-ownerSSN-${id}" class="text-lg font-bold text-white">${ownerSSN || '<span class="text-blue-300 opacity-70">Not set</span>'}</div>
+                        <div class="text-xs text-blue-300 mt-2 opacity-70">Click to edit</div>
+                    </div>
+                </div>
+                
+                <!-- Private Renter Notes (full width) -->
+                <div class="mb-4">
                     <div id="tile-renterNotes-${id}" 
                          class="stat-tile p-4 bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl border border-violet-500 cursor-pointer"
                          onclick="startEditTile('renterNotes', ${id}, 'textarea')"
@@ -1745,7 +1779,9 @@ window.startEditTile = function(field, propertyId, type) {
         const placeholder = field === 'ownerName' ? 'Enter contact name' : 
                            field === 'ownerPhone' ? 'Enter phone number' : 
                            field === 'renterName' ? 'Enter renter name' : 
-                           field === 'renterPhone' ? 'Enter renter phone' : '';
+                           field === 'renterPhone' ? 'Enter renter phone' :
+                           field === 'renterSSN' ? 'Enter renter SSN' :
+                           field === 'ownerSSN' ? 'Enter owner SSN' : '';
         const phoneHandler = type === 'tel' ? 'oninput="this.value = this.value.replace(/\\D/g, \'\')" maxlength="10"' : '';
         
         // Add minimum price info for buyPrice field
@@ -1834,7 +1870,7 @@ window.saveTileEdit = async function(field, propertyId, type) {
         // Allow empty values for owner/renter info
         newValue = input.value.trim();
         // For non-contact fields, require a value
-        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone' && field !== 'renterName' && field !== 'renterPhone') {
+        if (!newValue && field !== 'ownerName' && field !== 'ownerPhone' && field !== 'renterName' && field !== 'renterPhone' && field !== 'renterSSN' && field !== 'ownerSSN') {
             tile.classList.add('error');
             setTimeout(() => tile.classList.remove('error'), 500);
             return;
@@ -1926,7 +1962,7 @@ window.executeTileSave = async function(field, propertyId, type, newValue, tile,
         } else {
             displayValue = field === 'weeklyPrice' || field === 'biweeklyPrice' || field === 'monthlyPrice' ? `${newValue.toLocaleString()}` : newValue.toLocaleString();
         }
-    } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName' || field === 'renterPhone') && !newValue) {
+    } else if ((field === 'ownerName' || field === 'ownerPhone' || field === 'renterName' || field === 'renterPhone' || field === 'renterSSN' || field === 'ownerSSN') && !newValue) {
         displayValue = '<span class="opacity-70">Not set</span>';
     } else if (field === 'renterNotes' && !newValue) {
         displayValue = '<span class="opacity-70">Add notes...</span>';
@@ -5087,6 +5123,7 @@ window.processEviction = async function(propertyId) {
         await PropertyDataService.write(propertyId, 'renterName', '');
         await PropertyDataService.write(propertyId, 'renterPhone', '');
         await PropertyDataService.write(propertyId, 'renterNotes', '');
+        await PropertyDataService.write(propertyId, 'renterSSN', '');
         await PropertyDataService.write(propertyId, 'lastPaymentDate', '');
         await PropertyDataService.write(propertyId, 'paymentFrequency', '');
         
@@ -5198,6 +5235,7 @@ window.completeLease = async function(propertyId) {
         const renterPhone = PropertyDataService.getValue(propertyId, 'renterPhone', p.renterPhone || '');
         const paymentFrequency = PropertyDataService.getValue(propertyId, 'paymentFrequency', p.paymentFrequency || '');
         const renterNotes = PropertyDataService.getValue(propertyId, 'renterNotes', p.renterNotes || '');
+        const renterSSN = PropertyDataService.getValue(propertyId, 'renterSSN', p.renterSSN || '');
         
         // Get tenure summary
         const tenureSummary = await calculateTenureSummary(propertyId, renterName);
@@ -5209,6 +5247,7 @@ window.completeLease = async function(propertyId) {
             renterPhone: renterPhone,
             paymentFrequency: paymentFrequency,
             renterNotes: renterNotes,
+            renterSSN: renterSSN,
             startDate: tenureSummary.firstPayment,
             endDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             coverageEnd: tenureSummary.coverageEnd,
@@ -5265,6 +5304,7 @@ window.completeLease = async function(propertyId) {
                 prop.renterName = '';
                 prop.renterPhone = '';
                 prop.renterNotes = '';
+                prop.renterSSN = '';
                 prop.paymentFrequency = '';
                 prop.lastPaymentDate = '';
             }
@@ -5391,6 +5431,7 @@ async function clearRenterData(propertyId) {
         'renterName',
         'renterPhone', 
         'renterNotes',
+        'renterSSN',
         'paymentFrequency',
         'lastPaymentDate'
     ];
@@ -5404,6 +5445,7 @@ async function clearRenterData(propertyId) {
         prop.renterName = '';
         prop.renterPhone = '';
         prop.renterNotes = '';
+        prop.renterSSN = '';
         prop.paymentFrequency = '';
         prop.lastPaymentDate = '';
     }
@@ -8776,6 +8818,12 @@ window.showFinalPaymentReadyModal = async function(propertyId) {
     
     const ownerMessage = `Congratulations ${ownerDisplayName}! 🎉 All regular payments for ${propertyTitle} have been received and ${buyerName} is ready to schedule the in-person final payment. I'll go ahead and pray to the gods so we can try to get that scheduled as soon as realistically possible. Once that final payment of $${finalPaymentTotal.toLocaleString()} is received at City Hall with the government representative present, ownership will be transferred. Let me know if you have any questions or concerns!`;
     
+    // Build transfer request text
+    const ownerSSNVal = PropertyDataService.getValue(propertyId, 'ownerSSN', p.ownerSSN || '');
+    const renterSSNVal = PropertyDataService.getValue(propertyId, 'renterSSN', p.renterSSN || '');
+    const transferText = `${propertyTitle}\nSeller: ${ownerFullName || 'Unknown'}\nBuyer: ${buyerName}\nPrice: $${finalPaymentBase.toLocaleString()}\nFee: $${govFee.toLocaleString()}\n\n${ownerFullName || 'Unknown'} ${ownerSSNVal || '[SSN not set]'}\n${buyerName} ${renterSSNVal || '[SSN not set]'}`;
+    const hasSSNData = ownerSSNVal && renterSSNVal;
+    
     const modalHTML = `
         <div id="rtoFinalPaymentModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
             <div class="bg-gray-900 rounded-2xl max-w-md w-full p-5 border border-amber-500/30 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -8811,6 +8859,16 @@ window.showFinalPaymentReadyModal = async function(propertyId) {
                 </div>
                 ` : ''}
                 
+                <!-- Transfer Request -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-cyan-500/20">
+                    <div class="text-xs text-cyan-400 font-bold mb-2">🏛️ Ownership Transfer Request:</div>
+                    <pre class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-cyan-500/10 whitespace-pre-wrap font-mono">${transferText}</pre>
+                    ${!hasSSNData ? '<div class="text-xs text-amber-400 mt-1">⚠️ SSN data missing — set Owner SSN and Renter SSN on the property dashboard</div>' : ''}
+                    <button id="copyTransferRequestBtn" onclick="copyTransferRequest()" class="w-full mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Transfer Request
+                    </button>
+                </div>
+                
                 <button onclick="closeFinalPaymentModal()" class="w-full bg-gray-700 text-white py-2.5 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
             </div>
         </div>
@@ -8823,6 +8881,7 @@ window.showFinalPaymentReadyModal = async function(propertyId) {
     
     window._finalPaymentBuyerMsg = buyerMessage;
     window._finalPaymentOwnerMsg = ownerMessage;
+    window._transferRequestText = transferText;
 };
 
 window.closeFinalPaymentModal = function() {
@@ -8874,6 +8933,30 @@ window.copyFinalPaymentOwner = async function() {
     } catch (e) {
         const textarea = document.createElement('textarea');
         textarea.value = window._finalPaymentOwnerMsg;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) btn.innerHTML = '<span>✅</span> Copied!';
+    }
+};
+
+window.copyTransferRequest = async function() {
+    const btn = document.getElementById('copyTransferRequestBtn');
+    try {
+        await navigator.clipboard.writeText(window._transferRequestText);
+        if (btn) {
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.className = 'w-full mt-2 bg-gray-600 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
+            setTimeout(() => {
+                btn.innerHTML = origHTML;
+                btn.className = 'w-full mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window._transferRequestText;
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');
