@@ -608,14 +608,34 @@ window.viewPropertyStats = async function(id, skipTrack = false) {
     }
     
     // Set up real-time listener for all properties
-   PropertyDataService.subscribeAll((data) => {
-        // Re-render when data changes from another source
-        if (state.currentPropertyId === propId) {
-            renderPropertyStatsContent(propId);
-            requestAnimationFrame(() => {
-                loadStatsOwnerName(propId);
-            });
+    let subscribeAllTimeout = null;
+    let lastDataHash = null;
+    PropertyDataService.subscribeAll((data) => {
+        // Create a simple hash of relevant data to detect actual changes
+        const currentPropertyData = data && data[propId] ? JSON.stringify(data[propId]) : 'null';
+        
+        // Only re-render if data actually changed
+        if (currentPropertyData === lastDataHash) {
+            console.log(`[Stats] PropertyDataService callback - no changes detected for property ${propId}`);
+            return;
         }
+        
+        lastDataHash = currentPropertyData;
+        console.log(`[Stats] PropertyDataService detected changes for property ${propId}`);
+        
+        // Debounce re-renders to prevent wiping out successfully loaded owner names
+        // when WebChannel connections are unstable
+        clearTimeout(subscribeAllTimeout);
+        subscribeAllTimeout = setTimeout(() => {
+            // Re-render when data changes from another source
+            if (state.currentPropertyId === propId) {
+                console.log(`[Stats] Re-rendering due to PropertyDataService changes for property ${propId}`);
+                renderPropertyStatsContent(propId);
+                requestAnimationFrame(() => {
+                    loadStatsOwnerName(propId);
+                });
+            }
+        }, 500); // 500ms debounce to prevent rapid-fire re-renders
     });
     
     // Note: Property deletion notifications are handled by the global listener
