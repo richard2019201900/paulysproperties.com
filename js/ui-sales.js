@@ -189,7 +189,7 @@ window.showLogSaleModal = function(propertyId, rtoContractId = null) {
                         <div id="salesFeeDisplay" class="bg-gray-800 rounded-xl py-3 px-4 text-amber-400 font-bold">
                             $25,000
                         </div>
-                        <p class="text-gray-500 text-xs mt-1">Flat government tax paid at LUX</p>
+                        <p class="text-gray-500 text-xs mt-1">Flat government tax on property transfer</p>
                     </div>
                     
                     <div>
