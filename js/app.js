@@ -1281,65 +1281,88 @@ function renderPropertyStatsContent(id) {
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs">Payment Progress</div>
-                                <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments - 1}</div>
-                                <div class="text-gray-500 text-xs">Monthly payments</div>
+                                <div class="text-green-400 font-bold">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
+                                <div class="text-gray-500 text-xs">${rtoCurrentPayment >= rtoTotalPayments ? 'Complete ✓' : rtoCurrentPayment >= (rtoTotalPayments - 1) ? 'Final payment remaining' : 'Total payments'}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
-                                <div class="text-gray-400 text-xs">Monthly Payment</div>
-                                <div class="text-amber-400 font-semibold">$${PropertyDataService.getValue(id, 'rtoExpectedMonthly', p.rtoExpectedMonthly || monthlyPrice).toLocaleString()}</div>
+                                <div class="text-gray-400 text-xs">${(() => {
+                                    const regularPayments = rtoTotalPayments - 1;
+                                    if (rtoCurrentPayment >= regularPayments) return 'Next Payment';
+                                    return 'Monthly Payment';
+                                })()}</div>
+                                <div class="text-amber-400 font-semibold">${(() => {
+                                    const regularPayments = rtoTotalPayments - 1;
+                                    const rtoFPBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
+                                    const rtoFPFee = Math.round(rtoFPBase * 0.10);
+                                    if (rtoCurrentPayment >= rtoTotalPayments) return 'Complete ✓';
+                                    if (rtoCurrentPayment >= regularPayments) return '$' + (rtoFPBase + rtoFPFee).toLocaleString();
+                                    return '$' + PropertyDataService.getValue(id, 'rtoExpectedMonthly', p.rtoExpectedMonthly || monthlyPrice).toLocaleString();
+                                })()}</div>
+                                <div class="text-gray-500 text-xs">${(() => {
+                                    const regularPayments = rtoTotalPayments - 1;
+                                    if (rtoCurrentPayment >= rtoTotalPayments) return 'All payments made';
+                                    if (rtoCurrentPayment >= regularPayments) return 'Final (incl. gov fee)';
+                                    return 'Per cycle';
+                                })()}</div>
                             </div>
                             <div class="bg-gray-800/50 rounded-lg p-2">
                                 <div class="text-gray-400 text-xs">Remaining Balance</div>
-                                <div class="text-cyan-400 font-semibold">$${PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0).toLocaleString()}</div>
+                                <div class="text-cyan-400 font-semibold">${(() => {
+                                    const remBal = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
+                                    if (remBal <= 0) return '$0';
+                                    const rtoFPBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
+                                    const rtoFPFee = Math.round(rtoFPBase * 0.10);
+                                    // If remaining balance equals the final payment base, buyer owes base + gov fee
+                                    // Otherwise, buyer owes remaining + gov fee (gov fee always applies on final)
+                                    const totalOwed = remBal + rtoFPFee;
+                                    return '$' + totalOwed.toLocaleString();
+                                })()}</div>
+                                <div class="text-gray-500 text-xs">${(() => {
+                                    const remBal = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
+                                    if (remBal <= 0) return 'Paid in full';
+                                    const rtoFPBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
+                                    const rtoFPFee = Math.round(rtoFPBase * 0.10);
+                                    return 'Incl. $' + rtoFPFee.toLocaleString() + ' gov fee';
+                                })()}</div>
                             </div>
                         </div>
                         
-                        <!-- Final Payment Box (fixed calculation from actual contract structure) -->
+                        <!-- Final Payment Box (reads from contract data stored on property) -->
                         ${(() => {
                             const rtoContractId = PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '');
                             if (!rtoContractId) return '';
                             
-                            // Check if we're near the final payment
-                            const currentPayment = rtoCurrentPayment;
-                            const totalPayments = rtoTotalPayments - 1; // Monthly payments only
-                            const isOnFinalPayment = currentPayment >= totalPayments - 1;
+                            const remainingBalance = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
+                            if (remainingBalance <= 0) return '';
                             
-                            if (isOnFinalPayment) {
-                                // For now, use the remaining balance but we need to parse the actual contract
-                                const remainingBalance = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
-                                
-                                if (remainingBalance > 0) {
-                                    // This needs to show the TOTAL amount the buyer pays (including gov tax)
-                                    // For this contract: $770,000 total ($700k to owner + $70k gov tax)
-                                    
-                                    const ownerBase = remainingBalance; // $700k to owner
-                                    const govTax = 70000; // $70k government tax (should be parsed from contract)  
-                                    const finalPaymentTotal = ownerBase + govTax; // $770k total buyer pays
-                                    
-                                    // Calculate breakdown
-                                    const agentCommission = Math.round(ownerBase * 0.10); // Commission on base only
-                                    const ownerNet = ownerBase - agentCommission;
-                                    
-                                    return `
-                                        <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-lg p-3 mt-3">
-                                            <div class="flex justify-between items-center">
-                                                <div>
-                                                    <div class="text-amber-400 font-bold text-sm">🎯 Final Payment (Out the Door)</div>
-                                                    <div class="text-white text-lg font-bold">$${finalPaymentTotal.toLocaleString()}</div>
-                                                    <div class="text-gray-400 text-xs">Total buyer pays (Month ${totalPayments})</div>
-                                                </div>
-                                                <div class="text-right text-xs">
-                                                    <div class="text-green-400 font-semibold">$${ownerNet.toLocaleString()}</div>
-                                                    <div class="text-gray-400">Owner receives</div>
-                                                    <div class="text-purple-400">-$${agentCommission.toLocaleString()} commission</div>
-                                                    <div class="text-orange-400">-$${govTax.toLocaleString()} gov tax</div>
-                                                </div>
-                                            </div>
+                            // Read actual contract financial data from property
+                            const finalPaymentBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
+                            const govFee = Math.round(finalPaymentBase * 0.10);
+                            const finalPaymentTotal = finalPaymentBase + govFee;
+                            
+                            // Check if property has an agent for commission display
+                            const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(id) : [];
+                            const hasPropertyAgent = propertyAgents.length > 0;
+                            const agentCommission = hasPropertyAgent ? Math.round(finalPaymentBase * 0.10) : 0;
+                            const ownerNet = finalPaymentBase - agentCommission;
+                            
+                            return `
+                                <div class="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-lg p-3 mt-3">
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <div class="text-amber-400 font-bold text-sm">🎯 Final Payment (Out the Door)</div>
+                                            <div class="text-white text-lg font-bold">$${finalPaymentTotal.toLocaleString()}</div>
+                                            <div class="text-gray-400 text-xs">Total buyer pays (Month ${rtoTotalPayments})</div>
                                         </div>
-                                    `;
-                                }
-                            }
-                            return '';
+                                        <div class="text-right text-xs">
+                                            <div class="text-green-400 font-semibold">$${ownerNet.toLocaleString()}</div>
+                                            <div class="text-gray-400">Owner receives</div>
+                                            ${hasPropertyAgent ? `<div class="text-purple-400">-$${agentCommission.toLocaleString()} commission</div>` : ''}
+                                            <div class="text-orange-400">-$${govFee.toLocaleString()} gov fee</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
                         })()}
                         <div class="flex flex-wrap gap-2">
                             <button onclick="viewRTOContract('${PropertyDataService.getValue(id, 'rtoContractId', p.rtoContractId || '')}')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
@@ -1351,6 +1374,9 @@ function renderPropertyStatsContent(id) {
                                 Payment History
                             </button>
                         </div>
+                        <button onclick="showRTOWelcomeMessageModal(${id})" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                            <span>💬</span> Copy Welcome Message
+                        </button>
                         <div class="flex flex-wrap gap-2">
                             <button onclick="showRentToOwnWizard(${id})" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
@@ -7088,14 +7114,21 @@ window.saveRTOContract = async function() {
             }
         }
         
-        // Close the modal after a short delay and refresh the page
+        // Close the wizard and refresh, then show the welcome message modal
+        const savedPropertyId = state.propertyId;
         setTimeout(() => {
             closeRTOWizard();
             // Refresh the property stats page
             if (typeof showPropertyStats === 'function') {
-                showPropertyStats(state.propertyId);
+                showPropertyStats(savedPropertyId);
             }
-        }, 1500);
+            // Show welcome message modal after page refreshes
+            setTimeout(() => {
+                if (typeof showRTOWelcomeMessageModal === 'function') {
+                    showRTOWelcomeMessageModal(savedPropertyId);
+                }
+            }, 500);
+        }, 1000);
         
     } catch (error) {
         console.error('Error saving contract:', error);
@@ -7904,7 +7937,7 @@ window.showRTOPaymentModal = function(propertyId) {
     const today = new Date().toISOString().split('T')[0];
     const titleText = paymentType === 'deposit' 
         ? 'Log RTO Deposit Payment' 
-        : `Log RTO Payment - Month ${paymentNumber} of ${rtoTotalPayments - 1}`;
+        : `Log RTO Payment - Month ${paymentNumber} of ${rtoTotalPayments}`;
     
     const modalHTML = `
         <div id="rtoPaymentModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -8121,6 +8154,7 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: rtoExpectedMonthly,
                 remainingBalance: rtoRemainingBalance,
+                finalPaymentBase: PropertyDataService.getValue(propertyId, 'rtoFinalPaymentBase', p?.rtoFinalPaymentBase || 0),
                 hasAgent: hasAgent,
                 agentName: agentName
             });
@@ -8219,10 +8253,11 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                 propertyId: propertyId,
                 propertyTitle: propertyTitle,
                 paymentNumber: newPaymentNumber,
-                totalPayments: rtoTotalPayments - 1, // -1 for final payment
+                totalPayments: rtoTotalPayments, // Total payments including final
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: newExpectedMonthly,
                 remainingBalance: newRemainingBalance,
+                finalPaymentBase: rtoFinalPaymentBase,
                 hasAgent: hasAgent,
                 agentName: agentName
             });
@@ -8335,22 +8370,32 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     
     // Fix: Use expected amount or actual amount for next payment, NOT remaining balance
     // Only fall back to remaining balance if this is the FINAL payment
-    let nextPaymentAmount;
-    const isLastPayment = info.type === 'monthly' && info.paymentNumber >= info.totalPayments;
+    // Calculate gov fee from finalPaymentBase for accurate remaining balance display
+    const finalPaymentBase = info.finalPaymentBase || 0;
+    const govFee = Math.round(finalPaymentBase * 0.10);
+    const totalRemainingWithGov = info.remainingBalance > 0 ? info.remainingBalance + govFee : 0;
+    const finalPaymentTotal = finalPaymentBase + govFee;
     
-    if (isLastPayment || info.remainingBalance === 0) {
+    let nextPaymentAmount;
+    const isLastPayment = info.type === 'monthly' && info.remainingBalance <= 0;
+    // Check if all regular payments are done and only final remains
+    const regularPaymentsDone = info.type === 'monthly' && info.paymentNumber >= (info.totalPayments - 1);
+    
+    if (isLastPayment || info.remainingBalance <= 0) {
         // This was the last payment, no next payment
         nextPaymentAmount = 0;
+    } else if (regularPaymentsDone) {
+        // All regular payments done, next is the final payment (incl. gov fee)
+        nextPaymentAmount = finalPaymentTotal;
     } else if (info.nextExpectedAmount > 0) {
         // Use the calculated next expected amount
         nextPaymentAmount = info.nextExpectedAmount;
     } else if (actualAmount > 0 && info.remainingBalance > actualAmount) {
         // Fallback: use the actual payment amount as estimate for next payment
-        // This handles cases where expectedMonthly calculated to 0 incorrectly
         nextPaymentAmount = actualAmount;
     } else {
-        // Final fallback: remaining balance (this IS the final payment)
-        nextPaymentAmount = info.remainingBalance;
+        // Final fallback: remaining balance with gov fee
+        nextPaymentAmount = totalRemainingWithGov;
     }
     
     let renterMessage, ownerMessage, headerText, badgeText;
@@ -8359,30 +8404,31 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     if (info.type === 'deposit') {
         headerText = 'Deposit Received!';
         badgeText = '💰 RTO Deposit';
-        renterMessage = `Thanks ${displayName}! Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. Remaining balance: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}. Questions? Let me know!`;
+        renterMessage = `Thanks ${displayName}! Your deposit of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. Remaining balance: $${totalRemainingWithGov.toLocaleString()} (incl. gov fee). Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}. Questions? Let me know!`;
     } else {
         headerText = 'Payment Logged!';
-        // Fix: Show actual payment structure more clearly
-        const isLastPayment = info.remainingBalance <= 0;
-        const totalMonthlyPayments = info.totalPayments; // This should be total monthly payments only
+        const isComplete = info.remainingBalance <= 0;
         
-        if (isLastPayment) {
-            badgeText = `📋 Final Payment Complete${hasAgent ? ` • Agent: ${agentName}` : ''}`;
+        if (isComplete) {
+            badgeText = `📋 Payment ${info.paymentNumber}/${info.totalPayments} - Complete!${hasAgent ? ` • Agent: ${agentName}` : ''}`;
         } else {
-            badgeText = `📋 Month ${info.paymentNumber}/${totalMonthlyPayments}${hasAgent ? ` • Agent: ${agentName}` : ''}`;
+            badgeText = `📋 Payment ${info.paymentNumber} of ${info.totalPayments}${hasAgent ? ` • Agent: ${agentName}` : ''}`;
         }
-        if (info.remainingBalance <= 0) {
+        if (isComplete) {
             // Final payment - contract complete
             renterMessage = `Thanks ${displayName}! Final payment of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Congratulations - your Rent-to-Own contract is now complete! 🎉`;
+        } else if (regularPaymentsDone) {
+            // All regular payments done, final payment remaining
+            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber} of ${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()} (1 final payment of $${finalPaymentTotal.toLocaleString()} incl. $${govFee.toLocaleString()} gov fee). Due: ${info.nextDueDate}.`;
         } else {
-            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber}/${totalMonthlyPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${info.remainingBalance.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber} of ${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
         }
     }
     
     // === OWNER MESSAGE (Only shown when user is agent, not owner) ===
-    const paymentTypeLabel = info.type === 'deposit' ? 'deposit' : `payment ${info.paymentNumber}/${info.totalPayments}`;
+    const paymentTypeLabel = info.type === 'deposit' ? 'deposit' : `payment ${info.paymentNumber} of ${info.totalPayments}`;
     if (hasAgent) {
-        ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. After the 10% PaulysProperties.com agent fee of $${agentFee.toLocaleString()}, you are set to receive $${netToSeller.toLocaleString()} net. The remaining renter balance of $${info.remainingBalance.toLocaleString()} is due ${info.nextDueDate}. Reach out if you have any questions.`;
+        ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. After the 10% PaulysProperties.com agent fee of $${agentFee.toLocaleString()}, you are set to receive $${netToSeller.toLocaleString()} net. Remaining renter balance: $${totalRemainingWithGov.toLocaleString()}${info.remainingBalance > 0 ? ` (incl. $${govFee.toLocaleString()} gov fee)` : ''}. Next due: ${info.nextDueDate}. Reach out if you have any questions.`;
     } else {
         ownerMessage = ''; // Not needed when user is the owner
     }
@@ -8511,6 +8557,215 @@ window.copyOwnerMessage = async function() {
         if (btn) {
             btn.innerHTML = '<span>✅</span> Copied!';
         }
+    }
+};
+
+/**
+ * Show RTO Welcome Message modal - accessible from dashboard "Copy Welcome Message" button
+ * and automatically shown after contract creation
+ * Generates copyable congratulations messages for renter (and owner if agent exists)
+ */
+window.showRTOWelcomeMessageModal = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) {
+        showToast('Property not found', 'error');
+        return;
+    }
+    
+    const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', p.rtoContractId || '');
+    if (!rtoContractId) {
+        showToast('No active RTO contract found', 'error');
+        return;
+    }
+    
+    // Gather contract data from property
+    const buyerName = PropertyDataService.getValue(propertyId, 'rtoBuyer', p.rtoBuyer || 'Unknown');
+    const propertyTitle = p.title || `Property #${propertyId}`;
+    const totalPayments = PropertyDataService.getValue(propertyId, 'rtoTotalPayments', p.rtoTotalPayments || 0);
+    const expectedMonthly = PropertyDataService.getValue(propertyId, 'rtoExpectedMonthly', p.rtoExpectedMonthly || 0);
+    const finalPaymentBase = PropertyDataService.getValue(propertyId, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
+    const govFee = Math.round(finalPaymentBase * 0.10);
+    const finalPaymentTotal = finalPaymentBase + govFee;
+    const startDate = PropertyDataService.getValue(propertyId, 'rtoStartDate', p.rtoStartDate || '');
+    const depositAmount = PropertyDataService.getValue(propertyId, 'rtoDepositAmount', p.rtoDepositAmount || 0);
+    
+    // Calculate total purchase price from contract
+    let totalPurchasePrice = 0;
+    try {
+        const contractDoc = await db.collection('rentToOwnContracts').doc(rtoContractId).get();
+        if (contractDoc.exists) {
+            const contractData = contractDoc.data();
+            totalPurchasePrice = contractData.calculations?.purchasePrice || 0;
+        }
+    } catch (e) {
+        console.warn('[RTO] Could not fetch contract for welcome message:', e);
+    }
+    
+    // Calculate first due date (1 month from start)
+    let firstDueDateStr = '';
+    if (startDate) {
+        const start = parseLocalDate(startDate);
+        const firstDue = new Date(start);
+        firstDue.setMonth(firstDue.getMonth() + 1);
+        firstDueDateStr = firstDue.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+    
+    // Get buyer display name (first name for casual message)
+    const nameParts = buyerName.trim().split(' ');
+    const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'miss', 'prof.', 'prof'];
+    let displayName;
+    if (nameParts.length >= 2 && titles.includes(nameParts[0].toLowerCase())) {
+        displayName = `${nameParts[0]} ${nameParts[nameParts.length - 1]}`;
+    } else {
+        displayName = nameParts[0];
+    }
+    
+    // Regular monthly payments count (total - 1 for final)
+    const regularPayments = totalPayments - 1;
+    const termMonths = totalPayments;
+    
+    // Build renter message
+    const renterMessage = `Congratulations ${displayName}! 🎉🏠 Your Rent-to-Own agreement for ${propertyTitle} is officially set up! Here are the key details:\n\n` +
+        `📋 Total Purchase Price: $${totalPurchasePrice.toLocaleString()}\n` +
+        (depositAmount > 0 ? `💰 Down Payment: $${depositAmount.toLocaleString()}\n` : '') +
+        `📅 Term: ${termMonths} months\n` +
+        (regularPayments > 0 ? `💵 Monthly Payments (${regularPayments}): $${expectedMonthly.toLocaleString()}/month\n` : '') +
+        `🏁 Final Payment: $${finalPaymentTotal.toLocaleString()} (includes $${govFee.toLocaleString()} government transfer fee)\n` +
+        (firstDueDateStr ? `\n⏰ Your first payment is due: ${firstDueDateStr}\n` : '') +
+        `\nI'll be sending you the full contract document shortly. Let me know if you have any questions!`;
+    
+    // Check if property has an agent (only show owner message if agent exists)
+    const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
+    const hasAgent = propertyAgents.length > 0;
+    
+    let ownerMessage = '';
+    if (hasAgent) {
+        // Get agent display name
+        let agentName = 'PaulysProperties.com';
+        const agentDisplayNames = PropertyDataService.getValue(propertyId, 'agentDisplayNames', null);
+        if (agentDisplayNames && propertyAgents[0]) {
+            agentName = agentDisplayNames[propertyAgents[0].toLowerCase()] || propertyAgents[0].split('@')[0];
+        }
+        if (propertyAgents[0]?.toLowerCase() === 'richard2019201900@gmail.com') {
+            agentName = 'Pauly Amato';
+        }
+        
+        // Calculate agent commission on sale
+        const totalAgentCommission = Math.round(totalPurchasePrice * 0.10);
+        
+        ownerMessage = `Congrats! 🎉 A new Rent-to-Own agreement has been generated for ${propertyTitle}.\n\n` +
+            `📋 Total Sale Price: $${totalPurchasePrice.toLocaleString()}\n` +
+            `👤 Buyer: ${buyerName}\n` +
+            `📅 Term: ${termMonths} months\n` +
+            (regularPayments > 0 ? `💵 Monthly Payments: $${expectedMonthly.toLocaleString()}/month (${regularPayments} payments)\n` : '') +
+            `🏁 Final Payment: $${finalPaymentTotal.toLocaleString()} (incl. $${govFee.toLocaleString()} gov fee)\n` +
+            `💼 Total Agent Commission (10%): $${totalAgentCommission.toLocaleString()} (via ${agentName} / PaulysProperties.com)\n` +
+            `\nThe full contract document will be provided for review and signatures. Reach out with any questions!`;
+    }
+    
+    const modalHTML = `
+        <div id="rtoWelcomeModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full p-5 border border-emerald-500/30 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                <!-- X Close Button -->
+                <button onclick="closeRTOWelcomeModal()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
+                <!-- Header -->
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">🏠🎉</div>
+                    <h3 class="text-xl font-bold text-emerald-400">RTO Contract Created!</h3>
+                    <p class="text-gray-400 text-sm">${propertyTitle} • ${buyerName}</p>
+                </div>
+                
+                <!-- Renter Message -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3">
+                    <div class="text-xs text-emerald-400 font-bold mb-1">📱 For ${displayName} (Buyer):</div>
+                    <div id="rtoWelcomeRenterText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-gray-600 whitespace-pre-line">${renterMessage}</div>
+                    <button id="copyWelcomeRenterBtn" onclick="copyRTOWelcomeRenter()" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Renter Message</button>
+                </div>
+                
+                ${hasAgent ? `
+                <!-- Owner Message (only when property has agent) -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-purple-500/20">
+                    <div class="text-xs text-purple-400 font-bold mb-1">🏢 For Property Owner:</div>
+                    <div id="rtoWelcomeOwnerText" class="bg-gray-700/50 rounded p-2 text-white text-xs leading-relaxed border border-purple-500/20 whitespace-pre-line">${ownerMessage}</div>
+                    <button id="copyWelcomeOwnerBtn" onclick="copyRTOWelcomeOwner()" class="w-full mt-2 bg-purple-600 hover:bg-purple-500 text-white py-2 rounded-lg font-bold text-sm transition">📋 Copy Owner Message</button>
+                </div>
+                ` : ''}
+                
+                <button onclick="closeRTOWelcomeModal()" class="w-full bg-gray-700 text-white py-2 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
+            </div>
+        </div>
+    `;
+    
+    // Remove any existing modal
+    const existing = document.getElementById('rtoWelcomeModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Store messages for copy functions
+    window._rtoWelcomeRenterMsg = renterMessage;
+    window._rtoWelcomeOwnerMsg = ownerMessage;
+};
+
+window.closeRTOWelcomeModal = function() {
+    const modal = document.getElementById('rtoWelcomeModal');
+    if (modal) {
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.2s';
+        setTimeout(() => modal.remove(), 200);
+    }
+};
+
+window.copyRTOWelcomeRenter = async function() {
+    const btn = document.getElementById('copyWelcomeRenterBtn');
+    try {
+        await navigator.clipboard.writeText(window._rtoWelcomeRenterMsg);
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+            btn.classList.add('bg-gray-600');
+            setTimeout(() => {
+                btn.innerHTML = '📋 Copy Renter Message';
+                btn.classList.remove('bg-gray-600');
+                btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window._rtoWelcomeRenterMsg;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) btn.innerHTML = '<span>✅</span> Copied!';
+    }
+};
+
+window.copyRTOWelcomeOwner = async function() {
+    const btn = document.getElementById('copyWelcomeOwnerBtn');
+    try {
+        await navigator.clipboard.writeText(window._rtoWelcomeOwnerMsg);
+        if (btn) {
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.classList.remove('bg-purple-600', 'hover:bg-purple-500');
+            btn.classList.add('bg-gray-600');
+            setTimeout(() => {
+                btn.innerHTML = '📋 Copy Owner Message';
+                btn.classList.remove('bg-gray-600');
+                btn.classList.add('bg-purple-600', 'hover:bg-purple-500');
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window._rtoWelcomeOwnerMsg;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) btn.innerHTML = '<span>✅</span> Copied!';
     }
 };
 
