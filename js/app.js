@@ -7578,8 +7578,18 @@ window.viewRTOContract = async function(contractId) {
                             📋 Copy Contract
                         </button>
                         <button onclick="document.getElementById('viewContractModal').remove(); showRTOWelcomeMessageModal(${contract.propertyId || 0})" class="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
-                            💬 RTO Congrats Message
+                            💬 New RTO Congrats
                         </button>
+                        ${(() => {
+                            const vcTotalPayments = contract.totalPayments || contract.calculations?.termMonths || 0;
+                            const vcCurrentPayment = contract.currentPaymentNumber || 0;
+                            const vcRegularDone = vcCurrentPayment >= (vcTotalPayments - 1);
+                            const vcRemaining = contract.remainingBalance || 0;
+                            if (vcRegularDone && vcRemaining > 0) {
+                                return '<button onclick="document.getElementById(\'viewContractModal\').remove(); showFinalPaymentReadyModal(' + (contract.propertyId || 0) + ')" class="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">🏛️ Final Payment Congrats</button>';
+                            }
+                            return '';
+                        })()}
                         <button onclick="document.getElementById('viewContractModal').remove()" class="w-full bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
                             Close
                         </button>
@@ -8700,6 +8710,179 @@ window.copyRTOWelcomeOwner = async function() {
 };
 
 /**
+ * Show Final Payment Ready modal - messages for buyer and owner
+ * when all regular payments are done and final payment is next
+ */
+window.showFinalPaymentReadyModal = async function(propertyId) {
+    const p = properties.find(prop => prop.id === propertyId);
+    if (!p) {
+        showToast('Property not found', 'error');
+        return;
+    }
+    
+    const rtoContractId = PropertyDataService.getValue(propertyId, 'rtoContractId', p.rtoContractId || '');
+    if (!rtoContractId) {
+        showToast('No active RTO contract found', 'error');
+        return;
+    }
+    
+    // Gather data
+    const buyerName = PropertyDataService.getValue(propertyId, 'rtoBuyer', p.rtoBuyer || 'Unknown');
+    const propertyTitle = p.title || `Property #${propertyId}`;
+    const finalPaymentBase = PropertyDataService.getValue(propertyId, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
+    const govFee = Math.round(finalPaymentBase * 0.10);
+    const finalPaymentTotal = finalPaymentBase + govFee;
+    
+    // Get buyer first name
+    const buyerParts = buyerName.trim().split(' ');
+    const titles = ['dr.', 'dr', 'mr.', 'mr', 'mrs.', 'mrs', 'ms.', 'ms', 'miss', 'prof.', 'prof'];
+    let buyerDisplayName;
+    if (buyerParts.length >= 2 && titles.includes(buyerParts[0].toLowerCase())) {
+        buyerDisplayName = `${buyerParts[0]} ${buyerParts[buyerParts.length - 1]}`;
+    } else {
+        buyerDisplayName = buyerParts[0];
+    }
+    
+    // Build buyer message
+    const buyerMessage = `Congratulations ${buyerDisplayName}! 🎉 All regular payments for ${propertyTitle} have been received. You're now ready to schedule the final in-person payment of $${finalPaymentTotal.toLocaleString()} at City Hall with a government representative present. Once that payment is completed, ownership will be officially transferred to you. I'll go ahead and work on getting that scheduled as soon as possible. Let me know if you have any questions or concerns!`;
+    
+    // Get owner name and build owner message
+    const propertyAgents = typeof getPropertyAgents === 'function' ? getPropertyAgents(propertyId) : [];
+    const hasAgent = propertyAgents.length > 0;
+    
+    let ownerDisplayName = 'there';
+    let contractSeller = '';
+    try {
+        const contractDoc = await db.collection('rentToOwnContracts').doc(rtoContractId).get();
+        if (contractDoc.exists) {
+            contractSeller = contractDoc.data().seller || '';
+        }
+    } catch (e) {
+        console.warn('[RTO] Could not fetch contract for final payment message:', e);
+    }
+    
+    // Resolve owner name
+    let ownerFullName = window._ownerNameCache[propertyId] || contractSeller || '';
+    ownerFullName = ownerFullName.replace(/^[\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Component}\s]+/u, '').trim();
+    if (ownerFullName.includes('Managed by:')) {
+        ownerFullName = ownerFullName.replace(/.*Managed by:\s*/i, '').trim();
+    }
+    const ownerParts = ownerFullName.split(' ');
+    if (ownerParts.length >= 2 && titles.includes(ownerParts[0].toLowerCase())) {
+        ownerDisplayName = `${ownerParts[0]} ${ownerParts[ownerParts.length - 1]}`;
+    } else {
+        ownerDisplayName = ownerParts[0] || 'there';
+    }
+    
+    const ownerMessage = `Congratulations ${ownerDisplayName}! 🎉 All regular payments for ${propertyTitle} have been received and ${buyerName} is ready to schedule the in-person final payment. I'll go ahead and pray to the gods so we can try to get that scheduled as soon as realistically possible. Once that final payment of $${finalPaymentTotal.toLocaleString()} is received at City Hall with the government representative present, ownership will be transferred. Let me know if you have any questions or concerns!`;
+    
+    const modalHTML = `
+        <div id="rtoFinalPaymentModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full p-5 border border-amber-500/30 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                <!-- X Close Button -->
+                <button onclick="closeFinalPaymentModal()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
+                <!-- Header -->
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">🏛️🎉</div>
+                    <h3 class="text-xl font-bold text-amber-400">Final Payment Ready!</h3>
+                    <p class="text-gray-400 text-sm">${propertyTitle} • $${finalPaymentTotal.toLocaleString()} at City Hall</p>
+                </div>
+                
+                <!-- Buyer Message -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-amber-500/20">
+                    <div class="text-xs text-amber-400 font-bold mb-2">📱 For ${buyerDisplayName} (Buyer):</div>
+                    <div class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-amber-500/10">${buyerMessage}</div>
+                    <button id="copyFinalBuyerBtn" onclick="copyFinalPaymentBuyer()" class="w-full mt-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Buyer Message
+                    </button>
+                </div>
+                
+                ${hasAgent ? `
+                <!-- Owner Message -->
+                <div class="bg-gray-800 rounded-lg p-3 mb-3 border border-purple-500/20">
+                    <div class="text-xs text-purple-400 font-bold mb-2">🏢 For ${ownerDisplayName} (Owner):</div>
+                    <div class="bg-gray-700/50 rounded p-3 text-white text-sm leading-relaxed border border-purple-500/10">${ownerMessage}</div>
+                    <button id="copyFinalOwnerBtn" onclick="copyFinalPaymentOwner()" class="w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2">
+                        <span>📋</span> Copy Owner Message
+                    </button>
+                </div>
+                ` : ''}
+                
+                <button onclick="closeFinalPaymentModal()" class="w-full bg-gray-700 text-white py-2.5 rounded-lg font-bold hover:bg-gray-600 transition text-sm">Close</button>
+            </div>
+        </div>
+    `;
+    
+    const existing = document.getElementById('rtoFinalPaymentModal');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    window._finalPaymentBuyerMsg = buyerMessage;
+    window._finalPaymentOwnerMsg = ownerMessage;
+};
+
+window.closeFinalPaymentModal = function() {
+    const modal = document.getElementById('rtoFinalPaymentModal');
+    if (modal) {
+        modal.style.opacity = '0';
+        modal.style.transition = 'opacity 0.2s';
+        setTimeout(() => modal.remove(), 200);
+    }
+};
+
+window.copyFinalPaymentBuyer = async function() {
+    const btn = document.getElementById('copyFinalBuyerBtn');
+    try {
+        await navigator.clipboard.writeText(window._finalPaymentBuyerMsg);
+        if (btn) {
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.className = 'w-full mt-2 bg-gray-600 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
+            setTimeout(() => {
+                btn.innerHTML = origHTML;
+                btn.className = 'w-full mt-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window._finalPaymentBuyerMsg;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) btn.innerHTML = '<span>✅</span> Copied!';
+    }
+};
+
+window.copyFinalPaymentOwner = async function() {
+    const btn = document.getElementById('copyFinalOwnerBtn');
+    try {
+        await navigator.clipboard.writeText(window._finalPaymentOwnerMsg);
+        if (btn) {
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<span>✅</span> Copied!';
+            btn.className = 'w-full mt-2 bg-gray-600 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
+            setTimeout(() => {
+                btn.innerHTML = origHTML;
+                btn.className = 'w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2';
+            }, 2000);
+        }
+    } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = window._finalPaymentOwnerMsg;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (btn) btn.innerHTML = '<span>✅</span> Copied!';
+    }
+};
+
+/**
  * Show RTO Completion prompt when contract is fully paid
  */
 window.showRTOCompletionPrompt = function(propertyId, rtoContractId, buyerName, propertyTitle) {
@@ -8959,6 +9142,23 @@ window.showRTOPaymentHistory = async function(propertyId) {
             historyRows = '<tr><td colspan="6" class="py-8 text-center text-gray-500">No payments recorded yet</td></tr>';
         }
         
+        // Add Final Payment row when all regular payments are done but balance remains
+        let finalPaymentRow = '';
+        if (allRegularDone && remainingBal > 0) {
+            finalPaymentRow = `
+                <tr class="border-b border-gray-700 bg-amber-900/10">
+                    <td class="py-3 px-4 text-amber-400 font-bold">Month ${totalPaymentsCount} (Final)</td>
+                    <td class="py-3 px-4 text-amber-400">$${finalPaymentTotal.toLocaleString()}</td>
+                    <td class="py-3 px-4 text-gray-500">—</td>
+                    <td class="py-3 px-4 text-gray-500">Pending</td>
+                    <td class="py-3 px-4"><span class="text-amber-400">⏳ Awaiting</span></td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="showFinalPaymentReadyModal(${propertyId})" class="text-amber-400 hover:text-amber-300 text-xs bg-amber-900/30 border border-amber-500/30 px-2 py-1 rounded" title="Copy final payment ready messages">🏛️ Final Msg</button>
+                    </td>
+                </tr>
+            `;
+        }
+        
         const modalHTML = `
             <div id="rtoHistoryModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                 <div class="bg-gray-900 rounded-2xl max-w-4xl w-full border border-cyan-500/50 shadow-2xl overflow-hidden relative">
@@ -9011,6 +9211,7 @@ window.showRTOPaymentHistory = async function(propertyId) {
                             </thead>
                             <tbody>
                                 ${historyRows}
+                                ${finalPaymentRow}
                             </tbody>
                         </table>
                     </div>
