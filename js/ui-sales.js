@@ -98,40 +98,40 @@ window.createSaleCelebration = async function(sellerDisplayName, vehicleTitle, s
 // ==================== HOUSE SALES SYSTEM ====================
 
 /**
- * Show the Log Vehicle Sale modal
+ * Show the Log Property Sale modal
  */
-window.showLogSaleModal = function(vehicleId, financingContractId = null) {
+window.showLogSaleModal = function(propertyId, rtoContractId = null) {
     // Ensure numeric ID for comparison
-    const numericId = typeof vehicleId === 'string' ? parseInt(vehicleId) : vehicleId;
-    const p = vehicles.find(prop => prop.id === numericId);
+    const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
+    const p = properties.find(prop => prop.id === numericId);
     if (!p) {
-        showToast('Vehicle not found', 'error');
+        showToast('Property not found', 'error');
         return;
     }
     
-    const buyPrice = VehicleDataService.getValue(numericId, 'buyPrice', p.buyPrice || 0);
-    const buyerName = VehicleDataService.getValue(numericId, 'buyerName', p.buyerName || '');
+    const sellPrice = PropertyDataService.getValue(numericId, 'sellPrice', p.sellPrice || 0);
+    const buyerName = PropertyDataService.getValue(numericId, 'buyerName', p.buyerName || '');
     const today = new Date().toISOString().split('T')[0];
     const isAdmin = TierService.isMasterAdmin(auth.currentUser?.email);
     
-    // Determine if this is from Financing completion
-    const isRTOCompletion = !!financingContractId;
-    const saleType = isRTOCompletion ? 'financing_completion' : 'direct_sale';
+    // Determine if this is from RTO completion
+    const isRTOCompletion = !!rtoContractId;
+    const saleType = isRTOCompletion ? 'rto_completion' : 'direct_sale';
     
-    // Get current vehicle owner info
-    const vehicleOwnerEmail = VehicleDataService.getValue(numericId, 'owner', p.owner || '');
+    // Get current property owner info
+    const propertyOwnerEmail = PropertyDataService.getValue(numericId, 'ownerEmail', p.ownerEmail || '');
     const currentUserEmail = auth.currentUser?.email || '';
     const currentUserDisplayName = window.currentUserData?.displayName || currentUserEmail.split('@')[0];
     
     // Build seller selection HTML for admins
     const sellerSelectionHTML = isAdmin ? `
         <div>
-            <label class="block text-gray-400 text-sm mb-2">Seller (who sold the vehicle):</label>
+            <label class="block text-gray-400 text-sm mb-2">Seller (who sold the property):</label>
             <select id="saleSellerSelect" class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 text-white focus:border-rose-500 focus:outline-none">
                 <option value="">-- Select Seller --</option>
                 <!-- Will be populated dynamically -->
             </select>
-            <p class="text-gray-500 text-xs mt-1">Select the vehicle owner who made this sale</p>
+            <p class="text-gray-500 text-xs mt-1">Select the property owner who made this sale</p>
         </div>
     ` : `
         <input type="hidden" id="saleSellerSelect" value="${currentUserEmail}">
@@ -147,8 +147,8 @@ window.showLogSaleModal = function(vehicleId, financingContractId = null) {
                 
                 <div class="bg-gradient-to-r from-rose-600 to-pink-600 px-6 py-4">
                     <h3 class="text-xl font-bold text-white flex items-center gap-3">
-                        <span>🚗</span>
-                        Log Vehicle Sale
+                        <span>🏠</span>
+                        Log Property Sale
                     </h3>
                     <p class="text-rose-100 text-sm mt-1">${p.title}</p>
                 </div>
@@ -156,8 +156,8 @@ window.showLogSaleModal = function(vehicleId, financingContractId = null) {
                 <div class="p-6 space-y-4">
                     ${isRTOCompletion ? `
                     <div class="bg-indigo-900/50 border border-indigo-500/50 rounded-xl p-3">
-                        <div class="text-indigo-300 font-bold text-sm">📋 Financing Completion</div>
-                        <p class="text-indigo-200 text-xs mt-1">This sale is being logged from a completed Financing Plan contract.</p>
+                        <div class="text-indigo-300 font-bold text-sm">📋 RTO Completion</div>
+                        <p class="text-indigo-200 text-xs mt-1">This sale is being logged from a completed Rent-to-Own contract.</p>
                     </div>
                     ` : ''}
                     
@@ -167,7 +167,7 @@ window.showLogSaleModal = function(vehicleId, financingContractId = null) {
                         <label class="block text-gray-400 text-sm mb-2">Sale Price:</label>
                         <div class="relative">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                            <input type="number" id="salePriceInput" value="${buyPrice}" 
+                            <input type="number" id="salePriceInput" value="${sellPrice}" 
                                 class="w-full bg-gray-800 border border-gray-600 rounded-xl py-3 px-4 pl-8 text-white text-lg font-bold focus:border-rose-500 focus:outline-none">
                         </div>
                     </div>
@@ -213,7 +213,7 @@ window.showLogSaleModal = function(vehicleId, financingContractId = null) {
                     <button onclick="closeLogSaleModal()" class="flex-1 bg-gray-700 text-white py-3 rounded-xl font-bold hover:bg-gray-600 transition">
                         Cancel
                     </button>
-                    <button onclick="submitVehicleSale(${numericId}, '${saleType}', '${financingContractId || ''}')" class="flex-1 bg-gradient-to-r from-rose-500 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
+                    <button onclick="submitPropertySale(${numericId}, '${saleType}', '${rtoContractId || ''}')" class="flex-1 bg-gradient-to-r from-rose-500 to-pink-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition">
                         🏆 Complete Sale
                     </button>
                 </div>
@@ -296,22 +296,20 @@ async function populateSellerDropdown(vehicleId, defaultOwnerEmail) {
 /**
  * Submit vehicle sale to Firestore
  */
-window.submitVehicleSale = async function(vehicleId, saleType, financingContractId) {
+window.submitPropertySale = async function(propertyId, saleType, rtoContractId) {
     const priceInput = document.getElementById('salePriceInput');
     const buyerInput = document.getElementById('saleBuyerInput');
     const dateInput = document.getElementById('saleDateInput');
     const notesInput = document.getElementById('saleNotesInput');
-    const transferCheckbox = document.getElementById('transferOwnershipCheckbox');
     const sellerSelect = document.getElementById('saleSellerSelect');
     
     // Ensure numeric ID
-    const numericId = typeof vehicleId === 'string' ? parseInt(vehicleId) : vehicleId;
+    const numericId = typeof propertyId === 'string' ? parseInt(propertyId) : propertyId;
     
     const salePrice = parseInt(priceInput?.value) || 0;
     const buyerName = buyerInput?.value?.trim() || '';
     const saleDate = dateInput?.value || '';
     const notes = notesInput?.value?.trim() || '';
-    const requestTransfer = transferCheckbox?.checked || false;
     
     // Get seller info - from dropdown for admins, or current user for regular users
     let sellerEmail, sellerDisplayName, sellerUid;
@@ -371,18 +369,15 @@ window.submitVehicleSale = async function(vehicleId, saleType, financingContract
     }
     
     try {
-        showToast('🚗 Recording sale...', 'info');
+        showToast('🏠 Recording property sale...', 'info');
         closeLogSaleModal();
         
-        const p = vehicles.find(prop => prop.id === numericId);
-        
-        const salesFee = Math.round(salePrice * 0.10);
-        const netProceeds = salePrice - salesFee;
+        const p = properties.find(prop => prop.id === numericId);
         
         // Create sale record - NEVER store usernames, only display names
         const saleDoc = {
-            vehicleId: numericId,
-            vehicleTitle: p?.title || `Vehicle #${numericId}`,
+            propertyId: numericId,
+            propertyTitle: p?.title || `Property #${numericId}`,
             salePrice: salePrice,
             saleDate: saleDate,
             buyerName: buyerName,
@@ -390,24 +385,17 @@ window.submitVehicleSale = async function(vehicleId, saleType, financingContract
             sellerEmail: sellerEmail,              // Email for internal reference only
             sellerUid: sellerUid,                  // UID for XP awards
             saleType: saleType,
-            financingContractId: financingContractId || null,
-            salesFee: salesFee,
-            salesFeePercent: 10,
-            netProceeds: netProceeds,
-            requestTransfer: requestTransfer,
-            transferStatus: requestTransfer ? 'pending' : null,
+            rtoContractId: rtoContractId || null,
             notes: notes,
             recordedAt: new Date().toISOString(),
-            recordedBy: auth.currentUser?.email,  // Who logged it (for audit)
-            // Keep vehicleId for backwards compatibility
-            vehicleId: numericId
+            recordedBy: auth.currentUser?.email    // Who logged it (for audit)
         };
         
-        // Save to vehicleSales collection
-        const saleRef = await db.collection('vehicleSales').add(saleDoc);
+        // Save to houseSales collection
+        const saleRef = await db.collection('houseSales').add(saleDoc);
         
-        // Mark vehicle as sold
-        await VehicleDataService.writeMultiple(numericId, {
+        // Mark property as sold
+        await PropertyDataService.writeMultiple(numericId, {
             isSold: true,
             soldDate: saleDate,
             soldTo: buyerName,
@@ -415,46 +403,39 @@ window.submitVehicleSale = async function(vehicleId, saleType, financingContract
             saleId: saleRef.id
         });
         
-        // If Financing completion, update the contract status (legacy support)
-        if (financingContractId) {
+        // If RTO completion, update the contract status
+        if (rtoContractId) {
             try {
-                await db.collection('financingContracts').doc(financingContractId).update({
+                await db.collection('rentToOwnContracts').doc(rtoContractId).update({
                     status: 'completed',
                     completedDate: saleDate,
                     saleId: saleRef.id
                 });
             } catch (e) {
+                console.warn('Could not update RTO contract status:', e);
             }
         }
         
         // Award XP to the SELLER (not the person logging it)
         if (typeof GamificationService !== 'undefined' && GamificationService.awardXP && sellerUid) {
-            await GamificationService.awardXP(sellerUid, 2500, `Sold ${p?.title} for $${salePrice.toLocaleString()}`);
+            await GamificationService.awardXP(sellerUid, 5000, `Sold property ${p?.title} for $${salePrice.toLocaleString()}`);
         }
         
-        // Create celebration banner - use display name only, no buyer or price
-        await createSaleCelebration(sellerDisplayName, p?.title, salePrice, buyerName);
+        showToast('🎉 Property sale recorded! Congratulations!', 'success');
         
-        // If transfer requested, create transfer request
-        if (requestTransfer) {
-            await createOwnershipTransferRequest(numericId, buyerName, currentUserEmail, saleRef.id);
-        }
-        
-        showToast('🎉 Sale recorded! Congratulations!', 'success');
-        
-        // Refresh the vehicle stats page
+        // Refresh the property stats page
         setTimeout(() => {
-            if (typeof renderVehicleStatsContent === 'function') {
-                renderVehicleStatsContent(numericId);
+            if (typeof renderPropertyStatsContent === 'function') {
+                renderPropertyStatsContent(numericId);
             }
             if (typeof renderOwnerDashboard === 'function') {
                 renderOwnerDashboard();
             }
-        }, 500);
+        }, 1000);
         
     } catch (error) {
-        console.error('Error recording sale:', error);
-        showToast('Failed to record sale: ' + error.message, 'error');
+        console.error('Error recording property sale:', error);
+        showToast('❌ Error recording sale: ' + error.message, 'error');
     }
 };
 
