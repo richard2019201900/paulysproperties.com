@@ -832,7 +832,15 @@ function renderPropertyStatsContent(id) {
     if (lastPaymentDate) {
         const lastDate = parseLocalDate(lastPaymentDate);
         const nextDate = new Date(lastDate);
-        if (paymentFrequency === 'daily') {
+        
+        // Check for RTO paid-through date (multi-month payments)
+        const rtoPaidThroughDate = PropertyDataService.getValue(id, 'rtoPaidThroughDate', p.rtoPaidThroughDate || '');
+        
+        if (rtoPaidThroughDate && hasActiveRTO) {
+            // Use the paid-through date for RTO properties with multi-month payments
+            const paidThrough = parseLocalDate(rtoPaidThroughDate);
+            nextDate.setTime(paidThrough.getTime());
+        } else if (paymentFrequency === 'daily') {
             nextDate.setDate(nextDate.getDate() + 1);
         } else if (paymentFrequency === 'weekly') {
             nextDate.setDate(nextDate.getDate() + 7);
@@ -7878,6 +7886,7 @@ window.deleteRTOContract = async function(propertyId, contractId) {
             rtoRemainingBalance: 0,
             rtoExpectedMonthly: 0,
             rtoFinalPaymentBase: 0,
+            rtoPaidThroughDate: '',
             // Reset monthly price since RTO set it
             monthlyPrice: 0
         };
@@ -8273,13 +8282,19 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             const amountForMonthly = newRemainingBalance - rtoFinalPaymentBase;
             const newExpectedMonthly = remainingMonths > 0 ? Math.round(amountForMonthly / remainingMonths) : 0;
             
+            // Calculate the paid-through date (payment date + months covered)
+            const paidThroughDate = new Date(paymentDate);
+            paidThroughDate.setMonth(paidThroughDate.getMonth() + monthsCovered);
+            const paidThroughDateStr = paidThroughDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            
             // Update property
             await PropertyDataService.writeMultiple(propertyId, {
                 rtoCurrentPayment: newPaymentNumber,
                 rtoRemainingBalance: newRemainingBalance,
                 rtoExpectedMonthly: newExpectedMonthly,
                 monthlyPrice: newExpectedMonthly, // Update displayed monthly price
-                lastPaymentDate: paymentDate
+                lastPaymentDate: paymentDate,
+                rtoPaidThroughDate: paidThroughDateStr
             });
             
             // Update contract
