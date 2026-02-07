@@ -1286,27 +1286,6 @@ function renderPropertyStatsContent(id) {
                             </h4>
                         </div>
                         
-                        <!-- Deposit Status -->
-                        ${(() => {
-                            const depositAmount = PropertyDataService.getValue(id, 'rtoDepositAmount', p.rtoDepositAmount || 0);
-                            const depositPaid = PropertyDataService.getValue(id, 'rtoDepositPaid', p.rtoDepositPaid || false);
-                            if (depositAmount === 0) {
-                                return `<div class="bg-gray-800/50 rounded-lg p-2 text-sm">
-                                    <span class="text-gray-400">💰 Deposit:</span>
-                                    <span class="text-green-400 ml-2">$0 (Waived)</span>
-                                </div>`;
-                            } else if (depositPaid) {
-                                return `<div class="bg-gray-800/50 rounded-lg p-2 text-sm">
-                                    <span class="text-gray-400">💰 Deposit:</span>
-                                    <span class="text-green-400 ml-2">$${depositAmount.toLocaleString()} ✓ Paid</span>
-                                </div>`;
-                            } else {
-                                return `<div class="bg-amber-900/50 border border-amber-500/50 rounded-lg p-2 text-sm">
-                                    <span class="text-amber-300">⚠️ Deposit Due:</span>
-                                    <span class="text-amber-400 font-bold ml-2">$${depositAmount.toLocaleString()}</span>
-                                </div>`;
-                            }
-                        })()}
                         
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                             <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
@@ -1316,7 +1295,20 @@ function renderPropertyStatsContent(id) {
                             <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
                                 <div class="text-gray-400 text-xs font-medium mb-1">Payment Progress</div>
                                 <div class="text-green-400 font-bold text-lg">${rtoCurrentPayment} of ${rtoTotalPayments}</div>
-                                <div class="text-gray-500 text-xs">${rtoCurrentPayment >= rtoTotalPayments ? 'Complete ✓' : rtoCurrentPayment >= (rtoTotalPayments - 1) ? 'Final payment remaining' : 'Total payments'}</div>
+                                ${(() => {
+                                    const depositAmount = PropertyDataService.getValue(id, 'rtoDepositAmount', p.rtoDepositAmount || 0);
+                                    const depositPaid = PropertyDataService.getValue(id, 'rtoDepositPaid', p.rtoDepositPaid || false);
+                                    let depositLine = '';
+                                    if (depositAmount === 0) {
+                                        depositLine = '<div class="text-gray-500 text-xs">💰 $0 deposit (Waived)</div>';
+                                    } else if (depositPaid) {
+                                        depositLine = '<div class="text-green-400 text-xs">💰 $' + depositAmount.toLocaleString() + ' deposit ✓</div>';
+                                    } else {
+                                        depositLine = '<div class="text-amber-400 text-xs font-bold">⚠️ $' + depositAmount.toLocaleString() + ' deposit due</div>';
+                                    }
+                                    const statusLine = rtoCurrentPayment >= rtoTotalPayments ? 'Complete ✓' : rtoCurrentPayment >= (rtoTotalPayments - 1) ? 'Final payment remaining' : 'Total payments';
+                                    return depositLine + '<div class="text-gray-500 text-xs">' + statusLine + '</div>';
+                                })()}
                             </div>
                             <div class="bg-gray-800/80 border border-gray-600/50 rounded-lg p-3">
                                 <div class="text-gray-400 text-xs font-medium mb-1">${(() => {
@@ -1346,8 +1338,13 @@ function renderPropertyStatsContent(id) {
                                     if (remBal <= 0) return '$0';
                                     const rtoFPBase = PropertyDataService.getValue(id, 'rtoFinalPaymentBase', p.rtoFinalPaymentBase || 0);
                                     const rtoFPFee = Math.round(rtoFPBase * 0.10);
-                                    const totalOwed = remBal + rtoFPFee;
-                                    return '$' + totalOwed.toLocaleString();
+                                    const regularPayments = rtoTotalPayments - 1;
+                                    if (rtoCurrentPayment >= regularPayments) {
+                                        // Only final payment left - show finalBase + govFee (matches Next Payment tile)
+                                        return '$' + (rtoFPBase + rtoFPFee).toLocaleString();
+                                    }
+                                    // Regular payments still remaining - show remBal + govFee
+                                    return '$' + (remBal + rtoFPFee).toLocaleString();
                                 })()}</div>
                                 <div class="text-gray-500 text-xs">${(() => {
                                     const remBal = PropertyDataService.getValue(id, 'rtoRemainingBalance', p.rtoRemainingBalance || 0);
