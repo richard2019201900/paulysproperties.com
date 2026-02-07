@@ -7998,6 +7998,27 @@ window.showRTOPaymentModal = function(propertyId) {
                         <p class="text-gray-500 text-xs mt-1">Pre-filled with expected amount. Edit if different.</p>
                     </div>
                     
+                    ${paymentType === 'monthly' ? `
+                    <!-- Months Covered Selector (shows when amount > expected) -->
+                    <div id="rtoMonthsCoveredSection" class="hidden">
+                        <div class="bg-blue-900/40 border border-blue-500/40 rounded-xl p-4">
+                            <label class="block text-blue-300 text-sm font-bold mb-2">💡 Amount exceeds single payment — how many months does this cover?</label>
+                            <div class="flex items-center gap-3">
+                                <button onclick="adjustMonthsCovered(-1)" class="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold text-xl transition">−</button>
+                                <input type="number" 
+                                       id="rtoMonthsCovered" 
+                                       value="1" 
+                                       min="1"
+                                       max="${(rtoTotalPayments - 1) - rtoCurrentPayment}"
+                                       class="w-20 bg-gray-800 border border-blue-500/50 rounded-lg py-2 px-3 text-white text-xl font-bold text-center focus:border-blue-400 focus:outline-none">
+                                <button onclick="adjustMonthsCovered(1)" class="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold text-xl transition">+</button>
+                                <span class="text-blue-200 text-sm font-medium">month(s)</span>
+                            </div>
+                            <p id="rtoMonthsCoveredInfo" class="text-blue-400 text-xs mt-2">Payments ${paymentNumber} through ${paymentNumber} will be marked as paid</p>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
                     <!-- Payment Date -->
                     <div>
                         <label class="block text-gray-400 text-sm mb-2">Payment Date:</label>
@@ -8036,16 +8057,83 @@ window.showRTOPaymentModal = function(propertyId) {
     // Add input validation listener
     const amountInput = document.getElementById('rtoPaymentAmount');
     const warningEl = document.getElementById('rtoPaymentWarning');
+    const monthsCoveredSection = document.getElementById('rtoMonthsCoveredSection');
+    const monthsCoveredInput = document.getElementById('rtoMonthsCovered');
+    const monthsCoveredInfo = document.getElementById('rtoMonthsCoveredInfo');
+    
     if (amountInput && paymentType === 'monthly') {
-        amountInput.addEventListener('input', () => {
+        const updateMonthsCoveredUI = () => {
             const amount = parseInt(amountInput.value) || 0;
-            if (amount > maxPayment && warningEl) {
-                warningEl.classList.remove('hidden');
-            } else if (warningEl) {
-                warningEl.classList.add('hidden');
+            const months = parseInt(monthsCoveredInput?.value) || 1;
+            
+            if (amount > expectedAmount && monthsCoveredSection) {
+                // Show months covered selector
+                monthsCoveredSection.classList.remove('hidden');
+                
+                // Auto-suggest months based on amount
+                const suggestedMonths = Math.min(
+                    Math.round(amount / expectedAmount),
+                    (rtoTotalPayments - 1) - rtoCurrentPayment // max regular payments remaining
+                );
+                if (monthsCoveredInput && !monthsCoveredInput.dataset.userEdited) {
+                    monthsCoveredInput.value = Math.max(1, suggestedMonths);
+                }
+                
+                // Update info text
+                const currentMonths = parseInt(monthsCoveredInput?.value) || 1;
+                const startMonth = paymentNumber;
+                const endMonth = paymentNumber + currentMonths - 1;
+                if (monthsCoveredInfo) {
+                    monthsCoveredInfo.textContent = currentMonths === 1
+                        ? 'Payment ' + startMonth + ' will be marked as paid'
+                        : 'Payments ' + startMonth + ' through ' + endMonth + ' will be marked as paid';
+                }
+                
+                // Update max payment allowed based on months covered
+                const newMax = Math.max(0, rtoRemainingBalance - rtoFinalPaymentBase);
+                amountInput.max = newMax;
+                
+                // Check overpayment against new max
+                if (amount > newMax && warningEl) {
+                    warningEl.classList.remove('hidden');
+                } else if (warningEl) {
+                    warningEl.classList.add('hidden');
+                }
+            } else {
+                if (monthsCoveredSection) monthsCoveredSection.classList.add('hidden');
+                if (monthsCoveredInput) {
+                    monthsCoveredInput.value = 1;
+                    delete monthsCoveredInput.dataset.userEdited;
+                }
+                
+                if (amount > maxPayment && warningEl) {
+                    warningEl.classList.remove('hidden');
+                } else if (warningEl) {
+                    warningEl.classList.add('hidden');
+                }
             }
-        });
+        };
+        
+        amountInput.addEventListener('input', updateMonthsCoveredUI);
+        
+        if (monthsCoveredInput) {
+            monthsCoveredInput.addEventListener('input', () => {
+                monthsCoveredInput.dataset.userEdited = 'true';
+                updateMonthsCoveredUI();
+            });
+        }
     }
+};
+
+window.adjustMonthsCovered = function(delta) {
+    const input = document.getElementById('rtoMonthsCovered');
+    if (!input) return;
+    const current = parseInt(input.value) || 1;
+    const min = parseInt(input.min) || 1;
+    const max = parseInt(input.max) || 12;
+    input.value = Math.max(min, Math.min(max, current + delta));
+    input.dataset.userEdited = 'true';
+    input.dispatchEvent(new Event('input'));
 };
 
 window.closeRTOPaymentModal = function() {
@@ -8173,7 +8261,11 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
             const rtoCurrentPayment = PropertyDataService.getValue(propertyId, 'rtoCurrentPayment', p?.rtoCurrentPayment || 0);
             const rtoRemainingBalance = PropertyDataService.getValue(propertyId, 'rtoRemainingBalance', p?.rtoRemainingBalance || 0);
             
-            const newPaymentNumber = rtoCurrentPayment + 1;
+            // Get months covered from UI (defaults to 1)
+            const monthsCoveredInput = document.getElementById('rtoMonthsCovered');
+            const monthsCovered = parseInt(monthsCoveredInput?.value) || 1;
+            
+            const newPaymentNumber = rtoCurrentPayment + monthsCovered;
             const newRemainingBalance = rtoRemainingBalance - actualAmount;
             
             // Calculate new expected monthly (only recalculate for next payment, not historical)
@@ -8199,10 +8291,13 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                     rtoPaymentHistory = contractDoc.data().rtoPaymentHistory || [];
                 }
                 
-                // Add new payment record
+                // Add new payment record (single record for multi-month payment)
                 rtoPaymentHistory.push({
                     month: newPaymentNumber,
-                    expected: expectedAmount,
+                    monthsCovered: monthsCovered,
+                    monthStart: rtoCurrentPayment + 1,
+                    monthEnd: newPaymentNumber,
+                    expected: expectedAmount * monthsCovered,
                     actual: actualAmount,
                     date: paymentDate,
                     remainingBalanceAfter: newRemainingBalance,
@@ -8229,14 +8324,17 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                 amount: actualAmount,
                 expectedAmount: expectedAmount,
                 rtoMonth: newPaymentNumber,
+                monthsCovered: monthsCovered,
+                monthStart: rtoCurrentPayment + 1,
+                monthEnd: newPaymentNumber,
                 recordedBy: auth.currentUser?.email || 'owner',
                 isRTOPayment: true,
                 isRTODeposit: false
             });
             
-            // Calculate next due date (1 month from payment)
+            // Calculate next due date (X months from payment based on months covered)
             const nextDate = new Date(paymentDate);
-            nextDate.setMonth(nextDate.getMonth() + 1);
+            nextDate.setMonth(nextDate.getMonth() + monthsCovered);
             const nextDueDateStr = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
             const propertyTitle = p?.title || `Property #${propertyId}`;
             
@@ -8262,6 +8360,8 @@ window.submitRTOPayment = async function(propertyId, paymentType, expectedAmount
                 propertyId: propertyId,
                 propertyTitle: propertyTitle,
                 paymentNumber: newPaymentNumber,
+                monthsCovered: monthsCovered,
+                monthStart: rtoCurrentPayment + 1,
                 totalPayments: rtoTotalPayments, // Total payments including final
                 nextDueDate: nextDueDateStr,
                 nextExpectedAmount: newExpectedMonthly,
@@ -8417,9 +8517,14 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
     } else {
         headerText = 'Payment Logged!';
         const isComplete = info.remainingBalance <= 0;
+        const monthsCovered = info.monthsCovered || 1;
+        const monthStart = info.monthStart || info.paymentNumber;
         
+        // Badge text
         if (isComplete) {
             badgeText = `📋 Payment ${info.paymentNumber}/${info.totalPayments} - Complete!${hasAgent ? ` • Agent: ${agentName}` : ''}`;
+        } else if (monthsCovered > 1) {
+            badgeText = `📋 Payments ${monthStart}-${info.paymentNumber} of ${info.totalPayments} (${monthsCovered} months)${hasAgent ? ` • Agent: ${agentName}` : ''}`;
         } else {
             badgeText = `📋 Payment ${info.paymentNumber} of ${info.totalPayments}${hasAgent ? ` • Agent: ${agentName}` : ''}`;
         }
@@ -8428,14 +8533,25 @@ window.showRTOPaymentConfirmation = function(renterName, actualAmount, expectedA
             renterMessage = `Thanks ${displayName}! Final payment of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Congratulations - your Rent-to-Own contract is now complete! 🎉`;
         } else if (regularPaymentsDone) {
             // All regular payments done, final payment remaining
-            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber} of ${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()} (1 final payment of $${finalPaymentTotal.toLocaleString()} incl. $${govFee.toLocaleString()} gov fee). Due: ${info.nextDueDate}.`;
+            if (monthsCovered > 1) {
+                renterMessage = `Thanks ${displayName}! Payments ${monthStart} through ${info.paymentNumber} of ${info.totalPayments} ($${actualAmount.toLocaleString()} covering ${monthsCovered} months) for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()} (1 final payment of $${finalPaymentTotal.toLocaleString()} incl. $${govFee.toLocaleString()} gov fee). Due: ${info.nextDueDate}.`;
+            } else {
+                renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber} of ${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()} (1 final payment of $${finalPaymentTotal.toLocaleString()} incl. $${govFee.toLocaleString()} gov fee). Due: ${info.nextDueDate}.`;
+            }
         } else {
-            renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber} of ${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+            if (monthsCovered > 1) {
+                renterMessage = `Thanks ${displayName}! Payments ${monthStart} through ${info.paymentNumber} of ${info.totalPayments} ($${actualAmount.toLocaleString()} covering ${monthsCovered} months) for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+            } else {
+                renterMessage = `Thanks ${displayName}! Payment ${info.paymentNumber} of ${info.totalPayments} of $${actualAmount.toLocaleString()} for ${propertyTitle} received. Remaining: $${totalRemainingWithGov.toLocaleString()}. Next payment of $${nextPaymentAmount.toLocaleString()} due ${info.nextDueDate}.`;
+            }
         }
     }
     
     // === OWNER MESSAGE (Only shown when user is agent, not owner) ===
-    const paymentTypeLabel = info.type === 'deposit' ? 'deposit' : `payment ${info.paymentNumber} of ${info.totalPayments}`;
+    const monthsCoveredOwner = info.monthsCovered || 1;
+    const paymentTypeLabel = info.type === 'deposit' ? 'deposit' : 
+        monthsCoveredOwner > 1 ? `payments ${info.monthStart}-${info.paymentNumber} of ${info.totalPayments} (${monthsCoveredOwner} months)` :
+        `payment ${info.paymentNumber} of ${info.totalPayments}`;
     if (hasAgent) {
         ownerMessage = `A ${paymentTypeLabel} of $${actualAmount.toLocaleString()} for ${propertyTitle} (Rent-to-Own) has been received. After the 10% PaulysProperties.com agent fee of $${agentFee.toLocaleString()}, you are set to receive $${netToSeller.toLocaleString()} net. Remaining renter balance: $${totalRemainingWithGov.toLocaleString()}${info.remainingBalance > 0 ? ` (incl. $${govFee.toLocaleString()} gov fee)` : ''}. Next due: ${info.nextDueDate}. Reach out if you have any questions.`;
     } else {
