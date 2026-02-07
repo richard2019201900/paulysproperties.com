@@ -7848,12 +7848,20 @@ window.deleteRTOContract = async function(propertyId, contractId) {
             await db.collection('rentToOwnContracts').doc(contractId).delete();
         }
         
-        // 2. Remove last RTO-related payment(s) from payment history
+        // 2. Remove last RTO-related payment(s) from payment history AND reverse XP
+        let totalXPToDeduct = 0;
         try {
             const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
             if (historyDoc.exists) {
                 let payments = historyDoc.data().payments || [];
                 const originalCount = payments.length;
+                
+                // Sum up XP awarded for RTO payments being removed
+                payments.forEach(p => {
+                    if (p.isRTOPayment || p.isRTODeposit) {
+                        totalXPToDeduct += (p.xpAwarded || 0);
+                    }
+                });
                 
                 // Filter out any payments that were RTO payments (deposit or monthly)
                 payments = payments.filter(p => !p.isRTOPayment && !p.isRTODeposit);
@@ -7869,6 +7877,18 @@ window.deleteRTOContract = async function(propertyId, contractId) {
             }
         } catch (e) {
             console.warn('[RTO] Could not clean up payment history:', e);
+        }
+        
+        // 2b. Reverse XP for removed payments + contract creation (150 XP)
+        totalXPToDeduct += 150; // Contract creation XP
+        const user = auth.currentUser;
+        if (user && totalXPToDeduct > 0 && typeof GamificationService !== 'undefined') {
+            try {
+                await GamificationService.deductXP(user.uid, totalXPToDeduct, `Deleted RTO contract for property ${propertyId} (reversed ${totalXPToDeduct} XP)`);
+                console.log(`[RTO] Reversed ${totalXPToDeduct} XP for deleted contract`);
+            } catch (xpError) {
+                console.warn('[RTO] Could not reverse XP:', xpError);
+            }
         }
         
         // 3. Clear all RTO-related fields from the property (including monthlyPrice)
