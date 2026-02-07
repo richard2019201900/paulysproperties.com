@@ -5902,8 +5902,15 @@ function getMinimumBuyPrice(property) {
         return { min: 750000, category: 'Hotel', storage: storageSpace ? storageSpace + ' storage' : 'Unknown' };
     }
     
-    // Check for apartment
+    // Check for apartment - but consider storage and interior type
+    // Apartments with instance interiors and high storage use instance pricing
     if (type === 'apartment' || title.includes('apartment') || title.includes('apt')) {
+        // If apartment has instance interior, use instance house storage-based pricing
+        if (interiorType === 'instance') {
+            if (storageSpace >= 1000) return { min: 1200000, category: 'Instance Apartment 1000+', storage: storageSpace + ' storage' };
+            if (storageSpace >= 800) return { min: 800000, category: 'Instance Apartment 800-900', storage: storageSpace + ' storage' };
+        }
+        // Standard apartment (600 storage or less, or non-instance interior)
         return { min: 700000, category: 'Apartment 600 Storage', storage: storageSpace ? storageSpace + ' storage' : '600 storage' };
     }
     
