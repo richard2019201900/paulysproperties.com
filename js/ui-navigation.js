@@ -288,6 +288,82 @@ window.renderBlogPage = function() {
     // Blog posts data - add new posts at the top
     const blogPosts = [
         {
+            date: 'February 8, 2026',
+            title: '🚀 Over 100 Updates Since Last Month',
+            category: 'Major Update',
+            categoryColor: 'bg-green-500',
+            content: `
+                <p class="mb-4">Since the last site update I've pushed <strong>over 100 updates</strong> to the platform. PaulysProperties.com just hit <strong>521 total deployments</strong> in just over two months since launch. Here's what's new:</p>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🏠 Property Sales Tracking</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>You can now log property sales directly on the site with buyer info, sale price, date and government fees all in one place</li>
+                    <li>When a property sells it automatically updates to "Sold" status so everyone browsing knows what's available</li>
+                    <li>Property status is more detailed now. Instead of just "Available" or "Unavailable" you'll see <strong>Rented</strong>, <strong>Sold</strong> or <strong>Temporarily Unavailable</strong></li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">📋 Copy Listing</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Need to list multiple units in the same building? Use the new Copy Listing feature to duplicate a property with all its details, images and pricing in seconds</li>
+                    <li>Just change the title and storage and you're live. No more re-entering the same info over and over</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">👑 Premium Listings</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Premium listing management got a complete rebuild with better tracking and controls</li>
+                    <li>Want your property featured at the top of the page with a gold border and premium badge? Text me for details</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🛡️ Smarter Safeguards</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Accidentally clicking outside a popup no longer closes it. All modals now require you to click the X or a close button so you never lose progress mid-edit</li>
+                    <li>The system now guides you through the correct steps when ending a rental or clearing tenant info. No more accidental data wipes</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">📊 Dashboard Upgrades</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Designed and started building a <strong>Real Estate Agent</strong> system in preparation for future growth. When the time comes you'll be able to have an assigned agent managing your properties with full dashboard visibility, commission tracking and rent collection alerts built right in</li>
+                    <li>Income tracking and payment breakdowns are more accurate on every screen</li>
+                    <li>Real-time sync improvements so what you see on your dashboard is always current</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🔔 Notification System Rebuild</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>The entire notification system has been rebuilt from scratch for reliability</li>
+                    <li>Alerts now sync across devices and persist correctly between sessions</li>
+                    <li>Admin notifications properly track new users, new listings and premium fee reminders</li>
+                    <li>One-click "Clear All" button when notifications stack up</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">🏆 Leaderboard</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>XP tracking is tighter than ever. Scores reflect real activity only and corrections are made automatically if data changes</li>
+                    <li>Keep logging payments and making moves to climb the ranks</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">✨ Quality of Life</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>Simplified sign-up process. Just pick a username and password to get started, fill in your details after</li>
+                    <li>Display names now show correctly everywhere across the platform (property cards, notifications, agent listings)</li>
+                    <li>"List Your Property" button now works properly for new visitors and walks you through creating an account</li>
+                    <li>All payment reminder scripts now include the property name so there's no confusion about which property you're collecting for</li>
+                    <li>Contact info displays correctly for every property owner regardless of who's browsing</li>
+                </ul>
+                
+                <h4 class="font-bold text-white mb-2 mt-6">⚡ Under the Hood</h4>
+                <ul class="list-disc list-inside space-y-1 text-gray-300 mb-4">
+                    <li>113 updates deployed in the last 3 weeks alone</li>
+                    <li>Complete rewrite of the notification persistence system</li>
+                    <li>Real-time data sync improvements across every page</li>
+                    <li>Dozens of performance and reliability improvements you'll feel but won't see</li>
+                </ul>
+                
+                <p class="mt-6 text-gray-300">This platform is built for the community and that's never going to change. Every single feature request and piece of feedback I've received has been built and deployed within 24 to 48 hours. That's the standard and I plan to keep it that way. If you have ideas, suggestions or anything that would make your experience better I want to hear it. Fastest way to reach me is always a text.</p>
+                
+                <p class="mt-4"><span class="text-green-400 font-bold cursor-pointer hover:text-green-300" onclick="openModal('contactModal')">📱 Text Pauly</span></p>
+            `
+        },
+        {
             date: 'January 15, 2025',
             title: '🎉 Simplified Tier System - More Value, Lower Prices!',
             category: 'Major Update',

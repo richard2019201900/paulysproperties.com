@@ -17,7 +17,7 @@
 
 // ==================== SITE UPDATE NOTIFICATIONS ====================
 // Change this version string whenever you publish a new site update
-const LATEST_SITE_UPDATE_VERSION = '2025-01-15-tier-update';
+const LATEST_SITE_UPDATE_VERSION = '2026-02-08-major-update';
 
 // Check if user has seen the latest site update
 window.hasUnreadSiteUpdate = function() {
