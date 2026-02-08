@@ -7708,9 +7708,36 @@ window.viewRTOContract = async function(contractId) {
  * @param {boolean} newStatus - true = paid, false = pending
  */
 window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
-    // If toggling OFF (unpaid), just do it directly
+    // If toggling OFF (unpaid), show confirmation first
     if (!newStatus) {
-        await executeRemittanceToggle(contractId, paymentMonth, false, '');
+        const payLabel = paymentMonth === 'deposit' ? 'Deposit' : 'Payment #' + paymentMonth;
+        const modalHTML = `
+            <div id="remittanceUndoModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-sm w-full border border-red-500/30 shadow-2xl relative">
+                    <button onclick="document.getElementById('remittanceUndoModal').remove()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <div class="bg-gradient-to-r from-red-600 to-red-700 px-5 py-3 rounded-t-2xl">
+                        <h3 class="text-lg font-bold text-white">⚠️ Undo Remittance?</h3>
+                        <p class="text-red-100 text-sm">${payLabel} — mark as unpaid</p>
+                    </div>
+                    <div class="p-5">
+                        <p class="text-gray-300 text-sm">This will mark this payment as <span class="text-amber-400 font-bold">pending</span> and remove the remittance note. Are you sure?</p>
+                    </div>
+                    <div class="px-5 py-3 bg-gray-800/50 flex gap-3 rounded-b-2xl">
+                        <button onclick="document.getElementById('remittanceUndoModal').remove()" class="flex-1 bg-gray-700 text-white py-2.5 rounded-xl font-bold hover:bg-gray-600 transition text-sm">
+                            Cancel
+                        </button>
+                        <button onclick="document.getElementById('remittanceUndoModal').remove(); executeRemittanceToggle('${contractId}', ${typeof paymentMonth === 'string' ? "'" + paymentMonth + "'" : paymentMonth}, false, '')" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-2.5 rounded-xl font-bold hover:opacity-90 transition text-sm">
+                            ⏳ Mark Unpaid
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        const existing = document.getElementById('remittanceUndoModal');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
         return;
     }
     
@@ -7765,7 +7792,7 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
                     <div class="p-5 space-y-3">
                         <!-- Legacy Transfer Toggle -->
                         <label class="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" id="remittanceLegacy" class="w-4 h-4 rounded accent-amber-500" onchange="updateRemittancePreview(${netAmount}, '${timeStr}', '${dateStr}')">
+                            <input type="checkbox" id="remittanceLegacy" class="w-4 h-4 rounded accent-amber-500" onchange="handleLegacyToggle(${netAmount}, '${timeStr}', '${dateStr}')">
                             <span class="text-amber-400 text-sm font-medium">📦 Legacy transfer</span>
                             <span class="text-gray-500 text-xs">(no timestamp — older transfer)</span>
                         </label>
@@ -7818,6 +7845,20 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
         console.error('Error showing remittance modal:', error);
         showToast('Failed to load payment data: ' + error.message, 'error');
     }
+};
+
+window.handleLegacyToggle = function(netAmount, timeStr, dateStr) {
+    const isLegacy = document.getElementById('remittanceLegacy')?.checked || false;
+    const viaInput = document.getElementById('remittanceViaInput');
+    if (viaInput) {
+        // Swap default via text based on legacy toggle
+        if (isLegacy && (viaInput.value === "Pauly's ATM" || !viaInput.value)) {
+            viaInput.value = 'bank or text';
+        } else if (!isLegacy && (viaInput.value === 'bank or text' || !viaInput.value)) {
+            viaInput.value = "Pauly's ATM";
+        }
+    }
+    updateRemittancePreview(netAmount, timeStr, dateStr);
 };
 
 window.updateRemittancePreview = function(netAmount, timeStr, dateStr) {
