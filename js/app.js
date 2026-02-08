@@ -7477,19 +7477,23 @@ window.viewRTOContract = async function(contractId) {
                 const depStatusClass = depPaid ? 'text-green-400' : 'text-amber-400';
                 const depStatusIcon = depPaid ? '✅' : '⏳';
                 const depStatusText = depPaid ? `Paid ${depPaidDate ? new Date(depPaidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}` : 'Pending';
+                const depNote = contract.depositOwnerPaidNote || '';
                 const depToggle = isMasterAdmin ? `onclick="toggleRemittance('${contractId}', 'deposit', ${!depPaid})"` : '';
                 const depCursor = isMasterAdmin ? 'cursor-pointer hover:bg-gray-700/50' : '';
                 
                 paymentRows += `
-                    <div class="flex items-center justify-between py-2 px-3 rounded-lg ${depCursor} transition" ${depToggle} title="${isMasterAdmin ? 'Click to toggle payment status' : ''}">
-                        <div class="flex items-center gap-3">
-                            <span class="text-amber-400 font-bold text-xs w-16">Deposit</span>
-                            <span class="text-white text-sm">$${(contract.depositAmount || 0).toLocaleString()}</span>
-                            <span class="text-gray-500 text-xs">${contract.depositPaidDate ? new Date(contract.depositPaidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</span>
+                    <div class="${depCursor} transition rounded-lg" ${depToggle} title="${isMasterAdmin ? 'Click to toggle payment status' : ''}">
+                        <div class="flex items-center justify-between py-2 px-3">
+                            <div class="flex items-center gap-3">
+                                <span class="text-amber-400 font-bold text-xs w-16">Deposit</span>
+                                <span class="text-white text-sm">$${(contract.depositAmount || 0).toLocaleString()}</span>
+                                <span class="text-gray-500 text-xs">${contract.depositPaidDate ? new Date(contract.depositPaidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="${depStatusClass} text-xs font-medium">${depStatusIcon} ${depStatusText}</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="${depStatusClass} text-xs font-medium">${depStatusIcon} ${depStatusText}</span>
-                        </div>
+                        ${depNote ? `<div class="px-3 pb-2"><span class="text-gray-400 text-xs italic">📝 ${depNote}</span></div>` : ''}
                     </div>`;
             }
             
@@ -7500,20 +7504,24 @@ window.viewRTOContract = async function(contractId) {
                 const statusClass = paid ? 'text-green-400' : 'text-amber-400';
                 const statusIcon = paid ? '✅' : '⏳';
                 const statusText = paid ? `Paid ${paidDate ? new Date(paidDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}` : 'Pending';
+                const payNote = pay.ownerPaidNote || '';
                 const toggle = isMasterAdmin ? `onclick="toggleRemittance('${contractId}', ${pay.month}, ${!paid})"` : '';
                 const cursor = isMasterAdmin ? 'cursor-pointer hover:bg-gray-700/50' : '';
                 const payDate = pay.date ? new Date(pay.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
                 
                 paymentRows += `
-                    <div class="flex items-center justify-between py-2 px-3 rounded-lg ${cursor} transition" ${toggle} title="${isMasterAdmin ? 'Click to toggle payment status' : ''}">
-                        <div class="flex items-center gap-3">
-                            <span class="text-cyan-400 font-bold text-xs w-16">#${pay.month}</span>
-                            <span class="text-white text-sm">$${(pay.actual || 0).toLocaleString()}</span>
-                            <span class="text-gray-500 text-xs">${payDate}</span>
+                    <div class="${cursor} transition rounded-lg" ${toggle} title="${isMasterAdmin ? 'Click to toggle payment status' : ''}">
+                        <div class="flex items-center justify-between py-2 px-3">
+                            <div class="flex items-center gap-3">
+                                <span class="text-cyan-400 font-bold text-xs w-16">#${pay.month}</span>
+                                <span class="text-white text-sm">$${(pay.actual || 0).toLocaleString()}</span>
+                                <span class="text-gray-500 text-xs">${payDate}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="${statusClass} text-xs font-medium">${statusIcon} ${statusText}</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="${statusClass} text-xs font-medium">${statusIcon} ${statusText}</span>
-                        </div>
+                        ${payNote ? `<div class="px-3 pb-2"><span class="text-gray-400 text-xs italic">📝 ${payNote}</span></div>` : ''}
                     </div>`;
             });
             
@@ -7667,6 +7675,113 @@ window.viewRTOContract = async function(contractId) {
  * @param {boolean} newStatus - true = paid, false = pending
  */
 window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
+    // If toggling OFF (unpaid), just do it directly
+    if (!newStatus) {
+        await executeRemittanceToggle(contractId, paymentMonth, false, '');
+        return;
+    }
+    
+    // If toggling ON (paid), show the remittance note modal
+    try {
+        const contractRef = db.collection('rentToOwnContracts').doc(contractId);
+        const doc = await contractRef.get();
+        if (!doc.exists) {
+            showToast('Contract not found', 'error');
+            return;
+        }
+        const contract = doc.data();
+        
+        // Calculate net amount (actual - 10% agent commission)
+        let grossAmount = 0;
+        if (paymentMonth === 'deposit') {
+            grossAmount = contract.depositAmount || 0;
+        } else {
+            const history = contract.rtoPaymentHistory || [];
+            const payment = history.find(p => p.month === paymentMonth);
+            grossAmount = payment ? (payment.actual || 0) : 0;
+        }
+        
+        // Check if agent exists for commission calculation
+        const hasAgent = contract.seller && contract.seller.includes('Managed by:');
+        const netAmount = hasAgent ? Math.round(grossAmount * 0.90) : grossAmount;
+        
+        // Build timestamp
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'pm' : 'am';
+        const displayHour = hours % 12 || 12;
+        const month = now.getMonth() + 1;
+        const day = now.getDate();
+        const year = now.getFullYear();
+        const timeStr = `${displayHour}:${minutes}${ampm} PST`;
+        const dateStr = `${month}/${day}/${year}`;
+        
+        const modalHTML = `
+            <div id="remittanceNoteModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-cyan-500/30 shadow-2xl relative">
+                    <button onclick="document.getElementById('remittanceNoteModal').remove()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    
+                    <div class="bg-gradient-to-r from-cyan-600 to-blue-600 px-5 py-3 rounded-t-2xl">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">💸 Confirm Remittance</h3>
+                        <p class="text-cyan-100 text-sm">${paymentMonth === 'deposit' ? 'Deposit' : 'Payment #' + paymentMonth} • $${netAmount.toLocaleString()} net to owner</p>
+                    </div>
+                    
+                    <div class="p-5 space-y-3">
+                        <div class="bg-gray-800 rounded-lg p-3">
+                            <div class="text-gray-400 text-xs mb-1">Remittance Note (auto-filled):</div>
+                            <div class="bg-gray-700/50 rounded p-3 text-white text-sm font-mono border border-gray-600" id="remittancePreview">
+                                $${netAmount.toLocaleString()} sent @ ${timeStr} on ${dateStr} via <span class="text-cyan-400" id="remittanceViaPreview">Pauly's ATM</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-400 text-xs mb-1">Sent via:</label>
+                            <input type="text" 
+                                   id="remittanceViaInput" 
+                                   value="Pauly's ATM" 
+                                   placeholder="e.g. Pauly's ATM, Bank Transfer, Cash"
+                                   class="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-3 text-white text-sm focus:border-cyan-500 focus:outline-none"
+                                   oninput="document.getElementById('remittanceViaPreview').textContent = this.value || 'Pauly\\'s ATM'">
+                        </div>
+                    </div>
+                    
+                    <div class="px-5 py-3 bg-gray-800/50 flex gap-3 rounded-b-2xl">
+                        <button onclick="document.getElementById('remittanceNoteModal').remove()" class="flex-1 bg-gray-700 text-white py-2.5 rounded-xl font-bold hover:bg-gray-600 transition text-sm">
+                            Cancel
+                        </button>
+                        <button onclick="confirmRemittance('${contractId}', ${typeof paymentMonth === 'string' ? "'" + paymentMonth + "'" : paymentMonth}, ${netAmount}, '${timeStr}', '${dateStr}')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-2.5 rounded-xl font-bold hover:opacity-90 transition text-sm">
+                            ✅ Confirm Paid
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existing = document.getElementById('remittanceNoteModal');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('Error showing remittance modal:', error);
+        showToast('Failed to load payment data: ' + error.message, 'error');
+    }
+};
+
+window.confirmRemittance = async function(contractId, paymentMonth, netAmount, timeStr, dateStr) {
+    const viaInput = document.getElementById('remittanceViaInput');
+    const via = viaInput ? viaInput.value.trim() || "Pauly's ATM" : "Pauly's ATM";
+    const note = `$${netAmount.toLocaleString()} sent @ ${timeStr} on ${dateStr} via ${via}`;
+    
+    const modal = document.getElementById('remittanceNoteModal');
+    if (modal) modal.remove();
+    
+    await executeRemittanceToggle(contractId, paymentMonth, true, note);
+};
+
+window.executeRemittanceToggle = async function(contractId, paymentMonth, newStatus, note) {
     try {
         const contractRef = db.collection('rentToOwnContracts').doc(contractId);
         const doc = await contractRef.get();
@@ -7683,6 +7798,7 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
             await contractRef.update({
                 depositOwnerPaid: newStatus,
                 depositOwnerPaidDate: newStatus ? now : null,
+                depositOwnerPaidNote: newStatus ? note : null,
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
         } else {
@@ -7695,6 +7811,7 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
             }
             history[payIdx].ownerPaid = newStatus;
             history[payIdx].ownerPaidDate = newStatus ? now : null;
+            history[payIdx].ownerPaidNote = newStatus ? note : null;
             
             await contractRef.update({
                 rtoPaymentHistory: history,
