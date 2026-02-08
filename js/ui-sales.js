@@ -187,7 +187,7 @@ window.showLogSaleModal = function(propertyId, rtoContractId = null) {
                     <div>
                         <label class="block text-gray-400 text-sm mb-2">Government Sales Fee:</label>
                         <div id="salesFeeDisplay" class="bg-gray-800 rounded-xl py-3 px-4 text-amber-400 font-bold">
-                            $25,000
+                            $${Math.round((sellPrice || 0) * 0.10).toLocaleString()}
                         </div>
                         <p class="text-gray-500 text-xs mt-1">Flat government tax on property transfer</p>
                     </div>
@@ -235,7 +235,7 @@ window.showLogSaleModal = function(propertyId, rtoContractId = null) {
     
     // Populate seller dropdown for admins
     if (isAdmin) {
-        populateSellerDropdown(vehicleId, vehicleOwnerEmail);
+        populateSellerDropdown(numericId, propertyOwnerEmail);
     }
 };
 
