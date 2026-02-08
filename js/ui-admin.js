@@ -2245,24 +2245,24 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             </button>
                             <button onclick="copyPremiumReminder('${safeTitle}', ${weeklyFee}, '${nextDuePlainText}')" 
                                 class="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
-                                title="Copy reminder message">
-                                📋 Reminder
+                                title="Copy reminder message to clipboard">
+                                📋 Copy Reminder
                             </button>
                             ` : ''}
                             <button onclick="togglePremiumTrialStatus(${p.id})" 
                                 class="${isPremiumTrial ? 'bg-green-700 hover:bg-green-600' : 'bg-cyan-700 hover:bg-cyan-600'} text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
-                                title="${isPremiumTrial ? 'Convert to paid ($10k/week)' : 'Convert to free trial'}">
-                                ${isPremiumTrial ? '💰 To Paid' : '🎁 To Trial'}
+                                title="${isPremiumTrial ? 'Switch from free trial to paid ($10k/week)' : 'Switch from paid to free trial (30 days)'}">
+                                ${isPremiumTrial ? '💰 Convert to Paid' : '🎁 Convert to Trial'}
                             </button>
                             <button onclick="showCancelPremiumModal(${p.id}, '${safeTitle}')" 
                                 class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
-                                title="Cancel premium listing">
-                                ❌ Cancel
+                                title="Remove premium status entirely (preserves payment history)">
+                                ❌ Cancel Listing
                             </button>
                             <button onclick="showClearPremiumHistoryModal(${p.id}, '${safeTitle}')" 
                                 class="bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
-                                title="Clear premium payment history">
-                                🗑️ History
+                                title="Permanently delete all premium payment records">
+                                🗑️ Delete History
                             </button>
                         </div>
                     </div>

@@ -1544,13 +1544,13 @@ function renderPropertyStatsContent(id) {
                 <div class="text-xs text-amber-200 mt-2">${isPremiumTrial ? 'No charge' : '$10,000/week'}</div>
                 ${TierService.isMasterAdmin(auth.currentUser?.email) ? `
                 <button onclick="togglePremiumTrialStatus(${id})" class="mt-2 text-xs bg-amber-800 hover:bg-amber-700 px-2 py-1 rounded text-amber-100">
-                    ${isPremiumTrial ? 'Convert to Paid' : 'Convert to Trial'}
+                    ${isPremiumTrial ? '💰 Convert to Paid' : '🎁 Convert to Trial'}
                 </button>
                 <button onclick="showCancelPremiumModal(${id}, '${p.title?.replace(/'/g, "\\'")}')" class="mt-1 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded text-red-100">
-                    ❌ Cancel Premium
+                    ❌ Cancel Listing
                 </button>
                 <button onclick="showClearPremiumHistoryModal(${id}, '${p.title?.replace(/'/g, "\\'")}')" class="mt-1 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">
-                    🗑️ Clear History
+                    🗑️ Delete History
                 </button>
                 ` : ''}
             </div>
@@ -2549,16 +2549,33 @@ window.togglePremiumTrialStatus = async function(propertyId) {
     }
     
     try {
-        await PropertyDataService.write(propertyId, 'isPremiumTrial', newTrial);
-        
-        // If converting to paid, set last payment to today
-        if (!newTrial) {
+        if (newTrial) {
+            // Converting to trial - set trial dates
             const today = new Date().toISOString().split('T')[0];
-            await PropertyDataService.write(propertyId, 'premiumLastPayment', today);
+            const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            await PropertyDataService.writeMultiple(propertyId, {
+                isPremiumTrial: true,
+                premiumTrialStartDate: today,
+                premiumTrialEnds: trialEnd
+            });
+        } else {
+            // Converting to paid - set last payment to today, clear trial dates
+            const today = new Date().toISOString().split('T')[0];
+            await PropertyDataService.writeMultiple(propertyId, {
+                isPremiumTrial: false,
+                premiumLastPayment: today,
+                premiumTrialStartDate: '',
+                premiumTrialEnds: ''
+            });
         }
         
         p.isPremiumTrial = newTrial;
         renderPropertyStatsContent(propertyId);
+        
+        // Refresh admin dashboard if visible
+        if (typeof renderAdminDashboard === 'function') {
+            setTimeout(() => renderAdminDashboard(), 300);
+        }
         
         if (newTrial) {
             showToast('🎁 Converted to Free Trial', 'info');
