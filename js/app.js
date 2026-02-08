@@ -7493,7 +7493,7 @@ window.viewRTOContract = async function(contractId) {
                                 <span class="${depStatusClass} text-xs font-medium">${depStatusIcon} ${depStatusText}</span>
                             </div>
                         </div>
-                        ${depNote ? `<div class="px-3 pb-2"><span class="text-gray-400 text-xs italic">📝 ${depNote}</span></div>` : ''}
+                        ${depNote ? `<div class="px-3 pb-2 flex items-center gap-2"><span class="text-gray-400 text-xs italic flex-1">📝 ${depNote}</span><button onclick="event.stopPropagation(); navigator.clipboard.writeText('${depNote.replace(/'/g, "\\'")}'); this.textContent='✅'; setTimeout(() => this.textContent='📋', 1500)" class="text-gray-500 hover:text-cyan-400 text-xs px-1.5 py-0.5 rounded bg-gray-700/50 hover:bg-gray-700 transition" title="Copy note">📋</button></div>` : ''}
                     </div>`;
             }
             
@@ -7521,7 +7521,7 @@ window.viewRTOContract = async function(contractId) {
                                 <span class="${statusClass} text-xs font-medium">${statusIcon} ${statusText}</span>
                             </div>
                         </div>
-                        ${payNote ? `<div class="px-3 pb-2"><span class="text-gray-400 text-xs italic">📝 ${payNote}</span></div>` : ''}
+                        ${payNote ? `<div class="px-3 pb-2 flex items-center gap-2"><span class="text-gray-400 text-xs italic flex-1">📝 ${payNote}</span><button onclick="event.stopPropagation(); navigator.clipboard.writeText('${payNote.replace(/'/g, "\\'")}'); this.textContent='✅'; setTimeout(() => this.textContent='📋', 1500)" class="text-gray-500 hover:text-cyan-400 text-xs px-1.5 py-0.5 rounded bg-gray-700/50 hover:bg-gray-700 transition" title="Copy note">📋</button></div>` : ''}
                     </div>`;
             });
             
@@ -7730,6 +7730,13 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
                     </div>
                     
                     <div class="p-5 space-y-3">
+                        <!-- Legacy Transfer Toggle -->
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="remittanceLegacy" class="w-4 h-4 rounded accent-amber-500" onchange="updateRemittancePreview(${netAmount}, '${timeStr}', '${dateStr}')">
+                            <span class="text-amber-400 text-sm font-medium">📦 Legacy transfer</span>
+                            <span class="text-gray-500 text-xs">(no timestamp — older transfer)</span>
+                        </label>
+                        
                         <div class="bg-gray-800 rounded-lg p-3">
                             <div class="text-gray-400 text-xs mb-1">Remittance Note (auto-filled):</div>
                             <div class="bg-gray-700/50 rounded p-3 text-white text-sm font-mono border border-gray-600" id="remittancePreview">
@@ -7744,7 +7751,17 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
                                    value="Pauly's ATM" 
                                    placeholder="e.g. Pauly's ATM, Bank Transfer, Cash"
                                    class="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-3 text-white text-sm focus:border-cyan-500 focus:outline-none"
-                                   oninput="document.getElementById('remittanceViaPreview').textContent = this.value || 'Pauly\\'s ATM'">
+                                   oninput="updateRemittancePreview(${netAmount}, '${timeStr}', '${dateStr}')">
+                        </div>
+                        
+                        <!-- Optional detail for legacy -->
+                        <div id="remittanceLegacyDetail" class="hidden">
+                            <label class="block text-gray-400 text-xs mb-1">Additional detail (optional):</label>
+                            <input type="text" 
+                                   id="remittanceLegacyNote" 
+                                   placeholder="e.g. paid in January, no exact date"
+                                   class="w-full bg-gray-800 border border-gray-600 rounded-lg py-2 px-3 text-white text-sm focus:border-amber-500 focus:outline-none"
+                                   oninput="updateRemittancePreview(${netAmount}, '${timeStr}', '${dateStr}')">
                         </div>
                     </div>
                     
@@ -7770,10 +7787,41 @@ window.toggleRemittance = async function(contractId, paymentMonth, newStatus) {
     }
 };
 
+window.updateRemittancePreview = function(netAmount, timeStr, dateStr) {
+    const isLegacy = document.getElementById('remittanceLegacy')?.checked || false;
+    const via = document.getElementById('remittanceViaInput')?.value.trim() || "Pauly's ATM";
+    const legacyDetail = document.getElementById('remittanceLegacyNote')?.value.trim() || '';
+    const legacyDetailSection = document.getElementById('remittanceLegacyDetail');
+    const preview = document.getElementById('remittancePreview');
+    
+    // Show/hide legacy detail field
+    if (legacyDetailSection) {
+        legacyDetailSection.classList.toggle('hidden', !isLegacy);
+    }
+    
+    if (!preview) return;
+    
+    if (isLegacy) {
+        const detailSuffix = legacyDetail ? ', ' + legacyDetail : '';
+        preview.innerHTML = `$${netAmount.toLocaleString()} sent via <span class="text-cyan-400">${via}</span> <span class="text-amber-400">(legacy transfer${detailSuffix})</span>`;
+    } else {
+        preview.innerHTML = `$${netAmount.toLocaleString()} sent @ ${timeStr} on ${dateStr} via <span class="text-cyan-400">${via}</span>`;
+    }
+};
+
 window.confirmRemittance = async function(contractId, paymentMonth, netAmount, timeStr, dateStr) {
     const viaInput = document.getElementById('remittanceViaInput');
     const via = viaInput ? viaInput.value.trim() || "Pauly's ATM" : "Pauly's ATM";
-    const note = `$${netAmount.toLocaleString()} sent @ ${timeStr} on ${dateStr} via ${via}`;
+    const isLegacy = document.getElementById('remittanceLegacy')?.checked || false;
+    const legacyDetail = document.getElementById('remittanceLegacyNote')?.value.trim() || '';
+    
+    let note;
+    if (isLegacy) {
+        const detailSuffix = legacyDetail ? ', ' + legacyDetail : '';
+        note = `$${netAmount.toLocaleString()} sent via ${via} (legacy transfer${detailSuffix})`;
+    } else {
+        note = `$${netAmount.toLocaleString()} sent @ ${timeStr} on ${dateStr} via ${via}`;
+    }
     
     const modal = document.getElementById('remittanceNoteModal');
     if (modal) modal.remove();
