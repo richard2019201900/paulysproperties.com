@@ -7171,7 +7171,7 @@ window.downloadRTOContractImage = async function() {
     
     // Width is fixed, height will be cropped after drawing
     const canvasWidth = 1000;
-    const maxHeight = 1400; // Oversized to fit any content
+    const maxHeight = 1800; // Oversized to fit expanded contract terms
     canvas.width = canvasWidth;
     canvas.height = maxHeight;
     
@@ -7330,15 +7330,48 @@ window.downloadRTOContractImage = async function() {
     
     y += 6;
     
-    // === CONTRACT TERMS SUMMARY ===
+    // === CONTRACT TERMS ===
     drawLine();
     y += 4;
     drawText('KEY CONTRACT TERMS', margin, 16, '#f59e0b', 'Arial Black');
-    drawText(`• Monthly payments due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month`, margin, 11, '#ffffff');
+    y += 2;
+    
+    // Payment Terms
+    if (calc.termMonths > 1) {
+        drawText(`• Monthly payments due on the ${startDate.getDate()}${getOrdinalSuffix(startDate.getDate())} of each month`, margin, 11, '#ffffff');
+    } else {
+        drawText('• Single payment contract (no monthly payments)', margin, 11, '#ffffff');
+    }
     drawText('• 3-day grace period before $50,000 late fee', margin, 11, '#ffffff');
+    if (hasAgent) {
+        drawText('• Agent commission (10%) deducted from owner portion before remittance', margin, 11, '#ffffff');
+        drawText(`• Government fee ($${calc.finalPaymentFee.toLocaleString()}) paid directly to government on final transaction`, margin, 11, '#ffffff');
+    }
+    y += 4;
+    
+    // Late Payment & Default
+    ctx.font = 'bold 11px Arial'; ctx.fillStyle = '#f59e0b'; ctx.fillText('Late Payment & Default:', margin, y); y += 17;
+    drawText('• Days 1-3: Grace period (no penalty)', margin, 11, '#ffffff');
+    drawText('• Day 4: $50,000 late fee applied to balance', margin, 11, '#ffffff');
     drawText('• Day 7 without payment = DEFAULT & eviction', margin, 11, '#ef4444');
+    drawText('• Day 8: Buyer must VACATE property (24 hours after default)', margin, 11, '#ef4444');
     drawText('• All payments forfeited upon default', margin, 11, '#ffffff');
-    drawText('• Full ownership transfers upon final payment', margin, 11, '#ffffff');
+    y += 4;
+    
+    // Cure Period
+    ctx.font = 'bold 11px Arial'; ctx.fillStyle = '#f59e0b'; ctx.fillText('Cure Period:', margin, y); y += 17;
+    drawText('• Buyer may cure by paying full amount owed + late fees', margin, 11, '#ffffff');
+    drawText('• Must be paid IN FULL before Day 7 to avoid default', margin, 11, '#ffffff');
+    drawText('• Communication alone does not stop eviction - only payment', margin, 11, '#ffffff');
+    y += 4;
+    
+    // Property & Transfer
+    ctx.font = 'bold 11px Arial'; ctx.fillStyle = '#f59e0b'; ctx.fillText('Property & Transfer:', margin, y); y += 17;
+    drawText('• Buyer responsible for all maintenance during term', margin, 11, '#ffffff');
+    drawText('• No major modifications without seller consent', margin, 11, '#ffffff');
+    drawText('• Full ownership transfers upon final payment completion', margin, 11, '#ffffff');
+    drawText('• Title transfer within 7 days of final payment', margin, 11, '#ffffff');
+    drawText(`• Early payoff allowed without penalty ($${calc.finalPaymentFee.toLocaleString()} gov fee still applies)`, margin, 11, '#ffffff');
     y += 10;
     
     // === DOCUMENT ID ===
