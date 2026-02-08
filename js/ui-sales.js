@@ -394,13 +394,15 @@ window.submitPropertySale = async function(propertyId, saleType, rtoContractId) 
         // Save to houseSales collection
         const saleRef = await db.collection('houseSales').add(saleDoc);
         
-        // Mark property as sold
+        // Mark property as sold and set unavailable
         await PropertyDataService.writeMultiple(numericId, {
             isSold: true,
             soldDate: saleDate,
             soldTo: buyerName,
             soldPrice: salePrice,
-            saleId: saleRef.id
+            saleId: saleRef.id,
+            availability: 'unavailable',
+            unavailableReason: 'Sold'
         });
         
         // If RTO completion, update the contract status

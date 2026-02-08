@@ -757,8 +757,9 @@ function renderPropertyStatsContent(id) {
     }
     
     const isAvailable = state.availability[id] !== false;
+    const unavailableReason = PropertyDataService.getValue(id, 'unavailableReason', p.unavailableReason || 'Rented');
     const statusClass = isAvailable ? 'from-green-600 to-emerald-600' : 'from-red-600 to-pink-600';
-    const statusText = isAvailable ? 'Available' : 'Rented';
+    const statusText = isAvailable ? 'Available' : unavailableReason;
     
     // Get premium status
     const isPremium = PropertyDataService.getValue(id, 'isPremium', p.isPremium || false);
@@ -1524,7 +1525,7 @@ function renderPropertyStatsContent(id) {
                     <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
                 <div class="text-lg font-black">${statusText}</div>
-                <div class="text-xs opacity-80">${isAvailable ? 'Accepting inquiries' : 'Currently rented'}</div>
+                <div class="text-xs opacity-80">${isAvailable ? 'Accepting inquiries' : (unavailableReason === 'Sold' ? 'Property has been sold' : unavailableReason === 'Temporarily Unavailable' ? 'Not accepting inquiries' : 'Currently rented')}</div>
                 <div class="text-xs mt-1 opacity-70">Click to toggle</div>
             </div>
         </div>
@@ -2262,6 +2263,76 @@ window.savePropertyType = async function(propertyId, newValue) {
  * Toggle property status (available/rented)
  */
 window.togglePropertyStatus = async function(propertyId) {
+    const isAvailable = state.availability[propertyId] !== false;
+    
+    if (isAvailable) {
+        // Making UNAVAILABLE - show reason picker
+        const p = properties.find(prop => prop.id === propertyId);
+        const propertyTitle = p?.title || `Property #${propertyId}`;
+        
+        const modalHTML = `
+            <div id="unavailableReasonModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-sm w-full border border-red-500/30 shadow-2xl relative">
+                    <button onclick="document.getElementById('unavailableReasonModal').remove()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <div class="bg-gradient-to-r from-red-600 to-pink-600 px-5 py-3 rounded-t-2xl">
+                        <h3 class="text-lg font-bold text-white">Mark as Unavailable</h3>
+                        <p class="text-red-100 text-sm">${propertyTitle}</p>
+                    </div>
+                    <div class="p-5 space-y-2">
+                        <p class="text-gray-400 text-sm mb-3">Select a reason:</p>
+                        <button onclick="applyUnavailableReason(${propertyId}, 'Rented')" class="w-full text-left bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-red-500/50 rounded-xl px-4 py-3 text-white transition flex items-center gap-3">
+                            <span class="text-xl">🏠</span>
+                            <div>
+                                <div class="font-bold text-sm">Rented</div>
+                                <div class="text-gray-400 text-xs">Property is currently occupied</div>
+                            </div>
+                        </button>
+                        <button onclick="applyUnavailableReason(${propertyId}, 'Sold')" class="w-full text-left bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-amber-500/50 rounded-xl px-4 py-3 text-white transition flex items-center gap-3">
+                            <span class="text-xl">🏆</span>
+                            <div>
+                                <div class="font-bold text-sm">Sold</div>
+                                <div class="text-gray-400 text-xs">Property has been sold</div>
+                            </div>
+                        </button>
+                        <button onclick="applyUnavailableReason(${propertyId}, 'Temporarily Unavailable')" class="w-full text-left bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-blue-500/50 rounded-xl px-4 py-3 text-white transition flex items-center gap-3">
+                            <span class="text-xl">⏸️</span>
+                            <div>
+                                <div class="font-bold text-sm">Temporarily Unavailable</div>
+                                <div class="text-gray-400 text-xs">Not accepting inquiries right now</div>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="px-5 py-3 bg-gray-800/50 rounded-b-2xl">
+                        <button onclick="document.getElementById('unavailableReasonModal').remove()" class="w-full bg-gray-700 text-white py-2.5 rounded-xl font-bold hover:bg-gray-600 transition text-sm">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existing = document.getElementById('unavailableReasonModal');
+        if (existing) existing.remove();
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    } else {
+        // Making AVAILABLE - use existing toggleAvailability (has renter check built in)
+        await toggleAvailability(propertyId);
+        // Clear the reason when making available
+        await PropertyDataService.write(propertyId, 'unavailableReason', '');
+        setTimeout(() => renderPropertyStatsContent(propertyId), 100);
+    }
+};
+
+window.applyUnavailableReason = async function(propertyId, reason) {
+    const modal = document.getElementById('unavailableReasonModal');
+    if (modal) modal.remove();
+    
+    // Save the reason
+    await PropertyDataService.write(propertyId, 'unavailableReason', reason);
+    
+    // Toggle to unavailable
     await toggleAvailability(propertyId);
     setTimeout(() => renderPropertyStatsContent(propertyId), 100);
 };
