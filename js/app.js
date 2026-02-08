@@ -1546,6 +1546,12 @@ function renderPropertyStatsContent(id) {
                 <button onclick="togglePremiumTrialStatus(${id})" class="mt-2 text-xs bg-amber-800 hover:bg-amber-700 px-2 py-1 rounded text-amber-100">
                     ${isPremiumTrial ? 'Convert to Paid' : 'Convert to Trial'}
                 </button>
+                <button onclick="showCancelPremiumModal(${id}, '${p.title?.replace(/'/g, "\\'")}')" class="mt-1 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded text-red-100">
+                    ❌ Cancel Premium
+                </button>
+                <button onclick="showClearPremiumHistoryModal(${id}, '${p.title?.replace(/'/g, "\\'")}')" class="mt-1 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">
+                    🗑️ Clear History
+                </button>
                 ` : ''}
             </div>
             

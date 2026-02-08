@@ -80,6 +80,22 @@ window.openCreateListingModal = async function() {
     hideElement($('createListingError'));
     hideElement($('createListingSuccess'));
     hideElement($('priceWarning'));
+    
+    // Show/hide admin-only free trial option
+    const trialOption = $('newListingTrialOption');
+    if (trialOption) {
+        const isAdmin = typeof TierService !== 'undefined' && TierService.isMasterAdmin(auth.currentUser?.email);
+        if (!isAdmin) {
+            trialOption.classList.add('hidden');
+            trialOption.style.display = 'none'; // Extra insurance
+        } else {
+            trialOption.style.display = ''; // Allow CSS toggle to work
+        }
+    }
+    // Reset trial checkbox
+    const trialCheck = $('newListingPremiumTrial');
+    if (trialCheck) trialCheck.checked = false;
+    
     openModal('createListingModal');
 };
 
@@ -121,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const buyPrice = parseInt($('newListingBuyPrice')?.value) || 0;
             const imagesText = $('newListingImages').value.trim();
             const isPremium = $('newListingPremium')?.checked || false;
+            const isPremiumTrial = isPremium && ($('newListingPremiumTrial')?.checked || false);
             const warningDiv = $('createListingWarning');
             
             // Hide warning div if it exists
@@ -271,7 +288,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     ownerContactPhone: ownerContactPhone, // Public contact phone (synced from profile)
                     ownerDisplayName: ownerDisplayName,   // Public display name (synced from profile)
                     isPremium: isPremium,
+                    isPremiumTrial: isPremiumTrial,
                     premiumRequestedAt: isPremium ? new Date().toISOString() : null,
+                    premiumTrialStartDate: isPremiumTrial ? new Date().toISOString().split('T')[0] : null,
+                    premiumTrialEnds: isPremiumTrial ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : null,
                     createdAt: new Date().toISOString(),
                     createdAtTimestamp: firebase.firestore.FieldValue.serverTimestamp()
                 };
@@ -308,8 +328,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.warn('[CreateListing] Could not update lastPropertyPosted:', e);
                 }
                 
-                // Log premium listing fee if premium was selected
-                if (isPremium && typeof logPayment === 'function') {
+                // Log premium listing fee if premium was selected (skip for free trials)
+                if (isPremium && !isPremiumTrial && typeof logPayment === 'function') {
                     try {
                         await logPayment(newId, {
                             paymentDate: new Date().toISOString().split('T')[0],

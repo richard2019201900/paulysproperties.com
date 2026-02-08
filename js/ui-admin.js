@@ -2230,6 +2230,11 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                                 title="Copy reminder message">
                                 📋 Copy Reminder
                             </button>
+                            <button onclick="showCancelPremiumModal(${p.id}, '${safeTitle}')" 
+                                class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
+                                title="Cancel premium listing">
+                                ❌ Cancel
+                            </button>
                         </div>
                     </div>
                 `;

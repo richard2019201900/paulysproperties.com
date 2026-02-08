@@ -2493,3 +2493,178 @@ window.adminEditDisplayName = async function(userId, email, currentName) {
         alert('Error updating display name: ' + error.message);
     }
 };
+
+// ==================== CANCEL PREMIUM LISTING ====================
+
+/**
+ * Show confirmation modal to cancel premium listing
+ * Removes premium status but preserves all payment history
+ */
+window.showCancelPremiumModal = function(propertyId, propertyTitle) {
+    const decodedTitle = propertyTitle ? propertyTitle.replace(/&quot;/g, '"').replace(/&#39;/g, "'") : `Property #${propertyId}`;
+    
+    const modalHTML = `
+        <div id="cancelPremiumModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-red-500/30 shadow-2xl relative">
+                <button onclick="document.getElementById('cancelPremiumModal').remove()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <div class="bg-gradient-to-r from-red-600 to-red-700 px-5 py-3 rounded-t-2xl">
+                    <h3 class="text-lg font-bold text-white">❌ Cancel Premium Listing</h3>
+                    <p class="text-red-100 text-sm">${decodedTitle}</p>
+                </div>
+                <div class="p-5 space-y-3">
+                    <div class="bg-gray-800 rounded-lg p-3 space-y-2 text-sm">
+                        <p class="text-white font-bold">This will:</p>
+                        <p class="text-gray-300">• Remove premium status & featured placement</p>
+                        <p class="text-gray-300">• Stop any overdue payment reminders</p>
+                        <p class="text-green-400 font-medium">✅ All previous payment records are preserved</p>
+                    </div>
+                    <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-3">
+                        <p class="text-blue-300 text-xs">💡 Premium can be re-enabled later from the property's Owner Stats page if needed.</p>
+                    </div>
+                </div>
+                <div class="px-5 py-3 bg-gray-800/50 flex gap-3 rounded-b-2xl">
+                    <button onclick="document.getElementById('cancelPremiumModal').remove()" class="flex-1 bg-gray-700 text-white py-2.5 rounded-xl font-bold hover:bg-gray-600 transition text-sm">
+                        Keep Premium
+                    </button>
+                    <button onclick="executeCancelPremium(${propertyId})" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-2.5 rounded-xl font-bold hover:opacity-90 transition text-sm">
+                        ❌ Cancel Premium
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const existing = document.getElementById('cancelPremiumModal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.executeCancelPremium = async function(propertyId) {
+    try {
+        const modal = document.getElementById('cancelPremiumModal');
+        if (modal) modal.remove();
+        
+        // Remove premium status but preserve payment history
+        await PropertyDataService.writeMultiple(propertyId, {
+            isPremium: false,
+            isPremiumTrial: false,
+            premiumCancelledAt: new Date().toISOString(),
+            premiumUpdatedAt: new Date().toISOString()
+        });
+        
+        // Update local cache
+        const p = properties.find(prop => prop.id === propertyId);
+        if (p) {
+            p.isPremium = false;
+            p.isPremiumTrial = false;
+        }
+        
+        showToast('❌ Premium listing cancelled. Payment history preserved.', 'success');
+        
+        // Refresh relevant panels
+        if (typeof renderPropertyStatsContent === 'function') {
+            renderPropertyStatsContent(propertyId);
+        }
+        if (typeof window.renderPremiumAlertsPanel === 'function') {
+            window.renderPremiumAlertsPanel();
+        }
+        // Re-render admin user list
+        if (typeof renderAdminDashboard === 'function') {
+            setTimeout(() => renderAdminDashboard(), 300);
+        }
+        
+    } catch (error) {
+        console.error('[CancelPremium] Error:', error);
+        showToast('Failed to cancel premium: ' + error.message, 'error');
+    }
+};
+
+// ==================== CLEAR PREMIUM PAYMENT HISTORY ====================
+
+/**
+ * Show confirmation modal to clear premium payment history
+ * This is a destructive action - completely separate from cancel/trial toggles
+ */
+window.showClearPremiumHistoryModal = function(propertyId, propertyTitle) {
+    const decodedTitle = propertyTitle ? propertyTitle.replace(/&quot;/g, '"').replace(/&#39;/g, "'") : `Property #${propertyId}`;
+    
+    const modalHTML = `
+        <div id="clearPremiumHistoryModal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-900 rounded-2xl max-w-md w-full border border-red-500/30 shadow-2xl relative">
+                <button onclick="document.getElementById('clearPremiumHistoryModal').remove()" class="absolute top-3 right-3 w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                <div class="bg-gradient-to-r from-red-700 to-red-800 px-5 py-3 rounded-t-2xl">
+                    <h3 class="text-lg font-bold text-white">🗑️ Clear Premium Payment History</h3>
+                    <p class="text-red-100 text-sm">${decodedTitle}</p>
+                </div>
+                <div class="p-5 space-y-3">
+                    <div class="bg-red-900/30 border border-red-500/30 rounded-lg p-3 space-y-2 text-sm">
+                        <p class="text-red-300 font-bold">⚠️ This is permanent and cannot be undone!</p>
+                        <p class="text-gray-300">• All premium payment records will be deleted</p>
+                        <p class="text-gray-300">• Premium last payment date will be reset</p>
+                        <p class="text-gray-300">• This does NOT change premium active/trial status</p>
+                    </div>
+                    <p class="text-gray-400 text-xs">Only use this if payment records were logged in error and need to be wiped clean.</p>
+                </div>
+                <div class="px-5 py-3 bg-gray-800/50 flex gap-3 rounded-b-2xl">
+                    <button onclick="document.getElementById('clearPremiumHistoryModal').remove()" class="flex-1 bg-gray-700 text-white py-2.5 rounded-xl font-bold hover:bg-gray-600 transition text-sm">
+                        Cancel
+                    </button>
+                    <button onclick="executeClearPremiumHistory(${propertyId})" class="flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white py-2.5 rounded-xl font-bold hover:opacity-90 transition text-sm">
+                        🗑️ Clear History
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const existing = document.getElementById('clearPremiumHistoryModal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+};
+
+window.executeClearPremiumHistory = async function(propertyId) {
+    try {
+        const modal = document.getElementById('clearPremiumHistoryModal');
+        if (modal) modal.remove();
+        
+        // Remove premium payment entries from paymentHistory
+        const historyDoc = await db.collection('paymentHistory').doc(String(propertyId)).get();
+        if (historyDoc.exists) {
+            let payments = historyDoc.data().payments || [];
+            const originalCount = payments.length;
+            payments = payments.filter(p => p.type !== 'premium_fee' && p.frequency !== 'premium');
+            const removedCount = originalCount - payments.length;
+            
+            if (removedCount > 0) {
+                await db.collection('paymentHistory').doc(String(propertyId)).set({
+                    propertyId: propertyId,
+                    payments: payments,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        }
+        
+        // Reset premium last payment date
+        await PropertyDataService.write(propertyId, 'premiumLastPayment', '');
+        
+        const p = properties.find(prop => prop.id === propertyId);
+        if (p) p.premiumLastPayment = '';
+        
+        showToast('🗑️ Premium payment history cleared.', 'success');
+        
+        if (typeof renderPropertyStatsContent === 'function') {
+            renderPropertyStatsContent(propertyId);
+        }
+        if (typeof window.renderPremiumAlertsPanel === 'function') {
+            window.renderPremiumAlertsPanel();
+        }
+        
+    } catch (error) {
+        console.error('[ClearPremiumHistory] Error:', error);
+        showToast('Failed to clear history: ' + error.message, 'error');
+    }
+};

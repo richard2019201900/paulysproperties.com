@@ -505,7 +505,8 @@
                 <!-- Premium Listing Option -->
                 <div class="bg-gradient-to-r from-amber-900/30 to-yellow-900/30 border-2 border-amber-500/50 rounded-xl p-4">
                     <label class="flex items-start gap-4 cursor-pointer">
-                        <input type="checkbox" id="newListingPremium" class="w-6 h-6 mt-1 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                        <input type="checkbox" id="newListingPremium" class="w-6 h-6 mt-1 rounded border-amber-500 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                               onchange="document.getElementById('newListingTrialOption').classList.toggle('hidden', !this.checked)">
                         <div class="flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-2xl">👑</span>
@@ -521,6 +522,16 @@
                             <p class="text-orange-400 text-xs mt-2 font-semibold">⚠️ Weekly payment required - Pauly will contact you to collect $10k payment</p>
                         </div>
                     </label>
+                    <!-- Admin-only Free Trial option (hidden by default, shown via JS for admin) -->
+                    <div id="newListingTrialOption" class="hidden mt-3 ml-10 bg-cyan-900/30 border border-cyan-500/30 rounded-lg p-3">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="newListingPremiumTrial" class="w-5 h-5 rounded border-cyan-500 text-cyan-500 focus:ring-cyan-500 cursor-pointer">
+                            <div>
+                                <span class="text-cyan-300 font-bold text-sm">🎁 Start as Free Trial</span>
+                                <p class="text-cyan-200/60 text-xs mt-0.5">30-day trial — no weekly fee collected. Premium features active immediately.</p>
+                            </div>
+                        </label>
+                    </div>
                 </div>
                 
                 <div>
