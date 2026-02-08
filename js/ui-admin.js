@@ -2142,12 +2142,13 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
         const premiumListings = userProperties.filter(p => {
             const isPremium = PropertyDataService.getValue(p.id, 'isPremium', p.isPremium || false);
             const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
-            return isPremium && !isPremiumTrial;
+            return isPremium;
         });
         
         if (premiumListings.length > 0) {
             const premiumItems = premiumListings.map(p => {
                 const title = p.title || p.name || 'Property';
+                const isPremiumTrial = PropertyDataService.getValue(p.id, 'isPremiumTrial', p.isPremiumTrial || false);
                 const premiumLastPayment = PropertyDataService.getValue(p.id, 'premiumLastPayment', p.premiumLastPayment || '');
                 const weeklyFee = PropertyDataService.getValue(p.id, 'premiumWeeklyFee', p.premiumWeeklyFee || 10000);
                 
@@ -2158,7 +2159,23 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                 let statusIcon = '📅';
                 let urgencyClass = '';
                 
-                if (premiumLastPayment) {
+                if (isPremiumTrial) {
+                    // Trial listing - no payment tracking needed
+                    statusIcon = '🎁';
+                    urgencyClass = 'bg-cyan-900/30 border-cyan-600';
+                    lastPaidDisplay = 'Free Trial';
+                    const trialEnds = PropertyDataService.getValue(p.id, 'premiumTrialEnds', p.premiumTrialEnds || '');
+                    if (trialEnds) {
+                        const endDate = new Date(trialEnds);
+                        const today = new Date(); today.setHours(0,0,0,0); endDate.setHours(0,0,0,0);
+                        const daysLeft = Math.ceil((endDate - today) / (1000*60*60*24));
+                        nextDueDisplay = daysLeft > 0 
+                            ? `<span class="text-cyan-400">${daysLeft}d trial left</span>`
+                            : `<span class="text-red-400 font-bold">Trial expired!</span>`;
+                    } else {
+                        nextDueDisplay = '<span class="text-cyan-400">Active trial</span>';
+                    }
+                } else if (premiumLastPayment) {
                     const [year, month, day] = premiumLastPayment.split('-').map(Number);
                     const lastDate = new Date(year, month - 1, day);
                     lastPaidDisplay = lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -2214,13 +2231,14 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <span class="text-white font-medium text-xs flex items-center gap-1">
                                 ${statusIcon} 👑 ${title}
                             </span>
-                            <span class="text-xs text-amber-400">$${weeklyFee.toLocaleString()}/wk</span>
+                            <span class="text-xs ${isPremiumTrial ? 'text-cyan-400' : 'text-amber-400'}">${isPremiumTrial ? '🎁 Trial' : '$' + weeklyFee.toLocaleString() + '/wk'}</span>
                         </div>
                         <div class="flex items-center justify-between text-xs">
                             <span class="text-gray-400">Last paid: <span class="${statusColor}">${lastPaidDisplay}</span></span>
                             <span class="text-gray-400">Next due: ${nextDueDisplay}</span>
                         </div>
-                        <div class="flex items-center justify-between mt-1">
+                        <div class="flex flex-wrap items-center gap-1 mt-1">
+                            ${!isPremiumTrial ? `
                             <button onclick="recordPremiumPayment(${p.id}, '${escapedEmail}')" 
                                 class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1">
                                 💰 Record Payment
@@ -2228,12 +2246,23 @@ window.renderAdminUsersList = function(users, pendingRequests = null) {
                             <button onclick="copyPremiumReminder('${safeTitle}', ${weeklyFee}, '${nextDuePlainText}')" 
                                 class="bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
                                 title="Copy reminder message">
-                                📋 Copy Reminder
+                                📋 Reminder
+                            </button>
+                            ` : ''}
+                            <button onclick="togglePremiumTrialStatus(${p.id})" 
+                                class="${isPremiumTrial ? 'bg-green-700 hover:bg-green-600' : 'bg-cyan-700 hover:bg-cyan-600'} text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
+                                title="${isPremiumTrial ? 'Convert to paid ($10k/week)' : 'Convert to free trial'}">
+                                ${isPremiumTrial ? '💰 To Paid' : '🎁 To Trial'}
                             </button>
                             <button onclick="showCancelPremiumModal(${p.id}, '${safeTitle}')" 
                                 class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
                                 title="Cancel premium listing">
                                 ❌ Cancel
+                            </button>
+                            <button onclick="showClearPremiumHistoryModal(${p.id}, '${safeTitle}')" 
+                                class="bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1"
+                                title="Clear premium payment history">
+                                🗑️ History
                             </button>
                         </div>
                     </div>
