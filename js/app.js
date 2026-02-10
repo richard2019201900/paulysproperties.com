@@ -10829,7 +10829,7 @@ function pngRender(contracts,single,total,tax){
     if(!single&&contracts.length>1){
         var ownC=contracts.filter(function(c){return isOwnerContract(c);}),agtC=contracts.filter(function(c){return!isOwnerContract(c);});
         var T=calcTotals(contracts);
-        var sh=tax?300:170;rr(M,y,cw,sh,C.card,10);ctx.strokeStyle='#92400e';ctx.lineWidth=1.5;ctx.strokeRect(M,y,cw,sh);
+        var sh=tax?320:170;rr(M,y,cw,sh,C.card,10);ctx.strokeStyle='#92400e';ctx.lineWidth=1.5;ctx.strokeRect(M,y,cw,sh);
         ctx.font='bold 16px Arial';ctx.fillStyle=C.amber;ctx.fillText('Portfolio Summary',M+20,y+26);
         ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText(contracts.length+' total — '+ownC.length+' I own + '+agtC.length+' I manage as agent',M+185,y+26);
         var bw=(cw-60-30)/4,bh=50,by=y+40;
@@ -10843,9 +10843,9 @@ function pngRender(contracts,single,total,tax){
             rr(M+20,ty,cw-40,30,C.bgRed,6);ctx.font='bold 12px Arial';ctx.fillStyle=C.red;ctx.fillText('My Back Taxes Owed: $'+(T.ownTax+T.agtMyTax).toLocaleString(),M+30,ty+20);ctx.font='10px Arial';ctx.fillStyle='#fca5a5';ctx.fillText('($'+T.ownTax.toLocaleString()+' owner income + $'+T.agtMyTax.toLocaleString()+' agent comm)',M+310,ty+20);
             rr(M+20,ty+36,cw-40,28,'#78350f80',6);ctx.font='bold 11px Arial';ctx.fillStyle=C.orange;ctx.fillText('⚠️ Owner Back Taxes Owed: $'+T.agtOwnerTax.toLocaleString(),M+30,ty+54);
             // Grand total box with padding
-            var gtY=ty+74;rr(M+20,gtY,cw-40,40,C.inner,8);ctx.strokeStyle='#dc262688';ctx.lineWidth=2;ctx.strokeRect(M+20,gtY,cw-40,40);
-            ctx.font='bold 14px Arial';ctx.fillStyle=C.red;var gtText='TOTAL BACK TAXES OWED TO GOVERNMENT:  $'+grandTotal.toLocaleString();ctx.fillText(gtText,M+35,gtY+20);
-            ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText('As of '+todayStr,M+35,gtY+34);
+            var gtY=ty+78;rr(M+20,gtY,cw-40,52,C.inner,8);ctx.strokeStyle='#dc262688';ctx.lineWidth=2;ctx.strokeRect(M+20,gtY,cw-40,52);
+            ctx.font='bold 14px Arial';ctx.fillStyle=C.red;var gtText='TOTAL BACK TAXES OWED TO GOVERNMENT:  $'+grandTotal.toLocaleString();ctx.fillText(gtText,M+35,gtY+24);
+            ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText('As of '+todayStr,M+35,gtY+42);
         }
         y+=sh+18;
     }
