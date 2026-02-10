@@ -10535,3 +10535,737 @@ window.submitForcePasswordChange = async function() {
         }
     }
 };
+
+// ==================== RTO AUDIT REPORT ====================
+
+/**
+ * Open the RTO Audit Report modal - fetches all contracts from Firestore
+ */
+window.openRTOAuditReport = async function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Admin only', 'error');
+        return;
+    }
+    
+    showToast('📋 Loading contracts...', 'info');
+    
+    try {
+        const snapshot = await db.collection('rentToOwnContracts').get();
+        const contracts = [];
+        snapshot.forEach(doc => {
+            contracts.push({ id: doc.id, ...doc.data() });
+        });
+        
+        if (contracts.length === 0) {
+            showToast('No RTO contracts found', 'warning');
+            return;
+        }
+        
+        window._auditContracts = contracts;
+        
+        // Build unique buyer/seller list for filter
+        const people = new Set();
+        contracts.forEach(c => {
+            if (c.buyer) people.add(c.buyer);
+            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
+            if (seller) people.add(seller);
+        });
+        const sortedPeople = [...people].sort();
+        const filterOptions = sortedPeople.map(p => `<option value="${p}">${p}</option>`).join('');
+        
+        const modalHTML = `
+            <div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+                <div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col">
+                    <button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4">
+                        <h3 class="text-xl font-bold text-white flex items-center gap-3">
+                            <span>📋</span> RTO Contract Audit Report
+                        </h3>
+                        <p class="text-amber-100 text-sm mt-1">${contracts.length} contract(s) found</p>
+                    </div>
+                    <div class="px-6 py-3 bg-gray-800/50 border-b border-gray-700 flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-2">
+                            <label class="text-gray-400 text-sm">Filter:</label>
+                            <select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
+                                <option value="all">All Contracts</option>
+                                ${filterOptions}
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500">
+                                Include completed/cancelled
+                            </label>
+                        </div>
+                        <div class="ml-auto flex flex-wrap gap-2">
+                            <button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                📋 Copy All
+                            </button>
+                            <button onclick="downloadAuditPNG('single')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                🖼️ PNG Per Contract
+                            </button>
+                            <button onclick="downloadAuditPNG('combined')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                                🖼️ PNG All-in-One
+                            </button>
+                        </div>
+                    </div>
+                    <div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+                        <p class="text-gray-400">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        renderAuditReport();
+        
+    } catch (error) {
+        console.error('[Audit] Error loading contracts:', error);
+        showToast('Failed to load contracts', 'error');
+    }
+};
+
+window.closeRTOAuditModal = function() {
+    const modal = document.getElementById('rtoAuditModal');
+    if (modal) modal.remove();
+};
+
+window.renderAuditReport = function() {
+    const container = document.getElementById('auditReportContent');
+    if (!container || !window._auditContracts) return;
+    
+    const filterUser = document.getElementById('auditFilterUser')?.value || 'all';
+    const includeCompleted = document.getElementById('auditIncludeCompleted')?.checked ?? true;
+    
+    let filtered = window._auditContracts.slice();
+    
+    if (filterUser !== 'all') {
+        filtered = filtered.filter(c => {
+            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
+            return c.buyer === filterUser || seller === filterUser;
+        });
+    }
+    
+    if (!includeCompleted) {
+        filtered = filtered.filter(c => (c.status || 'active') === 'active');
+    }
+    
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 italic text-center py-8">No contracts match the current filters</p>';
+        return;
+    }
+    
+    // Calculate portfolio summary
+    let totalPurchaseValue = 0, totalCollected = 0, totalOutstanding = 0;
+    let activeCount = 0, completedCount = 0, cancelledCount = 0;
+    
+    filtered.forEach(c => {
+        const calc = c.calculations || {};
+        const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
+        const history = c.rtoPaymentHistory || [];
+        const deposit = c.depositPaid ? (c.depositAmount || 0) : 0;
+        const paymentsTotal = history.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const remaining = c.remainingBalance || 0;
+        const govFee = Math.round((c.finalPaymentBase || 0) * 0.10);
+        
+        totalPurchaseValue += purchasePrice;
+        totalCollected += deposit + paymentsTotal;
+        totalOutstanding += remaining + (remaining > 0 ? govFee : 0);
+        
+        const status = (c.status || 'active').toLowerCase();
+        if (status === 'active') activeCount++;
+        else if (status === 'completed') completedCount++;
+        else cancelledCount++;
+    });
+    
+    let html = `
+        <div class="bg-gradient-to-r from-gray-800 to-gray-800/50 rounded-xl p-5 border border-amber-600/40">
+            <h4 class="text-amber-400 font-bold text-lg mb-3">Portfolio Summary</h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <div class="text-gray-400 text-xs uppercase">Contracts</div>
+                    <div class="text-white text-xl font-bold">${filtered.length}</div>
+                    <div class="text-gray-500 text-xs">${activeCount} active${completedCount ? ', ' + completedCount + ' completed' : ''}${cancelledCount ? ', ' + cancelledCount + ' cancelled' : ''}</div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-xs uppercase">Total Purchase Value</div>
+                    <div class="text-white text-xl font-bold">$${totalPurchaseValue.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-xs uppercase">Total Collected</div>
+                    <div class="text-green-400 text-xl font-bold">$${totalCollected.toLocaleString()}</div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-xs uppercase">Total Outstanding</div>
+                    <div class="text-amber-400 text-xl font-bold">$${totalOutstanding.toLocaleString()}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    filtered.forEach((c, idx) => {
+        html += buildAuditContractCard(c, idx);
+    });
+    
+    container.innerHTML = html;
+};
+
+function buildAuditContractCard(c, idx) {
+    const calc = c.calculations || {};
+    const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
+    const termMonths = c.totalPayments || calc.termMonths || 0;
+    const history = (c.rtoPaymentHistory || []).slice().sort((a, b) => (a.month || 0) - (b.month || 0));
+    const deposit = c.depositAmount || 0;
+    const depositPaid = c.depositPaid || false;
+    const remaining = c.remainingBalance || 0;
+    const finalPaymentBase = c.finalPaymentBase || 0;
+    const govFee = Math.round(finalPaymentBase * 0.10);
+    const status = (c.status || 'active').toLowerCase();
+    const seller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
+    const buyer = c.buyer || 'Unknown';
+    const startDate = c.startDate || 'N/A';
+    const expectedMonthly = c.expectedMonthlyPayment || calc.monthlyPayment || 0;
+    
+    const hasAgent = seller.includes('Managed by:');
+    const agentName = hasAgent ? seller.replace(/Managed by:\s*/i, '').trim() : null;
+    const agentCommission = hasAgent ? Math.round(finalPaymentBase * 0.10) : 0;
+    
+    const statusBadge = status === 'active' 
+        ? '<span class="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold">ACTIVE</span>'
+        : status === 'completed'
+        ? '<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold">COMPLETED</span>'
+        : '<span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold">CANCELLED</span>';
+    
+    // Payment rows
+    let paymentRows = '';
+    let runningBalance = purchasePrice - deposit;
+    
+    if (deposit > 0) {
+        paymentRows += '<tr class="border-b border-gray-700/50">';
+        paymentRows += '<td class="py-1.5 px-2 text-gray-400 text-xs">Deposit</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-xs">' + (depositPaid ? '<span class="text-green-400">' + (c.depositPaidDate || 'Paid') + '</span>' : '<span class="text-amber-400">Pending</span>') + '</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-white text-xs text-right">$' + deposit.toLocaleString() + '</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-gray-300 text-xs text-right">$' + runningBalance.toLocaleString() + '</td>';
+        paymentRows += '</tr>';
+    }
+    
+    history.forEach((pay, i) => {
+        runningBalance = Math.max(0, runningBalance - (pay.amount || 0));
+        const monthLabel = pay.monthsCovered && pay.monthsCovered > 1 
+            ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered)) 
+            : 'Month ' + (pay.month || (i + 1));
+        const payDate = pay.date || pay.paidDate || 'N/A';
+        paymentRows += '<tr class="border-b border-gray-700/50">';
+        paymentRows += '<td class="py-1.5 px-2 text-gray-400 text-xs">' + monthLabel + '</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-green-400 text-xs">' + payDate + '</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-white text-xs text-right">$' + (pay.amount || 0).toLocaleString() + '</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-gray-300 text-xs text-right">$' + runningBalance.toLocaleString() + '</td>';
+        paymentRows += '</tr>';
+    });
+    
+    if (remaining > 0 && status === 'active') {
+        paymentRows += '<tr class="border-b border-gray-700/50 bg-amber-900/20">';
+        paymentRows += '<td class="py-1.5 px-2 text-amber-400 text-xs font-bold">Final Payment</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-amber-400 text-xs">Pending</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-amber-400 text-xs text-right font-bold">$' + (finalPaymentBase + govFee).toLocaleString() + '</td>';
+        paymentRows += '<td class="py-1.5 px-2 text-green-400 text-xs text-right font-bold">$0</td>';
+        paymentRows += '</tr>';
+    }
+    
+    // Next due date
+    const paidThrough = c.rtoPaidThroughDate || '';
+    let nextDueText = 'N/A';
+    if (status === 'active' && remaining > 0) {
+        if (paidThrough) {
+            nextDueText = new Date(paidThrough + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else if (history.length > 0) {
+            const lastPay = history[history.length - 1];
+            const lastDate = new Date((lastPay.date || lastPay.paidDate) + 'T12:00:00');
+            lastDate.setMonth(lastDate.getMonth() + 1);
+            nextDueText = lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+    }
+    
+    const depositCollected = depositPaid ? deposit : 0;
+    const paymentsCollected = history.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalCollected = depositCollected + paymentsCollected;
+    
+    let card = '';
+    card += '<div class="bg-gray-800/70 rounded-xl border border-gray-700 overflow-hidden" data-audit-contract="' + idx + '">';
+    card += '<div class="px-5 py-3 bg-gray-800 border-b border-gray-700 flex flex-wrap items-center justify-between gap-2">';
+    card += '<div>';
+    card += '<h5 class="text-white font-bold flex items-center gap-2">🏠 ' + (c.propertyTitle || 'Unknown Property') + ' ' + statusBadge + '</h5>';
+    card += '<p class="text-gray-400 text-xs mt-0.5">Contract: ' + (c.documentId || c.id) + ' | Started: ' + startDate + '</p>';
+    card += '</div>';
+    card += '<button onclick="copySingleAuditText(' + idx + ')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-xs font-bold transition">📋 Copy</button>';
+    card += '</div>';
+    card += '<div class="p-5">';
+    
+    // Details grid
+    card += '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">';
+    card += '<div><div class="text-gray-500 text-xs uppercase">Seller</div><div class="text-white text-sm font-medium">' + seller + '</div>';
+    if (hasAgent) card += '<div class="text-purple-400 text-xs">Agent: ' + agentName + '</div>';
+    card += '</div>';
+    card += '<div><div class="text-gray-500 text-xs uppercase">Buyer</div><div class="text-white text-sm font-medium">' + buyer + '</div></div>';
+    card += '<div><div class="text-gray-500 text-xs uppercase">Purchase Price</div><div class="text-white text-sm font-bold">$' + purchasePrice.toLocaleString() + '</div><div class="text-gray-500 text-xs">' + termMonths + ' month term</div></div>';
+    card += '<div><div class="text-gray-500 text-xs uppercase">Monthly Payment</div><div class="text-white text-sm font-bold">$' + expectedMonthly.toLocaleString() + '</div></div>';
+    card += '</div>';
+    
+    // Financial summary
+    card += '<div class="grid grid-cols-3 gap-3 mb-4">';
+    card += '<div class="bg-green-900/30 rounded-lg p-2.5 border border-green-700/30"><div class="text-green-400 text-xs uppercase">Collected</div><div class="text-green-400 text-lg font-bold">$' + totalCollected.toLocaleString() + '</div></div>';
+    card += '<div class="bg-amber-900/30 rounded-lg p-2.5 border border-amber-700/30"><div class="text-amber-400 text-xs uppercase">Remaining + Gov Fee</div><div class="text-amber-400 text-lg font-bold">$' + (remaining > 0 ? remaining + govFee : 0).toLocaleString() + '</div>';
+    if (govFee > 0 && remaining > 0) card += '<div class="text-gray-500 text-xs">Base: $' + remaining.toLocaleString() + ' + Gov: $' + govFee.toLocaleString() + '</div>';
+    card += '</div>';
+    card += '<div class="bg-gray-700/30 rounded-lg p-2.5 border border-gray-600/30"><div class="text-gray-400 text-xs uppercase">Next Due</div><div class="text-white text-lg font-bold">' + (status === 'active' ? nextDueText : 'N/A') + '</div>';
+    if (hasAgent && remaining > 0) card += '<div class="text-purple-400 text-xs">Agent comm: $' + agentCommission.toLocaleString() + '</div>';
+    card += '</div></div>';
+    
+    // Payment table
+    card += '<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-gray-600">';
+    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase">Payment</th>';
+    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase">Date</th>';
+    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase text-right">Amount</th>';
+    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase text-right">Balance After</th>';
+    card += '</tr></thead><tbody>';
+    card += paymentRows || '<tr><td colspan="4" class="py-2 px-2 text-gray-500 text-xs italic">No payments recorded</td></tr>';
+    card += '</tbody></table></div>';
+    
+    card += '</div></div>';
+    return card;
+}
+
+function buildAuditContractText(c) {
+    const calc = c.calculations || {};
+    const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
+    const termMonths = c.totalPayments || calc.termMonths || 0;
+    const history = (c.rtoPaymentHistory || []).slice().sort((a, b) => (a.month || 0) - (b.month || 0));
+    const deposit = c.depositAmount || 0;
+    const depositPaid = c.depositPaid || false;
+    const remaining = c.remainingBalance || 0;
+    const finalPaymentBase = c.finalPaymentBase || 0;
+    const govFee = Math.round(finalPaymentBase * 0.10);
+    const status = (c.status || 'active').toUpperCase();
+    const seller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
+    const buyer = c.buyer || 'Unknown';
+    const startDate = c.startDate || 'N/A';
+    const expectedMonthly = c.expectedMonthlyPayment || calc.monthlyPayment || 0;
+    const depositCollected = depositPaid ? deposit : 0;
+    const paymentsCollected = history.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalCollected = depositCollected + paymentsCollected;
+    
+    let text = '';
+    text += 'PROPERTY: ' + (c.propertyTitle || 'Unknown') + '\n';
+    text += 'STATUS: ' + status + '\n';
+    text += 'CONTRACT ID: ' + (c.documentId || c.id) + '\n';
+    text += 'START DATE: ' + startDate + '\n';
+    text += 'SELLER: ' + seller + '\n';
+    text += 'BUYER: ' + buyer + '\n';
+    text += 'PURCHASE PRICE: $' + purchasePrice.toLocaleString() + '\n';
+    text += 'TERM: ' + termMonths + ' months\n';
+    text += 'MONTHLY PAYMENT: $' + expectedMonthly.toLocaleString() + '\n';
+    text += '\n';
+    text += 'PAYMENT HISTORY:\n';
+    
+    let runningBalance = purchasePrice - deposit;
+    
+    if (deposit > 0) {
+        text += '  Deposit: $' + deposit.toLocaleString() + ' - ' + (depositPaid ? (c.depositPaidDate || 'Paid') : 'PENDING') + ' - Balance: $' + runningBalance.toLocaleString() + '\n';
+    }
+    
+    history.forEach((pay, i) => {
+        runningBalance = Math.max(0, runningBalance - (pay.amount || 0));
+        const monthLabel = pay.monthsCovered && pay.monthsCovered > 1
+            ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered))
+            : 'Month ' + (pay.month || (i + 1));
+        const payDate = pay.date || pay.paidDate || 'N/A';
+        text += '  ' + monthLabel + ': $' + (pay.amount || 0).toLocaleString() + ' - ' + payDate + ' - Balance: $' + runningBalance.toLocaleString() + '\n';
+    });
+    
+    if (remaining > 0 && (c.status || 'active') === 'active') {
+        text += '  Final Payment: $' + (finalPaymentBase + govFee).toLocaleString() + ' - PENDING - Balance: $0\n';
+    }
+    
+    text += '\n';
+    text += 'FINANCIAL SUMMARY:\n';
+    text += '  Total Collected: $' + totalCollected.toLocaleString() + '\n';
+    text += '  Remaining Balance: $' + remaining.toLocaleString() + '\n';
+    text += '  Government Transfer Fee (10%): $' + govFee.toLocaleString() + '\n';
+    text += '  Total Outstanding: $' + (remaining > 0 ? remaining + govFee : 0).toLocaleString() + '\n';
+    
+    return text;
+}
+
+window.copySingleAuditText = function(idx) {
+    const contracts = getFilteredAuditContracts();
+    if (!contracts[idx]) return;
+    
+    const text = buildAuditContractText(contracts[idx]);
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('📋 Contract copied to clipboard', 'success');
+    }).catch(() => {
+        showToast('Failed to copy', 'error');
+    });
+};
+
+window.copyAllAuditText = function() {
+    const contracts = getFilteredAuditContracts();
+    if (contracts.length === 0) {
+        showToast('No contracts to copy', 'warning');
+        return;
+    }
+    
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    
+    let fullText = 'RTO CONTRACT AUDIT REPORT\n';
+    fullText += 'Generated: ' + timestamp + '\n';
+    fullText += 'PaulysProperties.com\n';
+    fullText += '==================================================\n\n';
+    
+    let totalPurchase = 0, totalCollected = 0, totalOutstanding = 0;
+    let activeCount = 0, completedCount = 0;
+    
+    contracts.forEach(c => {
+        const calc = c.calculations || {};
+        const history = c.rtoPaymentHistory || [];
+        const depositAmt = c.depositPaid ? (c.depositAmount || 0) : 0;
+        const payAmt = history.reduce((s, p) => s + (p.amount || 0), 0);
+        const rem = c.remainingBalance || 0;
+        const gf = Math.round((c.finalPaymentBase || 0) * 0.10);
+        
+        totalPurchase += calc.purchasePrice || calc.totalPrice || 0;
+        totalCollected += depositAmt + payAmt;
+        totalOutstanding += rem > 0 ? rem + gf : 0;
+        if ((c.status || 'active') === 'active') activeCount++;
+        else completedCount++;
+    });
+    
+    fullText += 'PORTFOLIO SUMMARY\n';
+    fullText += '  Total Contracts: ' + contracts.length + ' (' + activeCount + ' active' + (completedCount ? ', ' + completedCount + ' completed/cancelled' : '') + ')\n';
+    fullText += '  Total Purchase Value: $' + totalPurchase.toLocaleString() + '\n';
+    fullText += '  Total Collected: $' + totalCollected.toLocaleString() + '\n';
+    fullText += '  Total Outstanding: $' + totalOutstanding.toLocaleString() + '\n';
+    fullText += '==================================================\n\n';
+    
+    contracts.forEach((c, i) => {
+        fullText += '──────────────────────────────────────────────────\n';
+        fullText += 'CONTRACT ' + (i + 1) + ' of ' + contracts.length + '\n';
+        fullText += '──────────────────────────────────────────────────\n';
+        fullText += buildAuditContractText(c);
+        fullText += '\n';
+    });
+    
+    navigator.clipboard.writeText(fullText).then(() => {
+        showToast('📋 All ' + contracts.length + ' contracts copied to clipboard', 'success');
+    }).catch(() => {
+        showToast('Failed to copy', 'error');
+    });
+};
+
+function getFilteredAuditContracts() {
+    if (!window._auditContracts) return [];
+    
+    const filterUser = document.getElementById('auditFilterUser')?.value || 'all';
+    const includeCompleted = document.getElementById('auditIncludeCompleted')?.checked ?? true;
+    
+    let filtered = window._auditContracts.slice();
+    
+    if (filterUser !== 'all') {
+        filtered = filtered.filter(c => {
+            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
+            return c.buyer === filterUser || seller === filterUser;
+        });
+    }
+    
+    if (!includeCompleted) {
+        filtered = filtered.filter(c => (c.status || 'active') === 'active');
+    }
+    
+    return filtered;
+}
+
+window.downloadAuditPNG = async function(mode) {
+    const contracts = getFilteredAuditContracts();
+    if (contracts.length === 0) {
+        showToast('No contracts to export', 'warning');
+        return;
+    }
+    
+    showToast('🖼️ Generating PNG...', 'info');
+    await new Promise(r => setTimeout(r, 100));
+    
+    if (mode === 'single') {
+        for (let i = 0; i < contracts.length; i++) {
+            const canvas = renderAuditPNGCanvas([contracts[i]], i + 1, contracts.length);
+            downloadCanvasAsPNG(canvas, 'audit-' + (contracts[i].propertyTitle || 'contract').replace(/[^a-zA-Z0-9]/g, '_') + '.png');
+            if (contracts.length > 1) await new Promise(r => setTimeout(r, 300));
+        }
+        showToast('✅ ' + contracts.length + ' PNG(s) downloaded', 'success');
+    } else {
+        const canvas = renderAuditPNGCanvas(contracts, null, contracts.length);
+        downloadCanvasAsPNG(canvas, 'rto-audit-report-' + new Date().toISOString().split('T')[0] + '.png');
+        showToast('✅ Audit report PNG downloaded', 'success');
+    }
+};
+
+function downloadCanvasAsPNG(canvas, filename) {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+function renderAuditPNGCanvas(contracts, singleIndex, totalCount) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    const W = 1200;
+    const maxH = 10000;
+    canvas.width = W;
+    canvas.height = maxH;
+    
+    // White background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, maxH);
+    
+    const margin = 60;
+    const cw = W - margin * 2;
+    let y = 0;
+    
+    const brandPurple = '#7c3aed';
+    const brandAmber = '#d97706';
+    const textBlack = '#1a1a1a';
+    const textGray = '#6b7280';
+    const textGreen = '#16a34a';
+    const textRed = '#dc2626';
+    const borderGray = '#e5e7eb';
+    const lightBg = '#f9fafb';
+    
+    const drawRect = (x, rY, w, h, fill) => { ctx.fillStyle = fill; ctx.fillRect(x, rY, w, h); };
+    
+    // ===== HEADER BAR =====
+    drawRect(0, 0, W, 80, brandPurple);
+    ctx.font = 'bold 28px Arial';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('PaulysProperties.com', margin, 50);
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#e2d5f7';
+    const subtitle = 'RTO Contract Audit Report';
+    ctx.fillText(subtitle, W - margin - ctx.measureText(subtitle).width, 50);
+    y = 100;
+    
+    // Timestamp
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    ctx.font = '11px Arial'; ctx.fillStyle = textGray;
+    ctx.fillText('Generated: ' + timestamp, margin, y); y += 16;
+    if (singleIndex) {
+        ctx.fillText('Contract ' + singleIndex + ' of ' + totalCount, margin, y);
+    } else {
+        ctx.fillText(contracts.length + ' contract(s) included', margin, y);
+    }
+    y += 20;
+    
+    // ===== PORTFOLIO SUMMARY (combined only) =====
+    if (!singleIndex && contracts.length > 1) {
+        ctx.strokeStyle = brandAmber; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke(); y += 10;
+        ctx.font = 'bold 16px Arial'; ctx.fillStyle = brandAmber;
+        ctx.fillText('PORTFOLIO SUMMARY', margin, y + 14); y += 26;
+        
+        let tPurchase = 0, tCollected = 0, tOutstanding = 0, aCount = 0;
+        contracts.forEach(c => {
+            const calc = c.calculations || {};
+            const hist = c.rtoPaymentHistory || [];
+            const dep = c.depositPaid ? (c.depositAmount || 0) : 0;
+            const pay = hist.reduce((s, p) => s + (p.amount || 0), 0);
+            const rem = c.remainingBalance || 0;
+            const gf = Math.round((c.finalPaymentBase || 0) * 0.10);
+            tPurchase += calc.purchasePrice || calc.totalPrice || 0;
+            tCollected += dep + pay;
+            tOutstanding += rem > 0 ? rem + gf : 0;
+            if ((c.status || 'active') === 'active') aCount++;
+        });
+        
+        const boxW = (cw - 30) / 4;
+        const boxH = 55;
+        const labels = ['Total Contracts', 'Purchase Value', 'Collected', 'Outstanding'];
+        const values = [contracts.length + ' (' + aCount + ' active)', '$' + tPurchase.toLocaleString(), '$' + tCollected.toLocaleString(), '$' + tOutstanding.toLocaleString()];
+        const colors = [textBlack, textBlack, textGreen, brandAmber];
+        
+        for (let i = 0; i < 4; i++) {
+            const bx = margin + i * (boxW + 10);
+            drawRect(bx, y, boxW, boxH, lightBg);
+            ctx.strokeStyle = borderGray; ctx.lineWidth = 1; ctx.strokeRect(bx, y, boxW, boxH);
+            ctx.font = '10px Arial'; ctx.fillStyle = textGray;
+            ctx.fillText(labels[i].toUpperCase(), bx + 10, y + 18);
+            ctx.font = 'bold 18px Arial'; ctx.fillStyle = colors[i];
+            ctx.fillText(values[i], bx + 10, y + 42);
+        }
+        y += boxH + 20;
+    }
+    
+    // ===== PER CONTRACT =====
+    contracts.forEach((c, cIdx) => {
+        const calc = c.calculations || {};
+        const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
+        const termMonths = c.totalPayments || calc.termMonths || 0;
+        const history = (c.rtoPaymentHistory || []).slice().sort((a, b) => (a.month || 0) - (b.month || 0));
+        const deposit = c.depositAmount || 0;
+        const depositPaid = c.depositPaid || false;
+        const remaining = c.remainingBalance || 0;
+        const finalPaymentBase = c.finalPaymentBase || 0;
+        const govFee = Math.round(finalPaymentBase * 0.10);
+        const status = (c.status || 'active');
+        const seller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
+        const buyer = c.buyer || 'Unknown';
+        const startDate = c.startDate || 'N/A';
+        const expectedMonthly = c.expectedMonthlyPayment || calc.monthlyPayment || 0;
+        const depCollected = depositPaid ? deposit : 0;
+        const payCollected = history.reduce((s, p) => s + (p.amount || 0), 0);
+        const collected = depCollected + payCollected;
+        
+        // Contract header bar
+        drawRect(margin, y, cw, 36, '#2d1b69');
+        ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(c.propertyTitle || 'Unknown Property', margin + 12, y + 23);
+        const statusText = status.toUpperCase();
+        const badgeColor = status === 'active' ? textGreen : status === 'completed' ? '#2563eb' : textRed;
+        ctx.font = 'bold 10px Arial';
+        const badgeW = ctx.measureText(statusText).width + 14;
+        drawRect(W - margin - badgeW - 10, y + 8, badgeW, 20, badgeColor);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(statusText, W - margin - badgeW - 3, y + 22);
+        y += 46;
+        
+        // Details row 1
+        const df = 11;
+        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('Seller:', margin, y + df);
+        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
+        ctx.fillText(seller, margin + 45, y + df);
+        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('Buyer:', margin + cw * 0.35, y + df);
+        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
+        ctx.fillText(buyer, margin + cw * 0.35 + 45, y + df);
+        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('Start:', margin + cw * 0.65, y + df);
+        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
+        ctx.fillText(startDate, margin + cw * 0.65 + 40, y + df);
+        y += df + 10;
+        
+        // Details row 2
+        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('Purchase Price:', margin, y + df);
+        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
+        ctx.fillText('$' + purchasePrice.toLocaleString(), margin + 95, y + df);
+        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('Term:', margin + cw * 0.35, y + df);
+        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
+        ctx.fillText(termMonths + ' months', margin + cw * 0.35 + 40, y + df);
+        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('Monthly:', margin + cw * 0.65, y + df);
+        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
+        ctx.fillText('$' + expectedMonthly.toLocaleString(), margin + cw * 0.65 + 55, y + df);
+        y += df + 14;
+        
+        // Financial summary boxes
+        const fBoxW = (cw - 20) / 3;
+        const fBoxH = 40;
+        drawRect(margin, y, fBoxW, fBoxH, '#f0fdf4');
+        ctx.strokeStyle = '#bbf7d0'; ctx.lineWidth = 1; ctx.strokeRect(margin, y, fBoxW, fBoxH);
+        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('COLLECTED', margin + 8, y + 14);
+        ctx.font = 'bold 16px Arial'; ctx.fillStyle = textGreen; ctx.fillText('$' + collected.toLocaleString(), margin + 8, y + 34);
+        
+        drawRect(margin + fBoxW + 10, y, fBoxW, fBoxH, '#fffbeb');
+        ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 1; ctx.strokeRect(margin + fBoxW + 10, y, fBoxW, fBoxH);
+        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('OUTSTANDING (incl. gov fee)', margin + fBoxW + 18, y + 14);
+        ctx.font = 'bold 16px Arial'; ctx.fillStyle = brandAmber; ctx.fillText('$' + (remaining > 0 ? remaining + govFee : 0).toLocaleString(), margin + fBoxW + 18, y + 34);
+        
+        drawRect(margin + (fBoxW + 10) * 2, y, fBoxW, fBoxH, lightBg);
+        ctx.strokeStyle = borderGray; ctx.lineWidth = 1; ctx.strokeRect(margin + (fBoxW + 10) * 2, y, fBoxW, fBoxH);
+        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('GOV TRANSFER FEE (10%)', margin + (fBoxW + 10) * 2 + 8, y + 14);
+        ctx.font = 'bold 16px Arial'; ctx.fillStyle = textBlack; ctx.fillText('$' + govFee.toLocaleString(), margin + (fBoxW + 10) * 2 + 8, y + 34);
+        y += fBoxH + 14;
+        
+        // Payment table header
+        drawRect(margin, y, cw, 22, '#f3f4f6');
+        ctx.font = 'bold 10px Arial'; ctx.fillStyle = textGray;
+        ctx.fillText('PAYMENT', margin + 8, y + 15);
+        ctx.fillText('DATE', margin + cw * 0.3, y + 15);
+        ctx.fillText('AMOUNT', margin + cw * 0.55, y + 15);
+        ctx.fillText('BALANCE AFTER', margin + cw * 0.78, y + 15);
+        y += 24;
+        
+        // Payment rows
+        let runBal = purchasePrice - deposit;
+        const rowH = 20;
+        
+        if (deposit > 0) {
+            drawRect(margin, y, cw, rowH, '#fafafa');
+            ctx.font = '10px Arial'; ctx.fillStyle = textGray; ctx.fillText('Deposit', margin + 8, y + 14);
+            ctx.fillStyle = depositPaid ? textGreen : brandAmber;
+            ctx.fillText(depositPaid ? (c.depositPaidDate || 'Paid') : 'Pending', margin + cw * 0.3, y + 14);
+            ctx.fillStyle = textBlack; ctx.font = 'bold 10px Arial';
+            ctx.fillText('$' + deposit.toLocaleString(), margin + cw * 0.55, y + 14);
+            ctx.fillStyle = textGray; ctx.font = '10px Arial';
+            ctx.fillText('$' + runBal.toLocaleString(), margin + cw * 0.78, y + 14);
+            y += rowH;
+        }
+        
+        history.forEach((pay, i) => {
+            runBal = Math.max(0, runBal - (pay.amount || 0));
+            if (i % 2 === 0) drawRect(margin, y, cw, rowH, '#fafafa');
+            const monthLabel = pay.monthsCovered && pay.monthsCovered > 1
+                ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered))
+                : 'Month ' + (pay.month || (i + 1));
+            ctx.font = '10px Arial'; ctx.fillStyle = textGray;
+            ctx.fillText(monthLabel, margin + 8, y + 14);
+            ctx.fillStyle = textGreen; ctx.fillText(pay.date || pay.paidDate || 'N/A', margin + cw * 0.3, y + 14);
+            ctx.fillStyle = textBlack; ctx.font = 'bold 10px Arial';
+            ctx.fillText('$' + (pay.amount || 0).toLocaleString(), margin + cw * 0.55, y + 14);
+            ctx.fillStyle = textGray; ctx.font = '10px Arial';
+            ctx.fillText('$' + runBal.toLocaleString(), margin + cw * 0.78, y + 14);
+            y += rowH;
+        });
+        
+        if (remaining > 0 && status === 'active') {
+            drawRect(margin, y, cw, rowH, '#fffbeb');
+            ctx.font = 'bold 10px Arial'; ctx.fillStyle = brandAmber;
+            ctx.fillText('Final Payment', margin + 8, y + 14);
+            ctx.fillText('Pending', margin + cw * 0.3, y + 14);
+            ctx.fillText('$' + (finalPaymentBase + govFee).toLocaleString(), margin + cw * 0.55, y + 14);
+            ctx.fillStyle = textGreen;
+            ctx.fillText('$0', margin + cw * 0.78, y + 14);
+            y += rowH;
+        }
+        
+        y += 20;
+        if (cIdx < contracts.length - 1) {
+            ctx.strokeStyle = borderGray; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke();
+            y += 15;
+        }
+    });
+    
+    // Footer
+    y += 10;
+    ctx.strokeStyle = brandPurple; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke();
+    y += 15;
+    ctx.font = '10px Arial'; ctx.fillStyle = textGray;
+    ctx.fillText('PaulysProperties.com | RTO Contract Audit Report | Generated ' + now.toLocaleDateString(), margin, y);
+    y += 30;
+    
+    // Crop
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = W;
+    croppedCanvas.height = Math.min(y, maxH);
+    const croppedCtx = croppedCanvas.getContext('2d');
+    croppedCtx.drawImage(canvas, 0, 0);
+    
+    return croppedCanvas;
+}
