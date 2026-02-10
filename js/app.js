@@ -10538,50 +10538,32 @@ window.submitForcePasswordChange = async function() {
 
 
 // ==================== RTO AUDIT REPORT ====================
-function getPayAmt(pay) { return pay.actual || pay.amount || 0; }
-function isOwnerContract(c) { return !(c.seller || '').replace(/👑|🌱|⭐|🏢/g, '').trim().includes('Managed by:'); }
-
-function computeAudit(c) {
-    var calc = c.calculations || {}, price = calc.purchasePrice || calc.totalPrice || 0, term = c.totalPayments || calc.termMonths || 0;
-    var hist = (c.rtoPaymentHistory || []).slice().sort(function(a,b){return (a.month||0)-(b.month||0);});
-    var dep = c.depositAmount||0, depPaid = c.depositPaid||false, rem = c.remainingBalance||0;
-    var fpBase = c.finalPaymentBase||0, govFee = Math.round(fpBase*0.10), status = (c.status||'active').toLowerCase();
-    var rawSeller = (c.seller||'Unknown').replace(/👑|🌱|⭐/g,'').trim(), buyer = c.buyer||'Unknown';
-    var start = c.startDate||'N/A', monthly = c.expectedMonthlyPayment||calc.monthlyPayment||0;
-    var own = isOwnerContract(c), hasAgent = rawSeller.includes('Managed by:');
-    var agentName = hasAgent ? rawSeller.replace(/.*Managed by:\s*/i,'').replace(/🏢/g,'').trim() : null;
-    var depCol = depPaid?dep:0, payCol = hist.reduce(function(s,p){return s+getPayAmt(p);},0), totalCol = depCol+payCol;
+function getPayAmt(pay){return pay.actual||pay.amount||0;}
+function isOwnerContract(c){return !(c.seller||'').replace(/👑|🌱|⭐|🏢/g,'').trim().includes('Managed by:');}
+function computeAudit(c){
+    var calc=c.calculations||{},price=calc.purchasePrice||calc.totalPrice||0,term=c.totalPayments||calc.termMonths||0;
+    var hist=(c.rtoPaymentHistory||[]).slice().sort(function(a,b){return(a.month||0)-(b.month||0);});
+    var dep=c.depositAmount||0,depPaid=c.depositPaid||false,rem=c.remainingBalance||0;
+    var fpBase=c.finalPaymentBase||0,govFee=Math.round(fpBase*0.10),status=(c.status||'active').toLowerCase();
+    var rawSeller=(c.seller||'Unknown').replace(/👑|🌱|⭐/g,'').trim(),buyer=c.buyer||'Unknown';
+    var start=c.startDate||'N/A',monthly=c.expectedMonthlyPayment||calc.monthlyPayment||0;
+    var own=isOwnerContract(c),hasAgent=rawSeller.includes('Managed by:');
+    var agentName=hasAgent?rawSeller.replace(/.*Managed by:\s*/i,'').replace(/🏢/g,'').trim():null;
+    var depCol=depPaid?dep:0,payCol=hist.reduce(function(s,p){return s+getPayAmt(p);},0),totalCol=depCol+payCol;
     var myTax=0,myIncome=0,ownerNet=0,ownerTax=0;
     if(own){myIncome=totalCol;myTax=Math.round(totalCol*0.10);}
     else{var depComm=depPaid?Math.round(dep*0.10):0;var payComm=hist.reduce(function(s,p){return s+Math.round(getPayAmt(p)*0.10);},0);myIncome=depComm+payComm;myTax=Math.round(myIncome*0.10);ownerNet=totalCol-myIncome;ownerTax=Math.round(ownerNet*0.10);}
     var nextDue='N/A';
     if(status==='active'&&rem>0){var pt=c.rtoPaidThroughDate||'';if(pt)nextDue=new Date(pt+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});else if(hist.length>0){var lp=hist[hist.length-1],ld=new Date((lp.date||lp.paidDate)+'T12:00:00');ld.setMonth(ld.getMonth()+1);nextDue=ld.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}}
-    return {price:price,term:term,hist:hist,dep:dep,depPaid:depPaid,rem:rem,fpBase:fpBase,govFee:govFee,status:status,seller:rawSeller,buyer:buyer,start:start,monthly:monthly,own:own,hasAgent:hasAgent,agentName:agentName,depCol:depCol,payCol:payCol,totalCol:totalCol,myTax:myTax,myIncome:myIncome,ownerNet:ownerNet,ownerTax:ownerTax,nextDue:nextDue};
+    return{price:price,term:term,hist:hist,dep:dep,depPaid:depPaid,rem:rem,fpBase:fpBase,govFee:govFee,status:status,seller:rawSeller,buyer:buyer,start:start,monthly:monthly,own:own,hasAgent:hasAgent,agentName:agentName,depCol:depCol,payCol:payCol,totalCol:totalCol,myTax:myTax,myIncome:myIncome,ownerNet:ownerNet,ownerTax:ownerTax,nextDue:nextDue};
 }
-
-window.openRTOAuditReport = async function() {
-    if(!TierService.isMasterAdmin(auth.currentUser?.email)){showToast('Admin only','error');return;}
-    showToast('📋 Loading contracts...','info');
-    try {
-        var snap=await db.collection('rentToOwnContracts').get(),contracts=[];
-        snap.forEach(function(doc){contracts.push({id:doc.id,...doc.data()});});
-        if(!contracts.length){showToast('No RTO contracts found','warning');return;}
-        window._auditContracts=contracts;
-        var people=new Set();contracts.forEach(function(c){if(c.buyer)people.add(c.buyer);var s=(c.seller||'').replace(/Managed by:\s*/i,'').replace(/👑|🌱|⭐|🏢/g,'').trim();if(s)people.add(s);});
-        var opts=[...people].sort().map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('');
-        var m='<div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"><div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col"><button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button><div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4"><h3 class="text-xl font-bold text-white flex items-center gap-3"><span>📋</span> RTO Contract Audit Report</h3><p class="text-amber-100 text-sm mt-1">'+contracts.length+' total Rent-to-Own contracts</p></div><div class="px-6 py-3 bg-gray-800/80 border-b border-gray-700 flex flex-wrap items-center gap-3"><div class="flex items-center gap-2"><label class="text-gray-400 text-sm">Filter:</label><select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm"><option value="all">All Contracts</option>'+opts+'</select></div><label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500"> Completed/Cancelled</label><label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="auditShowTax" onchange="renderAuditReport()" class="rounded accent-red-500"> Show Back Taxes</label><div class="ml-auto flex flex-wrap gap-2"><button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy All</button><button onclick="downloadAuditPNG(\'single\')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">🖼️ PNG Each</button><button onclick="downloadAuditPNG(\'combined\')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">🖼️ PNG All</button></div></div><div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-4"></div></div></div>';
-        document.body.insertAdjacentHTML('beforeend',m);renderAuditReport();
-    }catch(e){console.error('[Audit]',e);showToast('Failed to load contracts','error');}
-};
-window.closeRTOAuditModal=function(){var m=document.getElementById('rtoAuditModal');if(m)m.remove();};
-
 function getFilteredAuditContracts(){
     if(!window._auditContracts)return[];var fu=document.getElementById('auditFilterUser')?.value||'all';var ic=document.getElementById('auditIncludeCompleted')?.checked??true;
     var f=window._auditContracts.slice();if(fu!=='all')f=f.filter(function(c){var s=(c.seller||'').replace(/Managed by:\s*/i,'').replace(/👑|🌱|⭐|🏢/g,'').trim();return c.buyer===fu||s===fu;});
     if(!ic)f=f.filter(function(c){return(c.status||'active')==='active';});return f;
 }
 function calcTotals(filtered){
-    var ownC=filtered.filter(function(c){return isOwnerContract(c);}),agtC=filtered.filter(function(c){return !isOwnerContract(c);});
+    var ownC=filtered.filter(function(c){return isOwnerContract(c);}),agtC=filtered.filter(function(c){return!isOwnerContract(c);});
     var T={n:filtered.length,act:0,pv:0,col:0,out:0,ownN:ownC.length,ownPV:0,ownCol:0,ownOut:0,ownTax:0,agtN:agtC.length,agtPV:0,agtCol:0,agtComm:0,agtOut:0,agtMyTax:0,agtOwnerNet:0,agtOwnerTax:0};
     filtered.forEach(function(c){var d=computeAudit(c);T.pv+=d.price;T.col+=d.totalCol;T.out+=d.rem+(d.rem>0?d.govFee:0);if(d.status==='active')T.act++;
         if(d.own){T.ownPV+=d.price;T.ownCol+=d.totalCol;T.ownOut+=d.rem+(d.rem>0?d.govFee:0);T.ownTax+=d.myTax;}
@@ -10589,15 +10571,30 @@ function calcTotals(filtered){
     return T;
 }
 
+window.openRTOAuditReport=async function(){
+    if(!TierService.isMasterAdmin(auth.currentUser?.email)){showToast('Admin only','error');return;}
+    showToast('📋 Loading contracts...','info');
+    try{
+        var snap=await db.collection('rentToOwnContracts').get(),contracts=[];
+        snap.forEach(function(doc){contracts.push({id:doc.id,...doc.data()});});
+        if(!contracts.length){showToast('No RTO contracts found','warning');return;}
+        window._auditContracts=contracts;
+        var people=new Set();contracts.forEach(function(c){if(c.buyer)people.add(c.buyer);var s=(c.seller||'').replace(/Managed by:\s*/i,'').replace(/👑|🌱|⭐|🏢/g,'').trim();if(s)people.add(s);});
+        var opts=[...people].sort().map(function(p){return'<option value="'+p+'">'+p+'</option>';}).join('');
+        var m='<div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"><div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col"><button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button><div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4"><h3 class="text-xl font-bold text-white flex items-center gap-3"><span>📋</span> RTO Contract Audit Report</h3><p class="text-amber-100 text-sm mt-1">'+contracts.length+' total Rent-to-Own contracts</p></div><div class="px-6 py-3 bg-gray-800/80 border-b border-gray-700 flex flex-wrap items-center gap-3"><div class="flex items-center gap-2"><label class="text-gray-400 text-sm">Filter:</label><select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm"><option value="all">All Contracts</option>'+opts+'</select></div><label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500"> Completed/Cancelled</label><label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="auditShowTax" onchange="renderAuditReport()" class="rounded accent-red-500"> Show Back Taxes</label><div class="ml-auto flex flex-wrap gap-2"><button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy All</button><button onclick="downloadAuditPNG(\'single\')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">🖼️ PNG Each</button><button onclick="downloadAuditPNG(\'combined\')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">🖼️ PNG All</button></div></div><div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-4"></div></div></div>';
+        document.body.insertAdjacentHTML('beforeend',m);renderAuditReport();
+    }catch(e){console.error('[Audit]',e);showToast('Failed','error');}
+};
+window.closeRTOAuditModal=function(){var m=document.getElementById('rtoAuditModal');if(m)m.remove();};
+
 window.renderAuditReport=function(){
     var el=document.getElementById('auditReportContent');if(!el||!window._auditContracts)return;
     var filtered=getFilteredAuditContracts(),tax=document.getElementById('auditShowTax')?.checked||false;
     if(!filtered.length){el.innerHTML='<p class="text-gray-500 italic text-center py-8">No contracts match filters</p>';return;}
-    var ownC=filtered.filter(function(c){return isOwnerContract(c);}),agtC=filtered.filter(function(c){return !isOwnerContract(c);});
-    var T=calcTotals(filtered);
-    var h=buildSummary(T,tax);
-    if(ownC.length>0){h+='<div class="mt-6 pt-4 border-t border-purple-700/30"><div class="flex items-center gap-2.5 mb-4 pl-1"><span class="text-lg">🏠</span><h4 class="text-purple-300 font-bold text-lg">Properties I Own</h4><span class="bg-purple-600/80 text-purple-100 text-xs font-bold px-2.5 py-0.5 rounded-full">'+ownC.length+' contracts</span></div>';ownC.forEach(function(c,i){h+=buildCard(c,i,tax,'owner');});h+='</div>';}
-    if(agtC.length>0){h+='<div class="mt-6 pt-4 border-t border-cyan-700/30"><div class="flex items-center gap-2.5 mb-4 pl-1"><span class="text-lg">🏢</span><h4 class="text-cyan-300 font-bold text-lg">Properties I Manage as Agent</h4><span class="bg-cyan-600/80 text-cyan-100 text-xs font-bold px-2.5 py-0.5 rounded-full">'+agtC.length+' contracts</span></div>';agtC.forEach(function(c,i){h+=buildCard(c,ownC.length+i,tax,'agent');});h+='</div>';}
+    var ownC=filtered.filter(function(c){return isOwnerContract(c);}),agtC=filtered.filter(function(c){return!isOwnerContract(c);});
+    var T=calcTotals(filtered),h=buildSummary(T,tax);
+    if(ownC.length>0){h+='<div class="mt-6 pt-5 border-t border-purple-700/30"><div class="flex items-center gap-3 mb-4 pl-1"><span class="text-lg">🏠</span><h4 class="text-purple-300 font-bold text-lg">Properties I Own</h4><span class="bg-purple-600/80 text-purple-100 text-xs font-bold px-2.5 py-0.5 rounded-full ml-1">'+ownC.length+' contracts</span></div>';ownC.forEach(function(c,i){h+=buildCard(c,i,tax,'owner');});h+='</div>';}
+    if(agtC.length>0){h+='<div class="mt-6 pt-5 border-t border-cyan-700/30"><div class="flex items-center gap-3 mb-4 pl-1"><span class="text-lg">🏢</span><h4 class="text-cyan-300 font-bold text-lg">Properties I Manage as Agent</h4><span class="bg-cyan-600/80 text-cyan-100 text-xs font-bold px-2.5 py-0.5 rounded-full ml-1">'+agtC.length+' contracts</span></div>';agtC.forEach(function(c,i){h+=buildCard(c,ownC.length+i,tax,'agent');});h+='</div>';}
     el.innerHTML=h;
 };
 
@@ -10606,73 +10603,77 @@ function buildSummary(T,tax){
     var h='<div class="bg-gray-800 rounded-xl p-6 border border-amber-600/40">';
     h+='<h4 class="text-amber-400 font-bold text-lg mb-2">Portfolio Summary</h4>';
     h+='<p class="text-gray-500 text-xs mb-5">'+T.n+' total RTO contracts — '+T.ownN+' properties I own + '+T.agtN+' properties I manage as real estate agent</p>';
+    // Top 4 - removed "(ALL CONTRACTS)"
     h+='<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">';
     h+='<div class="bg-gray-700/40 rounded-lg p-4"><div class="text-gray-400 text-[10px] uppercase mb-1.5">Total RTO Contracts</div><div class="text-white text-2xl font-bold">'+T.n+'</div><div class="text-gray-500 text-xs mt-1">'+T.act+' active</div></div>';
-    h+='<div class="bg-gray-700/40 rounded-lg p-4"><div class="text-gray-400 text-[10px] uppercase mb-1.5 leading-tight">Total RTO Purchase Value<br>(All Contracts)</div><div class="text-white text-2xl font-bold mt-1">$'+T.pv.toLocaleString()+'</div></div>';
+    h+='<div class="bg-gray-700/40 rounded-lg p-4"><div class="text-gray-400 text-[10px] uppercase mb-1.5">Total RTO Purchase Value</div><div class="text-white text-2xl font-bold">$'+T.pv.toLocaleString()+'</div></div>';
     h+='<div class="bg-gray-700/40 rounded-lg p-4"><div class="text-gray-400 text-[10px] uppercase mb-1.5">Payments Received To Date</div><div class="text-green-400 text-2xl font-bold">$'+T.col.toLocaleString()+'</div></div>';
-    h+='<div class="bg-gray-700/40 rounded-lg p-4"><div class="text-gray-400 text-[10px] uppercase mb-1.5 leading-tight">Remaining Across<br>All Contracts</div><div class="text-amber-400 text-2xl font-bold mt-1">$'+T.out.toLocaleString()+'</div></div>';
+    h+='<div class="bg-gray-700/40 rounded-lg p-4"><div class="text-gray-400 text-[10px] uppercase mb-1.5">Remaining Across All Contracts</div><div class="text-amber-400 text-2xl font-bold">$'+T.out.toLocaleString()+'</div></div>';
     h+='</div>';
     // Two panels
-    h+='<div class="grid grid-cols-1 md:grid-cols-2 gap-5">';
-    // Owner
+    h+='<div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-'+( tax?'8':'0')+'">';
+    // Owner panel
     h+='<div class="bg-purple-900/20 rounded-xl p-6 border border-purple-700/30">';
     h+='<div class="flex items-center gap-2 mb-4"><span>🏠</span><span class="text-purple-300 font-bold text-base">Properties I Own ('+T.ownN+')</span></div>';
     h+='<div class="grid grid-cols-3 gap-3 mb-4">';
-    h+='<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">Purchase Value</div><div class="text-white text-sm font-bold">$'+T.ownPV.toLocaleString()+'</div></div>';
-    h+='<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">Collected</div><div class="text-green-400 text-sm font-bold">$'+T.ownCol.toLocaleString()+'</div></div>';
-    h+='<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">Outstanding</div><div class="text-amber-400 text-sm font-bold">$'+T.ownOut.toLocaleString()+'</div></div>';
+    h+=mBox('Purchase Value','$'+T.ownPV.toLocaleString(),'text-white');
+    h+=mBox('Collected','$'+T.ownCol.toLocaleString(),'text-green-400');
+    h+=mBox('Outstanding','$'+T.ownOut.toLocaleString(),'text-amber-400');
     h+='</div>';
-    if(tax){h+='<div class="bg-red-900/40 rounded-lg p-4 border border-red-700/30"><div class="flex justify-between items-center"><span class="text-red-400 text-xs font-bold uppercase">My Back Taxes (10% of $'+T.ownCol.toLocaleString()+')</span><span class="text-red-400 font-bold text-lg">$'+T.ownTax.toLocaleString()+'</span></div></div>';}
+    if(tax){h+='<div class="bg-red-900/40 rounded-lg p-4 border border-red-700/30"><div class="flex justify-between items-center"><span class="text-red-400 text-xs font-bold uppercase">My Back Taxes Owed (10% of $'+T.ownCol.toLocaleString()+')</span><span class="text-red-400 font-bold text-lg">$'+T.ownTax.toLocaleString()+'</span></div></div>';}
     h+='</div>';
-    // Agent
+    // Agent panel
     h+='<div class="bg-cyan-900/20 rounded-xl p-6 border border-cyan-700/30">';
     h+='<div class="flex items-center gap-2 mb-4"><span>🏢</span><span class="text-cyan-300 font-bold text-base">Properties I Manage ('+T.agtN+')</span></div>';
     h+='<div class="grid grid-cols-3 gap-3 mb-4">';
-    h+='<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">Total Collected</div><div class="text-white text-sm font-bold">$'+T.agtCol.toLocaleString()+'</div></div>';
-    h+='<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">My Commission</div><div class="text-cyan-400 text-sm font-bold">$'+T.agtComm.toLocaleString()+'</div></div>';
-    h+='<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">Owner Net (90%)</div><div class="text-orange-400 text-sm font-bold">$'+T.agtOwnerNet.toLocaleString()+'</div></div>';
+    h+=mBox('Total Collected','$'+T.agtCol.toLocaleString(),'text-white');
+    h+=mBox('My Commission','$'+T.agtComm.toLocaleString(),'text-cyan-400');
+    h+=mBox('Owner Net (90%)','$'+T.agtOwnerNet.toLocaleString(),'text-orange-400');
     h+='</div>';
     if(tax){
-        h+='<div class="bg-red-900/40 rounded-lg p-4 border border-red-700/30 mb-3"><div class="flex justify-between items-center"><span class="text-red-400 text-xs font-bold uppercase">My Back Taxes (10% of $'+T.agtComm.toLocaleString()+' commission)</span><span class="text-red-400 font-bold text-lg">$'+T.agtMyTax.toLocaleString()+'</span></div></div>';
-        h+='<div class="bg-orange-900/30 rounded-lg p-4 border border-orange-700/30"><div class="flex justify-between items-center"><span class="text-orange-400 text-xs font-bold uppercase">⚠️ Owners Back Taxes (10% of $'+T.agtOwnerNet.toLocaleString()+' net)</span><span class="text-orange-400 font-bold text-lg">$'+T.agtOwnerTax.toLocaleString()+'</span></div></div>';
+        h+='<div class="bg-red-900/40 rounded-lg p-4 border border-red-700/30 mb-3"><div class="flex justify-between items-center"><span class="text-red-400 text-xs font-bold uppercase">My Back Taxes Owed (10% of $'+T.agtComm.toLocaleString()+' commission)</span><span class="text-red-400 font-bold text-lg">$'+T.agtMyTax.toLocaleString()+'</span></div></div>';
+        h+='<div class="bg-orange-900/30 rounded-lg p-4 border border-orange-700/30"><div class="flex justify-between items-center"><span class="text-orange-400 text-xs font-bold uppercase">⚠️ Owner Back Taxes Owed (10% of $'+T.agtOwnerNet.toLocaleString()+' net)</span><span class="text-orange-400 font-bold text-lg">$'+T.agtOwnerTax.toLocaleString()+'</span></div></div>';
     }
     h+='</div></div>';
-    // Grand total
+    // Grand total - no separator line, just spacing via mb-8 above
     if(tax){
         var grandTotal=T.ownTax+T.agtMyTax+T.agtOwnerTax;
-        h+='<div class="mt-6 bg-gray-800/80 rounded-xl p-6 border-2 border-red-600/50">';
-        h+='<h5 class="text-white text-sm uppercase font-bold mb-5">Back Taxes Breakdown — as of '+todayStr+'</h5>';
+        h+='<div class="bg-gray-800/80 rounded-xl p-6 border-2 border-red-600/50">';
+        h+='<h5 class="text-white text-sm uppercase font-bold mb-5">Back Taxes Breakdown — As of '+todayStr+'</h5>';
         h+='<div class="flex justify-between items-center mb-3"><div><span class="text-red-400 font-bold">My Back Taxes Owed</span><span class="text-red-400/60 text-xs ml-2">($'+T.ownTax.toLocaleString()+' properties I own + $'+T.agtMyTax.toLocaleString()+' agent commissions)</span></div><span class="text-red-400 text-xl font-bold">$'+(T.ownTax+T.agtMyTax).toLocaleString()+'</span></div>';
-        h+='<div class="flex justify-between items-center mb-5"><div><span class="text-orange-400 font-bold">⚠️ Property Owners Back Taxes</span><span class="text-orange-400/60 text-xs ml-2">(10% of $'+T.agtOwnerNet.toLocaleString()+' owner net)</span></div><span class="text-orange-400 text-xl font-bold">$'+T.agtOwnerTax.toLocaleString()+'</span></div>';
-        h+='<div class="pt-4 border-t-2 border-red-600/40"><div class="flex justify-between items-center"><span class="text-white font-bold text-lg">TOTAL BACK TAXES OWED TO GOVERNMENT</span><span class="text-white text-3xl font-bold">$'+grandTotal.toLocaleString()+'</span></div><div class="text-gray-500 text-xs mt-1">As of '+todayStr+'</div></div>';
+        h+='<div class="flex justify-between items-center mb-5"><div><span class="text-orange-400 font-bold">⚠️ Owner Back Taxes Owed</span><span class="text-orange-400/60 text-xs ml-2">(10% of $'+T.agtOwnerNet.toLocaleString()+' owner net)</span></div><span class="text-orange-400 text-xl font-bold">$'+T.agtOwnerTax.toLocaleString()+'</span></div>';
+        h+='<div class="pt-4 border-t-2 border-red-600/40"><div class="flex justify-between items-center"><span class="text-red-500 font-bold text-lg">TOTAL BACK TAXES OWED TO GOVERNMENT</span><span class="text-red-500 text-3xl font-bold">$'+grandTotal.toLocaleString()+'</span></div><div class="text-gray-500 text-xs mt-1">As of '+todayStr+'</div></div>';
         h+='</div>';
     }
     h+='</div>';return h;
 }
+function mBox(l,v,color){return'<div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px] uppercase mb-1">'+l+'</div><div class="'+color+' text-sm font-bold">'+v+'</div></div>';}
 
 function buildCard(c,gIdx,tax,type){
     var d=computeAudit(c),bdr=type==='owner'?'border-purple-700/30':'border-cyan-700/30';
     var stBadge=d.status==='active'?'<span class="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold">ACTIVE</span>':d.status==='completed'?'<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold">COMPLETED</span>':'<span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold">CANCELLED</span>';
     var typeBadge=type==='owner'?'<span class="bg-purple-600/60 text-purple-200 px-2 py-0.5 rounded text-[10px] font-bold">I OWN</span>':'<span class="bg-cyan-600/60 text-cyan-200 px-2 py-0.5 rounded text-[10px] font-bold">I MANAGE</span>';
+    // Payment table rows
     var rows='',rb=d.price-d.dep;
     if(d.dep>0){rows+='<tr class="border-b border-gray-700/30 bg-gray-800/20"><td class="py-2.5 px-4 text-gray-300 text-sm">Deposit</td><td class="py-2.5 px-4 text-sm">'+(d.depPaid?'<span class="text-green-400">'+(c.depositPaidDate||'Paid')+'</span>':'<span class="text-amber-400">Pending</span>')+'</td><td class="py-2.5 px-4 text-white text-sm text-right font-medium">$'+d.dep.toLocaleString()+'</td><td class="py-2.5 px-4 text-gray-400 text-sm text-right">$'+rb.toLocaleString()+'</td>'+(tax?payTaxCols(d.dep,d.depPaid,d.own):'')+'</tr>';}
     d.hist.forEach(function(pay,i){var amt=getPayAmt(pay);rb=Math.max(0,rb-amt);var ml=pay.monthsCovered&&pay.monthsCovered>1?'Months '+(pay.monthStart||(i+1))+'-'+(pay.monthEnd||(i+pay.monthsCovered)):'Month '+(pay.month||(i+1));var bg=i%2===0?' bg-gray-800/20':'';
         rows+='<tr class="border-b border-gray-700/30'+bg+'"><td class="py-2.5 px-4 text-gray-300 text-sm">'+ml+'</td><td class="py-2.5 px-4 text-green-400 text-sm">'+(pay.date||pay.paidDate||'N/A')+'</td><td class="py-2.5 px-4 text-white text-sm text-right font-medium">$'+amt.toLocaleString()+'</td><td class="py-2.5 px-4 text-gray-400 text-sm text-right">$'+rb.toLocaleString()+'</td>'+(tax?payTaxCols(amt,true,d.own):'')+'</tr>';});
-    if(d.rem>0&&d.status==='active'){var dash=d.own?'<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>':'<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>';
-        rows+='<tr class="bg-amber-900/20 border-b border-amber-700/30"><td class="py-2.5 px-4 text-amber-400 text-sm font-bold">Final Payment</td><td class="py-2.5 px-4 text-amber-400 text-sm">Pending</td><td class="py-2.5 px-4 text-amber-400 text-sm text-right font-bold">$'+(d.fpBase+d.govFee).toLocaleString()+'</td><td class="py-2.5 px-4 text-green-400 text-sm text-right font-bold">$0</td>'+(tax?dash:'')+'</tr>';}
+    if(d.rem>0&&d.status==='active'){var ec=d.own?1:4;var dashes='';for(var di=0;di<ec;di++)dashes+='<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>';
+        rows+='<tr class="bg-amber-900/20 border-b border-amber-700/30"><td class="py-2.5 px-4 text-amber-400 text-sm font-bold">Final Payment</td><td class="py-2.5 px-4 text-amber-400 text-sm">Pending</td><td class="py-2.5 px-4 text-amber-400 text-sm text-right font-bold">$'+(d.fpBase+d.govFee).toLocaleString()+'</td><td class="py-2.5 px-4 text-green-400 text-sm text-right font-bold">$0</td>'+(tax?dashes:'')+'</tr>';}
     var h='<div class="bg-gray-800/80 rounded-xl border '+bdr+' overflow-hidden mt-3">';
     h+='<div class="px-5 py-4 bg-gray-800 border-b border-gray-700/50"><div class="flex flex-wrap items-center justify-between gap-2"><div class="flex items-center flex-wrap gap-2"><span class="text-white font-bold text-base">🏠 '+(c.propertyTitle||'Unknown')+'</span>'+stBadge+' '+typeBadge+'</div><button onclick="copySingleAuditText('+gIdx+')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy</button></div><p class="text-gray-500 text-xs mt-2">'+(c.documentId||c.id)+'  •  Started: '+d.start+'</p></div>';
     h+='<div class="p-5">';
+    // Details
     h+='<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"><div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Seller</div><div class="text-white text-sm font-medium">'+d.seller+'</div>'+(d.hasAgent?'<div class="text-purple-400 text-xs mt-1">Agent: '+d.agentName+'</div>':'')+'</div><div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Buyer</div><div class="text-white text-sm font-medium">'+d.buyer+'</div></div><div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Purchase Price</div><div class="text-white text-sm font-bold">$'+d.price.toLocaleString()+'</div><div class="text-gray-500 text-xs mt-1">'+d.term+' month term</div></div><div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Monthly Payment</div><div class="text-white text-sm font-bold">$'+d.monthly.toLocaleString()+'</div></div></div>';
-    // Financial boxes
+    // Financials
     if(d.own){
         h+='<div class="grid grid-cols-2 md:grid-cols-'+(tax?'4':'3')+' gap-3 mb-5">';
         h+=fBox('Collected','$'+d.totalCol.toLocaleString(),'','bg-green-900/30','border-green-700/30','text-green-400');
         h+=fBox('Remaining + Gov','$'+(d.rem>0?d.rem+d.govFee:0).toLocaleString(),d.govFee>0&&d.rem>0?'Base: $'+d.rem.toLocaleString()+' + Gov: $'+d.govFee.toLocaleString():'','bg-amber-900/30','border-amber-700/30','text-amber-400');
         h+=fBox('Next Due',d.status==='active'?d.nextDue:'N/A','','bg-gray-700/30','border-gray-600/30','text-white');
-        if(tax)h+=fBox('My Back Tax','$'+d.myTax.toLocaleString(),'10% of $'+d.myIncome.toLocaleString(),'bg-red-900/30','border-red-700/30','text-red-400');
+        if(tax)h+=fBox('My Back Tax Owed','$'+d.myTax.toLocaleString(),'10% of $'+d.myIncome.toLocaleString(),'bg-red-900/30','border-red-700/30','text-red-400');
         h+='</div>';
-    } else {
+    }else{
         h+='<div class="grid grid-cols-3 gap-3 mb-4">';
         h+=fBox('Total Collected','$'+d.totalCol.toLocaleString(),'','bg-green-900/30','border-green-700/30','text-green-400');
         h+=fBox('Remaining + Gov','$'+(d.rem>0?d.rem+d.govFee:0).toLocaleString(),d.govFee>0&&d.rem>0?'Base: $'+d.rem.toLocaleString()+' + Gov: $'+d.govFee.toLocaleString():'','bg-amber-900/30','border-amber-700/30','text-amber-400');
@@ -10680,33 +10681,39 @@ function buildCard(c,gIdx,tax,type){
         h+='</div>';
         if(tax){
             var contractGovTax=d.myTax+d.ownerTax;
-            // 3 columns: My Commission→My Tax | Owner Net→Owner Tax | Total to Govt
+            // 3 cols: Owner Net→Owner Back Tax | My Commission→My Back Tax | Total to Govt
             h+='<div class="grid grid-cols-3 gap-3 mb-5">';
-            h+='<div class="bg-red-900/30 rounded-lg p-4 border border-red-700/30"><div class="text-cyan-400 text-xs uppercase mb-1.5">My Commission (10%)</div><div class="text-cyan-400 text-lg font-bold mb-2">$'+d.myIncome.toLocaleString()+'</div><div class="bg-red-900/50 rounded-lg p-3 border border-red-700/20"><div class="flex justify-between items-center"><span class="text-red-400 text-xs font-bold">My Back Tax</span><span class="text-red-400 font-bold">$'+d.myTax.toLocaleString()+'</span></div></div></div>';
-            h+='<div class="bg-orange-900/20 rounded-lg p-4 border border-orange-700/30"><div class="text-orange-400 text-xs uppercase mb-1.5">Owner Net (90%)</div><div class="text-orange-400 text-lg font-bold mb-2">$'+d.ownerNet.toLocaleString()+'</div><div class="bg-orange-900/40 rounded-lg p-3 border border-orange-700/20"><div class="flex justify-between items-center"><span class="text-orange-400 text-xs font-bold">⚠️ Owner Tax</span><span class="text-orange-400 font-bold">$'+d.ownerTax.toLocaleString()+'</span></div></div></div>';
-            h+='<div class="bg-gray-700/30 rounded-lg p-4 border-2 border-red-600/30"><div class="text-gray-400 text-xs uppercase mb-1.5">Total Tax to Govt</div><div class="text-white text-lg font-bold mb-2">$'+contractGovTax.toLocaleString()+'</div><div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px]">$'+d.myTax.toLocaleString()+' mine + $'+d.ownerTax.toLocaleString()+' owner</div></div></div>';
+            // Col 1: Owner Net + Owner Back Tax Owed
+            h+='<div class="bg-orange-900/20 rounded-lg p-4 border border-orange-700/30"><div class="text-orange-400 text-xs uppercase mb-1.5">Owner Net (90%)</div><div class="text-orange-400 text-lg font-bold mb-2">$'+d.ownerNet.toLocaleString()+'</div><div class="bg-orange-900/40 rounded-lg p-3 border border-orange-700/20"><div class="flex justify-between items-center"><span class="text-orange-400 text-xs font-bold">Owner Back Tax Owed</span><span class="text-orange-400 font-bold">$'+d.ownerTax.toLocaleString()+'</span></div></div></div>';
+            // Col 2: My Commission + My Back Tax Owed
+            h+='<div class="bg-red-900/30 rounded-lg p-4 border border-red-700/30"><div class="text-cyan-400 text-xs uppercase mb-1.5">My Commission (10%)</div><div class="text-cyan-400 text-lg font-bold mb-2">$'+d.myIncome.toLocaleString()+'</div><div class="bg-red-900/50 rounded-lg p-3 border border-red-700/20"><div class="flex justify-between items-center"><span class="text-red-400 text-xs font-bold">My Back Tax Owed</span><span class="text-red-400 font-bold">$'+d.myTax.toLocaleString()+'</span></div></div></div>';
+            // Col 3: Total Back Tax Owed to Government
+            h+='<div class="bg-gray-700/30 rounded-lg p-4 border-2 border-red-600/30"><div class="text-red-500 text-xs uppercase font-bold mb-1.5">Total Back Tax Owed to Government</div><div class="text-red-500 text-xl font-bold mb-2">$'+contractGovTax.toLocaleString()+'</div><div class="bg-gray-800/60 rounded-lg p-3"><div class="text-gray-500 text-[10px]">$'+d.myTax.toLocaleString()+' mine + $'+d.ownerTax.toLocaleString()+' owner</div></div></div>';
             h+='</div>';
         }
     }
-    // Table
+    // Table - new column structure for agent
     h+='<div class="overflow-x-auto rounded-lg border border-gray-700/50"><table class="w-full text-left"><thead><tr class="bg-gray-700/40 border-b border-gray-600"><th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase">Payment</th><th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase">Date</th><th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase text-right">Amount</th><th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase text-right">Balance</th>';
-    if(tax){if(d.own)h+='<th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">My Tax</th>';else h+='<th class="py-2.5 px-4 text-cyan-400/70 text-xs font-bold uppercase text-right">My Comm</th><th class="py-2.5 px-4 text-orange-400/70 text-xs font-bold uppercase text-right">Owner Net</th><th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">My Tax</th>';}
+    if(tax){
+        if(d.own)h+='<th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">My Tax</th>';
+        else h+='<th class="py-2.5 px-4 text-orange-400/70 text-xs font-bold uppercase text-right">Owner Net<br><span class="text-[9px] text-orange-400/50">Back Tax</span></th><th class="py-2.5 px-4 text-cyan-400/70 text-xs font-bold uppercase text-right">My Commission<br><span class="text-[9px] text-red-400/50">Back Tax</span></th><th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">Owner Back Tax</th><th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">My Back Tax</th>';
+    }
     h+='</tr></thead><tbody>'+(rows||'<tr><td colspan="4" class="py-4 px-4 text-gray-500 text-sm italic text-center">No payments</td></tr>')+'</tbody></table></div>';
     h+='</div></div>';return h;
 }
 function payTaxCols(amt,paid,isOwner){
-    if(!paid)return isOwner?'<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>':'<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>';
-    if(isOwner)return '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$'+Math.round(amt*0.10).toLocaleString()+'</td>';
-    var cm=Math.round(amt*0.10),net=amt-cm;
-    return '<td class="py-2.5 px-4 text-cyan-400 text-sm text-right">$'+cm.toLocaleString()+'</td><td class="py-2.5 px-4 text-orange-400 text-sm text-right">$'+net.toLocaleString()+'</td><td class="py-2.5 px-4 text-red-400 text-sm text-right">$'+Math.round(cm*0.10).toLocaleString()+'</td>';
+    if(!paid)return isOwner?'<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>':'<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td><td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>';
+    if(isOwner)return'<td class="py-2.5 px-4 text-red-400 text-sm text-right">$'+Math.round(amt*0.10).toLocaleString()+'</td>';
+    var cm=Math.round(amt*0.10),net=amt-cm,ownerTx=Math.round(net*0.10),myTx=Math.round(cm*0.10);
+    return'<td class="py-2.5 px-4 text-orange-400 text-sm text-right">$'+net.toLocaleString()+'</td><td class="py-2.5 px-4 text-cyan-400 text-sm text-right">$'+cm.toLocaleString()+'</td><td class="py-2.5 px-4 text-orange-400/70 text-sm text-right">$'+ownerTx.toLocaleString()+'</td><td class="py-2.5 px-4 text-red-400 text-sm text-right">$'+myTx.toLocaleString()+'</td>';
 }
-function fBox(l,v,sub,bg,bdr,color){return '<div class="'+bg+' rounded-lg p-4 border '+bdr+'"><div class="'+color+' text-xs uppercase mb-1.5">'+l+'</div><div class="'+color+' text-xl font-bold">'+v+'</div>'+(sub?'<div class="text-gray-500 text-xs mt-1">'+sub+'</div>':'')+'</div>';}
+function fBox(l,v,sub,bg,bdr,color){return'<div class="'+bg+' rounded-lg p-4 border '+bdr+'"><div class="'+color+' text-xs uppercase mb-1.5">'+l+'</div><div class="'+color+' text-xl font-bold">'+v+'</div>'+(sub?'<div class="text-gray-500 text-xs mt-1">'+sub+'</div>':'')+'</div>';}
 
 // ==================== TEXT EXPORT ====================
 function buildContractText(c){
     var d=computeAudit(c),tax=document.getElementById('auditShowTax')?.checked||false;
     var t='';
-    t+='    PROPERTY:  '+( c.propertyTitle||'Unknown')+'\n';
+    t+='    PROPERTY:  '+(c.propertyTitle||'Unknown')+'\n';
     t+='    TYPE:      '+(d.own?'Property I Own':'Property I Manage as Agent')+'\n';
     t+='    STATUS:    '+d.status.toUpperCase()+'\n';
     t+='    CONTRACT:  '+(c.documentId||c.id)+'\n';
@@ -10717,52 +10724,36 @@ function buildContractText(c){
     t+='    MONTHLY:   $'+d.monthly.toLocaleString()+'\n';
     t+='\n    PAYMENTS\n    ─────────────────────────────────────\n';
     var rb=d.price-d.dep;
-    if(d.dep>0){
-        t+='    • Deposit: $'+d.dep.toLocaleString()+'  |  '+(d.depPaid?(c.depositPaidDate||'Paid'):'PENDING')+'  |  Balance: $'+rb.toLocaleString();
-        if(tax&&d.depPaid){if(d.own)t+='  |  Tax: $'+Math.round(d.dep*0.10).toLocaleString();else{var cm=Math.round(d.dep*0.10);t+='  |  Comm: $'+cm.toLocaleString()+'  |  Owner: $'+(d.dep-cm).toLocaleString()+'  |  MyTax: $'+Math.round(cm*0.10).toLocaleString();}}
-        t+='\n';
-    }
-    d.hist.forEach(function(p,i){
-        var a=getPayAmt(p);rb=Math.max(0,rb-a);
-        var ml=p.monthsCovered&&p.monthsCovered>1?'Mo '+(p.monthStart||(i+1))+'-'+(p.monthEnd||(i+p.monthsCovered)):'Month '+(p.month||(i+1));
+    if(d.dep>0){t+='    • Deposit: $'+d.dep.toLocaleString()+'  |  '+(d.depPaid?(c.depositPaidDate||'Paid'):'PENDING')+'  |  Balance: $'+rb.toLocaleString();
+        if(tax&&d.depPaid){if(d.own)t+='  |  Tax: $'+Math.round(d.dep*0.10).toLocaleString();else{var cm=Math.round(d.dep*0.10),nt=d.dep-cm;t+='\n             Commission: $'+cm.toLocaleString()+'  |  My Back Tax: $'+Math.round(cm*0.10).toLocaleString()+'\n             Owner Net: $'+nt.toLocaleString()+'  |  Owner Back Tax: $'+Math.round(nt*0.10).toLocaleString();}}t+='\n';}
+    d.hist.forEach(function(p,i){var a=getPayAmt(p);rb=Math.max(0,rb-a);var ml=p.monthsCovered&&p.monthsCovered>1?'Mo '+(p.monthStart||(i+1))+'-'+(p.monthEnd||(i+p.monthsCovered)):'Month '+(p.month||(i+1));
         t+='    • '+ml+': $'+a.toLocaleString()+'  |  '+(p.date||p.paidDate||'N/A')+'  |  Balance: $'+rb.toLocaleString();
-        if(tax){if(d.own)t+='  |  Tax: $'+Math.round(a*0.10).toLocaleString();else{var cm2=Math.round(a*0.10);t+='  |  Comm: $'+cm2.toLocaleString()+'  |  Owner: $'+(a-cm2).toLocaleString()+'  |  MyTax: $'+Math.round(cm2*0.10).toLocaleString();}}
-        t+='\n';
-    });
+        if(tax){if(d.own)t+='  |  Tax: $'+Math.round(a*0.10).toLocaleString();else{var cm2=Math.round(a*0.10),nt2=a-cm2;t+='\n             Commission: $'+cm2.toLocaleString()+'  |  My Back Tax: $'+Math.round(cm2*0.10).toLocaleString()+'\n             Owner Net: $'+nt2.toLocaleString()+'  |  Owner Back Tax: $'+Math.round(nt2*0.10).toLocaleString();}}t+='\n';});
     if(d.rem>0&&d.status==='active')t+='    • Final Payment: $'+(d.fpBase+d.govFee).toLocaleString()+'  |  PENDING\n';
     t+='\n    FINANCIAL SUMMARY\n    ─────────────────────────────────────\n';
     t+='    • Collected:    $'+d.totalCol.toLocaleString()+'\n';
     t+='    • Remaining:    $'+d.rem.toLocaleString()+'\n';
     t+='    • Gov Fee:      $'+d.govFee.toLocaleString()+'\n';
     t+='    • Outstanding:  $'+(d.rem>0?d.rem+d.govFee:0).toLocaleString()+'\n';
-    if(tax){
-        t+='\n    BACK TAXES\n    ─────────────────────────────────────\n';
-        if(d.own){
-            t+='    • My Income:       $'+d.myIncome.toLocaleString()+'\n';
-            t+='    • My Back Tax:     $'+d.myTax.toLocaleString()+' (10%)\n';
-        }else{
-            var govT=d.myTax+d.ownerTax;
-            t+='    • My Commission:   $'+d.myIncome.toLocaleString()+' (10%)\n';
-            t+='    • My Back Tax:     $'+d.myTax.toLocaleString()+' (10% of commission)\n';
-            t+='    • Owner Net:       $'+d.ownerNet.toLocaleString()+' (90%)\n';
-            t+='    • Owner Back Tax:  $'+d.ownerTax.toLocaleString()+' (10% of net)\n';
-            t+='    • Total to Govt:   $'+govT.toLocaleString()+'\n';
-        }
-    }
+    if(tax){t+='\n    BACK TAXES\n    ─────────────────────────────────────\n';
+        if(d.own){t+='    • My Income:              $'+d.myIncome.toLocaleString()+'\n    • My Back Tax Owed:       $'+d.myTax.toLocaleString()+' (10%)\n';}
+        else{var govT=d.myTax+d.ownerTax;
+            t+='    • Owner Net (90%):            $'+d.ownerNet.toLocaleString()+'\n';
+            t+='    • Owner Back Tax Owed:        $'+d.ownerTax.toLocaleString()+' (10% of net)\n';
+            t+='    • My Commission (10%):        $'+d.myIncome.toLocaleString()+'\n';
+            t+='    • My Back Tax Owed:           $'+d.myTax.toLocaleString()+' (10% of commission)\n';
+            t+='    ──────────────────────────────\n';
+            t+='    • Total Back Tax to Govt:     $'+govT.toLocaleString()+'\n';}}
     return t;
 }
-window.copySingleAuditText=function(idx){
-    var f=getFilteredAuditContracts(),o=[...f.filter(function(c){return isOwnerContract(c);}),...f.filter(function(c){return !isOwnerContract(c);})];
-    if(!o[idx])return;navigator.clipboard.writeText(buildContractText(o[idx])).then(function(){showToast('📋 Copied','success');}).catch(function(){showToast('Failed','error');});
-};
+window.copySingleAuditText=function(idx){var f=getFilteredAuditContracts(),o=[...f.filter(function(c){return isOwnerContract(c);}),...f.filter(function(c){return!isOwnerContract(c);})];if(!o[idx])return;navigator.clipboard.writeText(buildContractText(o[idx])).then(function(){showToast('📋 Copied','success');}).catch(function(){showToast('Failed','error');});};
 window.copyAllAuditText=function(){
     var f=getFilteredAuditContracts();if(!f.length){showToast('Nothing','warning');return;}
     var tax=document.getElementById('auditShowTax')?.checked||false;
-    var ownC=f.filter(function(c){return isOwnerContract(c);}),agtC=f.filter(function(c){return !isOwnerContract(c);});
+    var ownC=f.filter(function(c){return isOwnerContract(c);}),agtC=f.filter(function(c){return!isOwnerContract(c);});
     var T=calcTotals(f);
     var todayStr=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-    var now=new Date();
-    var ft='';
+    var now=new Date();var ft='';
     ft+='╔══════════════════════════════════════════════════════════════╗\n';
     ft+='║             RTO CONTRACT AUDIT REPORT                      ║\n';
     ft+='║             PaulysProperties.com                           ║\n';
@@ -10775,20 +10766,20 @@ window.copyAllAuditText=function(){
     ft+='    • '+T.ownN+' properties I own\n';
     ft+='    • '+T.agtN+' properties I manage as real estate agent\n\n';
     ft+='  OVERVIEW\n';
-    ft+='    • Total RTO Purchase Value (All Contracts):  $'+T.pv.toLocaleString()+'\n';
-    ft+='    • Payments Received To Date:                 $'+T.col.toLocaleString()+'\n';
-    ft+='    • Remaining Across All Contracts:            $'+T.out.toLocaleString()+'\n\n';
+    ft+='    • Total RTO Purchase Value:       $'+T.pv.toLocaleString()+'\n';
+    ft+='    • Payments Received To Date:      $'+T.col.toLocaleString()+'\n';
+    ft+='    • Remaining Across All Contracts: $'+T.out.toLocaleString()+'\n\n';
     ft+='  PROPERTIES I OWN ('+T.ownN+')\n';
     ft+='    • Purchase Value:    $'+T.ownPV.toLocaleString()+'\n';
     ft+='    • Collected:         $'+T.ownCol.toLocaleString()+'\n';
     ft+='    • Outstanding:       $'+T.ownOut.toLocaleString()+'\n\n';
     ft+='  PROPERTIES I MANAGE AS AGENT ('+T.agtN+')\n';
-    ft+='    • Total Collected:   $'+T.agtCol.toLocaleString()+'\n';
+    ft+='    • Purchase Value:    $'+T.agtPV.toLocaleString()+'\n';
+    ft+='    • Collected:         $'+T.agtCol.toLocaleString()+'\n';
     ft+='    • My Commission:     $'+T.agtComm.toLocaleString()+' (10%)\n';
     ft+='    • Owner Net:         $'+T.agtOwnerNet.toLocaleString()+' (90%)\n';
     ft+='    • Outstanding:       $'+T.agtOut.toLocaleString()+'\n';
-    if(tax){
-        var grandTotal=T.ownTax+T.agtMyTax+T.agtOwnerTax;
+    if(tax){var grandTotal=T.ownTax+T.agtMyTax+T.agtOwnerTax;
         ft+='\n────────────────────────────────────────────────────────────────\n';
         ft+='  BACK TAXES BREAKDOWN — As of '+todayStr+'\n';
         ft+='────────────────────────────────────────────────────────────────\n\n';
@@ -10796,26 +10787,17 @@ window.copyAllAuditText=function(){
         ft+='    • From properties I own (10%):      $'+T.ownTax.toLocaleString()+'\n';
         ft+='    • From agent commissions (10%):      $'+T.agtMyTax.toLocaleString()+'\n';
         ft+='    • MY TOTAL:                          $'+(T.ownTax+T.agtMyTax).toLocaleString()+'\n\n';
-        ft+='  PROPERTY OWNERS BACK TAXES\n';
+        ft+='  OWNER BACK TAXES OWED\n';
         ft+='    • 10% of $'+T.agtOwnerNet.toLocaleString()+' owner net:  $'+T.agtOwnerTax.toLocaleString()+'\n\n';
         ft+='  ┌────────────────────────────────────────────────────────┐\n';
-        ft+='  │  TOTAL BACK TAXES OWED TO GOVERNMENT:  $'+grandTotal.toLocaleString().padEnd(15)+'│\n';
-        ft+='  │  As of '+todayStr.padEnd(49)+'│\n';
+        ft+='  │  TOTAL BACK TAXES OWED TO GOVERNMENT                  │\n';
+        ft+='  │  $'+grandTotal.toLocaleString().padEnd(53)+'│\n';
+        ft+='  │  As of '+todayStr.padEnd(51)+'│\n';
         ft+='  └────────────────────────────────────────────────────────┘\n';
     }
     ft+='\n\n';
-    if(ownC.length>0){
-        ft+='════════════════════════════════════════════════════════════════\n';
-        ft+='  PROPERTIES I OWN ('+ownC.length+' contracts)\n';
-        ft+='════════════════════════════════════════════════════════════════\n\n';
-        ownC.forEach(function(c){ft+='────────────────────────────────────────────────────────────────\n'+buildContractText(c)+'\n';});
-    }
-    if(agtC.length>0){
-        ft+='════════════════════════════════════════════════════════════════\n';
-        ft+='  PROPERTIES I MANAGE AS AGENT ('+agtC.length+' contracts)\n';
-        ft+='════════════════════════════════════════════════════════════════\n\n';
-        agtC.forEach(function(c){ft+='────────────────────────────────────────────────────────────────\n'+buildContractText(c)+'\n';});
-    }
+    if(ownC.length>0){ft+='════════════════════════════════════════════════════════════════\n  PROPERTIES I OWN ('+ownC.length+' contracts)\n════════════════════════════════════════════════════════════════\n\n';ownC.forEach(function(c){ft+='────────────────────────────────────────────────────────────────\n'+buildContractText(c)+'\n';});}
+    if(agtC.length>0){ft+='════════════════════════════════════════════════════════════════\n  PROPERTIES I MANAGE AS AGENT ('+agtC.length+' contracts)\n════════════════════════════════════════════════════════════════\n\n';agtC.forEach(function(c){ft+='────────────────────────────────────────────────────────────────\n'+buildContractText(c)+'\n';});}
     navigator.clipboard.writeText(ft).then(function(){showToast('📋 All '+f.length+' copied','success');}).catch(function(){showToast('Failed','error');});
 };
 
@@ -10823,55 +10805,53 @@ window.copyAllAuditText=function(){
 window.downloadAuditPNG=async function(mode){
     var f=getFilteredAuditContracts();if(!f.length){showToast('None','warning');return;}var tax=document.getElementById('auditShowTax')?.checked||false;
     showToast('🖼️ Generating...','info');await new Promise(function(r){setTimeout(r,100);});
-    var o=[...f.filter(function(c){return isOwnerContract(c);}),...f.filter(function(c){return !isOwnerContract(c);})];
+    var o=[...f.filter(function(c){return isOwnerContract(c);}),...f.filter(function(c){return!isOwnerContract(c);})];
     if(mode==='single'){for(var i=0;i<o.length;i++){pngDL(pngRender([o[i]],i+1,o.length,tax),'audit-'+(o[i].propertyTitle||'c').replace(/[^a-zA-Z0-9]/g,'_')+'.png');if(o.length>1)await new Promise(function(r){setTimeout(r,300);});}showToast('✅ '+o.length+' PNGs','success');}
     else{pngDL(pngRender(o,null,o.length,tax),'rto-audit-'+new Date().toISOString().split('T')[0]+'.png');showToast('✅ PNG done','success');}
 };
 function pngDL(cv,fn){var a=document.createElement('a');a.download=fn;a.href=cv.toDataURL('image/png');a.click();}
 
 function pngRender(contracts,single,total,tax){
-    var cv=document.createElement('canvas'),ctx=cv.getContext('2d'),W=1200,H=15000;cv.width=W;cv.height=H;
+    var cv=document.createElement('canvas'),ctx=cv.getContext('2d'),W=1200,H=16000;cv.width=W;cv.height=H;
     ctx.fillStyle='#111827';ctx.fillRect(0,0,W,H);var M=50,cw=W-M*2;var y=0;
     var C={card:'#1f2937',inner:'#374151',white:'#f9fafb',gray:'#9ca3af',grayDk:'#6b7280',green:'#4ade80',amber:'#fbbf24',red:'#f87171',cyan:'#67e8f9',orange:'#fb923c',purple:'#a78bfa',bgGreen:'#064e3b',bgAmber:'#78350f',bgRed:'#7f1d1d',bgPurple:'#3b0764',bgCyan:'#083344'};
     var rr=function(x,rY,w,h,f,r){r=r||8;ctx.fillStyle=f;ctx.beginPath();ctx.moveTo(x+r,rY);ctx.lineTo(x+w-r,rY);ctx.quadraticCurveTo(x+w,rY,x+w,rY+r);ctx.lineTo(x+w,rY+h-r);ctx.quadraticCurveTo(x+w,rY+h,x+w-r,rY+h);ctx.lineTo(x+r,rY+h);ctx.quadraticCurveTo(x,rY+h,x,rY+h-r);ctx.lineTo(x,rY+r);ctx.quadraticCurveTo(x,rY,x+r,rY);ctx.closePath();ctx.fill();};
     var dr=function(x,rY,w,h,f){ctx.fillStyle=f;ctx.fillRect(x,rY,w,h);};
-    // Header - clean, no bleed
-    rr(0,y,W,70,'#b45309',0);
-    ctx.font='bold 22px Arial';ctx.fillStyle=C.white;ctx.fillText('📋  RTO Contract Audit Report',M,y+42);
-    ctx.font='12px Arial';ctx.fillStyle='#fed7aa';var sr='PaulysProperties.com';ctx.fillText(sr,W-M-ctx.measureText(sr).width,y+42);
-    y=85;
+    // Header - rounded rect, no bleed
+    rr(M,0,cw,65,'#b45309',10);
+    ctx.font='bold 22px Arial';ctx.fillStyle=C.white;ctx.fillText('📋  RTO Contract Audit Report',M+20,38);
+    ctx.font='12px Arial';ctx.fillStyle='#fed7aa';var sr='PaulysProperties.com';ctx.fillText(sr,W-M-20-ctx.measureText(sr).width,38);
+    y=80;
     var now=new Date();var todayStr=now.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
     ctx.font='11px Arial';ctx.fillStyle=C.gray;ctx.fillText('Generated: '+now.toLocaleString('en-US',{month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true}),M,y);y+=16;
     ctx.fillText(single?'Contract '+single+' of '+total:contracts.length+' total RTO contracts',M,y);y+=22;
     // Summary
     if(!single&&contracts.length>1){
-        var ownC=contracts.filter(function(c){return isOwnerContract(c);}),agtC=contracts.filter(function(c){return !isOwnerContract(c);});
+        var ownC=contracts.filter(function(c){return isOwnerContract(c);}),agtC=contracts.filter(function(c){return!isOwnerContract(c);});
         var T=calcTotals(contracts);
-        var sh=tax?290:170;rr(M,y,cw,sh,C.card,10);ctx.strokeStyle='#92400e';ctx.lineWidth=1.5;ctx.strokeRect(M,y,cw,sh);
+        var sh=tax?300:170;rr(M,y,cw,sh,C.card,10);ctx.strokeStyle='#92400e';ctx.lineWidth=1.5;ctx.strokeRect(M,y,cw,sh);
         ctx.font='bold 16px Arial';ctx.fillStyle=C.amber;ctx.fillText('Portfolio Summary',M+20,y+26);
-        ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText(contracts.length+' total — '+ownC.length+' I own + '+agtC.length+' I manage as agent',M+180,y+26);
-        var bw=(cw-60-30)/4,bh=52,by=y+40;
-        var boxes=[['TOTAL RTO CONTRACTS',contracts.length+' ('+T.act+' active)',C.white],['RTO PURCHASE VALUE','$'+T.pv.toLocaleString(),C.white,'(ALL CONTRACTS)'],['PAYMENTS RECEIVED','$'+T.col.toLocaleString(),C.green,'TO DATE'],['REMAINING ACROSS','$'+T.out.toLocaleString(),C.amber,'ALL CONTRACTS']];
-        boxes.forEach(function(arr,i){var bx=M+20+i*(bw+10);rr(bx,by,bw,bh,C.inner,6);ctx.font='bold 8px Arial';ctx.fillStyle=C.gray;ctx.fillText(arr[0],bx+10,by+14);if(arr[3]){ctx.font='8px Arial';ctx.fillText(arr[3],bx+10,by+24);}ctx.font='bold 16px Arial';ctx.fillStyle=arr[2];ctx.fillText(arr[1],bx+10,by+(arr[3]?44:38));});
+        ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText(contracts.length+' total — '+ownC.length+' I own + '+agtC.length+' I manage as agent',M+185,y+26);
+        var bw=(cw-60-30)/4,bh=50,by=y+40;
+        var boxes=[['TOTAL RTO CONTRACTS',null,contracts.length+' ('+T.act+' active)',C.white],['TOTAL RTO PURCHASE VALUE',null,'$'+T.pv.toLocaleString(),C.white],['PAYMENTS RECEIVED TO DATE',null,'$'+T.col.toLocaleString(),C.green],['REMAINING ACROSS','ALL CONTRACTS','$'+T.out.toLocaleString(),C.amber]];
+        boxes.forEach(function(arr,i){var bx=M+20+i*(bw+10);rr(bx,by,bw,bh,C.inner,6);ctx.font='bold 8px Arial';ctx.fillStyle=C.gray;ctx.fillText(arr[0],bx+10,by+14);if(arr[1]){ctx.font='8px Arial';ctx.fillText(arr[1],bx+10,by+24);}ctx.font='bold 16px Arial';ctx.fillStyle=arr[3];ctx.fillText(arr[2],bx+10,by+(arr[1]?44:38));});
         var sy=by+bh+14,hw=(cw-50)/2;
         rr(M+20,sy,hw,50,C.bgPurple+'80',6);ctx.font='bold 12px Arial';ctx.fillStyle=C.purple;ctx.fillText('🏠 Properties I Own ('+ownC.length+')',M+30,sy+18);ctx.font='11px Arial';ctx.fillStyle=C.green;ctx.fillText('Collected: $'+T.ownCol.toLocaleString(),M+30,sy+38);
-        rr(M+20+hw+10,sy,hw,50,C.bgCyan+'80',6);ctx.font='bold 12px Arial';ctx.fillStyle=C.cyan;ctx.fillText('🏢 Properties I Manage ('+agtC.length+')',M+30+hw+10,sy+18);ctx.font='11px Arial';ctx.fillStyle=C.cyan;ctx.fillText('Comm: $'+T.agtComm.toLocaleString(),M+30+hw+10,sy+38);ctx.fillStyle=C.orange;ctx.fillText('Owner Net: $'+T.agtOwnerNet.toLocaleString(),M+30+hw+10+hw*0.48,sy+38);
-        if(tax){
-            var ty=sy+62;var grandTotal=T.ownTax+T.agtMyTax+T.agtOwnerTax;
-            // Separator
-            ctx.strokeStyle='#dc262644';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(M+20,ty-4);ctx.lineTo(M+cw-20,ty-4);ctx.stroke();
-            ctx.font='bold 10px Arial';ctx.fillStyle=C.white;ctx.fillText('BACK TAXES BREAKDOWN — As of '+todayStr,M+20,ty+10);ty+=20;
-            rr(M+20,ty,cw-40,30,C.bgRed,6);ctx.font='bold 12px Arial';ctx.fillStyle=C.red;ctx.fillText('My Back Taxes: $'+(T.ownTax+T.agtMyTax).toLocaleString(),M+30,ty+20);ctx.font='10px Arial';ctx.fillStyle='#fca5a5';ctx.fillText('($'+T.ownTax.toLocaleString()+' owner income + $'+T.agtMyTax.toLocaleString()+' agent comm)',M+300,ty+20);
-            rr(M+20,ty+36,cw-40,28,'#78350f80',6);ctx.font='bold 11px Arial';ctx.fillStyle=C.orange;ctx.fillText('⚠️ Property Owners Back Taxes: $'+T.agtOwnerTax.toLocaleString(),M+30,ty+54);
-            rr(M+20,ty+72,cw-40,34,C.inner,8);ctx.strokeStyle='#dc262688';ctx.lineWidth=2;ctx.strokeRect(M+20,ty+72,cw-40,34);
-            ctx.font='bold 14px Arial';ctx.fillStyle=C.white;var gtText='TOTAL BACK TAXES OWED TO GOVERNMENT:  $'+grandTotal.toLocaleString();ctx.fillText(gtText,M+30,ty+94);
-            ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText('As of '+todayStr,W-M-20-ctx.measureText('As of '+todayStr).width,ty+94);
+        rr(M+20+hw+10,sy,hw,50,C.bgCyan+'80',6);ctx.font='bold 12px Arial';ctx.fillStyle=C.cyan;ctx.fillText('🏢 Properties I Manage ('+agtC.length+')',M+30+hw+10,sy+18);ctx.font='11px Arial';ctx.fillStyle=C.cyan;ctx.fillText('Commission: $'+T.agtComm.toLocaleString(),M+30+hw+10,sy+38);ctx.fillStyle=C.orange;ctx.fillText('Owner Net: $'+T.agtOwnerNet.toLocaleString(),M+30+hw+10+hw*0.48,sy+38);
+        if(tax){var ty=sy+65;var grandTotal=T.ownTax+T.agtMyTax+T.agtOwnerTax;
+            ctx.font='bold 11px Arial';ctx.fillStyle=C.white;ctx.fillText('BACK TAXES BREAKDOWN — As of '+todayStr,M+20,ty+10);ty+=18;
+            rr(M+20,ty,cw-40,30,C.bgRed,6);ctx.font='bold 12px Arial';ctx.fillStyle=C.red;ctx.fillText('My Back Taxes Owed: $'+(T.ownTax+T.agtMyTax).toLocaleString(),M+30,ty+20);ctx.font='10px Arial';ctx.fillStyle='#fca5a5';ctx.fillText('($'+T.ownTax.toLocaleString()+' owner income + $'+T.agtMyTax.toLocaleString()+' agent comm)',M+310,ty+20);
+            rr(M+20,ty+36,cw-40,28,'#78350f80',6);ctx.font='bold 11px Arial';ctx.fillStyle=C.orange;ctx.fillText('⚠️ Owner Back Taxes Owed: $'+T.agtOwnerTax.toLocaleString(),M+30,ty+54);
+            // Grand total box with padding
+            var gtY=ty+74;rr(M+20,gtY,cw-40,40,C.inner,8);ctx.strokeStyle='#dc262688';ctx.lineWidth=2;ctx.strokeRect(M+20,gtY,cw-40,40);
+            ctx.font='bold 14px Arial';ctx.fillStyle=C.red;var gtText='TOTAL BACK TAXES OWED TO GOVERNMENT:  $'+grandTotal.toLocaleString();ctx.fillText(gtText,M+35,gtY+20);
+            ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText('As of '+todayStr,M+35,gtY+34);
         }
         y+=sh+18;
     }
     // Per contract
-    var ownContracts=contracts.filter(function(c){return isOwnerContract(c);}),agtContracts=contracts.filter(function(c){return !isOwnerContract(c);});
-    if(!single&&ownContracts.length>0&&agtContracts.length>0){ctx.font='bold 15px Arial';ctx.fillStyle=C.purple;ctx.fillText('🏠  Properties I Own ('+ownContracts.length+')',M,y+14);y+=30;}
+    var ownContracts=contracts.filter(function(c){return isOwnerContract(c);}),agtContracts=contracts.filter(function(c){return!isOwnerContract(c);});
+    if(!single&&ownContracts.length>0&&agtContracts.length>0){ctx.font='bold 15px Arial';ctx.fillStyle=C.purple;ctx.fillText('🏠  Properties I Own ('+ownContracts.length+')',M,y+14);y+=32;}
     var renderC=function(c){
         var d=computeAudit(c);var pc=(d.dep>0?1:0)+d.hist.length+(d.rem>0&&d.status==='active'?1:0);
         var extraH=tax&&!d.own?58:0;var th=28+Math.max(pc,1)*26;var ch=52+62+60+extraH+th+25;
@@ -10888,27 +10868,30 @@ function pngRender(contracts,single,total,tax){
         rr(cx,y,fbw,fbh,C.bgGreen,6);ctx.font='8px Arial';ctx.fillStyle=C.green;ctx.fillText('COLLECTED',cx+10,y+13);ctx.font='bold 15px Arial';ctx.fillText('$'+d.totalCol.toLocaleString(),cx+10,y+34);
         rr(cx+fbw+8,y,fbw,fbh,C.bgAmber,6);ctx.font='8px Arial';ctx.fillStyle=C.amber;ctx.fillText('REMAINING + GOV',cx+fbw+18,y+13);ctx.font='bold 15px Arial';ctx.fillText('$'+(d.rem>0?d.rem+d.govFee:0).toLocaleString(),cx+fbw+18,y+34);
         rr(cx+(fbw+8)*2,y,fbw,fbh,C.inner,6);ctx.font='8px Arial';ctx.fillStyle=C.gray;ctx.fillText('NEXT DUE',cx+(fbw+8)*2+10,y+13);ctx.font='bold 15px Arial';ctx.fillStyle=C.white;ctx.fillText(d.status==='active'?d.nextDue:'N/A',cx+(fbw+8)*2+10,y+34);
-        if(tax&&d.own){rr(cx+(fbw+8)*3,y,fbw,fbh,C.bgRed,6);ctx.font='8px Arial';ctx.fillStyle=C.red;ctx.fillText('MY BACK TAX (10%)',cx+(fbw+8)*3+10,y+13);ctx.font='bold 15px Arial';ctx.fillText('$'+d.myTax.toLocaleString(),cx+(fbw+8)*3+10,y+34);}
+        if(tax&&d.own){rr(cx+(fbw+8)*3,y,fbw,fbh,C.bgRed,6);ctx.font='8px Arial';ctx.fillStyle=C.red;ctx.fillText('MY BACK TAX OWED',cx+(fbw+8)*3+10,y+13);ctx.font='bold 15px Arial';ctx.fillText('$'+d.myTax.toLocaleString(),cx+(fbw+8)*3+10,y+34);}
         y+=fbh+8;
-        // Agent tax: 3 col
+        // Agent: 3 col tax boxes
         if(tax&&!d.own){var thw=(ccw-16)/3;
-            rr(cx,y,thw,48,C.bgRed+'cc',6);ctx.font='8px Arial';ctx.fillStyle=C.cyan;ctx.fillText('MY COMM (10%): $'+d.myIncome.toLocaleString(),cx+8,y+13);ctx.font='bold 11px Arial';ctx.fillStyle=C.red;ctx.fillText('My Tax: $'+d.myTax.toLocaleString(),cx+8,y+34);
-            rr(cx+thw+8,y,thw,48,'#78350f80',6);ctx.font='8px Arial';ctx.fillStyle=C.orange;ctx.fillText('OWNER NET (90%): $'+d.ownerNet.toLocaleString(),cx+thw+16,y+13);ctx.font='bold 11px Arial';ctx.fillText('⚠️ Owner Tax: $'+d.ownerTax.toLocaleString(),cx+thw+16,y+34);
-            rr(cx+thw*2+16,y,thw,48,C.inner,6);ctx.strokeStyle='#dc262666';ctx.lineWidth=1;ctx.strokeRect(cx+thw*2+16,y,thw,48);ctx.font='8px Arial';ctx.fillStyle=C.gray;ctx.fillText('TOTAL TO GOVT',cx+thw*2+24,y+13);ctx.font='bold 13px Arial';ctx.fillStyle=C.white;ctx.fillText('$'+(d.myTax+d.ownerTax).toLocaleString(),cx+thw*2+24,y+34);
+            rr(cx,y,thw,48,'#78350f80',6);ctx.font='8px Arial';ctx.fillStyle=C.orange;ctx.fillText('OWNER NET (90%): $'+d.ownerNet.toLocaleString(),cx+8,y+13);ctx.font='bold 11px Arial';ctx.fillText('Owner Back Tax Owed: $'+d.ownerTax.toLocaleString(),cx+8,y+34);
+            rr(cx+thw+8,y,thw,48,C.bgRed+'cc',6);ctx.font='8px Arial';ctx.fillStyle=C.cyan;ctx.fillText('MY COMMISSION (10%): $'+d.myIncome.toLocaleString(),cx+thw+16,y+13);ctx.font='bold 11px Arial';ctx.fillStyle=C.red;ctx.fillText('My Back Tax Owed: $'+d.myTax.toLocaleString(),cx+thw+16,y+34);
+            rr(cx+thw*2+16,y,thw,48,C.inner,6);ctx.strokeStyle='#dc262666';ctx.lineWidth=1;ctx.strokeRect(cx+thw*2+16,y,thw,48);ctx.font='8px Arial';ctx.fillStyle=C.red;ctx.fillText('TOTAL BACK TAX OWED TO GOVT',cx+thw*2+24,y+13);ctx.font='bold 14px Arial';ctx.fillText('$'+(d.myTax+d.ownerTax).toLocaleString(),cx+thw*2+24,y+34);
             y+=56;}
         // Table
-        rr(cx,y,ccw,24,C.inner,6);dr(cx,y+16,ccw,8,C.inner);ctx.font='bold 9px Arial';ctx.fillStyle=C.gray;ctx.fillText('PAYMENT',cx+10,y+16);ctx.fillText('DATE',cx+ccw*0.22,y+16);ctx.fillText('AMOUNT',cx+ccw*0.42,y+16);ctx.fillText('BALANCE',cx+ccw*0.58,y+16);
-        if(tax){if(d.own){ctx.fillStyle=C.red;ctx.fillText('MY TAX',cx+ccw*0.85,y+16);}else{ctx.fillStyle=C.cyan;ctx.fillText('MY COMM',cx+ccw*0.72,y+16);ctx.fillStyle=C.orange;ctx.fillText('OWNER',cx+ccw*0.82,y+16);ctx.fillStyle=C.red;ctx.fillText('MY TAX',cx+ccw*0.92,y+16);}}
+        rr(cx,y,ccw,24,C.inner,6);dr(cx,y+16,ccw,8,C.inner);ctx.font='bold 9px Arial';ctx.fillStyle=C.gray;
+        ctx.fillText('PAYMENT',cx+10,y+16);ctx.fillText('DATE',cx+ccw*0.20,y+16);ctx.fillText('AMOUNT',cx+ccw*0.38,y+16);ctx.fillText('BALANCE',cx+ccw*0.52,y+16);
+        if(tax){if(d.own){ctx.fillStyle=C.red;ctx.fillText('MY TAX',cx+ccw*0.85,y+16);}
+        else{ctx.fillStyle=C.orange;ctx.fillText('OWNER NET',cx+ccw*0.64,y+16);ctx.fillStyle=C.cyan;ctx.fillText('MY COMM',cx+ccw*0.76,y+16);ctx.fillStyle=C.orange;ctx.fillText('OWN TAX',cx+ccw*0.87,y+16);ctx.fillStyle=C.red;ctx.fillText('MY TAX',cx+ccw*0.95,y+16);}}
         y+=26;var rb2=d.price-d.dep;var rh=24;
-        var drawRow2=function(label,date,amt,paid){dr(cx,y,ccw,rh,'#1a233280');ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText(label,cx+10,y+16);ctx.fillStyle=paid?C.green:C.amber;ctx.fillText(date,cx+ccw*0.22,y+16);ctx.fillStyle=C.white;ctx.font='bold 10px Arial';ctx.fillText('$'+amt.toLocaleString(),cx+ccw*0.42,y+16);ctx.fillStyle=C.gray;ctx.font='10px Arial';ctx.fillText('$'+rb2.toLocaleString(),cx+ccw*0.58,y+16);
-            if(tax&&paid){if(d.own){ctx.fillStyle=C.red;ctx.fillText('$'+Math.round(amt*0.10).toLocaleString(),cx+ccw*0.85,y+16);}else{var cm3=Math.round(amt*0.10),nt=amt-cm3;ctx.fillStyle=C.cyan;ctx.fillText('$'+cm3.toLocaleString(),cx+ccw*0.72,y+16);ctx.fillStyle=C.orange;ctx.fillText('$'+nt.toLocaleString(),cx+ccw*0.82,y+16);ctx.fillStyle=C.red;ctx.fillText('$'+Math.round(cm3*0.10).toLocaleString(),cx+ccw*0.92,y+16);}}y+=rh;};
+        var drawRow2=function(label,date,amt,paid){dr(cx,y,ccw,rh,'#1a233280');ctx.font='10px Arial';ctx.fillStyle=C.gray;ctx.fillText(label,cx+10,y+16);ctx.fillStyle=paid?C.green:C.amber;ctx.fillText(date,cx+ccw*0.20,y+16);ctx.fillStyle=C.white;ctx.font='bold 10px Arial';ctx.fillText('$'+amt.toLocaleString(),cx+ccw*0.38,y+16);ctx.fillStyle=C.gray;ctx.font='10px Arial';ctx.fillText('$'+rb2.toLocaleString(),cx+ccw*0.52,y+16);
+            if(tax&&paid){if(d.own){ctx.fillStyle=C.red;ctx.fillText('$'+Math.round(amt*0.10).toLocaleString(),cx+ccw*0.85,y+16);}
+            else{var cm3=Math.round(amt*0.10),nt=amt-cm3;ctx.fillStyle=C.orange;ctx.fillText('$'+nt.toLocaleString(),cx+ccw*0.64,y+16);ctx.fillStyle=C.cyan;ctx.fillText('$'+cm3.toLocaleString(),cx+ccw*0.76,y+16);ctx.fillStyle=C.orange;ctx.fillText('$'+Math.round(nt*0.10).toLocaleString(),cx+ccw*0.87,y+16);ctx.fillStyle=C.red;ctx.fillText('$'+Math.round(cm3*0.10).toLocaleString(),cx+ccw*0.95,y+16);}}y+=rh;};
         if(d.dep>0)drawRow2('Deposit',d.depPaid?(c.depositPaidDate||'Paid'):'Pending',d.dep,d.depPaid);
         d.hist.forEach(function(p,i){var a=getPayAmt(p);rb2=Math.max(0,rb2-a);var ml=p.monthsCovered&&p.monthsCovered>1?'Mo '+(p.monthStart||(i+1))+'-'+(p.monthEnd||(i+p.monthsCovered)):'Month '+(p.month||(i+1));drawRow2(ml,p.date||p.paidDate||'N/A',a,true);});
-        if(d.rem>0&&d.status==='active'){dr(cx,y,ccw,rh,'#78350f33');ctx.font='bold 10px Arial';ctx.fillStyle=C.amber;ctx.fillText('Final Payment',cx+10,y+16);ctx.fillText('Pending',cx+ccw*0.22,y+16);ctx.fillText('$'+(d.fpBase+d.govFee).toLocaleString(),cx+ccw*0.42,y+16);ctx.fillStyle=C.green;ctx.fillText('$0',cx+ccw*0.58,y+16);y+=rh;}
+        if(d.rem>0&&d.status==='active'){dr(cx,y,ccw,rh,'#78350f33');ctx.font='bold 10px Arial';ctx.fillStyle=C.amber;ctx.fillText('Final Payment',cx+10,y+16);ctx.fillText('Pending',cx+ccw*0.20,y+16);ctx.fillText('$'+(d.fpBase+d.govFee).toLocaleString(),cx+ccw*0.38,y+16);ctx.fillStyle=C.green;ctx.fillText('$0',cx+ccw*0.52,y+16);y+=rh;}
         y+=18;
     };
     ownContracts.forEach(function(c){renderC(c);});
-    if(!single&&agtContracts.length>0&&ownContracts.length>0){ctx.font='bold 15px Arial';ctx.fillStyle=C.cyan;ctx.fillText('🏢  Properties I Manage as Agent ('+agtContracts.length+')',M,y+14);y+=30;}
+    if(!single&&agtContracts.length>0&&ownContracts.length>0){ctx.font='bold 15px Arial';ctx.fillStyle=C.cyan;ctx.fillText('🏢  Properties I Manage as Agent ('+agtContracts.length+')',M,y+14);y+=32;}
     agtContracts.forEach(function(c){renderC(c);});
     y+=5;ctx.strokeStyle='#7c3aed';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(M,y);ctx.lineTo(W-M,y);ctx.stroke();y+=12;ctx.font='10px Arial';ctx.fillStyle=C.grayDk;ctx.fillText('PaulysProperties.com | RTO Audit Report | '+now.toLocaleDateString(),M,y);y+=30;
     var out=document.createElement('canvas');out.width=W;out.height=Math.min(y,H);out.getContext('2d').drawImage(cv,0,0);return out;
