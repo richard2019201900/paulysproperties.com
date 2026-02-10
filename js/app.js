@@ -10536,10 +10536,19 @@ window.submitForcePasswordChange = async function() {
     }
 };
 
+
+
 // ==================== RTO AUDIT REPORT ====================
 
 /**
- * Open the RTO Audit Report modal - fetches all contracts from Firestore
+ * Get payment amount from a payment record (handles both 'actual' and 'amount' field names)
+ */
+function getPaymentAmount(pay) {
+    return pay.actual || pay.amount || 0;
+}
+
+/**
+ * Open the RTO Audit Report modal
  */
 window.openRTOAuditReport = async function() {
     if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
@@ -10563,7 +10572,6 @@ window.openRTOAuditReport = async function() {
         
         window._auditContracts = contracts;
         
-        // Build unique buyer/seller list for filter
         const people = new Set();
         contracts.forEach(c => {
             if (c.buyer) people.add(c.buyer);
@@ -10571,52 +10579,30 @@ window.openRTOAuditReport = async function() {
             if (seller) people.add(seller);
         });
         const sortedPeople = [...people].sort();
-        const filterOptions = sortedPeople.map(p => `<option value="${p}">${p}</option>`).join('');
+        const filterOptions = sortedPeople.map(p => '<option value="' + p + '">' + p + '</option>').join('');
         
-        const modalHTML = `
-            <div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
-                <div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col">
-                    <button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                    <div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4">
-                        <h3 class="text-xl font-bold text-white flex items-center gap-3">
-                            <span>📋</span> RTO Contract Audit Report
-                        </h3>
-                        <p class="text-amber-100 text-sm mt-1">${contracts.length} contract(s) found</p>
-                    </div>
-                    <div class="px-6 py-3 bg-gray-800/50 border-b border-gray-700 flex flex-wrap items-center gap-3">
-                        <div class="flex items-center gap-2">
-                            <label class="text-gray-400 text-sm">Filter:</label>
-                            <select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">
-                                <option value="all">All Contracts</option>
-                                ${filterOptions}
-                            </select>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">
-                                <input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500">
-                                Include completed/cancelled
-                            </label>
-                        </div>
-                        <div class="ml-auto flex flex-wrap gap-2">
-                            <button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                                📋 Copy All
-                            </button>
-                            <button onclick="downloadAuditPNG('single')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                                🖼️ PNG Per Contract
-                            </button>
-                            <button onclick="downloadAuditPNG('combined')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                                🖼️ PNG All-in-One
-                            </button>
-                        </div>
-                    </div>
-                    <div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-                        <p class="text-gray-400">Loading...</p>
-                    </div>
-                </div>
-            </div>
-        `;
+        const modalHTML = '<div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">'
+            + '<div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col">'
+            + '<button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">'
+            + '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
+            + '<div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4">'
+            + '<h3 class="text-xl font-bold text-white flex items-center gap-3"><span>📋</span> RTO Contract Audit Report</h3>'
+            + '<p class="text-amber-100 text-sm mt-1">' + contracts.length + ' contract(s) found</p></div>'
+            + '<div class="px-6 py-3 bg-gray-800/80 border-b border-gray-700 flex flex-wrap items-center gap-3">'
+            + '<div class="flex items-center gap-2"><label class="text-gray-400 text-sm">Filter:</label>'
+            + '<select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">'
+            + '<option value="all">All Contracts</option>' + filterOptions + '</select></div>'
+            + '<label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">'
+            + '<input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500"> Include completed/cancelled</label>'
+            + '<label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">'
+            + '<input type="checkbox" id="auditShowTax" onchange="renderAuditReport()" class="rounded accent-red-500"> Show 10% Tax Liability</label>'
+            + '<div class="ml-auto flex flex-wrap gap-2">'
+            + '<button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">📋 Copy All</button>'
+            + '<button onclick="downloadAuditPNG(\'single\')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">🖼️ PNG Per Contract</button>'
+            + '<button onclick="downloadAuditPNG(\'combined\')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">🖼️ PNG All-in-One</button>'
+            + '</div></div>'
+            + '<div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-4"><p class="text-gray-400">Loading...</p></div>'
+            + '</div></div>';
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         renderAuditReport();
@@ -10632,87 +10618,10 @@ window.closeRTOAuditModal = function() {
     if (modal) modal.remove();
 };
 
-window.renderAuditReport = function() {
-    const container = document.getElementById('auditReportContent');
-    if (!container || !window._auditContracts) return;
-    
-    const filterUser = document.getElementById('auditFilterUser')?.value || 'all';
-    const includeCompleted = document.getElementById('auditIncludeCompleted')?.checked ?? true;
-    
-    let filtered = window._auditContracts.slice();
-    
-    if (filterUser !== 'all') {
-        filtered = filtered.filter(c => {
-            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
-            return c.buyer === filterUser || seller === filterUser;
-        });
-    }
-    
-    if (!includeCompleted) {
-        filtered = filtered.filter(c => (c.status || 'active') === 'active');
-    }
-    
-    if (filtered.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 italic text-center py-8">No contracts match the current filters</p>';
-        return;
-    }
-    
-    // Calculate portfolio summary
-    let totalPurchaseValue = 0, totalCollected = 0, totalOutstanding = 0;
-    let activeCount = 0, completedCount = 0, cancelledCount = 0;
-    
-    filtered.forEach(c => {
-        const calc = c.calculations || {};
-        const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
-        const history = c.rtoPaymentHistory || [];
-        const deposit = c.depositPaid ? (c.depositAmount || 0) : 0;
-        const paymentsTotal = history.reduce((sum, p) => sum + (p.amount || 0), 0);
-        const remaining = c.remainingBalance || 0;
-        const govFee = Math.round((c.finalPaymentBase || 0) * 0.10);
-        
-        totalPurchaseValue += purchasePrice;
-        totalCollected += deposit + paymentsTotal;
-        totalOutstanding += remaining + (remaining > 0 ? govFee : 0);
-        
-        const status = (c.status || 'active').toLowerCase();
-        if (status === 'active') activeCount++;
-        else if (status === 'completed') completedCount++;
-        else cancelledCount++;
-    });
-    
-    let html = `
-        <div class="bg-gradient-to-r from-gray-800 to-gray-800/50 rounded-xl p-5 border border-amber-600/40">
-            <h4 class="text-amber-400 font-bold text-lg mb-3">Portfolio Summary</h4>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                    <div class="text-gray-400 text-xs uppercase">Contracts</div>
-                    <div class="text-white text-xl font-bold">${filtered.length}</div>
-                    <div class="text-gray-500 text-xs">${activeCount} active${completedCount ? ', ' + completedCount + ' completed' : ''}${cancelledCount ? ', ' + cancelledCount + ' cancelled' : ''}</div>
-                </div>
-                <div>
-                    <div class="text-gray-400 text-xs uppercase">Total Purchase Value</div>
-                    <div class="text-white text-xl font-bold">$${totalPurchaseValue.toLocaleString()}</div>
-                </div>
-                <div>
-                    <div class="text-gray-400 text-xs uppercase">Total Collected</div>
-                    <div class="text-green-400 text-xl font-bold">$${totalCollected.toLocaleString()}</div>
-                </div>
-                <div>
-                    <div class="text-gray-400 text-xs uppercase">Total Outstanding</div>
-                    <div class="text-amber-400 text-xl font-bold">$${totalOutstanding.toLocaleString()}</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    filtered.forEach((c, idx) => {
-        html += buildAuditContractCard(c, idx);
-    });
-    
-    container.innerHTML = html;
-};
-
-function buildAuditContractCard(c, idx) {
+/**
+ * Compute audit data for a single contract
+ */
+function computeAuditData(c) {
     const calc = c.calculations || {};
     const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
     const termMonths = c.totalPayments || calc.termMonths || 0;
@@ -10732,47 +10641,14 @@ function buildAuditContractCard(c, idx) {
     const agentName = hasAgent ? seller.replace(/Managed by:\s*/i, '').trim() : null;
     const agentCommission = hasAgent ? Math.round(finalPaymentBase * 0.10) : 0;
     
-    const statusBadge = status === 'active' 
-        ? '<span class="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold">ACTIVE</span>'
-        : status === 'completed'
-        ? '<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold">COMPLETED</span>'
-        : '<span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold">CANCELLED</span>';
+    const depositCollected = depositPaid ? deposit : 0;
+    const paymentsCollected = history.reduce((sum, p) => sum + getPaymentAmount(p), 0);
+    const totalCollected = depositCollected + paymentsCollected;
     
-    // Payment rows
-    let paymentRows = '';
-    let runningBalance = purchasePrice - deposit;
-    
-    if (deposit > 0) {
-        paymentRows += '<tr class="border-b border-gray-700/50">';
-        paymentRows += '<td class="py-1.5 px-2 text-gray-400 text-xs">Deposit</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-xs">' + (depositPaid ? '<span class="text-green-400">' + (c.depositPaidDate || 'Paid') + '</span>' : '<span class="text-amber-400">Pending</span>') + '</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-white text-xs text-right">$' + deposit.toLocaleString() + '</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-gray-300 text-xs text-right">$' + runningBalance.toLocaleString() + '</td>';
-        paymentRows += '</tr>';
-    }
-    
-    history.forEach((pay, i) => {
-        runningBalance = Math.max(0, runningBalance - (pay.amount || 0));
-        const monthLabel = pay.monthsCovered && pay.monthsCovered > 1 
-            ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered)) 
-            : 'Month ' + (pay.month || (i + 1));
-        const payDate = pay.date || pay.paidDate || 'N/A';
-        paymentRows += '<tr class="border-b border-gray-700/50">';
-        paymentRows += '<td class="py-1.5 px-2 text-gray-400 text-xs">' + monthLabel + '</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-green-400 text-xs">' + payDate + '</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-white text-xs text-right">$' + (pay.amount || 0).toLocaleString() + '</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-gray-300 text-xs text-right">$' + runningBalance.toLocaleString() + '</td>';
-        paymentRows += '</tr>';
-    });
-    
-    if (remaining > 0 && status === 'active') {
-        paymentRows += '<tr class="border-b border-gray-700/50 bg-amber-900/20">';
-        paymentRows += '<td class="py-1.5 px-2 text-amber-400 text-xs font-bold">Final Payment</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-amber-400 text-xs">Pending</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-amber-400 text-xs text-right font-bold">$' + (finalPaymentBase + govFee).toLocaleString() + '</td>';
-        paymentRows += '<td class="py-1.5 px-2 text-green-400 text-xs text-right font-bold">$0</td>';
-        paymentRows += '</tr>';
-    }
+    // Tax: 10% of each collected payment
+    const depositTax = depositPaid ? Math.round(deposit * 0.10) : 0;
+    const paymentsTax = history.reduce((sum, p) => sum + Math.round(getPaymentAmount(p) * 0.10), 0);
+    const totalTax = depositTax + paymentsTax;
     
     // Next due date
     const paidThrough = c.rtoPaidThroughDate || '';
@@ -10788,49 +10664,179 @@ function buildAuditContractCard(c, idx) {
         }
     }
     
-    const depositCollected = depositPaid ? deposit : 0;
-    const paymentsCollected = history.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const totalCollected = depositCollected + paymentsCollected;
+    return {
+        purchasePrice, termMonths, history, deposit, depositPaid, remaining,
+        finalPaymentBase, govFee, status, seller, buyer, startDate, expectedMonthly,
+        hasAgent, agentName, agentCommission, depositCollected, paymentsCollected,
+        totalCollected, depositTax, paymentsTax, totalTax, nextDueText
+    };
+}
+
+window.renderAuditReport = function() {
+    const container = document.getElementById('auditReportContent');
+    if (!container || !window._auditContracts) return;
     
-    let card = '';
-    card += '<div class="bg-gray-800/70 rounded-xl border border-gray-700 overflow-hidden" data-audit-contract="' + idx + '">';
-    card += '<div class="px-5 py-3 bg-gray-800 border-b border-gray-700 flex flex-wrap items-center justify-between gap-2">';
-    card += '<div>';
-    card += '<h5 class="text-white font-bold flex items-center gap-2">🏠 ' + (c.propertyTitle || 'Unknown Property') + ' ' + statusBadge + '</h5>';
-    card += '<p class="text-gray-400 text-xs mt-0.5">Contract: ' + (c.documentId || c.id) + ' | Started: ' + startDate + '</p>';
+    const filtered = getFilteredAuditContracts();
+    const showTax = document.getElementById('auditShowTax')?.checked || false;
+    
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 italic text-center py-8">No contracts match the current filters</p>';
+        return;
+    }
+    
+    // Portfolio summary
+    let totalPurchaseValue = 0, totalCollected = 0, totalOutstanding = 0, totalTaxLiability = 0;
+    let activeCount = 0, completedCount = 0, cancelledCount = 0;
+    
+    filtered.forEach(c => {
+        const d = computeAuditData(c);
+        totalPurchaseValue += d.purchasePrice;
+        totalCollected += d.totalCollected;
+        totalOutstanding += d.remaining + (d.remaining > 0 ? d.govFee : 0);
+        totalTaxLiability += d.totalTax;
+        if (d.status === 'active') activeCount++;
+        else if (d.status === 'completed') completedCount++;
+        else cancelledCount++;
+    });
+    
+    // Summary card
+    let html = '<div class="bg-gray-800 rounded-xl p-6 border border-amber-600/40">';
+    html += '<h4 class="text-amber-400 font-bold text-lg mb-4">Portfolio Summary</h4>';
+    html += '<div class="grid grid-cols-2 md:grid-cols-' + (showTax ? '5' : '4') + ' gap-4">';
+    
+    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
+    html += '<div class="text-gray-400 text-xs uppercase mb-1">Contracts</div>';
+    html += '<div class="text-white text-2xl font-bold">' + filtered.length + '</div>';
+    html += '<div class="text-gray-500 text-xs mt-1">' + activeCount + ' active' + (completedCount ? ', ' + completedCount + ' completed' : '') + (cancelledCount ? ', ' + cancelledCount + ' cancelled' : '') + '</div></div>';
+    
+    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
+    html += '<div class="text-gray-400 text-xs uppercase mb-1">Total Purchase Value</div>';
+    html += '<div class="text-white text-2xl font-bold">$' + totalPurchaseValue.toLocaleString() + '</div></div>';
+    
+    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
+    html += '<div class="text-gray-400 text-xs uppercase mb-1">Total Collected</div>';
+    html += '<div class="text-green-400 text-2xl font-bold">$' + totalCollected.toLocaleString() + '</div></div>';
+    
+    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
+    html += '<div class="text-gray-400 text-xs uppercase mb-1">Total Outstanding</div>';
+    html += '<div class="text-amber-400 text-2xl font-bold">$' + totalOutstanding.toLocaleString() + '</div></div>';
+    
+    if (showTax) {
+        html += '<div class="bg-red-900/40 rounded-lg p-3 border border-red-700/40">';
+        html += '<div class="text-red-400 text-xs uppercase mb-1">Tax Liability (10%)</div>';
+        html += '<div class="text-red-400 text-2xl font-bold">$' + totalTaxLiability.toLocaleString() + '</div>';
+        html += '<div class="text-red-400/60 text-xs mt-1">10% of all collected</div></div>';
+    }
+    
+    html += '</div></div>';
+    
+    // Per-contract cards
+    filtered.forEach((c, idx) => {
+        html += buildAuditContractCard(c, idx, showTax);
+    });
+    
+    container.innerHTML = html;
+};
+
+function buildAuditContractCard(c, idx, showTax) {
+    const d = computeAuditData(c);
+    
+    const statusBadge = d.status === 'active' 
+        ? '<span class="bg-green-600 text-white px-2.5 py-0.5 rounded text-xs font-bold ml-2">ACTIVE</span>'
+        : d.status === 'completed'
+        ? '<span class="bg-blue-600 text-white px-2.5 py-0.5 rounded text-xs font-bold ml-2">COMPLETED</span>'
+        : '<span class="bg-red-600 text-white px-2.5 py-0.5 rounded text-xs font-bold ml-2">CANCELLED</span>';
+    
+    // Payment rows
+    let paymentRows = '';
+    let runningBalance = d.purchasePrice - d.deposit;
+    
+    if (d.deposit > 0) {
+        const amt = d.depositPaid ? d.deposit : 0;
+        paymentRows += '<tr class="border-b border-gray-700/30">';
+        paymentRows += '<td class="py-2.5 px-4 text-gray-300 text-sm">Deposit</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-sm">' + (d.depositPaid ? '<span class="text-green-400">' + (c.depositPaidDate || 'Paid') + '</span>' : '<span class="text-amber-400">Pending</span>') + '</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-white text-sm text-right font-medium">$' + d.deposit.toLocaleString() + '</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-gray-400 text-sm text-right">$' + runningBalance.toLocaleString() + '</td>';
+        if (showTax) paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + (d.depositPaid ? Math.round(d.deposit * 0.10).toLocaleString() : '0') + '</td>';
+        paymentRows += '</tr>';
+    }
+    
+    d.history.forEach((pay, i) => {
+        const payAmt = getPaymentAmount(pay);
+        runningBalance = Math.max(0, runningBalance - payAmt);
+        const monthLabel = pay.monthsCovered && pay.monthsCovered > 1 
+            ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered)) 
+            : 'Month ' + (pay.month || (i + 1));
+        const payDate = pay.date || pay.paidDate || 'N/A';
+        const rowBg = i % 2 === 0 ? ' bg-gray-800/30' : '';
+        paymentRows += '<tr class="border-b border-gray-700/30' + rowBg + '">';
+        paymentRows += '<td class="py-2.5 px-4 text-gray-300 text-sm">' + monthLabel + '</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-green-400 text-sm">' + payDate + '</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-white text-sm text-right font-medium">$' + payAmt.toLocaleString() + '</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-gray-400 text-sm text-right">$' + runningBalance.toLocaleString() + '</td>';
+        if (showTax) paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + Math.round(payAmt * 0.10).toLocaleString() + '</td>';
+        paymentRows += '</tr>';
+    });
+    
+    if (d.remaining > 0 && d.status === 'active') {
+        paymentRows += '<tr class="bg-amber-900/20 border-b border-amber-700/30">';
+        paymentRows += '<td class="py-2.5 px-4 text-amber-400 text-sm font-bold">Final Payment</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-amber-400 text-sm">Pending</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-amber-400 text-sm text-right font-bold">$' + (d.finalPaymentBase + d.govFee).toLocaleString() + '</td>';
+        paymentRows += '<td class="py-2.5 px-4 text-green-400 text-sm text-right font-bold">$0</td>';
+        if (showTax) paymentRows += '<td class="py-2.5 px-4 text-amber-400/60 text-sm text-right">-</td>';
+        paymentRows += '</tr>';
+    }
+    
+    let card = '<div class="bg-gray-800/80 rounded-xl border border-gray-700 overflow-hidden mt-4">';
+    
+    // Header
+    card += '<div class="px-5 py-3.5 bg-gray-800 border-b border-gray-700 flex flex-wrap items-center justify-between gap-2">';
+    card += '<div><h5 class="text-white font-bold text-base flex items-center">🏠 ' + (c.propertyTitle || 'Unknown Property') + statusBadge + '</h5>';
+    card += '<p class="text-gray-500 text-xs mt-1">Contract: ' + (c.documentId || c.id) + ' | Started: ' + d.startDate + '</p></div>';
+    card += '<button onclick="copySingleAuditText(' + idx + ')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy</button>';
     card += '</div>';
-    card += '<button onclick="copySingleAuditText(' + idx + ')" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-xs font-bold transition">📋 Copy</button>';
-    card += '</div>';
+    
+    // Body
     card += '<div class="p-5">';
     
     // Details grid
-    card += '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">';
-    card += '<div><div class="text-gray-500 text-xs uppercase">Seller</div><div class="text-white text-sm font-medium">' + seller + '</div>';
-    if (hasAgent) card += '<div class="text-purple-400 text-xs">Agent: ' + agentName + '</div>';
+    card += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">';
+    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Seller</div><div class="text-white text-sm font-medium">' + d.seller + '</div>';
+    if (d.hasAgent) card += '<div class="text-purple-400 text-xs mt-1">Agent: ' + d.agentName + '</div>';
     card += '</div>';
-    card += '<div><div class="text-gray-500 text-xs uppercase">Buyer</div><div class="text-white text-sm font-medium">' + buyer + '</div></div>';
-    card += '<div><div class="text-gray-500 text-xs uppercase">Purchase Price</div><div class="text-white text-sm font-bold">$' + purchasePrice.toLocaleString() + '</div><div class="text-gray-500 text-xs">' + termMonths + ' month term</div></div>';
-    card += '<div><div class="text-gray-500 text-xs uppercase">Monthly Payment</div><div class="text-white text-sm font-bold">$' + expectedMonthly.toLocaleString() + '</div></div>';
+    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Buyer</div><div class="text-white text-sm font-medium">' + d.buyer + '</div></div>';
+    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Purchase Price</div><div class="text-white text-sm font-bold">$' + d.purchasePrice.toLocaleString() + '</div><div class="text-gray-500 text-xs mt-1">' + d.termMonths + ' month term</div></div>';
+    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Monthly Payment</div><div class="text-white text-sm font-bold">$' + d.expectedMonthly.toLocaleString() + '</div></div>';
     card += '</div>';
     
     // Financial summary
-    card += '<div class="grid grid-cols-3 gap-3 mb-4">';
-    card += '<div class="bg-green-900/30 rounded-lg p-2.5 border border-green-700/30"><div class="text-green-400 text-xs uppercase">Collected</div><div class="text-green-400 text-lg font-bold">$' + totalCollected.toLocaleString() + '</div></div>';
-    card += '<div class="bg-amber-900/30 rounded-lg p-2.5 border border-amber-700/30"><div class="text-amber-400 text-xs uppercase">Remaining + Gov Fee</div><div class="text-amber-400 text-lg font-bold">$' + (remaining > 0 ? remaining + govFee : 0).toLocaleString() + '</div>';
-    if (govFee > 0 && remaining > 0) card += '<div class="text-gray-500 text-xs">Base: $' + remaining.toLocaleString() + ' + Gov: $' + govFee.toLocaleString() + '</div>';
+    const colCount = showTax ? '4' : '3';
+    card += '<div class="grid grid-cols-' + colCount + ' gap-3 mb-5">';
+    card += '<div class="bg-green-900/30 rounded-lg p-4 border border-green-700/30"><div class="text-green-400 text-xs uppercase mb-1">Collected</div><div class="text-green-400 text-xl font-bold">$' + d.totalCollected.toLocaleString() + '</div></div>';
+    card += '<div class="bg-amber-900/30 rounded-lg p-4 border border-amber-700/30"><div class="text-amber-400 text-xs uppercase mb-1">Remaining + Gov Fee</div><div class="text-amber-400 text-xl font-bold">$' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString() + '</div>';
+    if (d.govFee > 0 && d.remaining > 0) card += '<div class="text-gray-500 text-xs mt-1">Base: $' + d.remaining.toLocaleString() + ' + Gov: $' + d.govFee.toLocaleString() + '</div>';
     card += '</div>';
-    card += '<div class="bg-gray-700/30 rounded-lg p-2.5 border border-gray-600/30"><div class="text-gray-400 text-xs uppercase">Next Due</div><div class="text-white text-lg font-bold">' + (status === 'active' ? nextDueText : 'N/A') + '</div>';
-    if (hasAgent && remaining > 0) card += '<div class="text-purple-400 text-xs">Agent comm: $' + agentCommission.toLocaleString() + '</div>';
-    card += '</div></div>';
+    card += '<div class="bg-gray-700/30 rounded-lg p-4 border border-gray-600/30"><div class="text-gray-400 text-xs uppercase mb-1">Next Due</div><div class="text-white text-xl font-bold">' + (d.status === 'active' ? d.nextDueText : 'N/A') + '</div>';
+    if (d.hasAgent && d.remaining > 0) card += '<div class="text-purple-400 text-xs mt-1">Agent comm: $' + d.agentCommission.toLocaleString() + '</div>';
+    card += '</div>';
+    if (showTax) {
+        card += '<div class="bg-red-900/30 rounded-lg p-4 border border-red-700/30"><div class="text-red-400 text-xs uppercase mb-1">Tax Liability (10%)</div><div class="text-red-400 text-xl font-bold">$' + d.totalTax.toLocaleString() + '</div>';
+        card += '<div class="text-red-400/60 text-xs mt-1">On $' + d.totalCollected.toLocaleString() + ' collected</div></div>';
+    }
+    card += '</div>';
     
     // Payment table
-    card += '<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-gray-600">';
-    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase">Payment</th>';
-    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase">Date</th>';
-    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase text-right">Amount</th>';
-    card += '<th class="py-1.5 px-2 text-gray-400 text-xs font-bold uppercase text-right">Balance After</th>';
+    card += '<div class="overflow-x-auto rounded-lg border border-gray-700/50"><table class="w-full text-left">';
+    card += '<thead><tr class="bg-gray-700/40 border-b border-gray-600">';
+    card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase">Payment</th>';
+    card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase">Date</th>';
+    card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase text-right">Amount</th>';
+    card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase text-right">Balance After</th>';
+    if (showTax) card += '<th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">Tax (10%)</th>';
     card += '</tr></thead><tbody>';
-    card += paymentRows || '<tr><td colspan="4" class="py-2 px-2 text-gray-500 text-xs italic">No payments recorded</td></tr>';
+    card += paymentRows || '<tr><td colspan="' + (showTax ? '5' : '4') + '" class="py-4 px-4 text-gray-500 text-sm italic text-center">No payments recorded</td></tr>';
     card += '</tbody></table></div>';
     
     card += '</div></div>';
@@ -10838,62 +10844,54 @@ function buildAuditContractCard(c, idx) {
 }
 
 function buildAuditContractText(c) {
-    const calc = c.calculations || {};
-    const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
-    const termMonths = c.totalPayments || calc.termMonths || 0;
-    const history = (c.rtoPaymentHistory || []).slice().sort((a, b) => (a.month || 0) - (b.month || 0));
-    const deposit = c.depositAmount || 0;
-    const depositPaid = c.depositPaid || false;
-    const remaining = c.remainingBalance || 0;
-    const finalPaymentBase = c.finalPaymentBase || 0;
-    const govFee = Math.round(finalPaymentBase * 0.10);
-    const status = (c.status || 'active').toUpperCase();
-    const seller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
-    const buyer = c.buyer || 'Unknown';
-    const startDate = c.startDate || 'N/A';
-    const expectedMonthly = c.expectedMonthlyPayment || calc.monthlyPayment || 0;
-    const depositCollected = depositPaid ? deposit : 0;
-    const paymentsCollected = history.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const totalCollected = depositCollected + paymentsCollected;
+    const d = computeAuditData(c);
+    const showTax = document.getElementById('auditShowTax')?.checked || false;
     
     let text = '';
     text += 'PROPERTY: ' + (c.propertyTitle || 'Unknown') + '\n';
-    text += 'STATUS: ' + status + '\n';
+    text += 'STATUS: ' + d.status.toUpperCase() + '\n';
     text += 'CONTRACT ID: ' + (c.documentId || c.id) + '\n';
-    text += 'START DATE: ' + startDate + '\n';
-    text += 'SELLER: ' + seller + '\n';
-    text += 'BUYER: ' + buyer + '\n';
-    text += 'PURCHASE PRICE: $' + purchasePrice.toLocaleString() + '\n';
-    text += 'TERM: ' + termMonths + ' months\n';
-    text += 'MONTHLY PAYMENT: $' + expectedMonthly.toLocaleString() + '\n';
-    text += '\n';
+    text += 'START DATE: ' + d.startDate + '\n';
+    text += 'SELLER: ' + d.seller + '\n';
+    text += 'BUYER: ' + d.buyer + '\n';
+    text += 'PURCHASE PRICE: $' + d.purchasePrice.toLocaleString() + '\n';
+    text += 'TERM: ' + d.termMonths + ' months\n';
+    text += 'MONTHLY PAYMENT: $' + d.expectedMonthly.toLocaleString() + '\n\n';
     text += 'PAYMENT HISTORY:\n';
     
-    let runningBalance = purchasePrice - deposit;
+    let runningBalance = d.purchasePrice - d.deposit;
     
-    if (deposit > 0) {
-        text += '  Deposit: $' + deposit.toLocaleString() + ' - ' + (depositPaid ? (c.depositPaidDate || 'Paid') : 'PENDING') + ' - Balance: $' + runningBalance.toLocaleString() + '\n';
+    if (d.deposit > 0) {
+        text += '  Deposit: $' + d.deposit.toLocaleString() + ' - ' + (d.depositPaid ? (c.depositPaidDate || 'Paid') : 'PENDING') + ' - Balance: $' + runningBalance.toLocaleString();
+        if (showTax && d.depositPaid) text += ' - Tax: $' + Math.round(d.deposit * 0.10).toLocaleString();
+        text += '\n';
     }
     
-    history.forEach((pay, i) => {
-        runningBalance = Math.max(0, runningBalance - (pay.amount || 0));
+    d.history.forEach((pay, i) => {
+        const payAmt = getPaymentAmount(pay);
+        runningBalance = Math.max(0, runningBalance - payAmt);
         const monthLabel = pay.monthsCovered && pay.monthsCovered > 1
             ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered))
             : 'Month ' + (pay.month || (i + 1));
         const payDate = pay.date || pay.paidDate || 'N/A';
-        text += '  ' + monthLabel + ': $' + (pay.amount || 0).toLocaleString() + ' - ' + payDate + ' - Balance: $' + runningBalance.toLocaleString() + '\n';
+        text += '  ' + monthLabel + ': $' + payAmt.toLocaleString() + ' - ' + payDate + ' - Balance: $' + runningBalance.toLocaleString();
+        if (showTax) text += ' - Tax: $' + Math.round(payAmt * 0.10).toLocaleString();
+        text += '\n';
     });
     
-    if (remaining > 0 && (c.status || 'active') === 'active') {
-        text += '  Final Payment: $' + (finalPaymentBase + govFee).toLocaleString() + ' - PENDING - Balance: $0\n';
+    if (d.remaining > 0 && d.status === 'active') {
+        text += '  Final Payment: $' + (d.finalPaymentBase + d.govFee).toLocaleString() + ' - PENDING - Balance: $0\n';
     }
     
-    text += '\n';
-    text += 'FINANCIAL SUMMARY:\n';
-    text += '  Total Collected: $' + totalCollected.toLocaleString() + '\n';
-    text += '  Remaining Balance: $' + remaining.toLocaleString() + '\n';
-    text += '  Government Transfer Fee (10%): $' + govFee.toLocaleString() + '\n';
-    text += '  Total Outstanding: $' + (remaining > 0 ? remaining + govFee : 0).toLocaleString() + '\n';
+    text += '\nFINANCIAL SUMMARY:\n';
+    text += '  Total Collected: $' + d.totalCollected.toLocaleString() + '\n';
+    text += '  Remaining Balance: $' + d.remaining.toLocaleString() + '\n';
+    text += '  Government Transfer Fee (10%): $' + d.govFee.toLocaleString() + '\n';
+    text += '  Total Outstanding: $' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString() + '\n';
+    if (showTax) {
+        text += '\nTAX LIABILITY (10% of collected):\n';
+        text += '  Tax on Collected Payments: $' + d.totalTax.toLocaleString() + '\n';
+    }
     
     return text;
 }
@@ -10905,18 +10903,14 @@ window.copySingleAuditText = function(idx) {
     const text = buildAuditContractText(contracts[idx]);
     navigator.clipboard.writeText(text).then(() => {
         showToast('📋 Contract copied to clipboard', 'success');
-    }).catch(() => {
-        showToast('Failed to copy', 'error');
-    });
+    }).catch(() => { showToast('Failed to copy', 'error'); });
 };
 
 window.copyAllAuditText = function() {
     const contracts = getFilteredAuditContracts();
-    if (contracts.length === 0) {
-        showToast('No contracts to copy', 'warning');
-        return;
-    }
+    if (contracts.length === 0) { showToast('No contracts to copy', 'warning'); return; }
     
+    const showTax = document.getElementById('auditShowTax')?.checked || false;
     const now = new Date();
     const timestamp = now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
     
@@ -10925,22 +10919,16 @@ window.copyAllAuditText = function() {
     fullText += 'PaulysProperties.com\n';
     fullText += '==================================================\n\n';
     
-    let totalPurchase = 0, totalCollected = 0, totalOutstanding = 0;
+    let totalPurchase = 0, totalCollected = 0, totalOutstanding = 0, totalTax = 0;
     let activeCount = 0, completedCount = 0;
     
     contracts.forEach(c => {
-        const calc = c.calculations || {};
-        const history = c.rtoPaymentHistory || [];
-        const depositAmt = c.depositPaid ? (c.depositAmount || 0) : 0;
-        const payAmt = history.reduce((s, p) => s + (p.amount || 0), 0);
-        const rem = c.remainingBalance || 0;
-        const gf = Math.round((c.finalPaymentBase || 0) * 0.10);
-        
-        totalPurchase += calc.purchasePrice || calc.totalPrice || 0;
-        totalCollected += depositAmt + payAmt;
-        totalOutstanding += rem > 0 ? rem + gf : 0;
-        if ((c.status || 'active') === 'active') activeCount++;
-        else completedCount++;
+        const d = computeAuditData(c);
+        totalPurchase += d.purchasePrice;
+        totalCollected += d.totalCollected;
+        totalOutstanding += d.remaining > 0 ? d.remaining + d.govFee : 0;
+        totalTax += d.totalTax;
+        if (d.status === 'active') activeCount++; else completedCount++;
     });
     
     fullText += 'PORTFOLIO SUMMARY\n';
@@ -10948,64 +10936,55 @@ window.copyAllAuditText = function() {
     fullText += '  Total Purchase Value: $' + totalPurchase.toLocaleString() + '\n';
     fullText += '  Total Collected: $' + totalCollected.toLocaleString() + '\n';
     fullText += '  Total Outstanding: $' + totalOutstanding.toLocaleString() + '\n';
+    if (showTax) fullText += '  Tax Liability (10% of collected): $' + totalTax.toLocaleString() + '\n';
     fullText += '==================================================\n\n';
     
     contracts.forEach((c, i) => {
         fullText += '──────────────────────────────────────────────────\n';
         fullText += 'CONTRACT ' + (i + 1) + ' of ' + contracts.length + '\n';
         fullText += '──────────────────────────────────────────────────\n';
-        fullText += buildAuditContractText(c);
-        fullText += '\n';
+        fullText += buildAuditContractText(c) + '\n';
     });
     
     navigator.clipboard.writeText(fullText).then(() => {
         showToast('📋 All ' + contracts.length + ' contracts copied to clipboard', 'success');
-    }).catch(() => {
-        showToast('Failed to copy', 'error');
-    });
+    }).catch(() => { showToast('Failed to copy', 'error'); });
 };
 
 function getFilteredAuditContracts() {
     if (!window._auditContracts) return [];
-    
     const filterUser = document.getElementById('auditFilterUser')?.value || 'all';
     const includeCompleted = document.getElementById('auditIncludeCompleted')?.checked ?? true;
-    
     let filtered = window._auditContracts.slice();
-    
     if (filterUser !== 'all') {
         filtered = filtered.filter(c => {
             const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
             return c.buyer === filterUser || seller === filterUser;
         });
     }
-    
-    if (!includeCompleted) {
-        filtered = filtered.filter(c => (c.status || 'active') === 'active');
-    }
-    
+    if (!includeCompleted) filtered = filtered.filter(c => (c.status || 'active') === 'active');
     return filtered;
 }
 
+// ==================== PNG GENERATION (DARK THEME) ====================
+
 window.downloadAuditPNG = async function(mode) {
     const contracts = getFilteredAuditContracts();
-    if (contracts.length === 0) {
-        showToast('No contracts to export', 'warning');
-        return;
-    }
+    if (contracts.length === 0) { showToast('No contracts to export', 'warning'); return; }
     
+    const showTax = document.getElementById('auditShowTax')?.checked || false;
     showToast('🖼️ Generating PNG...', 'info');
     await new Promise(r => setTimeout(r, 100));
     
     if (mode === 'single') {
         for (let i = 0; i < contracts.length; i++) {
-            const canvas = renderAuditPNGCanvas([contracts[i]], i + 1, contracts.length);
+            const canvas = renderAuditPNGCanvas([contracts[i]], i + 1, contracts.length, showTax);
             downloadCanvasAsPNG(canvas, 'audit-' + (contracts[i].propertyTitle || 'contract').replace(/[^a-zA-Z0-9]/g, '_') + '.png');
             if (contracts.length > 1) await new Promise(r => setTimeout(r, 300));
         }
         showToast('✅ ' + contracts.length + ' PNG(s) downloaded', 'success');
     } else {
-        const canvas = renderAuditPNGCanvas(contracts, null, contracts.length);
+        const canvas = renderAuditPNGCanvas(contracts, null, contracts.length, showTax);
         downloadCanvasAsPNG(canvas, 'rto-audit-report-' + new Date().toISOString().split('T')[0] + '.png');
         showToast('✅ Audit report PNG downloaded', 'success');
     }
@@ -11018,246 +10997,285 @@ function downloadCanvasAsPNG(canvas, filename) {
     link.click();
 }
 
-function renderAuditPNGCanvas(contracts, singleIndex, totalCount) {
+function renderAuditPNGCanvas(contracts, singleIndex, totalCount, showTax) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
     const W = 1200;
-    const maxH = 10000;
+    const maxH = 12000;
     canvas.width = W;
     canvas.height = maxH;
     
-    // White background
-    ctx.fillStyle = '#FFFFFF';
+    // Dark background
+    ctx.fillStyle = '#111827';
     ctx.fillRect(0, 0, W, maxH);
     
-    const margin = 60;
+    const margin = 50;
     const cw = W - margin * 2;
     let y = 0;
     
+    // Colors matching modal
+    const bgCard = '#1f2937';
+    const bgCardInner = '#374151';
+    const borderColor = '#4b5563';
+    const textWhite = '#f9fafb';
+    const textGray = '#9ca3af';
+    const textGrayLight = '#6b7280';
+    const textGreen = '#4ade80';
+    const textAmber = '#fbbf24';
+    const textRed = '#f87171';
     const brandPurple = '#7c3aed';
     const brandAmber = '#d97706';
-    const textBlack = '#1a1a1a';
-    const textGray = '#6b7280';
-    const textGreen = '#16a34a';
-    const textRed = '#dc2626';
-    const borderGray = '#e5e7eb';
-    const lightBg = '#f9fafb';
+    const bgGreen = '#064e3b';
+    const bgAmber = '#78350f';
+    const bgRed = '#7f1d1d';
     
     const drawRect = (x, rY, w, h, fill) => { ctx.fillStyle = fill; ctx.fillRect(x, rY, w, h); };
+    const drawRoundedRect = (x, rY, w, h, fill, r) => {
+        r = r || 8;
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        ctx.moveTo(x + r, rY); ctx.lineTo(x + w - r, rY); ctx.quadraticCurveTo(x + w, rY, x + w, rY + r);
+        ctx.lineTo(x + w, rY + h - r); ctx.quadraticCurveTo(x + w, rY + h, x + w - r, rY + h);
+        ctx.lineTo(x + r, rY + h); ctx.quadraticCurveTo(x, rY + h, x, rY + h - r);
+        ctx.lineTo(x, rY + r); ctx.quadraticCurveTo(x, rY, x + r, rY);
+        ctx.closePath(); ctx.fill();
+    };
+    const drawBorder = (x, rY, w, h, color) => {
+        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.strokeRect(x, rY, w, h);
+    };
     
     // ===== HEADER BAR =====
-    drawRect(0, 0, W, 80, brandPurple);
-    ctx.font = 'bold 28px Arial';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('PaulysProperties.com', margin, 50);
-    ctx.font = '14px Arial';
-    ctx.fillStyle = '#e2d5f7';
-    const subtitle = 'RTO Contract Audit Report';
-    ctx.fillText(subtitle, W - margin - ctx.measureText(subtitle).width, 50);
-    y = 100;
+    const headerGrad = ctx.createLinearGradient(0, 0, W, 0);
+    headerGrad.addColorStop(0, '#b45309');
+    headerGrad.addColorStop(1, '#c2410c');
+    drawRect(0, 0, W, 75, '#000');
+    ctx.fillStyle = headerGrad;
+    ctx.fillRect(0, 0, W, 75);
+    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = textWhite;
+    ctx.fillText('📋  RTO Contract Audit Report', margin, 45);
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#fed7aa';
+    const subR = 'PaulysProperties.com';
+    ctx.fillText(subR, W - margin - ctx.measureText(subR).width, 45);
+    y = 90;
     
     // Timestamp
     const now = new Date();
     const timestamp = now.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-    ctx.font = '11px Arial'; ctx.fillStyle = textGray;
+    ctx.font = '11px Arial'; ctx.fillStyle = textGrayLight;
     ctx.fillText('Generated: ' + timestamp, margin, y); y += 16;
     if (singleIndex) {
         ctx.fillText('Contract ' + singleIndex + ' of ' + totalCount, margin, y);
     } else {
         ctx.fillText(contracts.length + ' contract(s) included', margin, y);
     }
-    y += 20;
+    y += 22;
     
-    // ===== PORTFOLIO SUMMARY (combined only) =====
+    // ===== PORTFOLIO SUMMARY =====
     if (!singleIndex && contracts.length > 1) {
-        ctx.strokeStyle = brandAmber; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke(); y += 10;
-        ctx.font = 'bold 16px Arial'; ctx.fillStyle = brandAmber;
-        ctx.fillText('PORTFOLIO SUMMARY', margin, y + 14); y += 26;
+        drawRoundedRect(margin, y, cw, showTax ? 110 : 100, bgCard, 10);
+        drawBorder(margin, y, cw, showTax ? 110 : 100, '#92400e');
         
-        let tPurchase = 0, tCollected = 0, tOutstanding = 0, aCount = 0;
+        ctx.font = 'bold 15px Arial'; ctx.fillStyle = textAmber;
+        ctx.fillText('Portfolio Summary', margin + 20, y + 25);
+        
+        let tPurchase = 0, tCollected = 0, tOutstanding = 0, tTax = 0, aCount = 0;
         contracts.forEach(c => {
-            const calc = c.calculations || {};
-            const hist = c.rtoPaymentHistory || [];
-            const dep = c.depositPaid ? (c.depositAmount || 0) : 0;
-            const pay = hist.reduce((s, p) => s + (p.amount || 0), 0);
-            const rem = c.remainingBalance || 0;
-            const gf = Math.round((c.finalPaymentBase || 0) * 0.10);
-            tPurchase += calc.purchasePrice || calc.totalPrice || 0;
-            tCollected += dep + pay;
-            tOutstanding += rem > 0 ? rem + gf : 0;
-            if ((c.status || 'active') === 'active') aCount++;
+            const dd = computeAuditData(c);
+            tPurchase += dd.purchasePrice;
+            tCollected += dd.totalCollected;
+            tOutstanding += dd.remaining > 0 ? dd.remaining + dd.govFee : 0;
+            tTax += dd.totalTax;
+            if (dd.status === 'active') aCount++;
         });
         
-        const boxW = (cw - 30) / 4;
-        const boxH = 55;
-        const labels = ['Total Contracts', 'Purchase Value', 'Collected', 'Outstanding'];
+        const boxCount = showTax ? 5 : 4;
+        const boxGap = 12;
+        const boxW = (cw - 40 - (boxCount - 1) * boxGap) / boxCount;
+        const boxY = y + 40;
+        const boxH = showTax ? 55 : 50;
+        const labels = ['CONTRACTS', 'PURCHASE VALUE', 'COLLECTED', 'OUTSTANDING'];
         const values = [contracts.length + ' (' + aCount + ' active)', '$' + tPurchase.toLocaleString(), '$' + tCollected.toLocaleString(), '$' + tOutstanding.toLocaleString()];
-        const colors = [textBlack, textBlack, textGreen, brandAmber];
+        const valColors = [textWhite, textWhite, textGreen, textAmber];
+        if (showTax) { labels.push('TAX LIABILITY (10%)'); values.push('$' + tTax.toLocaleString()); valColors.push(textRed); }
         
-        for (let i = 0; i < 4; i++) {
-            const bx = margin + i * (boxW + 10);
-            drawRect(bx, y, boxW, boxH, lightBg);
-            ctx.strokeStyle = borderGray; ctx.lineWidth = 1; ctx.strokeRect(bx, y, boxW, boxH);
-            ctx.font = '10px Arial'; ctx.fillStyle = textGray;
-            ctx.fillText(labels[i].toUpperCase(), bx + 10, y + 18);
-            ctx.font = 'bold 18px Arial'; ctx.fillStyle = colors[i];
-            ctx.fillText(values[i], bx + 10, y + 42);
+        for (let i = 0; i < boxCount; i++) {
+            const bx = margin + 20 + i * (boxW + boxGap);
+            const bgCol = i === 4 ? bgRed : bgCardInner;
+            drawRoundedRect(bx, boxY, boxW, boxH, bgCol, 6);
+            ctx.font = '9px Arial'; ctx.fillStyle = textGrayLight;
+            ctx.fillText(labels[i], bx + 10, boxY + 16);
+            ctx.font = 'bold 16px Arial'; ctx.fillStyle = valColors[i];
+            ctx.fillText(values[i], bx + 10, boxY + 38);
         }
-        y += boxH + 20;
+        y += (showTax ? 115 : 105) + 15;
     }
     
     // ===== PER CONTRACT =====
     contracts.forEach((c, cIdx) => {
-        const calc = c.calculations || {};
-        const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
-        const termMonths = c.totalPayments || calc.termMonths || 0;
-        const history = (c.rtoPaymentHistory || []).slice().sort((a, b) => (a.month || 0) - (b.month || 0));
-        const deposit = c.depositAmount || 0;
-        const depositPaid = c.depositPaid || false;
-        const remaining = c.remainingBalance || 0;
-        const finalPaymentBase = c.finalPaymentBase || 0;
-        const govFee = Math.round(finalPaymentBase * 0.10);
-        const status = (c.status || 'active');
-        const seller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
-        const buyer = c.buyer || 'Unknown';
-        const startDate = c.startDate || 'N/A';
-        const expectedMonthly = c.expectedMonthlyPayment || calc.monthlyPayment || 0;
-        const depCollected = depositPaid ? deposit : 0;
-        const payCollected = history.reduce((s, p) => s + (p.amount || 0), 0);
-        const collected = depCollected + payCollected;
+        const d = computeAuditData(c);
         
-        // Contract header bar
-        drawRect(margin, y, cw, 36, '#2d1b69');
-        ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(c.propertyTitle || 'Unknown Property', margin + 12, y + 23);
-        const statusText = status.toUpperCase();
-        const badgeColor = status === 'active' ? textGreen : status === 'completed' ? '#2563eb' : textRed;
+        // Estimate card height
+        const paymentCount = (d.deposit > 0 ? 1 : 0) + d.history.length + (d.remaining > 0 && d.status === 'active' ? 1 : 0);
+        const tableH = 30 + paymentCount * 28;
+        const cardH = 70 + 75 + 70 + tableH + 30;
+        
+        // Card background
+        drawRoundedRect(margin, y, cw, cardH, bgCard, 10);
+        drawBorder(margin, y, cw, cardH, borderColor);
+        
+        // Contract header
+        drawRoundedRect(margin, y, cw, 45, bgCardInner, 10);
+        // Fix top-left rounding issue by filling bottom corners
+        drawRect(margin, y + 35, cw, 10, bgCardInner);
+        
+        ctx.font = 'bold 14px Arial'; ctx.fillStyle = textWhite;
+        ctx.fillText('🏠  ' + (c.propertyTitle || 'Unknown Property'), margin + 16, y + 28);
+        
+        // Status badge
+        const statusText = d.status.toUpperCase();
+        const badgeColor = d.status === 'active' ? '#16a34a' : d.status === 'completed' ? '#2563eb' : '#dc2626';
         ctx.font = 'bold 10px Arial';
         const badgeW = ctx.measureText(statusText).width + 14;
-        drawRect(W - margin - badgeW - 10, y + 8, badgeW, 20, badgeColor);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(statusText, W - margin - badgeW - 3, y + 22);
-        y += 46;
+        drawRoundedRect(W - margin - badgeW - 16, y + 13, badgeW, 20, badgeColor, 4);
+        ctx.fillStyle = textWhite;
+        ctx.fillText(statusText, W - margin - badgeW - 9, y + 27);
         
-        // Details row 1
-        const df = 11;
-        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('Seller:', margin, y + df);
-        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
-        ctx.fillText(seller, margin + 45, y + df);
-        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('Buyer:', margin + cw * 0.35, y + df);
-        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
-        ctx.fillText(buyer, margin + cw * 0.35 + 45, y + df);
-        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('Start:', margin + cw * 0.65, y + df);
-        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
-        ctx.fillText(startDate, margin + cw * 0.65 + 40, y + df);
-        y += df + 10;
+        const cardX = margin + 16;
+        const cardCW = cw - 32;
+        y += 50;
         
-        // Details row 2
-        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('Purchase Price:', margin, y + df);
-        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
-        ctx.fillText('$' + purchasePrice.toLocaleString(), margin + 95, y + df);
-        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('Term:', margin + cw * 0.35, y + df);
-        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
-        ctx.fillText(termMonths + ' months', margin + cw * 0.35 + 40, y + df);
-        ctx.font = df + 'px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('Monthly:', margin + cw * 0.65, y + df);
-        ctx.font = 'bold ' + df + 'px Arial'; ctx.fillStyle = textBlack;
-        ctx.fillText('$' + expectedMonthly.toLocaleString(), margin + cw * 0.65 + 55, y + df);
-        y += df + 14;
+        // Contract ID / date
+        ctx.font = '10px Arial'; ctx.fillStyle = textGrayLight;
+        ctx.fillText('Contract: ' + (c.documentId || c.id) + '  |  Started: ' + d.startDate, cardX, y + 10);
+        y += 22;
         
-        // Financial summary boxes
-        const fBoxW = (cw - 20) / 3;
-        const fBoxH = 40;
-        drawRect(margin, y, fBoxW, fBoxH, '#f0fdf4');
-        ctx.strokeStyle = '#bbf7d0'; ctx.lineWidth = 1; ctx.strokeRect(margin, y, fBoxW, fBoxH);
-        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('COLLECTED', margin + 8, y + 14);
-        ctx.font = 'bold 16px Arial'; ctx.fillStyle = textGreen; ctx.fillText('$' + collected.toLocaleString(), margin + 8, y + 34);
+        // Detail boxes row
+        const detBoxW = (cardCW - 12 * 3) / 4;
+        const detBoxH = 50;
+        const detLabels = ['SELLER', 'BUYER', 'PURCHASE PRICE', 'MONTHLY PAYMENT'];
+        const detVals = [d.seller, d.buyer, '$' + d.purchasePrice.toLocaleString(), '$' + d.expectedMonthly.toLocaleString()];
+        const detSubs = [d.hasAgent ? 'Agent: ' + d.agentName : '', '', d.termMonths + ' month term', ''];
         
-        drawRect(margin + fBoxW + 10, y, fBoxW, fBoxH, '#fffbeb');
-        ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 1; ctx.strokeRect(margin + fBoxW + 10, y, fBoxW, fBoxH);
-        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('OUTSTANDING (incl. gov fee)', margin + fBoxW + 18, y + 14);
-        ctx.font = 'bold 16px Arial'; ctx.fillStyle = brandAmber; ctx.fillText('$' + (remaining > 0 ? remaining + govFee : 0).toLocaleString(), margin + fBoxW + 18, y + 34);
+        for (let i = 0; i < 4; i++) {
+            const bx = cardX + i * (detBoxW + 12);
+            drawRoundedRect(bx, y, detBoxW, detBoxH, bgCardInner, 6);
+            ctx.font = '9px Arial'; ctx.fillStyle = textGrayLight;
+            ctx.fillText(detLabels[i], bx + 8, y + 15);
+            ctx.font = (i >= 2 ? 'bold ' : '') + '12px Arial'; ctx.fillStyle = textWhite;
+            // Truncate long names
+            let val = detVals[i];
+            while (ctx.measureText(val).width > detBoxW - 16 && val.length > 3) val = val.slice(0, -1);
+            ctx.fillText(val, bx + 8, y + 32);
+            if (detSubs[i]) {
+                ctx.font = '9px Arial'; ctx.fillStyle = i === 0 ? '#a78bfa' : textGrayLight;
+                ctx.fillText(detSubs[i], bx + 8, y + 45);
+            }
+        }
+        y += detBoxH + 10;
         
-        drawRect(margin + (fBoxW + 10) * 2, y, fBoxW, fBoxH, lightBg);
-        ctx.strokeStyle = borderGray; ctx.lineWidth = 1; ctx.strokeRect(margin + (fBoxW + 10) * 2, y, fBoxW, fBoxH);
-        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('GOV TRANSFER FEE (10%)', margin + (fBoxW + 10) * 2 + 8, y + 14);
-        ctx.font = 'bold 16px Arial'; ctx.fillStyle = textBlack; ctx.fillText('$' + govFee.toLocaleString(), margin + (fBoxW + 10) * 2 + 8, y + 34);
-        y += fBoxH + 14;
+        // Financial boxes
+        const finCount = showTax ? 4 : 3;
+        const finBoxW = (cardCW - 10 * (finCount - 1)) / finCount;
+        const finBoxH = 52;
+        
+        // Collected
+        drawRoundedRect(cardX, y, finBoxW, finBoxH, bgGreen, 6);
+        ctx.font = '9px Arial'; ctx.fillStyle = textGreen; ctx.fillText('COLLECTED', cardX + 10, y + 16);
+        ctx.font = 'bold 18px Arial'; ctx.fillText('$' + d.totalCollected.toLocaleString(), cardX + 10, y + 40);
+        
+        // Outstanding
+        const ox = cardX + finBoxW + 10;
+        drawRoundedRect(ox, y, finBoxW, finBoxH, bgAmber, 6);
+        ctx.font = '9px Arial'; ctx.fillStyle = textAmber; ctx.fillText('REMAINING + GOV FEE', ox + 10, y + 16);
+        ctx.font = 'bold 18px Arial'; ctx.fillText('$' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString(), ox + 10, y + 40);
+        
+        // Next due
+        const nx = cardX + (finBoxW + 10) * 2;
+        drawRoundedRect(nx, y, finBoxW, finBoxH, bgCardInner, 6);
+        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('NEXT DUE', nx + 10, y + 16);
+        ctx.font = 'bold 18px Arial'; ctx.fillStyle = textWhite;
+        ctx.fillText(d.status === 'active' ? d.nextDueText : 'N/A', nx + 10, y + 40);
+        
+        // Tax box
+        if (showTax) {
+            const tx = cardX + (finBoxW + 10) * 3;
+            drawRoundedRect(tx, y, finBoxW, finBoxH, bgRed, 6);
+            ctx.font = '9px Arial'; ctx.fillStyle = textRed; ctx.fillText('TAX LIABILITY (10%)', tx + 10, y + 16);
+            ctx.font = 'bold 18px Arial'; ctx.fillText('$' + d.totalTax.toLocaleString(), tx + 10, y + 40);
+        }
+        y += finBoxH + 12;
         
         // Payment table header
-        drawRect(margin, y, cw, 22, '#f3f4f6');
+        drawRoundedRect(cardX, y, cardCW, 26, bgCardInner, 6);
+        drawRect(cardX, y + 18, cardCW, 8, bgCardInner); // fill bottom corners
         ctx.font = 'bold 10px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('PAYMENT', margin + 8, y + 15);
-        ctx.fillText('DATE', margin + cw * 0.3, y + 15);
-        ctx.fillText('AMOUNT', margin + cw * 0.55, y + 15);
-        ctx.fillText('BALANCE AFTER', margin + cw * 0.78, y + 15);
-        y += 24;
+        ctx.fillText('PAYMENT', cardX + 12, y + 17);
+        ctx.fillText('DATE', cardX + cardCW * 0.28, y + 17);
+        ctx.fillText('AMOUNT', cardX + cardCW * 0.50, y + 17);
+        ctx.fillText('BALANCE AFTER', cardX + cardCW * 0.70, y + 17);
+        if (showTax) { ctx.fillStyle = textRed; ctx.fillText('TAX (10%)', cardX + cardCW * 0.88, y + 17); }
+        y += 28;
         
         // Payment rows
-        let runBal = purchasePrice - deposit;
-        const rowH = 20;
+        let runBal = d.purchasePrice - d.deposit;
+        const rowH = 26;
         
-        if (deposit > 0) {
-            drawRect(margin, y, cw, rowH, '#fafafa');
-            ctx.font = '10px Arial'; ctx.fillStyle = textGray; ctx.fillText('Deposit', margin + 8, y + 14);
-            ctx.fillStyle = depositPaid ? textGreen : brandAmber;
-            ctx.fillText(depositPaid ? (c.depositPaidDate || 'Paid') : 'Pending', margin + cw * 0.3, y + 14);
-            ctx.fillStyle = textBlack; ctx.font = 'bold 10px Arial';
-            ctx.fillText('$' + deposit.toLocaleString(), margin + cw * 0.55, y + 14);
-            ctx.fillStyle = textGray; ctx.font = '10px Arial';
-            ctx.fillText('$' + runBal.toLocaleString(), margin + cw * 0.78, y + 14);
+        if (d.deposit > 0) {
+            if (true) drawRect(cardX, y, cardCW, rowH, '#1a2332');
+            ctx.font = '11px Arial'; ctx.fillStyle = textGray;
+            ctx.fillText('Deposit', cardX + 12, y + 17);
+            ctx.fillStyle = d.depositPaid ? textGreen : textAmber;
+            ctx.fillText(d.depositPaid ? (c.depositPaidDate || 'Paid') : 'Pending', cardX + cardCW * 0.28, y + 17);
+            ctx.fillStyle = textWhite; ctx.font = 'bold 11px Arial';
+            ctx.fillText('$' + d.deposit.toLocaleString(), cardX + cardCW * 0.50, y + 17);
+            ctx.fillStyle = textGray; ctx.font = '11px Arial';
+            ctx.fillText('$' + runBal.toLocaleString(), cardX + cardCW * 0.70, y + 17);
+            if (showTax) { ctx.fillStyle = textRed; ctx.fillText('$' + (d.depositPaid ? Math.round(d.deposit * 0.10).toLocaleString() : '0'), cardX + cardCW * 0.88, y + 17); }
             y += rowH;
         }
         
-        history.forEach((pay, i) => {
-            runBal = Math.max(0, runBal - (pay.amount || 0));
-            if (i % 2 === 0) drawRect(margin, y, cw, rowH, '#fafafa');
+        d.history.forEach((pay, i) => {
+            const payAmt = getPaymentAmount(pay);
+            runBal = Math.max(0, runBal - payAmt);
+            if (i % 2 === 0) drawRect(cardX, y, cardCW, rowH, '#1a2332');
             const monthLabel = pay.monthsCovered && pay.monthsCovered > 1
                 ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered))
                 : 'Month ' + (pay.month || (i + 1));
-            ctx.font = '10px Arial'; ctx.fillStyle = textGray;
-            ctx.fillText(monthLabel, margin + 8, y + 14);
-            ctx.fillStyle = textGreen; ctx.fillText(pay.date || pay.paidDate || 'N/A', margin + cw * 0.3, y + 14);
-            ctx.fillStyle = textBlack; ctx.font = 'bold 10px Arial';
-            ctx.fillText('$' + (pay.amount || 0).toLocaleString(), margin + cw * 0.55, y + 14);
-            ctx.fillStyle = textGray; ctx.font = '10px Arial';
-            ctx.fillText('$' + runBal.toLocaleString(), margin + cw * 0.78, y + 14);
+            ctx.font = '11px Arial'; ctx.fillStyle = textGray;
+            ctx.fillText(monthLabel, cardX + 12, y + 17);
+            ctx.fillStyle = textGreen; ctx.fillText(pay.date || pay.paidDate || 'N/A', cardX + cardCW * 0.28, y + 17);
+            ctx.fillStyle = textWhite; ctx.font = 'bold 11px Arial';
+            ctx.fillText('$' + payAmt.toLocaleString(), cardX + cardCW * 0.50, y + 17);
+            ctx.fillStyle = textGray; ctx.font = '11px Arial';
+            ctx.fillText('$' + runBal.toLocaleString(), cardX + cardCW * 0.70, y + 17);
+            if (showTax) { ctx.fillStyle = textRed; ctx.fillText('$' + Math.round(payAmt * 0.10).toLocaleString(), cardX + cardCW * 0.88, y + 17); }
             y += rowH;
         });
         
-        if (remaining > 0 && status === 'active') {
-            drawRect(margin, y, cw, rowH, '#fffbeb');
-            ctx.font = 'bold 10px Arial'; ctx.fillStyle = brandAmber;
-            ctx.fillText('Final Payment', margin + 8, y + 14);
-            ctx.fillText('Pending', margin + cw * 0.3, y + 14);
-            ctx.fillText('$' + (finalPaymentBase + govFee).toLocaleString(), margin + cw * 0.55, y + 14);
-            ctx.fillStyle = textGreen;
-            ctx.fillText('$0', margin + cw * 0.78, y + 14);
+        if (d.remaining > 0 && d.status === 'active') {
+            drawRect(cardX, y, cardCW, rowH, bgAmber + '33');
+            ctx.font = 'bold 11px Arial'; ctx.fillStyle = textAmber;
+            ctx.fillText('Final Payment', cardX + 12, y + 17);
+            ctx.fillText('Pending', cardX + cardCW * 0.28, y + 17);
+            ctx.fillText('$' + (d.finalPaymentBase + d.govFee).toLocaleString(), cardX + cardCW * 0.50, y + 17);
+            ctx.fillStyle = textGreen; ctx.fillText('$0', cardX + cardCW * 0.70, y + 17);
+            if (showTax) { ctx.fillStyle = textGrayLight; ctx.fillText('-', cardX + cardCW * 0.88, y + 17); }
             y += rowH;
         }
         
-        y += 20;
-        if (cIdx < contracts.length - 1) {
-            ctx.strokeStyle = borderGray; ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke();
-            y += 15;
-        }
+        y += 25;
     });
     
     // Footer
-    y += 10;
+    y += 5;
     ctx.strokeStyle = brandPurple; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke();
-    y += 15;
-    ctx.font = '10px Arial'; ctx.fillStyle = textGray;
-    ctx.fillText('PaulysProperties.com | RTO Contract Audit Report | Generated ' + now.toLocaleDateString(), margin, y);
+    y += 12;
+    ctx.font = '10px Arial'; ctx.fillStyle = textGrayLight;
+    ctx.fillText('PaulysProperties.com  |  RTO Contract Audit Report  |  Generated ' + now.toLocaleDateString(), margin, y);
     y += 30;
     
     // Crop
@@ -11266,6 +11284,5 @@ function renderAuditPNGCanvas(contracts, singleIndex, totalCount) {
     croppedCanvas.height = Math.min(y, maxH);
     const croppedCtx = croppedCanvas.getContext('2d');
     croppedCtx.drawImage(canvas, 0, 0);
-    
     return croppedCanvas;
 }
