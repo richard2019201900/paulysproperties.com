@@ -10540,87 +10540,19 @@ window.submitForcePasswordChange = async function() {
 
 // ==================== RTO AUDIT REPORT ====================
 
-/**
- * Get payment amount from a payment record (handles both 'actual' and 'amount' field names)
- */
 function getPaymentAmount(pay) {
     return pay.actual || pay.amount || 0;
 }
 
 /**
- * Open the RTO Audit Report modal
+ * Determine if a contract is an owner property (seller = "Pauly Amato" without "Managed by:")
+ * vs an agent-managed property (seller contains "Managed by:")
  */
-window.openRTOAuditReport = async function() {
-    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
-        showToast('Admin only', 'error');
-        return;
-    }
-    
-    showToast('📋 Loading contracts...', 'info');
-    
-    try {
-        const snapshot = await db.collection('rentToOwnContracts').get();
-        const contracts = [];
-        snapshot.forEach(doc => {
-            contracts.push({ id: doc.id, ...doc.data() });
-        });
-        
-        if (contracts.length === 0) {
-            showToast('No RTO contracts found', 'warning');
-            return;
-        }
-        
-        window._auditContracts = contracts;
-        
-        const people = new Set();
-        contracts.forEach(c => {
-            if (c.buyer) people.add(c.buyer);
-            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
-            if (seller) people.add(seller);
-        });
-        const sortedPeople = [...people].sort();
-        const filterOptions = sortedPeople.map(p => '<option value="' + p + '">' + p + '</option>').join('');
-        
-        const modalHTML = '<div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">'
-            + '<div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col">'
-            + '<button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">'
-            + '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
-            + '<div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4">'
-            + '<h3 class="text-xl font-bold text-white flex items-center gap-3"><span>📋</span> RTO Contract Audit Report</h3>'
-            + '<p class="text-amber-100 text-sm mt-1">' + contracts.length + ' contract(s) found</p></div>'
-            + '<div class="px-6 py-3 bg-gray-800/80 border-b border-gray-700 flex flex-wrap items-center gap-3">'
-            + '<div class="flex items-center gap-2"><label class="text-gray-400 text-sm">Filter:</label>'
-            + '<select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">'
-            + '<option value="all">All Contracts</option>' + filterOptions + '</select></div>'
-            + '<label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">'
-            + '<input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500"> Include completed/cancelled</label>'
-            + '<label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">'
-            + '<input type="checkbox" id="auditShowTax" onchange="renderAuditReport()" class="rounded accent-red-500"> Show 10% Tax Liability</label>'
-            + '<div class="ml-auto flex flex-wrap gap-2">'
-            + '<button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">📋 Copy All</button>'
-            + '<button onclick="downloadAuditPNG(\'single\')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">🖼️ PNG Per Contract</button>'
-            + '<button onclick="downloadAuditPNG(\'combined\')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">🖼️ PNG All-in-One</button>'
-            + '</div></div>'
-            + '<div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-4"><p class="text-gray-400">Loading...</p></div>'
-            + '</div></div>';
-        
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-        renderAuditReport();
-        
-    } catch (error) {
-        console.error('[Audit] Error loading contracts:', error);
-        showToast('Failed to load contracts', 'error');
-    }
-};
+function isOwnerContract(c) {
+    const seller = (c.seller || '').replace(/👑|🌱|⭐|🏢/g, '').trim();
+    return !seller.includes('Managed by:');
+}
 
-window.closeRTOAuditModal = function() {
-    const modal = document.getElementById('rtoAuditModal');
-    if (modal) modal.remove();
-};
-
-/**
- * Compute audit data for a single contract
- */
 function computeAuditData(c) {
     const calc = c.calculations || {};
     const purchasePrice = calc.purchasePrice || calc.totalPrice || 0;
@@ -10632,23 +10564,37 @@ function computeAuditData(c) {
     const finalPaymentBase = c.finalPaymentBase || 0;
     const govFee = Math.round(finalPaymentBase * 0.10);
     const status = (c.status || 'active').toLowerCase();
-    const seller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
+    const rawSeller = (c.seller || 'Unknown').replace(/👑|🌱|⭐/g, '').trim();
     const buyer = c.buyer || 'Unknown';
     const startDate = c.startDate || 'N/A';
     const expectedMonthly = c.expectedMonthlyPayment || calc.monthlyPayment || 0;
     
-    const hasAgent = seller.includes('Managed by:');
-    const agentName = hasAgent ? seller.replace(/Managed by:\s*/i, '').trim() : null;
+    const isOwner = isOwnerContract(c);
+    const hasAgent = rawSeller.includes('Managed by:');
+    const agentName = hasAgent ? rawSeller.replace(/.*Managed by:\s*/i, '').replace(/🏢/g, '').trim() : null;
+    const sellerDisplay = hasAgent ? rawSeller : rawSeller;
+    
+    // Agent commission: 10% of finalPaymentBase
     const agentCommission = hasAgent ? Math.round(finalPaymentBase * 0.10) : 0;
     
     const depositCollected = depositPaid ? deposit : 0;
     const paymentsCollected = history.reduce((sum, p) => sum + getPaymentAmount(p), 0);
     const totalCollected = depositCollected + paymentsCollected;
     
-    // Tax: 10% of each collected payment
-    const depositTax = depositPaid ? Math.round(deposit * 0.10) : 0;
-    const paymentsTax = history.reduce((sum, p) => sum + Math.round(getPaymentAmount(p) * 0.10), 0);
-    const totalTax = depositTax + paymentsTax;
+    // For OWNER contracts: tax = 10% of all collected
+    // For AGENT contracts: tax = 10% of the 10% agent commission portion only
+    let ownerIncome = 0, agentIncome = 0, ownerTax = 0, agentTax = 0;
+    if (isOwner) {
+        ownerIncome = totalCollected;
+        ownerTax = Math.round(totalCollected * 0.10);
+    } else {
+        // Agent gets 10% commission on each payment
+        const depositComm = depositPaid ? Math.round(deposit * 0.10) : 0;
+        const paymentsComm = history.reduce((sum, p) => sum + Math.round(getPaymentAmount(p) * 0.10), 0);
+        agentIncome = depositComm + paymentsComm;
+        agentTax = Math.round(agentIncome * 0.10);
+    }
+    const totalTax = ownerTax + agentTax;
     
     // Next due date
     const paidThrough = c.rtoPaidThroughDate || '';
@@ -10666,11 +10612,68 @@ function computeAuditData(c) {
     
     return {
         purchasePrice, termMonths, history, deposit, depositPaid, remaining,
-        finalPaymentBase, govFee, status, seller, buyer, startDate, expectedMonthly,
-        hasAgent, agentName, agentCommission, depositCollected, paymentsCollected,
-        totalCollected, depositTax, paymentsTax, totalTax, nextDueText
+        finalPaymentBase, govFee, status, seller: sellerDisplay, buyer, startDate,
+        expectedMonthly, isOwner, hasAgent, agentName, agentCommission,
+        depositCollected, paymentsCollected, totalCollected,
+        ownerIncome, agentIncome, ownerTax, agentTax, totalTax, nextDueText
     };
 }
+
+window.openRTOAuditReport = async function() {
+    if (!TierService.isMasterAdmin(auth.currentUser?.email)) {
+        showToast('Admin only', 'error'); return;
+    }
+    showToast('📋 Loading contracts...', 'info');
+    try {
+        const snapshot = await db.collection('rentToOwnContracts').get();
+        const contracts = [];
+        snapshot.forEach(doc => contracts.push({ id: doc.id, ...doc.data() }));
+        if (contracts.length === 0) { showToast('No RTO contracts found', 'warning'); return; }
+        window._auditContracts = contracts;
+        
+        const people = new Set();
+        contracts.forEach(c => {
+            if (c.buyer) people.add(c.buyer);
+            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐|🏢/g, '').trim();
+            if (seller) people.add(seller);
+        });
+        const filterOptions = [...people].sort().map(p => '<option value="' + p + '">' + p + '</option>').join('');
+        
+        const modalHTML = '<div id="rtoAuditModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">'
+            + '<div class="bg-gray-900 rounded-2xl max-w-5xl w-full border border-amber-500/50 shadow-2xl overflow-hidden relative max-h-[95vh] flex flex-col">'
+            + '<button onclick="closeRTOAuditModal()" class="absolute top-3 right-3 w-8 h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition z-10">'
+            + '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>'
+            + '<div class="bg-gradient-to-r from-amber-700 to-orange-700 px-6 py-4">'
+            + '<h3 class="text-xl font-bold text-white flex items-center gap-3"><span>📋</span> RTO Contract Audit Report</h3>'
+            + '<p class="text-amber-100 text-sm mt-1">' + contracts.length + ' contract(s) found</p></div>'
+            + '<div class="px-6 py-3 bg-gray-800/80 border-b border-gray-700 flex flex-wrap items-center gap-3">'
+            + '<div class="flex items-center gap-2"><label class="text-gray-400 text-sm">Filter:</label>'
+            + '<select id="auditFilterUser" onchange="renderAuditReport()" class="bg-gray-700 border border-gray-600 rounded-lg px-3 py-1.5 text-white text-sm">'
+            + '<option value="all">All Contracts</option>' + filterOptions + '</select></div>'
+            + '<label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">'
+            + '<input type="checkbox" id="auditIncludeCompleted" onchange="renderAuditReport()" checked class="rounded accent-amber-500"> Completed/Cancelled</label>'
+            + '<label class="text-gray-400 text-sm flex items-center gap-1.5 cursor-pointer">'
+            + '<input type="checkbox" id="auditShowTax" onchange="renderAuditReport()" class="rounded accent-red-500"> 10% Tax Liability</label>'
+            + '<div class="ml-auto flex flex-wrap gap-2">'
+            + '<button onclick="copyAllAuditText()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy All</button>'
+            + '<button onclick="downloadAuditPNG(\'single\')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">🖼️ PNG Each</button>'
+            + '<button onclick="downloadAuditPNG(\'combined\')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">🖼️ PNG All</button>'
+            + '</div></div>'
+            + '<div id="auditReportContent" class="flex-1 overflow-y-auto px-6 py-4 space-y-4"><p class="text-gray-400">Loading...</p></div>'
+            + '</div></div>';
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        renderAuditReport();
+    } catch (error) {
+        console.error('[Audit] Error loading contracts:', error);
+        showToast('Failed to load contracts', 'error');
+    }
+};
+
+window.closeRTOAuditModal = function() {
+    const modal = document.getElementById('rtoAuditModal');
+    if (modal) modal.remove();
+};
 
 window.renderAuditReport = function() {
     const container = document.getElementById('auditReportContent');
@@ -10684,62 +10687,152 @@ window.renderAuditReport = function() {
         return;
     }
     
-    // Portfolio summary
-    let totalPurchaseValue = 0, totalCollected = 0, totalOutstanding = 0, totalTaxLiability = 0;
-    let activeCount = 0, completedCount = 0, cancelledCount = 0;
+    // Split into owner vs agent
+    const ownerContracts = filtered.filter(c => isOwnerContract(c));
+    const agentContracts = filtered.filter(c => !isOwnerContract(c));
+    
+    // Aggregate totals
+    let totals = { contracts: filtered.length, activeCount: 0, purchaseValue: 0, collected: 0, outstanding: 0,
+        ownerContracts: ownerContracts.length, ownerCollected: 0, ownerOutstanding: 0, ownerPurchase: 0, ownerTax: 0,
+        agentContracts: agentContracts.length, agentCommCollected: 0, agentOutstanding: 0, agentPurchase: 0, agentTax: 0 };
     
     filtered.forEach(c => {
         const d = computeAuditData(c);
-        totalPurchaseValue += d.purchasePrice;
-        totalCollected += d.totalCollected;
-        totalOutstanding += d.remaining + (d.remaining > 0 ? d.govFee : 0);
-        totalTaxLiability += d.totalTax;
-        if (d.status === 'active') activeCount++;
-        else if (d.status === 'completed') completedCount++;
-        else cancelledCount++;
+        totals.purchaseValue += d.purchasePrice;
+        totals.collected += d.totalCollected;
+        totals.outstanding += d.remaining + (d.remaining > 0 ? d.govFee : 0);
+        if (d.status === 'active') totals.activeCount++;
+        
+        if (d.isOwner) {
+            totals.ownerCollected += d.totalCollected;
+            totals.ownerOutstanding += d.remaining + (d.remaining > 0 ? d.govFee : 0);
+            totals.ownerPurchase += d.purchasePrice;
+            totals.ownerTax += d.ownerTax;
+        } else {
+            totals.agentCommCollected += d.agentIncome;
+            totals.agentOutstanding += d.remaining + (d.remaining > 0 ? d.govFee : 0);
+            totals.agentPurchase += d.purchasePrice;
+            totals.agentTax += d.agentTax;
+        }
     });
     
-    // Summary card
-    let html = '<div class="bg-gray-800 rounded-xl p-6 border border-amber-600/40">';
-    html += '<h4 class="text-amber-400 font-bold text-lg mb-4">Portfolio Summary</h4>';
-    html += '<div class="grid grid-cols-2 md:grid-cols-' + (showTax ? '5' : '4') + ' gap-4">';
+    let html = buildPortfolioSummaryHTML(totals, showTax);
     
-    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
-    html += '<div class="text-gray-400 text-xs uppercase mb-1">Contracts</div>';
-    html += '<div class="text-white text-2xl font-bold">' + filtered.length + '</div>';
-    html += '<div class="text-gray-500 text-xs mt-1">' + activeCount + ' active' + (completedCount ? ', ' + completedCount + ' completed' : '') + (cancelledCount ? ', ' + cancelledCount + ' cancelled' : '') + '</div></div>';
-    
-    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
-    html += '<div class="text-gray-400 text-xs uppercase mb-1">Total Purchase Value</div>';
-    html += '<div class="text-white text-2xl font-bold">$' + totalPurchaseValue.toLocaleString() + '</div></div>';
-    
-    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
-    html += '<div class="text-gray-400 text-xs uppercase mb-1">Total Collected</div>';
-    html += '<div class="text-green-400 text-2xl font-bold">$' + totalCollected.toLocaleString() + '</div></div>';
-    
-    html += '<div class="bg-gray-700/50 rounded-lg p-3">';
-    html += '<div class="text-gray-400 text-xs uppercase mb-1">Total Outstanding</div>';
-    html += '<div class="text-amber-400 text-2xl font-bold">$' + totalOutstanding.toLocaleString() + '</div></div>';
-    
-    if (showTax) {
-        html += '<div class="bg-red-900/40 rounded-lg p-3 border border-red-700/40">';
-        html += '<div class="text-red-400 text-xs uppercase mb-1">Tax Liability (10%)</div>';
-        html += '<div class="text-red-400 text-2xl font-bold">$' + totalTaxLiability.toLocaleString() + '</div>';
-        html += '<div class="text-red-400/60 text-xs mt-1">10% of all collected</div></div>';
+    // Owner properties section
+    if (ownerContracts.length > 0) {
+        html += '<div class="mt-6"><div class="flex items-center gap-2 mb-3">'
+            + '<span class="text-lg">🏠</span>'
+            + '<h4 class="text-white font-bold text-base">My Properties</h4>'
+            + '<span class="bg-purple-600/80 text-purple-100 text-xs font-bold px-2.5 py-0.5 rounded-full">' + ownerContracts.length + ' contract' + (ownerContracts.length !== 1 ? 's' : '') + '</span>'
+            + '</div>';
+        ownerContracts.forEach((c, idx) => {
+            html += buildAuditContractCard(c, idx, showTax, 'owner');
+        });
+        html += '</div>';
     }
     
-    html += '</div></div>';
-    
-    // Per-contract cards
-    filtered.forEach((c, idx) => {
-        html += buildAuditContractCard(c, idx, showTax);
-    });
+    // Agent properties section
+    if (agentContracts.length > 0) {
+        html += '<div class="mt-6"><div class="flex items-center gap-2 mb-3">'
+            + '<span class="text-lg">🏢</span>'
+            + '<h4 class="text-white font-bold text-base">Agent-Managed Properties</h4>'
+            + '<span class="bg-cyan-600/80 text-cyan-100 text-xs font-bold px-2.5 py-0.5 rounded-full">' + agentContracts.length + ' contract' + (agentContracts.length !== 1 ? 's' : '') + '</span>'
+            + '</div>';
+        agentContracts.forEach((c, idx) => {
+            html += buildAuditContractCard(c, ownerContracts.length + idx, showTax, 'agent');
+        });
+        html += '</div>';
+    }
     
     container.innerHTML = html;
 };
 
-function buildAuditContractCard(c, idx, showTax) {
+function buildPortfolioSummaryHTML(t, showTax) {
+    let html = '<div class="bg-gray-800 rounded-xl p-6 border border-amber-600/40">';
+    html += '<h4 class="text-amber-400 font-bold text-lg mb-4">Portfolio Summary</h4>';
+    
+    // Top-level totals
+    html += '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">';
+    html += summaryBox('Contracts', t.contracts + '', t.activeCount + ' active', 'text-white');
+    html += summaryBox('Total Purchase Value', '$' + t.purchaseValue.toLocaleString(), '', 'text-white');
+    html += summaryBox('Total Collected', '$' + t.collected.toLocaleString(), '', 'text-green-400');
+    html += summaryBox('Total Outstanding', '$' + t.outstanding.toLocaleString(), '', 'text-amber-400');
+    html += '</div>';
+    
+    // Owner vs Agent breakdown
+    html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+    
+    // Owner section
+    html += '<div class="bg-purple-900/20 rounded-lg p-4 border border-purple-700/30">';
+    html += '<div class="flex items-center gap-2 mb-3"><span>🏠</span><span class="text-purple-300 font-bold text-sm">My Properties (' + t.ownerContracts + ')</span></div>';
+    html += '<div class="grid grid-cols-3 gap-2">';
+    html += miniBox('Purchase Value', '$' + t.ownerPurchase.toLocaleString(), 'text-white');
+    html += miniBox('Cash Collected', '$' + t.ownerCollected.toLocaleString(), 'text-green-400');
+    html += miniBox('Outstanding', '$' + t.ownerOutstanding.toLocaleString(), 'text-amber-400');
+    html += '</div>';
+    if (showTax) {
+        html += '<div class="mt-2 bg-red-900/30 rounded-lg p-2.5 border border-red-700/30">';
+        html += '<div class="flex justify-between items-center">';
+        html += '<span class="text-red-400 text-xs uppercase font-bold">Tax on Owner Income (10%)</span>';
+        html += '<span class="text-red-400 font-bold">$' + t.ownerTax.toLocaleString() + '</span>';
+        html += '</div></div>';
+    }
+    html += '</div>';
+    
+    // Agent section
+    html += '<div class="bg-cyan-900/20 rounded-lg p-4 border border-cyan-700/30">';
+    html += '<div class="flex items-center gap-2 mb-3"><span>🏢</span><span class="text-cyan-300 font-bold text-sm">Agent-Managed (' + t.agentContracts + ')</span></div>';
+    html += '<div class="grid grid-cols-3 gap-2">';
+    html += miniBox('Purchase Value', '$' + t.agentPurchase.toLocaleString(), 'text-white');
+    html += miniBox('Commission Earned', '$' + t.agentCommCollected.toLocaleString(), 'text-cyan-400');
+    html += miniBox('Outstanding', '$' + t.agentOutstanding.toLocaleString(), 'text-amber-400');
+    html += '</div>';
+    if (showTax) {
+        html += '<div class="mt-2 bg-red-900/30 rounded-lg p-2.5 border border-red-700/30">';
+        html += '<div class="flex justify-between items-center">';
+        html += '<span class="text-red-400 text-xs uppercase font-bold">Tax on Agent Commission (10%)</span>';
+        html += '<span class="text-red-400 font-bold">$' + t.agentTax.toLocaleString() + '</span>';
+        html += '</div></div>';
+    }
+    html += '</div></div>';
+    
+    // Grand total tax
+    if (showTax) {
+        html += '<div class="mt-3 bg-red-900/40 rounded-lg p-4 border border-red-600/50">';
+        html += '<div class="flex justify-between items-center">';
+        html += '<div><span class="text-red-400 font-bold text-sm">TOTAL TAX LIABILITY</span>';
+        html += '<span class="text-red-400/60 text-xs ml-2">(10% of owner income + 10% of agent commissions)</span></div>';
+        html += '<span class="text-red-400 text-xl font-bold">$' + (t.ownerTax + t.agentTax).toLocaleString() + '</span>';
+        html += '</div></div>';
+    }
+    
+    html += '</div>';
+    return html;
+}
+
+function summaryBox(label, value, sub, valueColor) {
+    let h = '<div class="bg-gray-700/40 rounded-lg p-4">';
+    h += '<div class="text-gray-400 text-xs uppercase mb-1.5">' + label + '</div>';
+    h += '<div class="' + valueColor + ' text-2xl font-bold">' + value + '</div>';
+    if (sub) h += '<div class="text-gray-500 text-xs mt-1">' + sub + '</div>';
+    h += '</div>';
+    return h;
+}
+
+function miniBox(label, value, valueColor) {
+    let h = '<div class="bg-gray-800/50 rounded-lg p-2.5">';
+    h += '<div class="text-gray-500 text-[10px] uppercase mb-0.5">' + label + '</div>';
+    h += '<div class="' + valueColor + ' text-sm font-bold">' + value + '</div>';
+    h += '</div>';
+    return h;
+}
+
+function buildAuditContractCard(c, globalIdx, showTax, contractType) {
     const d = computeAuditData(c);
+    
+    const typeBadge = contractType === 'owner'
+        ? '<span class="bg-purple-600/70 text-purple-100 px-2 py-0.5 rounded text-[10px] font-bold ml-2">MY PROPERTY</span>'
+        : '<span class="bg-cyan-600/70 text-cyan-100 px-2 py-0.5 rounded text-[10px] font-bold ml-2">AGENT</span>';
     
     const statusBadge = d.status === 'active' 
         ? '<span class="bg-green-600 text-white px-2.5 py-0.5 rounded text-xs font-bold ml-2">ACTIVE</span>'
@@ -10747,18 +10840,27 @@ function buildAuditContractCard(c, idx, showTax) {
         ? '<span class="bg-blue-600 text-white px-2.5 py-0.5 rounded text-xs font-bold ml-2">COMPLETED</span>'
         : '<span class="bg-red-600 text-white px-2.5 py-0.5 rounded text-xs font-bold ml-2">CANCELLED</span>';
     
+    const borderColor = contractType === 'owner' ? 'border-purple-700/30' : 'border-cyan-700/30';
+    
     // Payment rows
     let paymentRows = '';
     let runningBalance = d.purchasePrice - d.deposit;
     
     if (d.deposit > 0) {
-        const amt = d.depositPaid ? d.deposit : 0;
         paymentRows += '<tr class="border-b border-gray-700/30">';
         paymentRows += '<td class="py-2.5 px-4 text-gray-300 text-sm">Deposit</td>';
         paymentRows += '<td class="py-2.5 px-4 text-sm">' + (d.depositPaid ? '<span class="text-green-400">' + (c.depositPaidDate || 'Paid') + '</span>' : '<span class="text-amber-400">Pending</span>') + '</td>';
         paymentRows += '<td class="py-2.5 px-4 text-white text-sm text-right font-medium">$' + d.deposit.toLocaleString() + '</td>';
         paymentRows += '<td class="py-2.5 px-4 text-gray-400 text-sm text-right">$' + runningBalance.toLocaleString() + '</td>';
-        if (showTax) paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + (d.depositPaid ? Math.round(d.deposit * 0.10).toLocaleString() : '0') + '</td>';
+        if (showTax) {
+            if (d.isOwner) {
+                paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + (d.depositPaid ? Math.round(d.deposit * 0.10).toLocaleString() : '0') + '</td>';
+            } else {
+                const comm = d.depositPaid ? Math.round(d.deposit * 0.10) : 0;
+                paymentRows += '<td class="py-2.5 px-4 text-cyan-400 text-sm text-right">$' + comm.toLocaleString() + '</td>';
+                paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + Math.round(comm * 0.10).toLocaleString() + '</td>';
+            }
+        }
         paymentRows += '</tr>';
     }
     
@@ -10775,55 +10877,72 @@ function buildAuditContractCard(c, idx, showTax) {
         paymentRows += '<td class="py-2.5 px-4 text-green-400 text-sm">' + payDate + '</td>';
         paymentRows += '<td class="py-2.5 px-4 text-white text-sm text-right font-medium">$' + payAmt.toLocaleString() + '</td>';
         paymentRows += '<td class="py-2.5 px-4 text-gray-400 text-sm text-right">$' + runningBalance.toLocaleString() + '</td>';
-        if (showTax) paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + Math.round(payAmt * 0.10).toLocaleString() + '</td>';
+        if (showTax) {
+            if (d.isOwner) {
+                paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + Math.round(payAmt * 0.10).toLocaleString() + '</td>';
+            } else {
+                const comm = Math.round(payAmt * 0.10);
+                paymentRows += '<td class="py-2.5 px-4 text-cyan-400 text-sm text-right">$' + comm.toLocaleString() + '</td>';
+                paymentRows += '<td class="py-2.5 px-4 text-red-400 text-sm text-right">$' + Math.round(comm * 0.10).toLocaleString() + '</td>';
+            }
+        }
         paymentRows += '</tr>';
     });
     
     if (d.remaining > 0 && d.status === 'active') {
+        const colSpan = showTax ? (d.isOwner ? '5' : '6') : '4';
         paymentRows += '<tr class="bg-amber-900/20 border-b border-amber-700/30">';
         paymentRows += '<td class="py-2.5 px-4 text-amber-400 text-sm font-bold">Final Payment</td>';
         paymentRows += '<td class="py-2.5 px-4 text-amber-400 text-sm">Pending</td>';
         paymentRows += '<td class="py-2.5 px-4 text-amber-400 text-sm text-right font-bold">$' + (d.finalPaymentBase + d.govFee).toLocaleString() + '</td>';
         paymentRows += '<td class="py-2.5 px-4 text-green-400 text-sm text-right font-bold">$0</td>';
-        if (showTax) paymentRows += '<td class="py-2.5 px-4 text-amber-400/60 text-sm text-right">-</td>';
+        if (showTax) {
+            paymentRows += '<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>';
+            if (!d.isOwner) paymentRows += '<td class="py-2.5 px-4 text-gray-600 text-sm text-right">-</td>';
+        }
         paymentRows += '</tr>';
     }
     
-    let card = '<div class="bg-gray-800/80 rounded-xl border border-gray-700 overflow-hidden mt-4">';
+    let card = '<div class="bg-gray-800/80 rounded-xl border ' + borderColor + ' overflow-hidden mt-3">';
     
     // Header
-    card += '<div class="px-5 py-3.5 bg-gray-800 border-b border-gray-700 flex flex-wrap items-center justify-between gap-2">';
-    card += '<div><h5 class="text-white font-bold text-base flex items-center">🏠 ' + (c.propertyTitle || 'Unknown Property') + statusBadge + '</h5>';
-    card += '<p class="text-gray-500 text-xs mt-1">Contract: ' + (c.documentId || c.id) + ' | Started: ' + d.startDate + '</p></div>';
-    card += '<button onclick="copySingleAuditText(' + idx + ')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy</button>';
+    card += '<div class="px-5 py-3.5 bg-gray-800 border-b border-gray-700/50 flex flex-wrap items-center justify-between gap-2">';
+    card += '<div>';
+    card += '<div class="flex items-center flex-wrap gap-1"><span class="text-white font-bold text-base">🏠 ' + (c.propertyTitle || 'Unknown Property') + '</span>' + statusBadge + typeBadge + '</div>';
+    card += '<p class="text-gray-500 text-xs mt-1.5">Contract: ' + (c.documentId || c.id) + '  •  Started: ' + d.startDate + '</p>';
+    card += '</div>';
+    card += '<button onclick="copySingleAuditText(' + globalIdx + ')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">📋 Copy</button>';
     card += '</div>';
     
     // Body
     card += '<div class="p-5">';
     
     // Details grid
-    card += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">';
-    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Seller</div><div class="text-white text-sm font-medium">' + d.seller + '</div>';
-    if (d.hasAgent) card += '<div class="text-purple-400 text-xs mt-1">Agent: ' + d.agentName + '</div>';
-    card += '</div>';
-    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Buyer</div><div class="text-white text-sm font-medium">' + d.buyer + '</div></div>';
-    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Purchase Price</div><div class="text-white text-sm font-bold">$' + d.purchasePrice.toLocaleString() + '</div><div class="text-gray-500 text-xs mt-1">' + d.termMonths + ' month term</div></div>';
-    card += '<div class="bg-gray-700/30 rounded-lg p-3"><div class="text-gray-500 text-xs uppercase mb-1">Monthly Payment</div><div class="text-white text-sm font-bold">$' + d.expectedMonthly.toLocaleString() + '</div></div>';
+    card += '<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">';
+    card += detailBox('Seller', d.seller, d.hasAgent ? 'Agent: ' + d.agentName : '');
+    card += detailBox('Buyer', d.buyer, '');
+    card += detailBox('Purchase Price', '$' + d.purchasePrice.toLocaleString(), d.termMonths + ' month term');
+    card += detailBox('Monthly Payment', '$' + d.expectedMonthly.toLocaleString(), '');
     card += '</div>';
     
     // Financial summary
-    const colCount = showTax ? '4' : '3';
-    card += '<div class="grid grid-cols-' + colCount + ' gap-3 mb-5">';
-    card += '<div class="bg-green-900/30 rounded-lg p-4 border border-green-700/30"><div class="text-green-400 text-xs uppercase mb-1">Collected</div><div class="text-green-400 text-xl font-bold">$' + d.totalCollected.toLocaleString() + '</div></div>';
-    card += '<div class="bg-amber-900/30 rounded-lg p-4 border border-amber-700/30"><div class="text-amber-400 text-xs uppercase mb-1">Remaining + Gov Fee</div><div class="text-amber-400 text-xl font-bold">$' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString() + '</div>';
-    if (d.govFee > 0 && d.remaining > 0) card += '<div class="text-gray-500 text-xs mt-1">Base: $' + d.remaining.toLocaleString() + ' + Gov: $' + d.govFee.toLocaleString() + '</div>';
-    card += '</div>';
-    card += '<div class="bg-gray-700/30 rounded-lg p-4 border border-gray-600/30"><div class="text-gray-400 text-xs uppercase mb-1">Next Due</div><div class="text-white text-xl font-bold">' + (d.status === 'active' ? d.nextDueText : 'N/A') + '</div>';
-    if (d.hasAgent && d.remaining > 0) card += '<div class="text-purple-400 text-xs mt-1">Agent comm: $' + d.agentCommission.toLocaleString() + '</div>';
-    card += '</div>';
+    let finCols = '3';
+    if (showTax && d.isOwner) finCols = '4';
+    if (showTax && !d.isOwner) finCols = '4';
+    card += '<div class="grid grid-cols-2 md:grid-cols-' + finCols + ' gap-3 mb-4">';
+    card += finBox('Collected', '$' + d.totalCollected.toLocaleString(), '', 'bg-green-900/30', 'border-green-700/30', 'text-green-400');
+    card += finBox('Remaining + Gov Fee', '$' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString(),
+        d.govFee > 0 && d.remaining > 0 ? 'Base: $' + d.remaining.toLocaleString() + ' + Gov: $' + d.govFee.toLocaleString() : '',
+        'bg-amber-900/30', 'border-amber-700/30', 'text-amber-400');
+    card += finBox('Next Due', d.status === 'active' ? d.nextDueText : 'N/A',
+        d.hasAgent && d.remaining > 0 ? 'Agent comm: $' + d.agentCommission.toLocaleString() : '',
+        'bg-gray-700/30', 'border-gray-600/30', 'text-white');
     if (showTax) {
-        card += '<div class="bg-red-900/30 rounded-lg p-4 border border-red-700/30"><div class="text-red-400 text-xs uppercase mb-1">Tax Liability (10%)</div><div class="text-red-400 text-xl font-bold">$' + d.totalTax.toLocaleString() + '</div>';
-        card += '<div class="text-red-400/60 text-xs mt-1">On $' + d.totalCollected.toLocaleString() + ' collected</div></div>';
+        if (d.isOwner) {
+            card += finBox('Tax Liability (10%)', '$' + d.ownerTax.toLocaleString(), 'On $' + d.ownerIncome.toLocaleString() + ' income', 'bg-red-900/30', 'border-red-700/30', 'text-red-400');
+        } else {
+            card += finBox('Tax on Commission', '$' + d.agentTax.toLocaleString(), 'On $' + d.agentIncome.toLocaleString() + ' comm earned', 'bg-red-900/30', 'border-red-700/30', 'text-red-400');
+        }
     }
     card += '</div>';
     
@@ -10834,14 +10953,41 @@ function buildAuditContractCard(c, idx, showTax) {
     card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase">Date</th>';
     card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase text-right">Amount</th>';
     card += '<th class="py-2.5 px-4 text-gray-400 text-xs font-bold uppercase text-right">Balance After</th>';
-    if (showTax) card += '<th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">Tax (10%)</th>';
+    if (showTax) {
+        if (d.isOwner) {
+            card += '<th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">Tax (10%)</th>';
+        } else {
+            card += '<th class="py-2.5 px-4 text-cyan-400/70 text-xs font-bold uppercase text-right">Commission</th>';
+            card += '<th class="py-2.5 px-4 text-red-400/70 text-xs font-bold uppercase text-right">Tax on Comm</th>';
+        }
+    }
     card += '</tr></thead><tbody>';
-    card += paymentRows || '<tr><td colspan="' + (showTax ? '5' : '4') + '" class="py-4 px-4 text-gray-500 text-sm italic text-center">No payments recorded</td></tr>';
+    card += paymentRows || '<tr><td colspan="4" class="py-4 px-4 text-gray-500 text-sm italic text-center">No payments recorded</td></tr>';
     card += '</tbody></table></div>';
     
     card += '</div></div>';
     return card;
 }
+
+function detailBox(label, value, sub) {
+    let h = '<div class="bg-gray-700/30 rounded-lg p-3">';
+    h += '<div class="text-gray-500 text-xs uppercase mb-1">' + label + '</div>';
+    h += '<div class="text-white text-sm font-medium">' + value + '</div>';
+    if (sub) h += '<div class="text-purple-400 text-xs mt-1">' + sub + '</div>';
+    h += '</div>';
+    return h;
+}
+
+function finBox(label, value, sub, bg, border, valueColor) {
+    let h = '<div class="' + bg + ' rounded-lg p-4 border ' + border + '">';
+    h += '<div class="' + valueColor + ' text-xs uppercase mb-1">' + label + '</div>';
+    h += '<div class="' + valueColor + ' text-xl font-bold">' + value + '</div>';
+    if (sub) h += '<div class="text-gray-500 text-xs mt-1">' + sub + '</div>';
+    h += '</div>';
+    return h;
+}
+
+// ==================== TEXT EXPORT ====================
 
 function buildAuditContractText(c) {
     const d = computeAuditData(c);
@@ -10849,6 +10995,7 @@ function buildAuditContractText(c) {
     
     let text = '';
     text += 'PROPERTY: ' + (c.propertyTitle || 'Unknown') + '\n';
+    text += 'TYPE: ' + (d.isOwner ? 'Owner Property' : 'Agent-Managed Property') + '\n';
     text += 'STATUS: ' + d.status.toUpperCase() + '\n';
     text += 'CONTRACT ID: ' + (c.documentId || c.id) + '\n';
     text += 'START DATE: ' + d.startDate + '\n';
@@ -10863,7 +11010,10 @@ function buildAuditContractText(c) {
     
     if (d.deposit > 0) {
         text += '  Deposit: $' + d.deposit.toLocaleString() + ' - ' + (d.depositPaid ? (c.depositPaidDate || 'Paid') : 'PENDING') + ' - Balance: $' + runningBalance.toLocaleString();
-        if (showTax && d.depositPaid) text += ' - Tax: $' + Math.round(d.deposit * 0.10).toLocaleString();
+        if (showTax && d.depositPaid) {
+            if (d.isOwner) text += ' - Tax: $' + Math.round(d.deposit * 0.10).toLocaleString();
+            else { const comm = Math.round(d.deposit * 0.10); text += ' - Comm: $' + comm.toLocaleString() + ' - Tax on Comm: $' + Math.round(comm * 0.10).toLocaleString(); }
+        }
         text += '\n';
     }
     
@@ -10873,9 +11023,11 @@ function buildAuditContractText(c) {
         const monthLabel = pay.monthsCovered && pay.monthsCovered > 1
             ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered))
             : 'Month ' + (pay.month || (i + 1));
-        const payDate = pay.date || pay.paidDate || 'N/A';
-        text += '  ' + monthLabel + ': $' + payAmt.toLocaleString() + ' - ' + payDate + ' - Balance: $' + runningBalance.toLocaleString();
-        if (showTax) text += ' - Tax: $' + Math.round(payAmt * 0.10).toLocaleString();
+        text += '  ' + monthLabel + ': $' + payAmt.toLocaleString() + ' - ' + (pay.date || pay.paidDate || 'N/A') + ' - Balance: $' + runningBalance.toLocaleString();
+        if (showTax) {
+            if (d.isOwner) text += ' - Tax: $' + Math.round(payAmt * 0.10).toLocaleString();
+            else { const comm = Math.round(payAmt * 0.10); text += ' - Comm: $' + comm.toLocaleString() + ' - Tax on Comm: $' + Math.round(comm * 0.10).toLocaleString(); }
+        }
         text += '\n';
     });
     
@@ -10889,18 +11041,27 @@ function buildAuditContractText(c) {
     text += '  Government Transfer Fee (10%): $' + d.govFee.toLocaleString() + '\n';
     text += '  Total Outstanding: $' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString() + '\n';
     if (showTax) {
-        text += '\nTAX LIABILITY (10% of collected):\n';
-        text += '  Tax on Collected Payments: $' + d.totalTax.toLocaleString() + '\n';
+        text += '\nTAX LIABILITY:\n';
+        if (d.isOwner) {
+            text += '  Owner Income: $' + d.ownerIncome.toLocaleString() + '\n';
+            text += '  Tax (10% of income): $' + d.ownerTax.toLocaleString() + '\n';
+        } else {
+            text += '  Agent Commission Earned: $' + d.agentIncome.toLocaleString() + '\n';
+            text += '  Tax (10% of commission): $' + d.agentTax.toLocaleString() + '\n';
+        }
     }
-    
     return text;
 }
 
 window.copySingleAuditText = function(idx) {
     const contracts = getFilteredAuditContracts();
-    if (!contracts[idx]) return;
+    // idx is global across owner+agent
+    const ownerContracts = contracts.filter(c => isOwnerContract(c));
+    const agentContracts = contracts.filter(c => !isOwnerContract(c));
+    const allOrdered = [...ownerContracts, ...agentContracts];
+    if (!allOrdered[idx]) return;
     
-    const text = buildAuditContractText(contracts[idx]);
+    const text = buildAuditContractText(allOrdered[idx]);
     navigator.clipboard.writeText(text).then(() => {
         showToast('📋 Contract copied to clipboard', 'success');
     }).catch(() => { showToast('Failed to copy', 'error'); });
@@ -10914,40 +11075,55 @@ window.copyAllAuditText = function() {
     const now = new Date();
     const timestamp = now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
     
+    const ownerContracts = contracts.filter(c => isOwnerContract(c));
+    const agentContracts = contracts.filter(c => !isOwnerContract(c));
+    
+    let t = { purchaseValue: 0, collected: 0, outstanding: 0, ownerCollected: 0, ownerTax: 0, agentComm: 0, agentTax: 0 };
+    contracts.forEach(c => {
+        const d = computeAuditData(c);
+        t.purchaseValue += d.purchasePrice;
+        t.collected += d.totalCollected;
+        t.outstanding += d.remaining > 0 ? d.remaining + d.govFee : 0;
+        if (d.isOwner) { t.ownerCollected += d.totalCollected; t.ownerTax += d.ownerTax; }
+        else { t.agentComm += d.agentIncome; t.agentTax += d.agentTax; }
+    });
+    
     let fullText = 'RTO CONTRACT AUDIT REPORT\n';
     fullText += 'Generated: ' + timestamp + '\n';
     fullText += 'PaulysProperties.com\n';
     fullText += '==================================================\n\n';
-    
-    let totalPurchase = 0, totalCollected = 0, totalOutstanding = 0, totalTax = 0;
-    let activeCount = 0, completedCount = 0;
-    
-    contracts.forEach(c => {
-        const d = computeAuditData(c);
-        totalPurchase += d.purchasePrice;
-        totalCollected += d.totalCollected;
-        totalOutstanding += d.remaining > 0 ? d.remaining + d.govFee : 0;
-        totalTax += d.totalTax;
-        if (d.status === 'active') activeCount++; else completedCount++;
-    });
-    
     fullText += 'PORTFOLIO SUMMARY\n';
-    fullText += '  Total Contracts: ' + contracts.length + ' (' + activeCount + ' active' + (completedCount ? ', ' + completedCount + ' completed/cancelled' : '') + ')\n';
-    fullText += '  Total Purchase Value: $' + totalPurchase.toLocaleString() + '\n';
-    fullText += '  Total Collected: $' + totalCollected.toLocaleString() + '\n';
-    fullText += '  Total Outstanding: $' + totalOutstanding.toLocaleString() + '\n';
-    if (showTax) fullText += '  Tax Liability (10% of collected): $' + totalTax.toLocaleString() + '\n';
+    fullText += '  Total Contracts: ' + contracts.length + ' (' + ownerContracts.length + ' owner, ' + agentContracts.length + ' agent)\n';
+    fullText += '  Total Purchase Value: $' + t.purchaseValue.toLocaleString() + '\n';
+    fullText += '  Total Collected: $' + t.collected.toLocaleString() + '\n';
+    fullText += '  Total Outstanding: $' + t.outstanding.toLocaleString() + '\n\n';
+    fullText += '  MY PROPERTIES: $' + t.ownerCollected.toLocaleString() + ' collected\n';
+    fullText += '  AGENT COMMISSION: $' + t.agentComm.toLocaleString() + ' earned\n';
+    if (showTax) {
+        fullText += '\n  TAX LIABILITY:\n';
+        fullText += '    Owner Income Tax (10%): $' + t.ownerTax.toLocaleString() + '\n';
+        fullText += '    Agent Commission Tax (10%): $' + t.agentTax.toLocaleString() + '\n';
+        fullText += '    TOTAL TAX: $' + (t.ownerTax + t.agentTax).toLocaleString() + '\n';
+    }
     fullText += '==================================================\n\n';
     
-    contracts.forEach((c, i) => {
-        fullText += '──────────────────────────────────────────────────\n';
-        fullText += 'CONTRACT ' + (i + 1) + ' of ' + contracts.length + '\n';
-        fullText += '──────────────────────────────────────────────────\n';
-        fullText += buildAuditContractText(c) + '\n';
-    });
+    if (ownerContracts.length > 0) {
+        fullText += '=== MY PROPERTIES (' + ownerContracts.length + ') ===\n\n';
+        ownerContracts.forEach((c, i) => {
+            fullText += '──────────────────────────────────────────────────\n';
+            fullText += buildAuditContractText(c) + '\n';
+        });
+    }
+    if (agentContracts.length > 0) {
+        fullText += '=== AGENT-MANAGED PROPERTIES (' + agentContracts.length + ') ===\n\n';
+        agentContracts.forEach((c, i) => {
+            fullText += '──────────────────────────────────────────────────\n';
+            fullText += buildAuditContractText(c) + '\n';
+        });
+    }
     
     navigator.clipboard.writeText(fullText).then(() => {
-        showToast('📋 All ' + contracts.length + ' contracts copied to clipboard', 'success');
+        showToast('📋 All ' + contracts.length + ' contracts copied', 'success');
     }).catch(() => { showToast('Failed to copy', 'error'); });
 };
 
@@ -10958,7 +11134,7 @@ function getFilteredAuditContracts() {
     let filtered = window._auditContracts.slice();
     if (filterUser !== 'all') {
         filtered = filtered.filter(c => {
-            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐/g, '').trim();
+            const seller = (c.seller || '').replace(/Managed by:\s*/i, '').replace(/👑|🌱|⭐|🏢/g, '').trim();
             return c.buyer === filterUser || seller === filterUser;
         });
     }
@@ -10971,20 +11147,24 @@ function getFilteredAuditContracts() {
 window.downloadAuditPNG = async function(mode) {
     const contracts = getFilteredAuditContracts();
     if (contracts.length === 0) { showToast('No contracts to export', 'warning'); return; }
-    
     const showTax = document.getElementById('auditShowTax')?.checked || false;
     showToast('🖼️ Generating PNG...', 'info');
     await new Promise(r => setTimeout(r, 100));
     
+    // Always group by owner/agent
+    const ownerContracts = contracts.filter(c => isOwnerContract(c));
+    const agentContracts = contracts.filter(c => !isOwnerContract(c));
+    const ordered = [...ownerContracts, ...agentContracts];
+    
     if (mode === 'single') {
-        for (let i = 0; i < contracts.length; i++) {
-            const canvas = renderAuditPNGCanvas([contracts[i]], i + 1, contracts.length, showTax);
-            downloadCanvasAsPNG(canvas, 'audit-' + (contracts[i].propertyTitle || 'contract').replace(/[^a-zA-Z0-9]/g, '_') + '.png');
-            if (contracts.length > 1) await new Promise(r => setTimeout(r, 300));
+        for (let i = 0; i < ordered.length; i++) {
+            const canvas = renderAuditPNGCanvas([ordered[i]], i + 1, ordered.length, showTax);
+            downloadCanvasAsPNG(canvas, 'audit-' + (ordered[i].propertyTitle || 'contract').replace(/[^a-zA-Z0-9]/g, '_') + '.png');
+            if (ordered.length > 1) await new Promise(r => setTimeout(r, 300));
         }
-        showToast('✅ ' + contracts.length + ' PNG(s) downloaded', 'success');
+        showToast('✅ ' + ordered.length + ' PNG(s) downloaded', 'success');
     } else {
-        const canvas = renderAuditPNGCanvas(contracts, null, contracts.length, showTax);
+        const canvas = renderAuditPNGCanvas(ordered, null, ordered.length, showTax);
         downloadCanvasAsPNG(canvas, 'rto-audit-report-' + new Date().toISOString().split('T')[0] + '.png');
         showToast('✅ Audit report PNG downloaded', 'success');
     }
@@ -11000,289 +11180,297 @@ function downloadCanvasAsPNG(canvas, filename) {
 function renderAuditPNGCanvas(contracts, singleIndex, totalCount, showTax) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
+    const W = 1200, maxH = 15000;
+    canvas.width = W; canvas.height = maxH;
     
-    const W = 1200;
-    const maxH = 12000;
-    canvas.width = W;
-    canvas.height = maxH;
+    // Dark bg
+    ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, W, maxH);
     
-    // Dark background
-    ctx.fillStyle = '#111827';
-    ctx.fillRect(0, 0, W, maxH);
-    
-    const margin = 50;
-    const cw = W - margin * 2;
+    const M = 50, cw = W - M * 2;
     let y = 0;
     
-    // Colors matching modal
-    const bgCard = '#1f2937';
-    const bgCardInner = '#374151';
-    const borderColor = '#4b5563';
-    const textWhite = '#f9fafb';
-    const textGray = '#9ca3af';
-    const textGrayLight = '#6b7280';
-    const textGreen = '#4ade80';
-    const textAmber = '#fbbf24';
-    const textRed = '#f87171';
-    const brandPurple = '#7c3aed';
-    const brandAmber = '#d97706';
-    const bgGreen = '#064e3b';
-    const bgAmber = '#78350f';
-    const bgRed = '#7f1d1d';
+    // Colors
+    const C = {
+        card: '#1f2937', inner: '#374151', border: '#4b5563',
+        white: '#f9fafb', gray: '#9ca3af', grayDk: '#6b7280',
+        green: '#4ade80', amber: '#fbbf24', red: '#f87171', cyan: '#67e8f9',
+        purple: '#a78bfa', bgGreen: '#064e3b', bgAmber: '#78350f', bgRed: '#7f1d1d',
+        bgPurple: '#3b0764', bgCyan: '#083344'
+    };
     
     const drawRect = (x, rY, w, h, fill) => { ctx.fillStyle = fill; ctx.fillRect(x, rY, w, h); };
-    const drawRoundedRect = (x, rY, w, h, fill, r) => {
-        r = r || 8;
-        ctx.fillStyle = fill;
-        ctx.beginPath();
-        ctx.moveTo(x + r, rY); ctx.lineTo(x + w - r, rY); ctx.quadraticCurveTo(x + w, rY, x + w, rY + r);
-        ctx.lineTo(x + w, rY + h - r); ctx.quadraticCurveTo(x + w, rY + h, x + w - r, rY + h);
-        ctx.lineTo(x + r, rY + h); ctx.quadraticCurveTo(x, rY + h, x, rY + h - r);
-        ctx.lineTo(x, rY + r); ctx.quadraticCurveTo(x, rY, x + r, rY);
+    const rr = (x, rY, w, h, fill, r) => {
+        r = r || 8; ctx.fillStyle = fill; ctx.beginPath();
+        ctx.moveTo(x+r,rY); ctx.lineTo(x+w-r,rY); ctx.quadraticCurveTo(x+w,rY,x+w,rY+r);
+        ctx.lineTo(x+w,rY+h-r); ctx.quadraticCurveTo(x+w,rY+h,x+w-r,rY+h);
+        ctx.lineTo(x+r,rY+h); ctx.quadraticCurveTo(x,rY+h,x,rY+h-r);
+        ctx.lineTo(x,rY+r); ctx.quadraticCurveTo(x,rY,x+r,rY);
         ctx.closePath(); ctx.fill();
     };
-    const drawBorder = (x, rY, w, h, color) => {
-        ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.strokeRect(x, rY, w, h);
-    };
     
-    // ===== HEADER BAR =====
-    const headerGrad = ctx.createLinearGradient(0, 0, W, 0);
-    headerGrad.addColorStop(0, '#b45309');
-    headerGrad.addColorStop(1, '#c2410c');
-    drawRect(0, 0, W, 75, '#000');
-    ctx.fillStyle = headerGrad;
-    ctx.fillRect(0, 0, W, 75);
-    ctx.font = 'bold 24px Arial';
-    ctx.fillStyle = textWhite;
-    ctx.fillText('📋  RTO Contract Audit Report', margin, 45);
-    ctx.font = '12px Arial';
-    ctx.fillStyle = '#fed7aa';
-    const subR = 'PaulysProperties.com';
-    ctx.fillText(subR, W - margin - ctx.measureText(subR).width, 45);
+    // Header
+    const hg = ctx.createLinearGradient(0,0,W,0);
+    hg.addColorStop(0,'#b45309'); hg.addColorStop(1,'#c2410c');
+    drawRect(0,0,W,75,'#000'); ctx.fillStyle = hg; ctx.fillRect(0,0,W,75);
+    ctx.font = 'bold 24px Arial'; ctx.fillStyle = C.white;
+    ctx.fillText('📋  RTO Contract Audit Report', M, 45);
+    ctx.font = '12px Arial'; ctx.fillStyle = '#fed7aa';
+    const sr = 'PaulysProperties.com'; ctx.fillText(sr, W-M-ctx.measureText(sr).width, 45);
     y = 90;
     
-    // Timestamp
     const now = new Date();
-    const timestamp = now.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-    ctx.font = '11px Arial'; ctx.fillStyle = textGrayLight;
-    ctx.fillText('Generated: ' + timestamp, margin, y); y += 16;
-    if (singleIndex) {
-        ctx.fillText('Contract ' + singleIndex + ' of ' + totalCount, margin, y);
-    } else {
-        ctx.fillText(contracts.length + ' contract(s) included', margin, y);
-    }
+    ctx.font = '11px Arial'; ctx.fillStyle = C.grayDk;
+    ctx.fillText('Generated: ' + now.toLocaleString('en-US', { month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true }), M, y);
+    y += 16;
+    ctx.fillText(singleIndex ? 'Contract ' + singleIndex + ' of ' + totalCount : contracts.length + ' contract(s) included', M, y);
     y += 22;
     
-    // ===== PORTFOLIO SUMMARY =====
+    // Portfolio Summary (combined only)
     if (!singleIndex && contracts.length > 1) {
-        drawRoundedRect(margin, y, cw, showTax ? 110 : 100, bgCard, 10);
-        drawBorder(margin, y, cw, showTax ? 110 : 100, '#92400e');
+        const ownerC = contracts.filter(c => isOwnerContract(c));
+        const agentC = contracts.filter(c => !isOwnerContract(c));
         
-        ctx.font = 'bold 15px Arial'; ctx.fillStyle = textAmber;
-        ctx.fillText('Portfolio Summary', margin + 20, y + 25);
-        
-        let tPurchase = 0, tCollected = 0, tOutstanding = 0, tTax = 0, aCount = 0;
+        let t = { pv:0, col:0, out:0, oc:0, oTax:0, ac:0, aTax:0, active:0 };
         contracts.forEach(c => {
-            const dd = computeAuditData(c);
-            tPurchase += dd.purchasePrice;
-            tCollected += dd.totalCollected;
-            tOutstanding += dd.remaining > 0 ? dd.remaining + dd.govFee : 0;
-            tTax += dd.totalTax;
-            if (dd.status === 'active') aCount++;
+            const d = computeAuditData(c);
+            t.pv += d.purchasePrice; t.col += d.totalCollected;
+            t.out += d.remaining > 0 ? d.remaining + d.govFee : 0;
+            if (d.status === 'active') t.active++;
+            if (d.isOwner) { t.oc += d.totalCollected; t.oTax += d.ownerTax; }
+            else { t.ac += d.agentIncome; t.aTax += d.agentTax; }
         });
         
-        const boxCount = showTax ? 5 : 4;
-        const boxGap = 12;
-        const boxW = (cw - 40 - (boxCount - 1) * boxGap) / boxCount;
-        const boxY = y + 40;
-        const boxH = showTax ? 55 : 50;
-        const labels = ['CONTRACTS', 'PURCHASE VALUE', 'COLLECTED', 'OUTSTANDING'];
-        const values = [contracts.length + ' (' + aCount + ' active)', '$' + tPurchase.toLocaleString(), '$' + tCollected.toLocaleString(), '$' + tOutstanding.toLocaleString()];
-        const valColors = [textWhite, textWhite, textGreen, textAmber];
-        if (showTax) { labels.push('TAX LIABILITY (10%)'); values.push('$' + tTax.toLocaleString()); valColors.push(textRed); }
+        // Summary card
+        const sumH = showTax ? 195 : 160;
+        rr(M, y, cw, sumH, C.card, 10);
+        ctx.strokeStyle = '#92400e'; ctx.lineWidth = 1; ctx.strokeRect(M, y, cw, sumH);
+        ctx.font = 'bold 15px Arial'; ctx.fillStyle = C.amber;
+        ctx.fillText('Portfolio Summary', M + 20, y + 25);
         
-        for (let i = 0; i < boxCount; i++) {
-            const bx = margin + 20 + i * (boxW + boxGap);
-            const bgCol = i === 4 ? bgRed : bgCardInner;
-            drawRoundedRect(bx, boxY, boxW, boxH, bgCol, 6);
-            ctx.font = '9px Arial'; ctx.fillStyle = textGrayLight;
-            ctx.fillText(labels[i], bx + 10, boxY + 16);
-            ctx.font = 'bold 16px Arial'; ctx.fillStyle = valColors[i];
-            ctx.fillText(values[i], bx + 10, boxY + 38);
+        // Top row: 4 boxes
+        const bw = (cw - 60 - 30) / 4, bh = 50, by = y + 38;
+        const topLabels = ['CONTRACTS','PURCHASE VALUE','COLLECTED','OUTSTANDING'];
+        const topVals = [contracts.length + ' (' + t.active + ' active)', '$'+t.pv.toLocaleString(), '$'+t.col.toLocaleString(), '$'+t.out.toLocaleString()];
+        const topColors = [C.white, C.white, C.green, C.amber];
+        for (let i = 0; i < 4; i++) {
+            const bx = M + 20 + i * (bw + 10);
+            rr(bx, by, bw, bh, C.inner, 6);
+            ctx.font = '9px Arial'; ctx.fillStyle = C.grayDk; ctx.fillText(topLabels[i], bx+10, by+16);
+            ctx.font = 'bold 16px Arial'; ctx.fillStyle = topColors[i]; ctx.fillText(topVals[i], bx+10, by+38);
         }
-        y += (showTax ? 115 : 105) + 15;
+        
+        // Owner/Agent sub-rows
+        const subY = by + bh + 12;
+        const halfW = (cw - 50) / 2;
+        
+        // Owner box
+        rr(M + 20, subY, halfW, 50, C.bgPurple + '80', 6);
+        ctx.font = 'bold 11px Arial'; ctx.fillStyle = C.purple;
+        ctx.fillText('🏠 My Properties (' + ownerC.length + ')', M + 30, subY + 16);
+        ctx.font = '11px Arial'; ctx.fillStyle = C.green;
+        ctx.fillText('Collected: $' + t.oc.toLocaleString(), M + 30, subY + 34);
+        if (showTax) { ctx.fillStyle = C.red; ctx.fillText('Tax: $' + t.oTax.toLocaleString(), M + 30 + halfW * 0.5, subY + 34); }
+        
+        // Agent box
+        rr(M + 20 + halfW + 10, subY, halfW, 50, C.bgCyan + '80', 6);
+        ctx.font = 'bold 11px Arial'; ctx.fillStyle = C.cyan;
+        ctx.fillText('🏢 Agent-Managed (' + agentC.length + ')', M + 30 + halfW + 10, subY + 16);
+        ctx.font = '11px Arial'; ctx.fillStyle = C.cyan;
+        ctx.fillText('Commission: $' + t.ac.toLocaleString(), M + 30 + halfW + 10, subY + 34);
+        if (showTax) { ctx.fillStyle = C.red; ctx.fillText('Tax: $' + t.aTax.toLocaleString(), M + 30 + halfW + 10 + halfW * 0.5, subY + 34); }
+        
+        // Total tax row
+        if (showTax) {
+            const taxY = subY + 58;
+            rr(M + 20, taxY, cw - 40, 28, C.bgRed, 6);
+            ctx.font = 'bold 11px Arial'; ctx.fillStyle = C.red;
+            ctx.fillText('TOTAL TAX LIABILITY: $' + (t.oTax + t.aTax).toLocaleString(), M + 30, taxY + 18);
+            ctx.font = '10px Arial'; ctx.fillStyle = '#fca5a5';
+            ctx.fillText('(10% of owner income + 10% of agent commissions)', M + 300, taxY + 18);
+        }
+        
+        y += sumH + 15;
     }
     
-    // ===== PER CONTRACT =====
-    contracts.forEach((c, cIdx) => {
+    // Section headers and per-contract rendering
+    const ownerContracts = contracts.filter(c => isOwnerContract(c));
+    const agentContracts = contracts.filter(c => !isOwnerContract(c));
+    
+    if (!singleIndex && ownerContracts.length > 0 && agentContracts.length > 0) {
+        // Section header: My Properties
+        ctx.font = 'bold 14px Arial'; ctx.fillStyle = C.purple;
+        ctx.fillText('🏠  My Properties (' + ownerContracts.length + ')', M, y + 14);
+        y += 25;
+    }
+    
+    const renderContract = (c, cIdx) => {
         const d = computeAuditData(c);
+        const payCount = (d.deposit > 0 ? 1 : 0) + d.history.length + (d.remaining > 0 && d.status === 'active' ? 1 : 0);
+        const tableH = 30 + Math.max(payCount, 1) * 28;
+        const cardH = 55 + 65 + 65 + tableH + 30;
         
-        // Estimate card height
-        const paymentCount = (d.deposit > 0 ? 1 : 0) + d.history.length + (d.remaining > 0 && d.status === 'active' ? 1 : 0);
-        const tableH = 30 + paymentCount * 28;
-        const cardH = 70 + 75 + 70 + tableH + 30;
+        const borderCol = d.isOwner ? '#7c3aed44' : '#06b6d444';
+        rr(M, y, cw, cardH, C.card, 10);
+        ctx.strokeStyle = borderCol; ctx.lineWidth = 1; ctx.strokeRect(M, y, cw, cardH);
         
-        // Card background
-        drawRoundedRect(margin, y, cw, cardH, bgCard, 10);
-        drawBorder(margin, y, cw, cardH, borderColor);
+        // Header
+        rr(M, y, cw, 42, C.inner, 10);
+        drawRect(M, y + 34, cw, 8, C.inner);
+        ctx.font = 'bold 13px Arial'; ctx.fillStyle = C.white;
+        ctx.fillText('🏠  ' + (c.propertyTitle || 'Unknown'), M + 14, y + 26);
         
-        // Contract header
-        drawRoundedRect(margin, y, cw, 45, bgCardInner, 10);
-        // Fix top-left rounding issue by filling bottom corners
-        drawRect(margin, y + 35, cw, 10, bgCardInner);
+        // Status + type badges
+        let bx = W - M - 14;
+        const typeTxt = d.isOwner ? 'OWNER' : 'AGENT';
+        const typeCol = d.isOwner ? '#7c3aed' : '#0891b2';
+        ctx.font = 'bold 9px Arial';
+        const tw = ctx.measureText(typeTxt).width + 12;
+        bx -= tw;
+        rr(bx, y + 12, tw, 18, typeCol, 4);
+        ctx.fillStyle = C.white; ctx.fillText(typeTxt, bx + 6, y + 24);
         
-        ctx.font = 'bold 14px Arial'; ctx.fillStyle = textWhite;
-        ctx.fillText('🏠  ' + (c.propertyTitle || 'Unknown Property'), margin + 16, y + 28);
+        const stTxt = d.status.toUpperCase();
+        const stCol = d.status === 'active' ? '#16a34a' : d.status === 'completed' ? '#2563eb' : '#dc2626';
+        const sw2 = ctx.measureText(stTxt).width + 12;
+        bx -= sw2 + 6;
+        rr(bx, y + 12, sw2, 18, stCol, 4);
+        ctx.fillStyle = C.white; ctx.fillText(stTxt, bx + 6, y + 24);
         
-        // Status badge
-        const statusText = d.status.toUpperCase();
-        const badgeColor = d.status === 'active' ? '#16a34a' : d.status === 'completed' ? '#2563eb' : '#dc2626';
-        ctx.font = 'bold 10px Arial';
-        const badgeW = ctx.measureText(statusText).width + 14;
-        drawRoundedRect(W - margin - badgeW - 16, y + 13, badgeW, 20, badgeColor, 4);
-        ctx.fillStyle = textWhite;
-        ctx.fillText(statusText, W - margin - badgeW - 9, y + 27);
+        const cx = M + 14, ccw = cw - 28;
+        y += 48;
         
-        const cardX = margin + 16;
-        const cardCW = cw - 32;
-        y += 50;
+        ctx.font = '10px Arial'; ctx.fillStyle = C.grayDk;
+        ctx.fillText('Contract: ' + (c.documentId || c.id) + '  •  Started: ' + d.startDate, cx, y + 8);
+        y += 18;
         
-        // Contract ID / date
-        ctx.font = '10px Arial'; ctx.fillStyle = textGrayLight;
-        ctx.fillText('Contract: ' + (c.documentId || c.id) + '  |  Started: ' + d.startDate, cardX, y + 10);
-        y += 22;
-        
-        // Detail boxes row
-        const detBoxW = (cardCW - 12 * 3) / 4;
-        const detBoxH = 50;
-        const detLabels = ['SELLER', 'BUYER', 'PURCHASE PRICE', 'MONTHLY PAYMENT'];
-        const detVals = [d.seller, d.buyer, '$' + d.purchasePrice.toLocaleString(), '$' + d.expectedMonthly.toLocaleString()];
-        const detSubs = [d.hasAgent ? 'Agent: ' + d.agentName : '', '', d.termMonths + ' month term', ''];
-        
+        // Detail boxes
+        const dbw = (ccw - 9 * 3) / 4, dbh = 44;
+        const dLabels = ['SELLER','BUYER','PURCHASE PRICE','MONTHLY'];
+        const dVals = [d.seller, d.buyer, '$'+d.purchasePrice.toLocaleString(), '$'+d.expectedMonthly.toLocaleString()];
         for (let i = 0; i < 4; i++) {
-            const bx = cardX + i * (detBoxW + 12);
-            drawRoundedRect(bx, y, detBoxW, detBoxH, bgCardInner, 6);
-            ctx.font = '9px Arial'; ctx.fillStyle = textGrayLight;
-            ctx.fillText(detLabels[i], bx + 8, y + 15);
-            ctx.font = (i >= 2 ? 'bold ' : '') + '12px Arial'; ctx.fillStyle = textWhite;
-            // Truncate long names
-            let val = detVals[i];
-            while (ctx.measureText(val).width > detBoxW - 16 && val.length > 3) val = val.slice(0, -1);
-            ctx.fillText(val, bx + 8, y + 32);
-            if (detSubs[i]) {
-                ctx.font = '9px Arial'; ctx.fillStyle = i === 0 ? '#a78bfa' : textGrayLight;
-                ctx.fillText(detSubs[i], bx + 8, y + 45);
-            }
+            const dx = cx + i * (dbw + 9);
+            rr(dx, y, dbw, dbh, C.inner, 6);
+            ctx.font = '8px Arial'; ctx.fillStyle = C.grayDk; ctx.fillText(dLabels[i], dx+8, y+14);
+            ctx.font = (i>=2?'bold ':'') + '11px Arial'; ctx.fillStyle = C.white;
+            let v = dVals[i];
+            while (ctx.measureText(v).width > dbw - 16 && v.length > 3) v = v.slice(0,-1);
+            ctx.fillText(v, dx+8, y+30);
+            if (i === 2) { ctx.font = '8px Arial'; ctx.fillStyle = C.grayDk; ctx.fillText(d.termMonths + ' mo term', dx+8, y+40); }
         }
-        y += detBoxH + 10;
+        y += dbh + 8;
         
         // Financial boxes
-        const finCount = showTax ? 4 : 3;
-        const finBoxW = (cardCW - 10 * (finCount - 1)) / finCount;
-        const finBoxH = 52;
+        const fc = showTax ? 4 : 3;
+        const fbw = (ccw - 8 * (fc - 1)) / fc, fbh = 48;
         
-        // Collected
-        drawRoundedRect(cardX, y, finBoxW, finBoxH, bgGreen, 6);
-        ctx.font = '9px Arial'; ctx.fillStyle = textGreen; ctx.fillText('COLLECTED', cardX + 10, y + 16);
-        ctx.font = 'bold 18px Arial'; ctx.fillText('$' + d.totalCollected.toLocaleString(), cardX + 10, y + 40);
+        rr(cx, y, fbw, fbh, C.bgGreen, 6);
+        ctx.font = '8px Arial'; ctx.fillStyle = C.green; ctx.fillText('COLLECTED', cx+10, y+14);
+        ctx.font = 'bold 16px Arial'; ctx.fillText('$'+d.totalCollected.toLocaleString(), cx+10, y+36);
         
-        // Outstanding
-        const ox = cardX + finBoxW + 10;
-        drawRoundedRect(ox, y, finBoxW, finBoxH, bgAmber, 6);
-        ctx.font = '9px Arial'; ctx.fillStyle = textAmber; ctx.fillText('REMAINING + GOV FEE', ox + 10, y + 16);
-        ctx.font = 'bold 18px Arial'; ctx.fillText('$' + (d.remaining > 0 ? d.remaining + d.govFee : 0).toLocaleString(), ox + 10, y + 40);
+        rr(cx+fbw+8, y, fbw, fbh, C.bgAmber, 6);
+        ctx.font = '8px Arial'; ctx.fillStyle = C.amber; ctx.fillText('REMAINING + GOV FEE', cx+fbw+18, y+14);
+        ctx.font = 'bold 16px Arial'; ctx.fillText('$'+(d.remaining>0?d.remaining+d.govFee:0).toLocaleString(), cx+fbw+18, y+36);
         
-        // Next due
-        const nx = cardX + (finBoxW + 10) * 2;
-        drawRoundedRect(nx, y, finBoxW, finBoxH, bgCardInner, 6);
-        ctx.font = '9px Arial'; ctx.fillStyle = textGray; ctx.fillText('NEXT DUE', nx + 10, y + 16);
-        ctx.font = 'bold 18px Arial'; ctx.fillStyle = textWhite;
-        ctx.fillText(d.status === 'active' ? d.nextDueText : 'N/A', nx + 10, y + 40);
+        rr(cx+(fbw+8)*2, y, fbw, fbh, C.inner, 6);
+        ctx.font = '8px Arial'; ctx.fillStyle = C.gray; ctx.fillText('NEXT DUE', cx+(fbw+8)*2+10, y+14);
+        ctx.font = 'bold 16px Arial'; ctx.fillStyle = C.white;
+        ctx.fillText(d.status==='active'?d.nextDueText:'N/A', cx+(fbw+8)*2+10, y+36);
         
-        // Tax box
         if (showTax) {
-            const tx = cardX + (finBoxW + 10) * 3;
-            drawRoundedRect(tx, y, finBoxW, finBoxH, bgRed, 6);
-            ctx.font = '9px Arial'; ctx.fillStyle = textRed; ctx.fillText('TAX LIABILITY (10%)', tx + 10, y + 16);
-            ctx.font = 'bold 18px Arial'; ctx.fillText('$' + d.totalTax.toLocaleString(), tx + 10, y + 40);
+            rr(cx+(fbw+8)*3, y, fbw, fbh, C.bgRed, 6);
+            ctx.font = '8px Arial'; ctx.fillStyle = C.red;
+            ctx.fillText(d.isOwner ? 'TAX (10% INCOME)' : 'TAX (10% COMMISSION)', cx+(fbw+8)*3+10, y+14);
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText('$'+(d.isOwner?d.ownerTax:d.agentTax).toLocaleString(), cx+(fbw+8)*3+10, y+36);
         }
-        y += finBoxH + 12;
+        y += fbh + 10;
         
-        // Payment table header
-        drawRoundedRect(cardX, y, cardCW, 26, bgCardInner, 6);
-        drawRect(cardX, y + 18, cardCW, 8, bgCardInner); // fill bottom corners
-        ctx.font = 'bold 10px Arial'; ctx.fillStyle = textGray;
-        ctx.fillText('PAYMENT', cardX + 12, y + 17);
-        ctx.fillText('DATE', cardX + cardCW * 0.28, y + 17);
-        ctx.fillText('AMOUNT', cardX + cardCW * 0.50, y + 17);
-        ctx.fillText('BALANCE AFTER', cardX + cardCW * 0.70, y + 17);
-        if (showTax) { ctx.fillStyle = textRed; ctx.fillText('TAX (10%)', cardX + cardCW * 0.88, y + 17); }
-        y += 28;
+        // Table header
+        rr(cx, y, ccw, 24, C.inner, 6);
+        drawRect(cx, y+16, ccw, 8, C.inner);
+        ctx.font = 'bold 9px Arial'; ctx.fillStyle = C.gray;
+        ctx.fillText('PAYMENT', cx+10, y+16); ctx.fillText('DATE', cx+ccw*0.25, y+16);
+        ctx.fillText('AMOUNT', cx+ccw*0.48, y+16); ctx.fillText('BALANCE', cx+ccw*0.66, y+16);
+        if (showTax) {
+            if (d.isOwner) { ctx.fillStyle = C.red; ctx.fillText('TAX', cx+ccw*0.85, y+16); }
+            else { ctx.fillStyle = C.cyan; ctx.fillText('COMM', cx+ccw*0.78, y+16); ctx.fillStyle = C.red; ctx.fillText('TAX', cx+ccw*0.90, y+16); }
+        }
+        y += 26;
         
-        // Payment rows
-        let runBal = d.purchasePrice - d.deposit;
-        const rowH = 26;
+        // Table rows
+        let rb = d.purchasePrice - d.deposit;
+        const rh = 26;
         
         if (d.deposit > 0) {
-            if (true) drawRect(cardX, y, cardCW, rowH, '#1a2332');
-            ctx.font = '11px Arial'; ctx.fillStyle = textGray;
-            ctx.fillText('Deposit', cardX + 12, y + 17);
-            ctx.fillStyle = d.depositPaid ? textGreen : textAmber;
-            ctx.fillText(d.depositPaid ? (c.depositPaidDate || 'Paid') : 'Pending', cardX + cardCW * 0.28, y + 17);
-            ctx.fillStyle = textWhite; ctx.font = 'bold 11px Arial';
-            ctx.fillText('$' + d.deposit.toLocaleString(), cardX + cardCW * 0.50, y + 17);
-            ctx.fillStyle = textGray; ctx.font = '11px Arial';
-            ctx.fillText('$' + runBal.toLocaleString(), cardX + cardCW * 0.70, y + 17);
-            if (showTax) { ctx.fillStyle = textRed; ctx.fillText('$' + (d.depositPaid ? Math.round(d.deposit * 0.10).toLocaleString() : '0'), cardX + cardCW * 0.88, y + 17); }
-            y += rowH;
+            drawRect(cx, y, ccw, rh, '#1a2332');
+            ctx.font = '10px Arial'; ctx.fillStyle = C.gray; ctx.fillText('Deposit', cx+10, y+17);
+            ctx.fillStyle = d.depositPaid ? C.green : C.amber;
+            ctx.fillText(d.depositPaid ? (c.depositPaidDate||'Paid') : 'Pending', cx+ccw*0.25, y+17);
+            ctx.fillStyle = C.white; ctx.font = 'bold 10px Arial';
+            ctx.fillText('$'+d.deposit.toLocaleString(), cx+ccw*0.48, y+17);
+            ctx.fillStyle = C.gray; ctx.font = '10px Arial';
+            ctx.fillText('$'+rb.toLocaleString(), cx+ccw*0.66, y+17);
+            if (showTax && d.depositPaid) {
+                if (d.isOwner) { ctx.fillStyle = C.red; ctx.fillText('$'+Math.round(d.deposit*0.10).toLocaleString(), cx+ccw*0.85, y+17); }
+                else { const cm = Math.round(d.deposit*0.10); ctx.fillStyle = C.cyan; ctx.fillText('$'+cm.toLocaleString(), cx+ccw*0.78, y+17); ctx.fillStyle = C.red; ctx.fillText('$'+Math.round(cm*0.10).toLocaleString(), cx+ccw*0.90, y+17); }
+            }
+            y += rh;
         }
         
         d.history.forEach((pay, i) => {
-            const payAmt = getPaymentAmount(pay);
-            runBal = Math.max(0, runBal - payAmt);
-            if (i % 2 === 0) drawRect(cardX, y, cardCW, rowH, '#1a2332');
-            const monthLabel = pay.monthsCovered && pay.monthsCovered > 1
-                ? 'Months ' + (pay.monthStart || (i+1)) + '-' + (pay.monthEnd || (i + pay.monthsCovered))
-                : 'Month ' + (pay.month || (i + 1));
-            ctx.font = '11px Arial'; ctx.fillStyle = textGray;
-            ctx.fillText(monthLabel, cardX + 12, y + 17);
-            ctx.fillStyle = textGreen; ctx.fillText(pay.date || pay.paidDate || 'N/A', cardX + cardCW * 0.28, y + 17);
-            ctx.fillStyle = textWhite; ctx.font = 'bold 11px Arial';
-            ctx.fillText('$' + payAmt.toLocaleString(), cardX + cardCW * 0.50, y + 17);
-            ctx.fillStyle = textGray; ctx.font = '11px Arial';
-            ctx.fillText('$' + runBal.toLocaleString(), cardX + cardCW * 0.70, y + 17);
-            if (showTax) { ctx.fillStyle = textRed; ctx.fillText('$' + Math.round(payAmt * 0.10).toLocaleString(), cardX + cardCW * 0.88, y + 17); }
-            y += rowH;
+            const pa = getPaymentAmount(pay);
+            rb = Math.max(0, rb - pa);
+            if (i%2===0) drawRect(cx, y, ccw, rh, '#1a2332');
+            const ml = pay.monthsCovered && pay.monthsCovered > 1
+                ? 'Mo ' + (pay.monthStart||(i+1)) + '-' + (pay.monthEnd||(i+pay.monthsCovered))
+                : 'Month ' + (pay.month||(i+1));
+            ctx.font = '10px Arial'; ctx.fillStyle = C.gray; ctx.fillText(ml, cx+10, y+17);
+            ctx.fillStyle = C.green; ctx.fillText(pay.date||pay.paidDate||'N/A', cx+ccw*0.25, y+17);
+            ctx.fillStyle = C.white; ctx.font = 'bold 10px Arial';
+            ctx.fillText('$'+pa.toLocaleString(), cx+ccw*0.48, y+17);
+            ctx.fillStyle = C.gray; ctx.font = '10px Arial';
+            ctx.fillText('$'+rb.toLocaleString(), cx+ccw*0.66, y+17);
+            if (showTax) {
+                if (d.isOwner) { ctx.fillStyle = C.red; ctx.fillText('$'+Math.round(pa*0.10).toLocaleString(), cx+ccw*0.85, y+17); }
+                else { const cm = Math.round(pa*0.10); ctx.fillStyle = C.cyan; ctx.fillText('$'+cm.toLocaleString(), cx+ccw*0.78, y+17); ctx.fillStyle = C.red; ctx.fillText('$'+Math.round(cm*0.10).toLocaleString(), cx+ccw*0.90, y+17); }
+            }
+            y += rh;
         });
         
         if (d.remaining > 0 && d.status === 'active') {
-            drawRect(cardX, y, cardCW, rowH, bgAmber + '33');
-            ctx.font = 'bold 11px Arial'; ctx.fillStyle = textAmber;
-            ctx.fillText('Final Payment', cardX + 12, y + 17);
-            ctx.fillText('Pending', cardX + cardCW * 0.28, y + 17);
-            ctx.fillText('$' + (d.finalPaymentBase + d.govFee).toLocaleString(), cardX + cardCW * 0.50, y + 17);
-            ctx.fillStyle = textGreen; ctx.fillText('$0', cardX + cardCW * 0.70, y + 17);
-            if (showTax) { ctx.fillStyle = textGrayLight; ctx.fillText('-', cardX + cardCW * 0.88, y + 17); }
-            y += rowH;
+            drawRect(cx, y, ccw, rh, '#78350f33');
+            ctx.font = 'bold 10px Arial'; ctx.fillStyle = C.amber;
+            ctx.fillText('Final Payment', cx+10, y+17);
+            ctx.fillText('Pending', cx+ccw*0.25, y+17);
+            ctx.fillText('$'+(d.finalPaymentBase+d.govFee).toLocaleString(), cx+ccw*0.48, y+17);
+            ctx.fillStyle = C.green; ctx.fillText('$0', cx+ccw*0.66, y+17);
+            y += rh;
         }
         
+        y += 20;
+    };
+    
+    ownerContracts.forEach((c, i) => renderContract(c, i));
+    
+    if (!singleIndex && agentContracts.length > 0 && ownerContracts.length > 0) {
+        ctx.font = 'bold 14px Arial'; ctx.fillStyle = C.cyan;
+        ctx.fillText('🏢  Agent-Managed Properties (' + agentContracts.length + ')', M, y + 14);
         y += 25;
-    });
+    }
+    
+    agentContracts.forEach((c, i) => renderContract(c, i));
     
     // Footer
     y += 5;
-    ctx.strokeStyle = brandPurple; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke();
+    ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(M,y); ctx.lineTo(W-M,y); ctx.stroke();
     y += 12;
-    ctx.font = '10px Arial'; ctx.fillStyle = textGrayLight;
-    ctx.fillText('PaulysProperties.com  |  RTO Contract Audit Report  |  Generated ' + now.toLocaleDateString(), margin, y);
+    ctx.font = '10px Arial'; ctx.fillStyle = C.grayDk;
+    ctx.fillText('PaulysProperties.com  |  RTO Contract Audit Report  |  Generated ' + now.toLocaleDateString(), M, y);
     y += 30;
     
-    // Crop
-    const croppedCanvas = document.createElement('canvas');
-    croppedCanvas.width = W;
-    croppedCanvas.height = Math.min(y, maxH);
-    const croppedCtx = croppedCanvas.getContext('2d');
-    croppedCtx.drawImage(canvas, 0, 0);
-    return croppedCanvas;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = Math.min(y, maxH);
+    out.getContext('2d').drawImage(canvas, 0, 0);
+    return out;
 }
