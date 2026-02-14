@@ -33,6 +33,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://r2.fivemanage.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS (Pre-compiled for compatibility with all browsers including FiveM/lb-phone) -->
     <link rel="stylesheet" href="css/tailwind-compiled.css">
@@ -154,59 +155,825 @@
             box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.5) !important;
         }
     </style>
+    <!-- Shutdown Overlay Styles -->
+    <style id="shutdown-styles">
+        #shutdownOverlay { position: fixed; inset: 0; z-index: 999999; background: #0a0e17; overflow-y: auto; -webkit-overflow-scrolling: touch; font-family: 'IBM Plex Sans', -apple-system, sans-serif; color: #c8cdd5; line-height: 1.7; }
+        #shutdownOverlay * { box-sizing: border-box; }
+        #shutdownOverlay .shutdown-container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+        #shutdownOverlay .shutdown-header { text-align: center; padding: 48px 0 40px; border-bottom: 1px solid #1e2a3a; margin-bottom: 40px; }
+        #shutdownOverlay .shutdown-header h1 { font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 8px; }
+        #shutdownOverlay .shutdown-header .site-name { font-family: 'IBM Plex Mono', monospace; color: #f59e0b; font-size: 14px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
+        #shutdownOverlay .shutdown-header .date { color: #64748b; font-size: 13px; }
+        #shutdownOverlay .status-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 16px; border-radius: 4px; margin-bottom: 20px; }
+        #shutdownOverlay .section { margin-bottom: 40px; }
+        #shutdownOverlay .section-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #f59e0b33; }
+        #shutdownOverlay .section-title .number { color: #f59e0b; font-family: 'IBM Plex Mono', monospace; margin-right: 8px; }
+        #shutdownOverlay p { margin-bottom: 14px; font-size: 15px; }
+        #shutdownOverlay .evidence-box { background: #111827; border-left: 3px solid #f59e0b; padding: 20px 24px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+        #shutdownOverlay .evidence-box.critical { border-left-color: #dc2626; background: #1a0a0a; }
+        #shutdownOverlay .evidence-box.approval { border-left-color: #22c55e; background: #0a1a0f; }
+        #shutdownOverlay .evidence-box .label { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px; }
+        #shutdownOverlay .evidence-box .label.amber { color: #f59e0b; }
+        #shutdownOverlay .evidence-box .label.red { color: #ef4444; }
+        #shutdownOverlay .evidence-box .label.green { color: #22c55e; }
+        #shutdownOverlay .evidence-box p { margin-bottom: 8px; font-size: 14px; }
+        #shutdownOverlay .evidence-box p:last-child { margin-bottom: 0; }
+        #shutdownOverlay .pricing-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+        #shutdownOverlay .pricing-table th { text-align: left; color: #f59e0b; font-weight: 600; padding: 10px 16px; border-bottom: 2px solid #f59e0b33; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+        #shutdownOverlay .pricing-table td { padding: 10px 16px; border-bottom: 1px solid #1e2a3a; color: #c8cdd5; }
+        #shutdownOverlay .pricing-table tr:last-child td { border-bottom: none; }
+        #shutdownOverlay .pricing-table .highlight { color: #22c55e; font-weight: 600; }
+        #shutdownOverlay .annotation { background: #f59e0b11; border: 1px solid #f59e0b33; border-radius: 8px; padding: 16px 20px; margin: 16px 0; font-size: 14px; }
+        #shutdownOverlay .annotation.critical-annotation { background: #dc262611; border-color: #dc262644; }
+        #shutdownOverlay .annotation.key-annotation { background: #3b82f611; border-color: #3b82f633; }
+        #shutdownOverlay .annotation .tag { font-size: 11px; font-weight: 700; color: #f59e0b; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+        #shutdownOverlay .annotation.critical-annotation .tag { color: #ef4444; }
+        #shutdownOverlay .annotation.key-annotation .tag { color: #60a5fa; }
+        #shutdownOverlay .annotation p { color: #e2e8f0; font-size: 14px; margin-bottom: 0; }
+        #shutdownOverlay .transcript-section { background: #111827; border: 1px solid #1e2a3a; border-radius: 12px; overflow: hidden; margin: 24px 0; }
+        #shutdownOverlay .transcript-header { background: #1e293b; padding: 16px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #1e2a3a; flex-wrap: wrap; }
+        #shutdownOverlay .transcript-header h3 { font-size: 15px; font-weight: 600; color: #ffffff; }
+        #shutdownOverlay .transcript-header .badge { font-size: 11px; background: #dc262633; color: #ef4444; padding: 3px 10px; border-radius: 4px; font-weight: 600; }
+        #shutdownOverlay .transcript-body { padding: 24px; }
+        #shutdownOverlay .msg { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #1e2a3a22; }
+        #shutdownOverlay .msg:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        #shutdownOverlay .msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+        #shutdownOverlay .msg-author { font-weight: 600; font-size: 14px; }
+        #shutdownOverlay .msg-author.staff { color: #ef4444; }
+        #shutdownOverlay .msg-author.user { color: #22c55e; }
+        #shutdownOverlay .msg-author.bot { color: #64748b; }
+        #shutdownOverlay .msg-author.other-staff { color: #a78bfa; }
+        #shutdownOverlay .msg-role { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; }
+        #shutdownOverlay .msg-role.staff-role { background: #dc262622; color: #f87171; }
+        #shutdownOverlay .msg-role.user-role { background: #22c55e22; color: #4ade80; }
+        #shutdownOverlay .msg-role.other-staff-role { background: #7c3aed22; color: #a78bfa; }
+        #shutdownOverlay .msg-time { font-size: 12px; color: #475569; font-family: 'IBM Plex Mono', monospace; }
+        #shutdownOverlay .msg-content { font-size: 14px; color: #cbd5e1; line-height: 1.65; padding-left: 2px; }
+        #shutdownOverlay .msg-content p { margin-bottom: 8px; font-size: 14px; }
+        #shutdownOverlay .msg-content p:last-child { margin-bottom: 0; }
+        #shutdownOverlay .msg-attachment { display: inline-block; background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-size: 12px; color: #64748b; margin-top: 8px; margin-right: 6px; font-family: 'IBM Plex Mono', monospace; }
+        #shutdownOverlay .johnny-quote { background: #1e293b; border-left: 2px solid #475569; padding: 8px 14px; margin: 8px 0; font-size: 13px; color: #94a3b8; font-style: italic; }
+        #shutdownOverlay .divider { height: 1px; background: linear-gradient(to right, transparent, #1e2a3a, transparent); margin: 48px 0; }
+        #shutdownOverlay .ticket-closed-banner { background: #dc262622; border: 1px solid #dc262644; border-radius: 8px; padding: 20px 24px; text-align: center; margin: 24px 0; }
+        #shutdownOverlay .ticket-closed-banner .closed-icon { font-size: 32px; margin-bottom: 8px; }
+        #shutdownOverlay .ticket-closed-banner .closed-text { color: #ef4444; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+        #shutdownOverlay .ticket-closed-banner .closed-subtext { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+        #shutdownOverlay .time-gap { text-align: center; padding: 12px 0; color: #475569; font-size: 12px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.5px; }
+        #shutdownOverlay .final-statement { background: linear-gradient(135deg, #111827, #0f172a); border: 1px solid #1e2a3a; border-radius: 12px; padding: 32px; text-align: center; }
+        #shutdownOverlay .final-statement h3 { color: #ffffff; font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+        #shutdownOverlay .final-statement p { color: #94a3b8; font-size: 15px; max-width: 640px; margin: 0 auto 12px; }
+        #shutdownOverlay .signature { margin-top: 24px; color: #f59e0b; font-weight: 600; font-size: 16px; }
+        @media (max-width: 640px) {
+            #shutdownOverlay .shutdown-container { padding: 24px 16px 60px; }
+            #shutdownOverlay .shutdown-header h1 { font-size: 22px; }
+            #shutdownOverlay .shutdown-header { padding: 32px 0 28px; }
+            #shutdownOverlay .evidence-box { padding: 16px; }
+            #shutdownOverlay .transcript-body { padding: 16px; }
+            #shutdownOverlay .pricing-table { font-size: 13px; }
+            #shutdownOverlay .pricing-table td, #shutdownOverlay .pricing-table th { padding: 8px 10px; }
+            #shutdownOverlay .msg-header { gap: 6px; }
+        }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-gray-800 min-h-screen text-gray-100">
     <!-- Disclaimer Modal - blocks access until accepted -->
-    <div id="disclaimerModal" class="fixed inset-0 bg-black flex items-center justify-center hidden" role="dialog" aria-modal="true" style="z-index: 99999;">
-        <div class="bg-gray-900 rounded-2xl max-w-lg w-full mx-4 border-2 border-amber-500/50 shadow-2xl overflow-hidden">
-            <div class="bg-gradient-to-r from-amber-600 to-yellow-600 px-6 py-4">
-                <h2 class="text-xl font-black text-gray-900 flex items-center gap-3">
-                    <span class="text-2xl">⚠️</span>
-                    IMPORTANT DISCLAIMER
-                </h2>
+
+    <!-- Shutdown Overlay -->
+<div id="shutdownOverlay">
+    <div class="shutdown-container">
+
+        <div class="shutdown-header">
+            <div class="site-name">PaulysProperties.com</div>
+            <span class="status-badge">Service Discontinued</span>
+            <h1>A Statement to Our Users &amp; Community</h1>
+            <div class="date">Published February 14, 2026</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="number">01</span> What Happened</div>
+            <p>If you're here, you probably already heard the rumors. Let me confirm them. I've been permanently banned from PMA and PaulysProperties.com has been shut down.</p>
+            <p>What you're about to read is the full, unfiltered truth behind what happened. I'm going to show you every ticket, every conversation, every approval, and every accusation so you can see for yourself how PMA leadership operates when they feel threatened by something they can't control. No spin, no filter. Just the actual messages, the actual timelines, and the actual facts.</p>
+            <p>By the end of this you will have zero doubt about what really happened here, who was operating in good faith, and who wasn't.</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="number">02</span> This Website Was Approved</div>
+            <p>PaulysProperties.com was not created in secret. I brought it directly to PMA staff for review through an official ticket. Johnny was part of this process from the start. He looked at the site, said the formatting was correct, and sent it up to Putts, one of the server owners and Community Manager, for final approval. Putts reviewed everything and gave me a clear list of conditions to meet:</p>
+            <div class="evidence-box approval">
+                <div class="label green">Conditions Given by PMA Staff (Putts)</div>
+                <p>✓ Make it clear the site is player-run, not city-run</p>
+                <p>✓ Only city cash accepted, no real money</p>
+                <p>✓ All communication must remain in-city</p>
+                <p>✓ No Discord or email links on the site</p>
+                <p>✓ Full compliance with Tebex and Rockstar terms</p>
             </div>
-            <div class="p-6">
-                <p class="text-white font-semibold mb-4">
-                    PaulysProperties.com is a <span class="text-amber-400">player-run</span> property rental marketplace created and fully managed by <span class="text-amber-400">Pauly Amato</span>.
-                </p>
-                
-                <div class="bg-red-900/30 border border-red-500/50 rounded-xl p-4 mb-4">
-                    <p class="text-red-300 font-bold text-sm">
-                        This service is NOT endorsed by, affiliated with, or officially associated with PMA or any server administration.
-                    </p>
+            <p>I implemented every single one of those conditions. The disclaimer on this very site (which you all saw every time you visited) stated clearly that this was a player-run service, not affiliated with PMA, using in-game currency only. I did everything they asked. The full approval ticket is in Section 03 below so you can see the entire conversation for yourself.</p>
+        </div>
+
+        <!-- SECTION 03: THE APPROVAL TICKET -->
+        <div class="section">
+            <div class="section-title"><span class="number">03</span> The Approval Ticket, In Their Own Words</div>
+            <p>This is the full ticket where I submitted both PaulysProperties.com and PaulysAutos.com for review. Putts, who is one of the actual server owners (tagged as Community Manager in the conversation below), reviewed both sites and gave his conditions. The property site was approved. The auto site was not, and I respected that. Johnny was involved from the start. Look at what was said and how it ended.</p>
+
+            <div class="transcript-section">
+                <div class="transcript-header">
+                    <h3>General Inquiry Ticket #35433 // Site Approval</h3>
+                    <span class="badge">CLOSED BY JOHNNY</span>
                 </div>
-                
-                <p class="text-gray-300 mb-4">By using this site, you acknowledge and agree:</p>
-                
-                <ul class="text-gray-300 text-sm space-y-2 mb-6">
-                    <li class="flex items-start gap-2">
-                        <span class="text-amber-400">•</span>
-                        <span>All transactions use <strong class="text-amber-400">in-game currency only</strong> — no real money</span>
-                    </li>
-                    <li class="flex items-start gap-2">
-                        <span class="text-amber-400">•</span>
-                        <span>All communication must occur <strong class="text-amber-400">in-game</strong></span>
-                    </li>
-                    <li class="flex items-start gap-2">
-                        <span class="text-amber-400">•</span>
-                        <span>This is a <strong class="text-amber-400">roleplay (RP) service</strong> subject to server rules</span>
-                    </li>
-                    <li class="flex items-start gap-2">
-                        <span class="text-amber-400">•</span>
-                        <span>PaulysProperties.com is <strong class="text-red-400">not responsible</strong> for any disputes</span>
-                    </li>
-                    <li class="flex items-start gap-2">
-                        <span class="text-amber-400">•</span>
-                        <span>Property listings and transactions are <strong class="text-amber-400">between players only</strong></span>
-                    </li>
-                </ul>
-                
-                <button onclick="acceptDisclaimer()" class="w-full bg-gradient-to-r from-amber-500 to-yellow-500 text-gray-900 py-4 px-6 rounded-xl font-black text-lg hover:opacity-90 transition shadow-lg">
-                    I Understand & Accept
-                </button>
+                <div class="transcript-body">
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Jan 19, 2026 — 8:33 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>i added code to detect lb-phone browser and it renders nicely there -- want to see how it looks on tablet</p>
+                            <div class="msg-attachment">📎 image.png (site screenshots)</div>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">socal_native_</span>
+                            <span class="msg-role other-staff-role">PMA Staff</span>
+                            <span class="msg-time">Jan 19, 2026 — 12:24 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Will get this over to Johnny to take a look for you</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Jan 19, 2026 — 10:15 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>these are formated correctly just need to get the Community Manager to approve them being added.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation key-annotation">
+                        <div class="tag">📋 Note</div>
+                        <p>Johnny looked at the site, said it was formatted correctly, and sent it to the Community Manager for approval. This is the same guy who 3 weeks later would call it a "scheme" and a "structured plan to misreport prices." He saw the site. He reviewed it. He approved it.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Jan 20, 2026 — 12:24 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Appreciate it — lmk if there's any questions or anything. I've made sure to make disclaimers and keep all communications in city, etc.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">Putts</span>
+                            <span class="msg-role other-staff-role">Server Owner / CM</span>
+                            <span class="msg-time">Jan 22, 2026 — 8:04 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>I got no issue with the property one. The vehicle one though can not be approved, why you might ask? Our limit on Lux is really the true limit for the Eco we are willing to see cars go for at all. Thats why we set it. Have we chose to ignore the "rare car market" for now? Yes. But what I will tell you is if there were a page advertising "rare cars" we would just use it for what should be re added to the next release if its sought after. Then it would destroy the credibility of whatever page, never mind the fact the page would undermine our current limit on lux further then we already ignore happening.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation">
+                        <div class="tag">📌 Note</div>
+                        <p>Read that again. Putts, one of the actual server owners, is openly saying they know players are selling cars above the Lux cap and they've chosen not to get involved. Player-to-player deals above the official limits are happening, they know about it, and they let it happen. That is the exact same thing I was doing with property agreements. The only difference is I documented mine.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">Putts</span>
+                            <span class="msg-role other-staff-role">Server Owner / CM</span>
+                            <span class="msg-time">Jan 22, 2026 — 8:05 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>For the property page it needs to be clear on it that its player ran and RP subject. Also that only city cash can be accepted and messages within the city.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">Putts</span>
+                            <span class="msg-role other-staff-role">Server Owner / CM</span>
+                            <span class="msg-time">Jan 22, 2026 — 8:06 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>This can not have links to discords and emails as it would violate sales terms for tebex if it spread out of RP at all.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">Putts</span>
+                            <span class="msg-role other-staff-role">Server Owner / CM</span>
+                            <span class="msg-time">Jan 22, 2026 — 8:07 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>If it violates any of the above it would need removed on sight as we will always 100 percent comply with tebex and rockstar terms without question.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">Putts</span>
+                            <span class="msg-role other-staff-role">Server Owner / CM</span>
+                            <span class="msg-time">Jan 22, 2026 — 8:07 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Terms like "the citys" need removed it needs to be clear its player ran not city ran.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Jan 22, 2026 — 8:58 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>thank you putts, understood.</p>
+                            <p>for the properties page i need to work on that last part -- "remove term like the city's and make it more obvious that its player ran." ---- ill be sure to work with johnny to make sure ALL the requirements have been met.</p>
+                            <p>am i still able to direct players to paulysautos.com on their in city lb-phone browser if they just want to see MY cars for sale? even if i have to lower prices a bit? (i don't want to go against anything the city is trying to accomplish obviously, I'm always on board to help support whatever's best for PMA)</p>
+                            <p>I've got over 100 and I'd like to have a place where i could showcase them -- lux app is quite limited and leaves a lot to be desired</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">Putts</span>
+                            <span class="msg-role other-staff-role">Server Owner / CM</span>
+                            <span class="msg-time">Jan 24, 2026 — 7:35 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>We just cant reference or support it in anyway that's all as a server.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation">
+                        <div class="tag">📌 Note</div>
+                        <p>Putts is saying the same thing here that he said about the car market. The server won't officially back it, but they're not telling me I can't do it. "We can't support it" and "you can't do it" are two completely different things. I understood that distinction and respected it. Then months later it got twisted into something it never was.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Jan 24, 2026 — 8:05 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>ok -- tyvm putts appreciate your time bro</p>
+                            <p>johnny ill work on this over the next day or two and ping u when i think all the requirements have been satisfied</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Jan 31, 2026 — 8:11 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>hey Johnny i've made the changes and am ready to review the site with you -- whenever your free just ping me ill do what i can to work around your schedule. appreciate all your help man</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Jan 31, 2026 — 8:16 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Ill take a look tomorrow when im back from visitin the kids</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Jan 31, 2026 — 8:24 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>No rush man — enjoy your family time ✌️</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation key-annotation">
+                        <div class="tag">📋 Note</div>
+                        <p>Look at the tone of this whole exchange. I'm working with Johnny, respecting his time, making changes, checking in when they're done. He's responsive and engaged. This is 9 days before the ban. Does this look like someone running a "scheme"? Or does it look like a player working with staff to get everything right?</p>
+                    </div>
+
+                    <div class="time-gap">Feb 09, 2026 — The day of the ban</div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Feb 09, 2026 — 9:21 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>how was this guy <strong style="color:#60a5fa">dukespropertyhub.com</strong> approved?</p>
+                            <p>there's no disclaimer that its player ran, he's using acronyms like GTA in his descriptions breaking immersion, he's even asking for real money donations on the website</p>
+                            <p>half the shit on here doesn't even work (map feature shows properties in the middle of the water, cant scroll down when viewing any property details, you cant delete houses after they are posted -- he has houses on there listed that i literally have open contracts on with renters in them)</p>
+                            <p>no site updates in over a month -- says its free but then says u can promote your property to the top of the list for 24hrs -- idk this feels really sloppy -- I'm surprised this one got through</p>
+                            <div class="msg-attachment">📎 4 screenshots of dukespropertyhub.com violations</div>
+                        </div>
+                    </div>
+
+                    <div class="ticket-closed-banner">
+                        <div class="closed-icon">🔒</div>
+                        <div class="closed-text">Ticket Closed by Johnny // Feb 09, 2026 at 10:40 AM</div>
+                        <div class="closed-subtext">Closed the moment I asked about a competing site not being held to the same standard. Zero response.</div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Ticket Creator</span>
+                            <span class="msg-time">Feb 09, 2026 — 10:42 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>???</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Critical</div>
+                        <p>I raised a legitimate question. <strong>dukespropertyhub.com</strong> had no player-run disclaimer, used "GTA" in descriptions breaking immersion, was asking for real money donations on the site, and had broken features with listings for properties I had active contracts on. It violated every single condition that was set for my site. Johnny's response? He closed the ticket without saying a word. This was February 9, 2026. The same day I was banned. Draw your own conclusions.</p>
+                    </div>
+
+                </div>
             </div>
         </div>
+
+        <!-- SECTION 04: THE PRICING -->
+        <div class="section">
+            <div class="section-title"><span class="number">04</span> PMA Provided the Pricing Structure</div>
+            <p>I didn't make these numbers up. The property pricing used on this platform was given to me directly by PMA administration through an official support ticket. These are the government minimum prices they gave me:</p>
+            <div class="evidence-box approval">
+                <div class="label green">Official PMA Pricing, Provided via Ticket</div>
+                <table class="pricing-table">
+                    <thead><tr><th>Property Type</th><th>Price</th></tr></thead>
+                    <tbody>
+                        <tr><td>Apartments (600 Storage)</td><td>$700,000</td></tr>
+                        <tr><td>Hotel (800 Storage)</td><td>$750,000</td></tr>
+                        <tr><td>Instance House (800-900 Storage)</td><td>$800,000</td></tr>
+                        <tr><td>Hotel (1050 Storage)</td><td>$900,000</td></tr>
+                        <tr><td>Instance House (1000+)</td><td>$1,200,000</td></tr>
+                        <tr><td class="highlight">Walk-In House</td><td class="highlight">$1,500,000 minimum</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>Look at that last row. The word <strong style="color: #22c55e;">minimum</strong> is right there. PMA gave me floor prices, not fixed prices. So when properties were listed at or above these minimums, how does that become price manipulation? You can't hand someone a minimum and then ban them for pricing at or above it.</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="number">05</span> The Accusations Don't Hold Up</div>
+
+            <div class="evidence-box critical">
+                <div class="label red">Their Claim</div>
+                <p>"Rent-to-own is not allowed and anyone who asked has been told no."</p>
+            </div>
+            <div class="evidence-box">
+                <div class="label amber">The Reality</div>
+                <p>There is no written rule anywhere in the server rules that prohibits player-to-player rent-to-own agreements. Players across the server have been doing this informally for a long time. Collecting rent, then eventually selling at the government minimum once enough has been collected. I didn't invent that concept.</p>
+                <p>I actually opened a ticket and specifically asked about rent-to-own. Staff told me they couldn't facilitate or endorse RTO themselves, but I could collect payments on my own as long as ownership transfers never went below the minimums shown in Section 04. It had to be player-run, player-negotiated, and kept in RP. The government couldn't endorse it, couldn't guarantee anything, and wouldn't get involved in player-to-player deals.</p>
+                <p>Putts later reinforced this exact same position in the site approval ticket (Section 03) when he said "We just cant reference or support it in anyway that's all as a server." Two different tickets, same message both times. The server doesn't get involved in player-to-player business. That's not a prohibition, that's a boundary.</p>
+                <p>That is exactly what I did. I followed the guidance I was given, built a system around it with full documentation, and operated within those boundaries. That guidance was never corrected, never revised, and never followed up on until it became the basis for a permanent ban.</p>
+            </div>
+
+            <div class="evidence-box critical">
+                <div class="label red">Their Claim</div>
+                <p>"This is money laundering" and "defrauding the economy."</p>
+            </div>
+            <div class="evidence-box">
+                <div class="label amber">The Reality</div>
+                <p>Laundering means hiding money. I did the opposite of that. Every transaction was documented on a public website, backed by signed contracts, tracked with text message records, and voluntarily submitted to staff through tickets. I was the one bringing every transfer to staff's attention with full documentation attached. That's not what someone trying to hide money looks like.</p>
+            </div>
+
+            <div class="evidence-box critical">
+                <div class="label red">Their Claim</div>
+                <p>"Walk-in properties don't have set minimums."</p>
+            </div>
+            <div class="evidence-box">
+                <div class="label amber">The Reality</div>
+                <p>Go back to Section 04. PMA gave me a pricing list through a ticket that says Walk-In Houses have a <strong style="color:#22c55e">$1,500,000 minimum</strong>. Johnny says the opposite in the ban appeal below. So either staff gave me wrong information or Johnny doesn't know what his own team told me. Either way, I used the pricing they gave me.</p>
+            </div>
+
+            <div class="evidence-box critical">
+                <div class="label red">Their Claim</div>
+                <p>"The City has a system to cap Car Sales at 700k .. There SHOULDN'T be Cars sold for more than 700k."</p>
+            </div>
+            <div class="evidence-box">
+                <div class="label amber">The Reality</div>
+                <p>First of all, the actual Lux app cap is <strong style="color:#22c55e">$750,000</strong>, not $700,000. Johnny doesn't even know the correct limit on his own server. But more importantly, Putts said in the approval ticket that they've "chose to ignore the rare car market for now." That means player-to-player transactions above the official cap are happening, they know about it, and they choose not to get involved. That is the exact same thing I was doing with properties. Player-to-player agreements outside the official system. But when I put documentation and transparency behind it, suddenly that same concept became a "scheme."</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title"><span class="number">06</span> The Full Ticket Conversation</div>
+            <p>Below is the complete, unedited ban appeal ticket between me and PMA administration. Read the whole thing. Not once does anyone on staff ask a single clarifying question. No "how does this work?" No "can you show us the contracts?" Zero effort to understand the system before passing judgment.</p>
+            <p>I've added notes at key moments to call out what I think the conversation really shows.</p>
+
+            <div class="transcript-section">
+                <div class="transcript-header">
+                    <h3>Ban Appeal Ticket #29351, Full Transcript</h3>
+                    <span class="badge">CLOSED WITHOUT RESOLUTION</span>
+                </div>
+                <div class="transcript-body">
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author bot">Ticket Tool</span>
+                            <span class="msg-time">Feb 09, 2026, 9:33 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Welcome to Ban Appeals. Please make sure to attach a screenshot of your ban reason.</p>
+                            <p style="color:#64748b; font-size:13px;">Cfx.re Account: GIANTPIFF · Character: Pauly Amato · Ban ID: BLG6-LMZQ</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 09, 2026, 9:33 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>following up on whatever this is regarding</p>
+                            <div class="msg-attachment">📎 image.png (ban screenshot)</div>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 09, 2026, 9:35 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>ive been putting receipts in text messages accounting for every dollar moved in &amp; out of pauly's bank</p>
+                            <p>&amp; if its anything regarding paulysproperties.com, in addition to the text receipts mentioned above i also have a backup payment ledger on there for every payment that has ever come in or gone out regarding properties (just in case something like this were to happen) -- won't be an issue for me to explain any money movements</p>
+                            <p>Please let me know what the concern is -- really don't want to miss out on this event on Friday I've been planning for months 😯</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation">
+                        <div class="tag">📌 Note: Transparency from the Start</div>
+                        <p>Nobody has even told me what the issue is yet and I'm already saying I have full documentation. Text receipts, a payment ledger on the website, ready to walk through anything. That's not how someone with something to hide responds.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author other-staff">socal_native_</span>
+                            <span class="msg-role other-staff-role">PMA Staff</span>
+                            <span class="msg-time">Feb 09, 2026, 10:54 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Will be for Johnny, please be patient he will be with you as soon as he is available</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Feb 09, 2026, 11:02 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>You are using Pauly Properties as some Scheme to make Money and help people evade paying taxes on properties.</p>
+                            <p>Property was Sold for 6ish Million but you took a partial payment of 4.85 Mil .. You Kept 485K and you sent the 4.3 Million to the property Seller.. and then you Made the ticket and claimed to Us that the property is only being sold for 1.5 Mil and a fee of 150k.</p>
+                            <p style="background:#1e293b; padding:10px 14px; border-radius:6px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#94a3b8; margin:8px 0;">Deposit Collected: $4,850,000 · Agent (10%): -$485,000 · Net to Owner: $4,365,000 · Balance: $1,650,000<br><br>Example 1:<br>Assisting the following two paulysproperties.com clients with a property sale.<br>Black Market · Seller: Brandon Banks · Buyer: Jack Lawrence<br>Price: $1,500,000 · Fee: $150,000</p>
+                            <p>You have a second ticket open doing the same thing at a smaller scale and from a quick double check another 8 to 10 pending (Rent to Own) Scams going.</p>
+                            <p>How could you think this would even be close to being permitted?</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Critical: This Is the Very First Response</div>
+                        <p>This is the very first message from staff. No questions. Not "can you explain how this works?" Not "walk me through the system." The first thing out of his mouth is "You are using Pauly Properties as some Scheme." He already decided what happened before he asked a single thing. This was never an inquiry. It was a sentencing.</p>
+                    </div>
+
+                    <div class="time-gap">~8 hours later, Pauly writes a detailed response</div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 09, 2026, 7:14 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Hey Johnny,</p>
+                            <p>Thanks for getting back to me and explaining the concern. I can see how this might look questionable at first glance but I need to clarify what's actually happening here because this isn't tax evasion or any kind of scheme.</p>
+                            <p>PaulysProperties.com is a free service for buyers (no account creation needed) and free for property owners who can list up to 3 properties simultaneously at any given time. In addition to the standard listings, I offer managed services where players contractually agree to let me act as their real estate agent. I handle everything from taking photos, creating listings, writing descriptions, doing constant in city advertising and running showings until we land on some kind of agreement (countless hours of RP). Once a deal is reached, the service offers three options: standard rent, rent to own, and single transaction sales. Both examples you mentioned are managed properties where I'm collecting a 10% agent fee for the work I'm doing.</p>
+                            <p>Looking at what you've outlined, the concern appears to be with the rent to own agreements specifically. I'm attaching the full player contracts for both examples you mentioned so you can see exactly what was agreed to.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 09, 2026, 7:14 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p><strong>Example #1, Black Market Property:</strong></p>
+                            <p>Total purchase price: $6,500,000 · Down payment: $4,850,000 (this is essentially advanced rent, ownership has NOT transferred yet) · My 10% agent commission: $485,000 (taken from the owner's portion) · Net to property owner: $4,365,000 · Remaining balance: $1,650,000 (due on 3/1/2026) · Final payment breakdown: $1,500,000 base + $150,000 government transfer fee</p>
+                            <p>The ticket I submitted reflected the final payment of $1,500,000 because that's when ownership actually transfers and that's when the government gets their 10% transfer fee ($150,000). The $4.85M down payment isn't a sale, it's a rental payment. The buyer doesn't own the property yet.</p>
+                            <p><strong>Example #2, Eclipse Towers:</strong></p>
+                            <p>Total purchase price: $1,250,000 · Down payment: $0 · Monthly payments: $275,000 x2 months · Final payment: $700,000 base + $70,000 government transfer fee · Same structure, government gets their cut when ownership transfers</p>
+                            <p>I realize now that I should have been more explicit in the tickets that these were part of rent to own agreements rather than just listing the final payment amounts. I can see how that looked concerning without the full context and I take responsibility for that lack of clarity.</p>
+                            <p>The way I've understood it, this follows the same structure that's been used across the server for rentals and car payment plans. The government transfer fee gets paid when ownership actually changes hands, not on rental income or deposits. People collect rent for months and eventually offer to sell properties for the government minimum once enough has been collected that both parties agree on. That's what I'm doing here, just with formalized contracts and full documentation.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 09, 2026, 7:15 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Not every player has millions sitting around to buy properties in a single transaction. There's massive demand for rent to own and I'm in a unique position (I'm in city constantly) where I can facilitate these agreements. Players get to move in and enjoy the RP immediately instead of grinding for months to save up. Like I tell everyone, if you really love this house and want to enjoy it I'll find a way to make it work. That's the whole point, creating the best possible RP experience.</p>
+                            <p>In both of these examples I've spent countless hours acting as their real estate agent through the website for a 10% fee. Taking pictures, marketing, actively selling their properties. That's legitimate work that adds value to the server.</p>
+                            <p>I've never been banned in the 2 years I've been here. I own hundreds of millions of dollars in assets including Pauly's restaurant which I've been successfully running for over a year and a half now. I'm literally the guy that opens tickets to report himself when I learn something I did might have crossed into a potential rule break. I've always been honest and transparent with everyone in and out of RP and I have all the documentation to back that up.</p>
+                            <p>PaulysProperties.com is only about 2 and a half months old at this point. Having a player run their own real estate website and formalize deals this way is a bit of uncharted territory for everyone. I'm opening tickets to help facilitate these transactions and make everything as transparent as possible for staff, which is why I include templates and all the documentation upfront. I'm genuinely trying to help and make things easier for everyone involved, not create some scheme to avoid taxes. I would never jeopardize everything I've built here over something like that.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 09, 2026, 7:15 PM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>You're welcome to reach out to the players in those two example tickets and ask them directly about their experience. Neither one had enough for a single transaction purchase at the time so I offered them a way to move in and enjoy the RP the day the contract was signed. The government gets their 10% when ownership transfers as shown in the contracts, and every payment is documented in text messages and in my backup ledger on the website.</p>
+                            <p>If there's something I should be doing differently with how I submit tickets for rent to own agreements I'm happy to adjust moving forward. I've got complete documentation for everything and I'm happy to walk through any transaction in detail.</p>
+                            <p>Please let me know what else you need from me or if there's anything I can clarify further.</p>
+                            <p>Thanks for taking the time to look into this.</p>
+                            <p>Pauly</p>
+                            <div class="msg-attachment">📎 Jack_Lawrence_-_Black_Market.png (contract)</div>
+                            <div class="msg-attachment">📎 Maverick_Silvertongue_-_Eclipse_Towers_Apt_108.png (contract)</div>
+                        </div>
+                    </div>
+
+                    <div class="annotation key-annotation">
+                        <div class="tag">📋 Note: Complete Cooperation</div>
+                        <p>I gave detailed breakdowns of both transactions he cited, attached the full signed contracts, offered to let staff talk to the buyers directly, admitted what I could've done better with ticket clarity, and said I'd adjust the process going forward. Full audit, voluntarily. Look at the effort I put into this response and compare it to what comes next.</p>
+                    </div>
+
+                    <div class="time-gap">~5 hours later, Johnny responds after midnight</div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Feb 10, 2026, 12:30 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>If someone wants to rent a property out for 50k, 100k whatever a week or month we aren't going to mess around with trying to collect 10% of all rentals.</p>
+                            <p>However Rent to Own Isnt a Thing. Its Never Been a Thing. I dont know why you thought you could start and run a system without making a ticket and asking if it was possible or allowed.</p>
+                            <p>That is like If I started a new business in real life and didnt check to make sure it was legal, or how it would effect the amount of taxes that I need to pay. You cant break the law, avoid paying Gov Fee, basically stealing the money from the Gov. What do you mean I cant have a business plan that is illegal and avoids paying taxes.. oh nooos.</p>
+                            <p>Which in this example you provide A Property Transfer for 6.5 Mil means the Gov. Tax is 650k. and you negotiate some scheme where 80% of the deal is done under the table and that 485k goes to you instead of to the realtor to be removed from the economy.</p>
+                            <p>Selling that property for $1.5 Mil would not get approved as it is drastically too low and looks like an eco dump. Then when we say.. this is not approved they are going to say well I already paid like $5 Mil thru Pauly and then boom where is that tax on that.</p>
+                            <p>This is why All Transactions are done in a single payment from the Buyer to the Seller with a Staff Member Present and a 10% Tax is added to the sales price which is in turn deleted to remove it from the economy.</p>
+                            <p>It doesnt matter if people dont have the funds to pay 6 Mil all at one time they can save up to make the purchase.</p>
+                            <p>Why we Don't allow Rent To Own and never have .. because What Happens when someone is on Payment 12 of 20 and the owner of the house has to DNR or gets Banned and the house gets Repo'd.</p>
+                            <p>Then the house is mine, and someone has paid you 5 of 10 mil .. and they are now out 5 Mil, and they make a ticket saying but I was paying Pauly for that house.. and they have to just be shit out of luck because you sent 90% of it to the owner and it gets deleted when he Dies or is banned. and I put the house up for Auction and that person is just SOL.</p>
+                            <p>Or the person paying into it is 10 payments in and they get banned.. then they get evicted and you just keep all the money.</p>
+                            <p>This should have all be Crystal Clear when you were told your Car System wouldnt be advertised because the City has a system to cap Car Sales at 700k .. There SHOULDNT be Cars sold for more than 700k .. The city doesnt get involved in any deals outside of the Lux App.</p>
+                            <p>So Now I have to waste more of my Time auditing you and figuring out where all this money has gone.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Critical: "Rent to Own Isn't a Thing" But There's No Rule Against It</div>
+                        <p>Johnny says "Rent to Own Isnt a Thing. Its Never Been a Thing." But there's no written rule against it. Players have been doing informal versions of this for years. When I brought the website to staff I was given conditions for approval and not one of them mentioned RTO being off limits. I also opened a separate ticket and specifically asked about RTO and was given guidance on how to handle it. If this was "never a thing," why wasn't it flagged during approval? Why was I given instructions on how to do it? And look at the tone here: "oh nooos," mocking someone who's trying to cooperate. That's not someone interested in finding a resolution.</p>
+                    </div>
+
+                    <div class="annotation">
+                        <div class="tag">📌 Note: "I have to waste more of my Time"</div>
+                        <p>I handed him a complete audit trail, detailed breakdowns, contracts, offered to walk through anything he needed. And his takeaway is that he has to "waste more of my Time." The documentation I built to make staff's job easier is being treated like an inconvenience instead of what it actually is: proof that I had nothing to hide.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 10, 2026, 3:42 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Hey Johnny,</p>
+                            <p>I understand the concern about DNRs and bans mid-contract creating headaches for staff. I want to be clear where I was coming from. I did create tickets about legal minimums, but I thought the player to player ran RTO approach itself was already okay based on what I see happen consistently across the server. People collect rent informally then eventually sell at legal mins. I genuinely thought I was taking something that already happens and making it cleaner, more transparent, and properly documented so it could work at scale without any gray areas.</p>
+                            <p>I get now that it's not allowed and I want to help sort it out. Every transaction is documented in texts and the website ledger. I can pull together a breakdown of every contract showing total price, payments made, and remaining balance so we can figure out the best path forward. Refunds, completing as single purchases with tax, whatever makes it easiest for the team.</p>
+                            <p>I apologize for creating this situation. I thought I was solving a real RP problem the right way. Whatever you decide is best for the server, I'm PMA first and will support it. Just let me know what you need.</p>
+                            <p>Pauly</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation key-annotation">
+                        <div class="tag">📋 Note: Full Accountability, Offered Solutions</div>
+                        <p>Even though I believed I did nothing wrong, I accepted the ruling, apologized, and offered real solutions. Refunds, completing transactions as single purchases with proper tax, whatever they wanted. I told him "I'm PMA first and will support it." That's someone trying to make things right. This offer was completely ignored.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Feb 10, 2026, 5:35 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Any person that has asked about Rent to Own has been told No.</p>
+                            <p>Every transaction that comes thru for a property sale is reviewed and anything that would have looked like Rent to Own to the level of this 6 Mil property being sold for 1.5 Mil would have been caught because Walk in Properties dont have "set minimums" so Selling a Walk in like this Black Market Map for 1.5 Mil would have been investigated and denied, and if the Seller came forward and admitted and paid back the taxes due it would be a CM call to allow it, deny it and if a ban would happen.</p>
+                            <p>The big ISSUE here is.. this isnt a One Off.. its not that You Sold your own property like this and tried to Save some money on the Gov Tax.</p>
+                            <p>You have dozens of text messages from you collecting and exchanging money and taking fees.</p>
+                            <p>You are essentially Laundering Millions of Dollars of in game currency, PMA Realtors don't take or keep the fees it is collected and dumped into a gov storage that wipes the money from the economy.</p>
+                            <p>You have in turn used this money for all kinds of other things ive spent hours trying to track everything down. there are millions coming in and out.</p>
+                            <p>This is NOT something that is just a *slap on the wrist* you shoulda known better.. There are 10s of Millions of Dollars. and that is just dealing with the properties. I still have to look further into the cars and the weird things which I know their is a history of issues in the past.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Critical: "Walk-in Properties Don't Have Set Minimums"</div>
+                        <p>Go look at Section 04. PMA staff gave me a pricing list that says <strong style="color:#22c55e">Walk-In House, $1,500,000 minimum</strong>. Johnny is saying the opposite right here. So either his own team gave me wrong info, or he doesn't know what they told me. Doesn't matter which one it is. I used the pricing they gave me.</p>
+                    </div>
+
+                    <div class="annotation">
+                        <div class="tag">📌 Note: "Laundering Millions"</div>
+                        <p>He's using the word "laundering" to describe a system where every transaction was on a public website, backed by signed contracts, tracked in text messages, and submitted to staff through tickets by me. Laundering means hiding where money comes from. I did the exact opposite. The documentation was the whole point.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 10, 2026, 8:51 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Hey Johnny,</p>
+                            <p>There's a lot to unpack here so let me go through it because I don't think what's actually happening lines up with what I'm being accused of.</p>
+                            <p>You mentioned that anyone who has asked about rent to own has been told no. When I brought both PaulysProperties.com and PaulysAutos.com to staff for review, Putts reviewed it and specifically said the server couldn't endorse it. It would need to be clear that it was a player run service and not backed or guaranteed by the city, only city cash accepted, messages kept within the city, no discord or email links, and full compliance with Tebex and Rockstar terms. I made every single one of those changes. At no point during any of that was I told that player to player agreements like rent to own were off limits. The server said they couldn't facilitate or endorse it themselves, which I understood, but that's very different from saying players can't do it between each other. Players have been doing this kind of thing for a long time now, collecting rent and eventually selling a property at the government minimum once both parties agree enough has been collected. I didn't invent that. I just formalized it with contracts and documentation so there was a clear paper trail for everyone involved.</p>
+                            <p>I've reviewed the full server rules and there is no mention of rent to own being prohibited in player to player agreements, no rule about how those transactions must be structured, and no rule stating that players can't charge for facilitating them. If there was a policy beyond what came out of those conversations I genuinely did not know about it and would have appreciated being told before being accused of laundering.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 10, 2026, 8:51 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>On that word specifically, laundering implies I'm hiding something. I'm doing the exact opposite. I have a public website documenting every transaction, signed contracts with every buyer and seller, text message records of every payment, and I voluntarily open tickets to facilitate these transfers with documentation upfront. I'm the one bringing all of this to staff's attention. That's not what someone looks like when they're trying to hide money.</p>
+                            <p>You compared what I'm doing to PMA Realtors and said they don't keep fees, that it goes into government storage. I understand that's how the PMA Realtor mechanic works but that's a server mechanic with its own rules. What I'm doing is player to player agreements, the same kind of RP that happens on a daily basis in all sorts of different forms. Players charge each other for all kinds of things whether its houses, cars, guns, services, whatever. A 10% fee for the hours of work I put into each listing, the photos, the descriptions, the advertising, the showings, the negotiations, all the contracts, that's just a player to player agreement like any other.</p>
+                            <p>You pointed to the volume of transactions like that's evidence of something wrong. Volume with full documentation is the opposite of suspicious. Every single one of those transactions is accounted for. There's nothing to uncover because I've already put it all out in the open.</p>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 10, 2026, 8:51 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>To continue showing good faith and full transparency I'm attaching a complete audit of every rent to own agreement facilitated through PaulysProperties.com. This covers deals where I'm the property owner and deals where I acted as the realtor for another player. Every contract, every payment, every commission, all laid out.</p>
+                            <p>I'm happy to provide whatever level of detail is needed to resolve this. I just want it resolved fairly and not be accused or treated like a criminal over something I did openly and in good faith.</p>
+                            <p>Thanks,</p>
+                            <p>Pauly</p>
+                            <div class="msg-attachment">📎 RTO_Contract_Audit_Report.txt</div>
+                            <div class="msg-attachment">📎 rto-audit-2026-02-10.png</div>
+                        </div>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author user">Pauly (giantpiff)</span>
+                            <span class="msg-role user-role">Appellant</span>
+                            <span class="msg-time">Feb 10, 2026, 9:03 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>Same audit report, one in a single PNG one in a text file for easy copy &amp; paste analysis. I even added back taxes for rent collections to help with your calculations.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation key-annotation">
+                        <div class="tag">📋 Note: I Did Staff's Homework for Them</div>
+                        <p>I didn't just give him the audit. I formatted it two ways so it would be easy to work with: a PNG to look at and a text file for copy/paste. I even pre-calculated the back taxes on rent collections to save him time. I was literally doing his job for him to help get this resolved. He never mentioned any of it.</p>
+                    </div>
+
+                    <div class="time-gap">~1 hour later, Johnny's final response</div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Feb 10, 2026, 10:08 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <div class="johnny-quote">"The server said they couldn't facilitate or endorse it themselves, which I understood, but that's very different from saying players can't do it between each other. Players have been doing this kind of thing for a long time now, collecting rent and eventually selling a property at the government minimum once both parties agree enough has been collected. I didn't invent that. I just formalized it with contracts and documentation so there was a clear paper trail for everyone involved."</div>
+                            <p>This is your assumption, I can assure you as the Head of Realtors for the past 2 years and as a Member for Staff for the last 4+ Years we have never permitted Rent to Own. If someone is able to sneak it past that was on them.</p>
+                            <p>However as I stated. this Property you made a ticket for for the walk in for 1.5 Mil would be denied (on paper if it was simply brought to us at this Walk in clearly work much more was being sold at 1.5) and as I stated earlier depending on the situation if the seller did this on their own it was be reviewed to either be resolved or they would also face a ban, but that is just 1 property. You are running this scheme on like 20 properties.</p>
+
+                            <div class="johnny-quote">"I've reviewed the full server rules and there is no mention of rent to own being prohibited in player to player agreements, no rule about how those transactions must be structured, and no rule stating that players can't charge for facilitating them. If there was a policy beyond what came out of those conversations I genuinely did not know about it and would have appreciated being told before being accused of laundering."</div>
+                            <p>Not Every Possible Rule is listed in the official rules, Some are Common Sense and some fall under ( All rules are subject to change at any time. Staff will always have the final say in any situation.) Such as all Player to Player Sales of properties have to go thru Staff, thus Players Can not Circumvent the Tax system to by using a Non Staff Person to be their Realtor.</p>
+                            <p>If you were helping people to sell properties and charging a Flat Fee to list the property, or broker the deal it would be one thing. However Having players make payments outside of the established and official system and collecting what would be the disposed of funds for yourself is Where you went wrong.</p>
+                            <p>I am also aware that it wouldn't technically fall under money laundering as you were not making fake transaction to create an excuse for funds its closer to Tax Evasion and Embezzlement</p>
+
+                            <div class="johnny-quote">"You compared what I'm doing to PMA Realtors and said they don't keep fees, that it goes into government storage. I understand that's how the PMA Realtor mechanic works but that's a server mechanic with its own rules. What I'm doing is player to player agreements, the same kind of RP that happens on a daily basis in all sorts of different forms. Players charge each other for all kinds of things whether its houses, cars, guns, services, whatever. A 10% fee for the hours of work I put into each listing, the photos, the descriptions, the advertising, the showings, the negotiations, all the contracts, that's just a player to player agreement like any other."</div>
+                            <p>You didn't just facilitate deals; you intentionally structured them to underreport the sale price and bypass the 10% money sink. That's not some staff only loophole that's deliberate circumvention. This Directly effects the Server Economy. That is Money that is intended to be deleted from the server to keep the eco in balance, not let you make 10% off of every click you can get for people to rent or buy a house. Also having records of everything doesn't make it compliant or acceptable; it just documents the violations and that fact you Defrauded the city and we are lucky it was caught when it was because it looks like you were on your way to making nearly $10 Mil that should have been deleted. Not recycled back into the Eco from you buying more properties or cars to continue the scheme.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Critical: Three Major Admissions in One Message</div>
+                        <p><strong style="color:#ef4444">Admission #1: "Not Every Possible Rule is listed in the official rules."</strong> Johnny is openly admitting the rule I supposedly broke doesn't exist in the written rules. He's saying it falls under "common sense" and a catch-all clause that staff can change rules whenever they want. You can't punish someone for breaking an unwritten rule that nobody told them about during the approval process.</p>
+                        <p style="margin-top:10px;"><strong style="color:#ef4444">Admission #2: "It wouldn't technically fall under money laundering."</strong> After opening with accusations of "laundering millions" and running "schemes," Johnny now admits it doesn't actually fit the definition. The accusation quietly shifts to "tax evasion and embezzlement" but the ban was already in place before any of this was even discussed.</p>
+                        <p style="margin-top:10px;"><strong style="color:#ef4444">Admission #3: "If someone is able to sneak it past that was on them."</strong> Johnny is admitting right here that other players have done rent-to-own style arrangements and gotten away with it. The difference? They didn't document it. I documented everything and that's what made me a target.</p>
+                    </div>
+
+                    <div class="msg">
+                        <div class="msg-header">
+                            <span class="msg-author staff">Johnny</span>
+                            <span class="msg-role staff-role">PMA Staff</span>
+                            <span class="msg-time">Feb 10, 2026, 10:11 AM</span>
+                        </div>
+                        <div class="msg-content">
+                            <p>So you can claim this Was just "rent-to-own RP or Realtor Role Play" .. but It Not...</p>
+                            <p>It was a structured plan to misreport prices, bypass the tax system, and keep the money for yourself.</p>
+                        </div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Final Word: No Questions Were Ever Asked</div>
+                        <p>This is where the conversation ends. Go through the whole thing and count how many times Johnny asked me to explain the system. Count how many times he asked to see the contracts. Count how many times he acknowledged the audit I gave him or the solutions I offered. Refunds, restructuring, whatever they needed. The answer is zero across the board. The pricing PMA gave me via ticket was never addressed. He had already made up his mind before the first message was sent.</p>
+                    </div>
+
+                    <div class="time-gap">3 days of silence</div>
+
+                    <div class="ticket-closed-banner">
+                        <div class="closed-icon">🔒</div>
+                        <div class="closed-text">Ticket Closed by Johnny, Feb 13, 2026 at 3:31 AM</div>
+                        <div class="closed-subtext">No resolution offered. No follow-up on the audit. No response to the solutions proposed. Just $close.</div>
+                    </div>
+
+                    <div class="annotation critical-annotation">
+                        <div class="tag">🚩 Closed Without Resolution</div>
+                        <p>3 days of silence. Then Johnny closed the ticket at 3:31 AM. No final message. Didn't address the audit. Didn't respond to the refund offer. Didn't offer any path forward. Just $close. That was it.</p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+            <div class="section-title"><span class="number">07</span> A Personal Statement from Pauly</div>
+            <p>I've spent the last 11 years of my career working tickets at a Fortune 500 tech company. That's what I do for a living. Every single day I sit across from people with problems and I find solutions. I listen, I ask questions, I figure out what's going on, and I resolve it. That process is second nature to me. So when I opened this ban appeal ticket, I knew from the very first response that I wasn't dealing with someone who had any interest in understanding what happened. I was dealing with someone who had already decided the outcome before the conversation started.</p>
+            <p>In 11 years of doing this professionally, I have never once had an interaction where the person on the other side opens with accusations, asks zero clarifying questions, ignores every piece of evidence submitted, dismisses every solution offered, and closes the ticket without resolution. Not once. That's not how you handle something when your goal is to understand what happened. That's how you handle it when your only goal is to build a case to remove someone.</p>
+            <p>And that's exactly what this was.</p>
+            <p>Go back and read that transcript one more time. Count the questions Johnny asked me about how the system worked. Count the times he said "can you walk me through this?" or "show me how these contracts are structured." Count how many times he acknowledged the full audit I handed him on a silver platter, formatted two ways to make his job easier, with back taxes pre-calculated. The answer to all of those is zero. He didn't want to understand the system because understanding it would've made it harder to ban me for it.</p>
+            <p>Let me be clear about something. I have a two-year track record on this server with zero bans and thousands of hours invested. Not just playing, but actively building something that made the community better. I built a real estate platform from the ground up, brought it to staff for approval, hit every condition they gave me, followed the pricing they provided, documented every transaction on a public website, and voluntarily submitted everything to staff through tickets. I didn't cut corners. I didn't hide anything. I did the opposite of hiding. I built an entire system around transparency so that everyone involved was protected.</p>
+            <p>And the reward for all of that? Immediate permanent ban, accusations of running a criminal enterprise, and every player who trusted this platform dragged down with me.</p>
+            <p>Here's what should have happened. Someone in leadership should've looked at this and said: "This player built something impressive. He came to us for approval. He followed our conditions. He documented everything. There might be an issue with how rent-to-own interacts with the economy, let's talk to him about it and figure out a path forward." That's what real leadership looks like. That's what you do when someone is clearly acting in good faith with a proven track record.</p>
+            <p>Instead? No questions. No conversation. No attempt to work with the system or the player behind it. Just an immediate ban and a narrative built after the fact to justify it. You don't treat a two-year member with a clean record like a criminal without motive. And you don't close their appeal without resolution after they've handed you a complete audit and offered to do whatever it takes to make it right.</p>
+            <p>Sometimes you just outgrow the space you're in. And instead of the people around you recognizing that and finding ways to work with it, they feel threatened by it. What was support turns into suspicion. What was encouragement turns into resentment. I've seen it in corporate environments and I've seen it here. The moment PaulysProperties.com became something that actually worked, something players relied on, something that formalized what had been happening informally across the server for years, it stopped being an asset and started being a threat to people who needed to control everything.</p>
+            <p>This was never about rent-to-own. This was never about taxes or the economy. This was about control. The server wants all property transactions to flow through their auction system because that's what they control. A player-built platform that gave people an alternative, even an approved and fully documented one, was something they couldn't let exist. So they found a reason to shut it down and ban the person behind it.</p>
+            <p>The irony of a server called "Positive Mental Attitude" treating its most active and transparent community members this way isn't lost on me. We fly in to have fun. We spend real money, real time, and real energy building something we care about. And the moment that creates something bigger than what leadership is comfortable with, you get labeled a villain and everything you built gets used against you.</p>
+            <p>I'm not saying this out of emotion. I'm saying it because I've laid out every fact, every message, every document, and every timeline for you to see with your own eyes. The record is right here. Read it and decide for yourself who was operating in good faith and who wasn't.</p>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+            <div class="section-title"><span class="number">08</span> To Every User Who Trusted This Platform</div>
+            <p>If you're being banned, investigated, or harassed for using PaulysProperties.com, know that you did nothing wrong. You used an approved website that operated transparently with full documentation. You took part in player-to-player roleplay transactions that have been happening across the server for a long time.</p>
+            <p>I documented everything so there would never be a question about where money went or how deals were structured. The irony is that the transparency I built to protect everyone is now being used as a map to target you.</p>
+            <p>You deserve better than that.</p>
+        </div>
+
+        <div class="final-statement">
+            <h3>The Record Speaks for Itself</h3>
+            <p>I asked for approval and got it. I was given pricing and followed it. I documented every transaction and made it all public. I cooperated fully with every staff interaction.</p>
+            <p>And for all of that, my reward was a ban and the accusation that I was running a criminal enterprise in a video game.</p>
+            <p style="color: #e2e8f0;">This page stays up as a permanent record so anyone affected can see the full truth of what happened.</p>
+            <div class="signature">- Pauly Amato</div>
+        </div>
+
     </div>
+</div>
+
 
     <!-- Celebration Banner Container (site-wide notifications for achievements) -->
     <div id="celebrationBannerContainer" class="hidden fixed top-0 left-0 right-0 z-50">

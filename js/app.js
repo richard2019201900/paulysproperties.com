@@ -54,95 +54,16 @@
 (function() {
     'use strict';
     
-    // Check if disclaimer was already accepted (localStorage for guests)
-    window.checkDisclaimerAccepted = function() {
-        return localStorage.getItem('paulysproperties_disclaimer_accepted') === 'true';
-    };
-    
-    // Show disclaimer modal
-    window.showDisclaimerModal = function() {
-        const modal = document.getElementById('disclaimerModal');
-        if (modal) {
-            modal.classList.remove('hidden');
-        }
-    };
-    
-    // Hide disclaimer modal
-    window.hideDisclaimerModal = function() {
-        const modal = document.getElementById('disclaimerModal');
-        if (modal) {
-            modal.classList.add('hidden');
-        }
-    };
-    
-    // Accept disclaimer
-    window.acceptDisclaimer = async function() {
-        // Always save to localStorage (for guests and as backup)
-        localStorage.setItem('paulysproperties_disclaimer_accepted', 'true');
-        
-        // If user is logged in, also save to Firestore
-        if (typeof auth !== 'undefined' && auth.currentUser) {
-            try {
-                await db.collection('users').doc(auth.currentUser.uid).set({
-                    disclaimerAccepted: true,
-                    disclaimerAcceptedAt: new Date().toISOString()
-                }, { merge: true });
-            } catch (e) {
-                // Silent fail - localStorage is the backup
-            }
-        }
-        
-        hideDisclaimerModal();
-    };
-    
-    // Check disclaimer on page load (before Firebase is ready)
-    window.initDisclaimerCheck = function() {
-        if (checkDisclaimerAccepted()) {
-            hideDisclaimerModal();
-            return;
-        }
-        showDisclaimerModal();
-    };
-    
-    // Check disclaimer for logged-in users (called after auth state change)
-    window.checkDisclaimerForUser = async function(user) {
-        if (!user) {
-            if (!checkDisclaimerAccepted()) {
-                showDisclaimerModal();
-            }
-            return;
-        }
-        
-        // User is logged in - check Firestore first
-        try {
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            if (userDoc.exists && userDoc.data().disclaimerAccepted === true) {
-                localStorage.setItem('paulysproperties_disclaimer_accepted', 'true');
-                hideDisclaimerModal();
-                return;
-            }
-        } catch (e) {
-            // Silent fail - check localStorage
-        }
-        
-        // Check localStorage as fallback
-        if (checkDisclaimerAccepted()) {
-            // Sync to Firestore
-            try {
-                await db.collection('users').doc(user.uid).set({
-                    disclaimerAccepted: true,
-                    disclaimerAcceptedAt: new Date().toISOString()
-                }, { merge: true });
-            } catch (e) {
-                // Silent fail
-            }
-            hideDisclaimerModal();
-            return;
-        }
-        
-        // Not accepted anywhere - show modal
-        showDisclaimerModal();
-    };
+    // ============================================
+    // DISCLAIMER FUNCTIONS DISABLED - SITE SHUTDOWN
+    // Shutdown overlay replaces all disclaimer functionality
+    // ============================================
+    window.checkDisclaimerAccepted = function() { return true; };
+    window.showDisclaimerModal = function() {};
+    window.hideDisclaimerModal = function() {};
+    window.acceptDisclaimer = async function() {};
+    window.initDisclaimerCheck = function() {};
+    window.checkDisclaimerForUser = async function() {};
     
     // Run initial check when DOM is ready
     if (document.readyState === 'loading') {
