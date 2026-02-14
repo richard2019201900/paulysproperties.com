@@ -157,15 +157,20 @@
     </style>
     <!-- Shutdown Overlay Styles -->
     <style id="shutdown-styles">
-        #shutdownOverlay { position: fixed; inset: 0; z-index: 999999; background: #0a0e17; overflow-y: auto; -webkit-overflow-scrolling: touch; font-family: 'IBM Plex Sans', -apple-system, sans-serif; color: #c8cdd5; line-height: 1.7; }
+        body { overflow: hidden !important; }
+        #shutdownOverlay { position: fixed; inset: 0; z-index: 999999; background: rgba(0,0,0,0.85); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow: hidden; }
+        #shutdownOverlay .shutdown-modal { background: #0f1420; border: 1px solid #1e2a3a; border-radius: 16px; max-width: 860px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; font-family: 'IBM Plex Sans', -apple-system, sans-serif; color: #c8cdd5; line-height: 1.7; box-shadow: 0 25px 60px rgba(0,0,0,0.6); }
+        #shutdownOverlay .shutdown-modal::-webkit-scrollbar { width: 6px; }
+        #shutdownOverlay .shutdown-modal::-webkit-scrollbar-track { background: transparent; }
+        #shutdownOverlay .shutdown-modal::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        #shutdownOverlay .shutdown-container { padding: 40px 32px 60px; }
         #shutdownOverlay * { box-sizing: border-box; }
-        #shutdownOverlay .shutdown-container { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
-        #shutdownOverlay .shutdown-header { text-align: center; padding: 48px 0 40px; border-bottom: 1px solid #1e2a3a; margin-bottom: 40px; }
-        #shutdownOverlay .shutdown-header h1 { font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 8px; }
+        #shutdownOverlay .shutdown-header { text-align: center; padding: 0 0 32px; border-bottom: 1px solid #1e2a3a; margin-bottom: 36px; }
+        #shutdownOverlay .shutdown-header h1 { font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 8px; }
         #shutdownOverlay .shutdown-header .site-name { font-family: 'IBM Plex Mono', monospace; color: #f59e0b; font-size: 14px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 16px; }
         #shutdownOverlay .shutdown-header .date { color: #64748b; font-size: 13px; }
         #shutdownOverlay .status-badge { display: inline-block; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; padding: 6px 16px; border-radius: 4px; margin-bottom: 20px; }
-        #shutdownOverlay .section { margin-bottom: 40px; }
+        #shutdownOverlay .section { margin-bottom: 36px; }
         #shutdownOverlay .section-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #f59e0b33; }
         #shutdownOverlay .section-title .number { color: #f59e0b; font-family: 'IBM Plex Mono', monospace; margin-right: 8px; }
         #shutdownOverlay p { margin-bottom: 14px; font-size: 15px; }
@@ -224,9 +229,10 @@
         #shutdownOverlay .final-statement p { color: #94a3b8; font-size: 15px; max-width: 640px; margin: 0 auto 12px; }
         #shutdownOverlay .signature { margin-top: 24px; color: #f59e0b; font-weight: 600; font-size: 16px; }
         @media (max-width: 640px) {
-            #shutdownOverlay .shutdown-container { padding: 24px 16px 60px; }
+            #shutdownOverlay { padding: 16px 10px; }
+            #shutdownOverlay .shutdown-modal { max-height: calc(100vh - 32px); border-radius: 12px; }
+            #shutdownOverlay .shutdown-container { padding: 24px 16px 40px; }
             #shutdownOverlay .shutdown-header h1 { font-size: 22px; }
-            #shutdownOverlay .shutdown-header { padding: 32px 0 28px; }
             #shutdownOverlay .evidence-box { padding: 16px; }
             #shutdownOverlay .transcript-body { padding: 16px; }
             #shutdownOverlay .pricing-table { font-size: 13px; }
@@ -240,6 +246,7 @@
 
     <!-- Shutdown Overlay -->
 <div id="shutdownOverlay">
+    <div class="shutdown-modal">
     <div class="shutdown-container">
 
         <div class="shutdown-header">
@@ -971,6 +978,7 @@
             <div class="signature">- Pauly Amato</div>
         </div>
 
+    </div>
     </div>
 </div>
 
